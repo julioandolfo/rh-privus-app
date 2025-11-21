@@ -1,0 +1,245 @@
+<?php
+/**
+ * Sistema de Templates de Email
+ */
+
+require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/email.php';
+
+/**
+ * Substitui variáveis no template
+ */
+function substituir_variaveis($texto, $variaveis) {
+    foreach ($variaveis as $chave => $valor) {
+        $texto = str_replace('{' . $chave . '}', $valor ?? '', $texto);
+    }
+    return $texto;
+}
+
+/**
+ * Busca template por código
+ */
+function buscar_template_email($codigo) {
+    $pdo = getDB();
+    $stmt = $pdo->prepare("SELECT * FROM email_templates WHERE codigo = ? AND ativo = 1");
+    $stmt->execute([$codigo]);
+    return $stmt->fetch();
+}
+
+/**
+ * Envia email usando template
+ */
+function enviar_email_template($codigo_template, $email_destinatario, $variaveis = [], $opcoes = []) {
+    $template = buscar_template_email($codigo_template);
+    
+    if (!$template) {
+        return [
+            'success' => false,
+            'message' => 'Template de email não encontrado ou inativo.'
+        ];
+    }
+    
+    // Substitui variáveis no assunto e corpo
+    $assunto = substituir_variaveis($template['assunto'], $variaveis);
+    $corpo_html = substituir_variaveis($template['corpo_html'], $variaveis);
+    $corpo_texto = $template['corpo_texto'] ? substituir_variaveis($template['corpo_texto'], $variaveis) : null;
+    
+    // Prepara opções
+    $opcoes_email = array_merge([
+        'nome_destinatario' => $variaveis['nome_completo'] ?? '',
+        'texto_alternativo' => $corpo_texto
+    ], $opcoes);
+    
+    return enviar_email($email_destinatario, $assunto, $corpo_html, $opcoes_email);
+}
+
+/**
+ * Envia email de boas-vindas para novo colaborador
+ */
+function enviar_email_novo_colaborador($colaborador_id) {
+    $pdo = getDB();
+    
+    // Busca dados do colaborador
+    $stmt = $pdo->prepare("
+        SELECT c.*, 
+               e.nome_fantasia as empresa_nome,
+               s.nome_setor,
+               car.nome_cargo
+        FROM colaboradores c
+        LEFT JOIN empresas e ON c.empresa_id = e.id
+        LEFT JOIN setores s ON c.setor_id = s.id
+        LEFT JOIN cargos car ON c.cargo_id = car.id
+        WHERE c.id = ?
+    ");
+    $stmt->execute([$colaborador_id]);
+    $colab = $stmt->fetch();
+    
+    if (!$colab || empty($colab['email_pessoal'])) {
+        return ['success' => false, 'message' => 'Colaborador não encontrado ou sem email cadastrado.'];
+    }
+    
+    // Prepara variáveis
+    $variaveis = [
+        'nome_completo' => $colab['nome_completo'],
+        'empresa_nome' => $colab['empresa_nome'] ?? '',
+        'cargo_nome' => $colab['nome_cargo'] ?? '',
+        'setor_nome' => $colab['nome_setor'] ?? '',
+        'data_inicio' => formatar_data($colab['data_inicio']),
+        'tipo_contrato' => $colab['tipo_contrato'],
+        'cpf' => formatar_cpf($colab['cpf'] ?? ''),
+        'email_pessoal' => $colab['email_pessoal'],
+        'telefone' => $colab['telefone'] ?? ''
+    ];
+    
+    return enviar_email_template('novo_colaborador', $colab['email_pessoal'], $variaveis);
+}
+
+/**
+ * Envia email de nova promoção
+ */
+function enviar_email_nova_promocao($promocao_id) {
+    $pdo = getDB();
+    
+    // Busca dados da promoção
+    $stmt = $pdo->prepare("
+        SELECT p.*, 
+               c.nome_completo, c.email_pessoal,
+               e.nome_fantasia as empresa_nome,
+               u.nome as usuario_nome
+        FROM promocoes p
+        INNER JOIN colaboradores c ON p.colaborador_id = c.id
+        LEFT JOIN empresas e ON c.empresa_id = e.id
+        LEFT JOIN usuarios u ON p.usuario_id = u.id
+        WHERE p.id = ?
+    ");
+    $stmt->execute([$promocao_id]);
+    $promocao = $stmt->fetch();
+    
+    if (!$promocao || empty($promocao['email_pessoal'])) {
+        return ['success' => false, 'message' => 'Promoção não encontrada ou colaborador sem email.'];
+    }
+    
+    // Prepara variáveis
+    $variaveis = [
+        'nome_completo' => $promocao['nome_completo'],
+        'data_promocao' => formatar_data($promocao['data_promocao']),
+        'salario_anterior' => number_format($promocao['salario_anterior'], 2, ',', '.'),
+        'salario_novo' => number_format($promocao['salario_novo'], 2, ',', '.'),
+        'motivo' => $promocao['motivo'],
+        'observacoes' => $promocao['observacoes'] ? '<p><strong>Observações:</strong> ' . nl2br(htmlspecialchars($promocao['observacoes'])) . '</p>' : '',
+        'empresa_nome' => $promocao['empresa_nome'] ?? ''
+    ];
+    
+    return enviar_email_template('nova_promocao', $promocao['email_pessoal'], $variaveis);
+}
+
+/**
+ * Envia email de fechamento de pagamento
+ */
+function enviar_email_fechamento_pagamento($fechamento_id, $colaborador_id) {
+    $pdo = getDB();
+    
+    // Busca dados do fechamento e colaborador
+    $stmt = $pdo->prepare("
+        SELECT f.*, 
+               c.nome_completo, c.email_pessoal,
+               e.nome_fantasia as empresa_nome,
+               i.salario_base, i.horas_extras, i.valor_horas_extras, 
+               i.descontos, i.adicionais, i.valor_total, i.observacoes
+        FROM fechamentos_pagamento f
+        INNER JOIN fechamentos_pagamento_itens i ON f.id = i.fechamento_id
+        INNER JOIN colaboradores c ON i.colaborador_id = c.id
+        LEFT JOIN empresas e ON f.empresa_id = e.id
+        WHERE f.id = ? AND c.id = ?
+    ");
+    $stmt->execute([$fechamento_id, $colaborador_id]);
+    $dados = $stmt->fetch();
+    
+    if (!$dados || empty($dados['email_pessoal'])) {
+        return ['success' => false, 'message' => 'Dados não encontrados ou colaborador sem email.'];
+    }
+    
+    // Formata mês de referência
+    $mes_ref = explode('-', $dados['mes_referencia']);
+    $mes_formatado = date('m/Y', strtotime($mes_ref[0] . '-' . $mes_ref[1] . '-01'));
+    
+    // Prepara variáveis
+    $variaveis = [
+        'nome_completo' => $dados['nome_completo'],
+        'mes_referencia' => $mes_formatado,
+        'salario_base' => number_format($dados['salario_base'], 2, ',', '.'),
+        'horas_extras' => number_format($dados['horas_extras'], 2, ',', '.'),
+        'valor_horas_extras' => number_format($dados['valor_horas_extras'], 2, ',', '.'),
+        'descontos' => number_format($dados['descontos'], 2, ',', '.'),
+        'adicionais' => number_format($dados['adicionais'], 2, ',', '.'),
+        'valor_total' => number_format($dados['valor_total'], 2, ',', '.'),
+        'data_fechamento' => formatar_data($dados['data_fechamento']),
+        'observacoes' => $dados['observacoes'] ? '<p><strong>Observações:</strong> ' . nl2br(htmlspecialchars($dados['observacoes'])) . '</p>' : '',
+        'empresa_nome' => $dados['empresa_nome'] ?? ''
+    ];
+    
+    return enviar_email_template('fechamento_pagamento', $dados['email_pessoal'], $variaveis);
+}
+
+/**
+ * Envia email de ocorrência
+ */
+function enviar_email_ocorrencia($ocorrencia_id) {
+    $pdo = getDB();
+    
+    // Busca dados da ocorrência
+    $stmt = $pdo->prepare("
+        SELECT o.*, 
+               c.nome_completo, c.email_pessoal,
+               e.nome_fantasia as empresa_nome,
+               s.nome_setor,
+               car.nome_cargo,
+               u.nome as usuario_nome,
+               t.nome as tipo_ocorrencia_nome
+        FROM ocorrencias o
+        INNER JOIN colaboradores c ON o.colaborador_id = c.id
+        LEFT JOIN empresas e ON c.empresa_id = e.id
+        LEFT JOIN setores s ON c.setor_id = s.id
+        LEFT JOIN cargos car ON c.cargo_id = car.id
+        LEFT JOIN usuarios u ON o.usuario_id = u.id
+        LEFT JOIN tipos_ocorrencias t ON o.tipo_ocorrencia_id = t.id
+        WHERE o.id = ?
+    ");
+    $stmt->execute([$ocorrencia_id]);
+    $ocorrencia = $stmt->fetch();
+    
+    if (!$ocorrencia || empty($ocorrencia['email_pessoal'])) {
+        return ['success' => false, 'message' => 'Ocorrência não encontrada ou colaborador sem email.'];
+    }
+    
+    // Prepara variáveis HTML condicionais
+    $hora_ocorrencia_html = '';
+    $tempo_atraso_html = '';
+    
+    if (!empty($ocorrencia['hora_ocorrencia'])) {
+        $hora_ocorrencia_html = '<li><strong>Hora:</strong> ' . substr($ocorrencia['hora_ocorrencia'], 0, 5) . '</li>';
+    }
+    
+    if (!empty($ocorrencia['tempo_atraso_minutos'])) {
+        $horas = floor($ocorrencia['tempo_atraso_minutos'] / 60);
+        $minutos = $ocorrencia['tempo_atraso_minutos'] % 60;
+        $tempo_atraso_html = '<li><strong>Tempo de Atraso:</strong> ' . ($horas > 0 ? $horas . 'h ' : '') . $minutos . 'min</li>';
+    }
+    
+    $variaveis = [
+        'nome_completo' => $ocorrencia['nome_completo'] ?? '',
+        'tipo_ocorrencia' => $ocorrencia['tipo_ocorrencia_nome'] ?? $ocorrencia['tipo'] ?? '',
+        'data_ocorrencia' => formatar_data($ocorrencia['data_ocorrencia'] ?? ''),
+        'hora_ocorrencia' => $hora_ocorrencia_html,
+        'tempo_atraso' => $tempo_atraso_html,
+        'descricao' => !empty($ocorrencia['descricao']) ? nl2br(htmlspecialchars($ocorrencia['descricao'])) : '',
+        'usuario_registro' => $ocorrencia['usuario_nome'] ?? '',
+        'data_registro' => formatar_data($ocorrencia['created_at'] ?? '', 'd/m/Y H:i'),
+        'empresa_nome' => $ocorrencia['empresa_nome'] ?? '',
+        'setor_nome' => $ocorrencia['nome_setor'] ?? '',
+        'cargo_nome' => $ocorrencia['nome_cargo'] ?? ''
+    ];
+    
+    return enviar_email_template('ocorrencia', $ocorrencia['email_pessoal'], $variaveis);
+}
+

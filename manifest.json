@@ -1,0 +1,62 @@
+{
+  "name": "RH Privus",
+  "short_name": "RH Privus",
+  "description": "Sistema de Gestão de Recursos Humanos",
+  "start_url": "/rh/",
+  "scope": "/rh/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#009ef7",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/rh/assets/media/logos/favicon.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/rh/assets/media/logos/favicon.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/rh/assets/media/logos/favicon.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/rh/assets/media/logos/favicon.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/rh/assets/media/logos/favicon.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/rh/assets/media/logos/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/rh/assets/media/logos/favicon.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/rh/assets/media/logos/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
