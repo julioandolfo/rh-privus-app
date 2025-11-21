@@ -3,7 +3,19 @@
  * API para enviar notificações push via OneSignal
  */
 
-require_once __DIR__ . '/../../includes/functions.php';
+// Tratamento de erros para debug
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+try {
+    require_once __DIR__ . '/../../includes/functions.php';
+} catch (Throwable $e) {
+    error_log("Erro ao carregar functions.php: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Erro ao carregar dependências: ' . $e->getMessage()]);
+    exit;
+}
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -16,13 +28,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Valida autenticação (apenas ADMIN ou RH pode enviar)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-if (!isset($_SESSION['usuario']) || !in_array($_SESSION['usuario']['role'], ['ADMIN', 'RH'])) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Sem permissão']);
+try {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Tenta passar sessão via cookie se não estiver disponível
+    if (!isset($_SESSION['usuario']) && isset($_COOKIE[session_name()])) {
+        session_start();
+    }
+    
+    if (!isset($_SESSION['usuario']) || !in_array($_SESSION['usuario']['role'], ['ADMIN', 'RH'])) {
+        error_log("Acesso negado - Sessão: " . (isset($_SESSION['usuario']) ? 'existe' : 'não existe'));
+        error_log("Role: " . ($_SESSION['usuario']['role'] ?? 'não definido'));
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Sem permissão']);
+        exit;
+    }
+} catch (Throwable $e) {
+    error_log("Erro na validação de sessão: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Erro na validação: ' . $e->getMessage()]);
     exit;
 }
 
@@ -55,14 +81,27 @@ if (!$usuario_id && !$colaborador_id && !isset($input['broadcast'])) {
 }
 
 try {
+    if (!function_exists('getDB')) {
+        throw new Exception('Função getDB não encontrada');
+    }
+    
     $pdo = getDB();
     
-    // Busca configurações do OneSignal
-    $stmt = $pdo->query("SELECT app_id, rest_api_key FROM onesignal_config ORDER BY id DESC LIMIT 1");
-    $config = $stmt->fetch();
+    if (!$pdo) {
+        throw new Exception('Não foi possível conectar ao banco de dados');
+    }
     
-    if (!$config) {
-        throw new Exception('OneSignal não configurado');
+    // Busca configurações do OneSignal
+    try {
+        $stmt = $pdo->query("SELECT app_id, rest_api_key FROM onesignal_config ORDER BY id DESC LIMIT 1");
+        $config = $stmt->fetch();
+    } catch (PDOException $e) {
+        error_log("Erro ao buscar configuração OneSignal: " . $e->getMessage());
+        throw new Exception('Erro ao buscar configuração do OneSignal: ' . $e->getMessage());
+    }
+    
+    if (!$config || empty($config['app_id']) || empty($config['rest_api_key'])) {
+        throw new Exception('OneSignal não configurado corretamente');
     }
     
     // Busca player_ids baseado no critério
@@ -167,8 +206,17 @@ try {
         throw new Exception($errorMessage . ' (HTTP ' . $httpCode . ')');
     }
     
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    error_log("Erro em send.php: " . $e->getMessage());
+    error_log("Arquivo: " . $e->getFile() . ":" . $e->getLine());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    echo json_encode([
+        'success' => false, 
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ]);
 }
 

@@ -164,14 +164,25 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null) {
         ]);
         
         // Passa cookie de sessão se disponível
-        if (session_status() === PHP_SESSION_ACTIVE && isset($_COOKIE[session_name()])) {
-            curl_setopt($ch, CURLOPT_COOKIE, session_name() . '=' . $_COOKIE[session_name()]);
+        $cookieString = '';
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            if (isset($_COOKIE[session_name()])) {
+                $cookieString = session_name() . '=' . $_COOKIE[session_name()];
+            }
+            if (!empty($cookieString)) {
+                curl_setopt($ch, CURLOPT_COOKIE, $cookieString);
+                error_log("enviar_push_usuario - Cookie passado: " . session_name());
+            } else {
+                error_log("enviar_push_usuario - AVISO: Cookie de sessão não encontrado");
+            }
         }
         
         // Para requisições internas, também passa variáveis de sessão via header
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Timeout de conexão de 10 segundos
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

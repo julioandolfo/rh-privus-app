@@ -35,25 +35,47 @@ try {
 
 // Processa envio de notificação
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_notificacao'])) {
+    // Configura tratamento de erros para capturar erros fatais
+    set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        error_log("ERRO FATAL PHP: [{$errno}] {$errstr} em {$errfile}:{$errline}");
+        return false; // Continua execução normal
+    });
+    
+    register_shutdown_function(function() {
+        $error = error_get_last();
+        if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+            error_log("SHUTDOWN ERROR: " . print_r($error, true));
+        }
+    });
+    
     error_log('=== INÍCIO PROCESSAMENTO NOTIFICAÇÃO ===');
     error_log('POST data: ' . print_r($_POST, true));
     
-    $usuario_id = !empty($_POST['usuario_id']) ? intval($_POST['usuario_id']) : null;
-    $colaborador_id = !empty($_POST['colaborador_id']) ? intval($_POST['colaborador_id']) : null;
-    $titulo = trim($_POST['titulo'] ?? '');
-    $mensagem = trim($_POST['mensagem'] ?? '');
-    $url = trim($_POST['url'] ?? '');
-    
-    error_log("Valores processados - usuario_id: {$usuario_id}, colaborador_id: {$colaborador_id}, titulo: {$titulo}, mensagem: " . substr($mensagem, 0, 50));
-    
-    if (empty($titulo) || empty($mensagem)) {
-        $error = 'Título e mensagem são obrigatórios!';
-        error_log('ERRO: Título ou mensagem vazios');
-    } elseif (!$usuario_id && !$colaborador_id) {
-        $error = 'Selecione um destinatário!';
-        error_log('ERRO: Nenhum destinatário selecionado');
-    } else {
-        try {
+    try {
+        // Verifica se as funções necessárias existem
+        if (!function_exists('enviar_push_usuario')) {
+            throw new Exception('Função enviar_push_usuario não encontrada. Verifique se includes/push_notifications.php está sendo carregado.');
+        }
+        
+        if (!function_exists('enviar_push_colaborador')) {
+            throw new Exception('Função enviar_push_colaborador não encontrada. Verifique se includes/push_notifications.php está sendo carregado.');
+        }
+        
+        $usuario_id = !empty($_POST['usuario_id']) ? intval($_POST['usuario_id']) : null;
+        $colaborador_id = !empty($_POST['colaborador_id']) ? intval($_POST['colaborador_id']) : null;
+        $titulo = trim($_POST['titulo'] ?? '');
+        $mensagem = trim($_POST['mensagem'] ?? '');
+        $url = trim($_POST['url'] ?? '');
+        
+        error_log("Valores processados - usuario_id: {$usuario_id}, colaborador_id: {$colaborador_id}, titulo: {$titulo}, mensagem: " . substr($mensagem, 0, 50));
+        
+        if (empty($titulo) || empty($mensagem)) {
+            $error = 'Título e mensagem são obrigatórios!';
+            error_log('ERRO: Título ou mensagem vazios');
+        } elseif (!$usuario_id && !$colaborador_id) {
+            $error = 'Selecione um destinatário!';
+            error_log('ERRO: Nenhum destinatário selecionado');
+        } else {
             error_log('Iniciando envio de notificação...');
             
             if ($colaborador_id) {
@@ -66,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_notificacao'])
             
             error_log('Resultado do envio: ' . print_r($resultado, true));
             
-            if ($resultado['success']) {
+            if (isset($resultado['success']) && $resultado['success']) {
                 $success = "Notificação enviada com sucesso para {$resultado['enviadas']} dispositivo(s)!";
                 error_log("SUCESSO: {$success}");
                 // Recarrega a página após 1 segundo para atualizar a lista
@@ -76,11 +98,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_notificacao'])
                 $error = $resultado['message'] ?? 'Erro desconhecido ao enviar notificação';
                 error_log("ERRO no resultado: {$error}");
             }
-        } catch (Exception $e) {
-            $error = 'Erro ao enviar notificação: ' . $e->getMessage();
-            error_log('EXCEÇÃO ao enviar push notification: ' . $e->getMessage());
-            error_log('Stack trace: ' . $e->getTraceAsString());
         }
+    } catch (Throwable $e) {
+        $error = 'Erro ao enviar notificação: ' . $e->getMessage();
+        error_log('EXCEÇÃO ao enviar push notification: ' . $e->getMessage());
+        error_log('Arquivo: ' . $e->getFile() . ':' . $e->getLine());
+        error_log('Stack trace: ' . $e->getTraceAsString());
+        
+        // Se for um erro fatal, mostra mais detalhes
+        if ($e instanceof Error) {
+            error_log('ERRO FATAL: ' . get_class($e));
+        }
+    } finally {
+        restore_error_handler();
     }
     
     error_log('=== FIM PROCESSAMENTO NOTIFICAÇÃO ===');
