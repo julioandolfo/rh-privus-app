@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RH Privus</string>
+    <string name="title_activity_main">RH Privus</string>
+    <string name="package_name">br.com.privus.rh</string>
+    <string name="custom_url_scheme">br.com.privus.rh</string>
+</resources>

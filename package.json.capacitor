@@ -1,0 +1,25 @@
+{
+  "name": "rh-privus-capacitor",
+  "version": "1.0.0",
+  "description": "RH Privus - App Mobile com Capacitor",
+  "scripts": {
+    "cap:sync": "npx cap sync",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios",
+    "cap:build:android": "npx cap sync android && npx cap open android",
+    "cap:build:ios": "npx cap sync ios && npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^5.5.0",
+    "@capacitor/app": "^5.0.6",
+    "@capacitor/haptics": "^5.0.6",
+    "@capacitor/keyboard": "^5.0.6",
+    "@capacitor/status-bar": "^5.0.6",
+    "@capacitor/splash-screen": "^5.0.6"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^5.5.0",
+    "@capacitor/assets": "^2.0.4"
+  }
+}
+

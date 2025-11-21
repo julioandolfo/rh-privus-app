@@ -1,0 +1,28 @@
+{
+  "name": "rh-privus",
+  "version": "1.0.0",
+  "description": "RH Privus - Sistema de Gestão de Recursos Humanos",
+  "scripts": {
+    "cap:sync": "npx cap sync",
+    "cap:sync:android": "npx cap sync android",
+    "cap:sync:ios": "npx cap sync ios",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios",
+    "cap:build:android": "npx cap sync android && npx cap open android",
+    "cap:build:ios": "npx cap sync ios && npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "^5.0.6",
+    "@capacitor/core": "^5.5.0",
+    "@capacitor/haptics": "^5.0.6",
+    "@capacitor/keyboard": "^5.0.6",
+    "@capacitor/splash-screen": "^5.0.6",
+    "@capacitor/status-bar": "^5.0.6"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^5.5.0",
+    "@capacitor/assets": "^2.0.4",
+    "@capacitor/cli": "^5.5.0",
+    "@capacitor/ios": "^5.7.8"
+  }
+}

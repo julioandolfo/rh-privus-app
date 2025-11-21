@@ -1,0 +1,44 @@
+{
+  "appId": "br.com.privus.rh",
+  "appName": "RH Privus",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://privus.com.br/rh",
+    "cleartext": false,
+    "allowNavigation": [
+      "https://privus.com.br",
+      "https://onesignal.com",
+      "https://cdn.onesignal.com"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#009ef7",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "light",
+      "backgroundColor": "#009ef7"
+    },
+    "App": {
+      "launchUrl": "https://privus.com.br/rh/"
+    }
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "scrollEnabled": true,
+    "allowsLinkPreview": false
+  }
+}
