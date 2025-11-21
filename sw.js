@@ -1,6 +1,6 @@
 // Service Worker - RH Privus PWA
 // OneSignal SDK será carregado automaticamente via OneSignalSDKWorker.js
-const CACHE_NAME = 'rh-privus-v2'; // Atualizado para forçar atualização
+const CACHE_NAME = 'rh-privus-v3'; // Atualizado para corrigir redirects em login/logout
 
 // Detecta BASE_PATH automaticamente
 // Funciona tanto em /rh-privus/ (localhost) quanto /rh/ (produção)
@@ -19,8 +19,7 @@ try {
 }
 
 const urlsToCache = [
-  BASE_PATH + '/',
-  BASE_PATH + '/login.php',
+  // Não inclui login.php, logout.php ou index.php pois podem ter redirects dinâmicos
   BASE_PATH + '/pages/dashboard.php',
   BASE_PATH + '/assets/css/style.bundle.css',
   BASE_PATH + '/assets/js/scripts.bundle.js',
@@ -82,10 +81,14 @@ self.addEventListener('fetch', (event) => {
     return fetch(request, { redirect: 'follow' });
   }
   
-  // Ignora requisições que podem resultar em redirects (index.php, etc)
+  // Ignora requisições que podem resultar em redirects (index.php, login.php, logout.php, etc)
   // Essas não devem ser cacheadas pelo Service Worker
   if (url.pathname === BASE_PATH + '/' || 
       url.pathname === BASE_PATH + '/index.php' ||
+      url.pathname === BASE_PATH + '/login.php' ||
+      url.pathname === BASE_PATH + '/logout.php' ||
+      url.pathname.endsWith('/login.php') ||
+      url.pathname.endsWith('/logout.php') ||
       url.pathname.endsWith('/')) {
     // Deixa o browser lidar normalmente com redirects
     return fetch(request, { redirect: 'follow' });
@@ -128,6 +131,7 @@ self.addEventListener('fetch', (event) => {
           if (responseUrl.pathname.endsWith('.php') && 
               (responseUrl.pathname.includes('index') || 
                responseUrl.pathname.includes('login') ||
+               responseUrl.pathname.includes('logout') ||
                responseUrl.pathname.includes('dashboard'))) {
             return response; // Retorna sem fazer cache
           }
