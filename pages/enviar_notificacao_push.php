@@ -7,6 +7,23 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/push_notifications.php';
 
+if (!function_exists('log_push_debug')) {
+    function log_push_debug($message)
+    {
+        $timestamp = date('Y-m-d H:i:s');
+        $formatted = "[{$timestamp}] {$message}";
+        error_log($formatted);
+        
+        $logDir = __DIR__ . '/../storage/logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0775, true);
+        }
+        
+        $logFile = $logDir . '/enviar_notificacao_push.log';
+        file_put_contents($logFile, $formatted . PHP_EOL, FILE_APPEND);
+    }
+}
+
 // Inicia sessão se não estiver iniciada
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -37,19 +54,19 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_notificacao'])) {
     // Configura tratamento de erros para capturar erros fatais
     set_error_handler(function($errno, $errstr, $errfile, $errline) {
-        error_log("ERRO FATAL PHP: [{$errno}] {$errstr} em {$errfile}:{$errline}");
+        log_push_debug("ERRO FATAL PHP: [{$errno}] {$errstr} em {$errfile}:{$errline}");
         return false; // Continua execução normal
     });
     
     register_shutdown_function(function() {
         $error = error_get_last();
         if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-            error_log("SHUTDOWN ERROR: " . print_r($error, true));
+            log_push_debug("SHUTDOWN ERROR: " . print_r($error, true));
         }
     });
     
-    error_log('=== INÍCIO PROCESSAMENTO NOTIFICAÇÃO ===');
-    error_log('POST data: ' . print_r($_POST, true));
+    log_push_debug('=== INÍCIO PROCESSAMENTO NOTIFICAÇÃO ===');
+    log_push_debug('POST data: ' . print_r($_POST, true));
     
     try {
         // Verifica se as funções necessárias existem
@@ -67,53 +84,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_notificacao'])
         $mensagem = trim($_POST['mensagem'] ?? '');
         $url = trim($_POST['url'] ?? '');
         
-        error_log("Valores processados - usuario_id: {$usuario_id}, colaborador_id: {$colaborador_id}, titulo: {$titulo}, mensagem: " . substr($mensagem, 0, 50));
+        log_push_debug("Valores processados - usuario_id: {$usuario_id}, colaborador_id: {$colaborador_id}, titulo: {$titulo}, mensagem: " . substr($mensagem, 0, 50));
         
         if (empty($titulo) || empty($mensagem)) {
             $error = 'Título e mensagem são obrigatórios!';
-            error_log('ERRO: Título ou mensagem vazios');
+            log_push_debug('ERRO: Título ou mensagem vazios');
         } elseif (!$usuario_id && !$colaborador_id) {
             $error = 'Selecione um destinatário!';
-            error_log('ERRO: Nenhum destinatário selecionado');
+            log_push_debug('ERRO: Nenhum destinatário selecionado');
         } else {
-            error_log('Iniciando envio de notificação...');
+            log_push_debug('Iniciando envio de notificação...');
             
             if ($colaborador_id) {
-                error_log("Enviando para colaborador_id: {$colaborador_id}");
+                log_push_debug("Enviando para colaborador_id: {$colaborador_id}");
                 $resultado = enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url ?: null);
             } else {
-                error_log("Enviando para usuario_id: {$usuario_id}");
+                log_push_debug("Enviando para usuario_id: {$usuario_id}");
                 $resultado = enviar_push_usuario($usuario_id, $titulo, $mensagem, $url ?: null);
             }
             
-            error_log('Resultado do envio: ' . print_r($resultado, true));
+            log_push_debug('Resultado do envio: ' . print_r($resultado, true));
             
             if (isset($resultado['success']) && $resultado['success']) {
                 $success = "Notificação enviada com sucesso para {$resultado['enviadas']} dispositivo(s)!";
-                error_log("SUCESSO: {$success}");
+                log_push_debug("SUCESSO: {$success}");
                 // Recarrega a página após 1 segundo para atualizar a lista
                 header('Location: ' . $_SERVER['PHP_SELF'] . '?success=' . urlencode($success));
                 exit;
             } else {
                 $error = $resultado['message'] ?? 'Erro desconhecido ao enviar notificação';
-                error_log("ERRO no resultado: {$error}");
+                log_push_debug("ERRO no resultado: {$error}");
             }
         }
     } catch (Throwable $e) {
         $error = 'Erro ao enviar notificação: ' . $e->getMessage();
-        error_log('EXCEÇÃO ao enviar push notification: ' . $e->getMessage());
-        error_log('Arquivo: ' . $e->getFile() . ':' . $e->getLine());
-        error_log('Stack trace: ' . $e->getTraceAsString());
+        log_push_debug('EXCEÇÃO ao enviar push notification: ' . $e->getMessage());
+        log_push_debug('Arquivo: ' . $e->getFile() . ':' . $e->getLine());
+        log_push_debug('Stack trace: ' . $e->getTraceAsString());
         
         // Se for um erro fatal, mostra mais detalhes
         if ($e instanceof Error) {
-            error_log('ERRO FATAL: ' . get_class($e));
+            log_push_debug('ERRO FATAL: ' . get_class($e));
         }
     } finally {
         restore_error_handler();
     }
     
-    error_log('=== FIM PROCESSAMENTO NOTIFICAÇÃO ===');
+    log_push_debug('=== FIM PROCESSAMENTO NOTIFICAÇÃO ===');
 }
 
 // Busca subscriptions com informações dos usuários
@@ -173,7 +190,7 @@ if (empty($error)) {
         $stmt->execute($params);
         $subscriptions = $stmt->fetchAll();
     } catch (PDOException $e) {
-        error_log('Erro na query de subscriptions: ' . $e->getMessage());
+        log_push_debug('Erro na query de subscriptions: ' . $e->getMessage());
         $subscriptions = [];
         $error = 'Erro ao carregar lista de usuários: ' . $e->getMessage();
     }
@@ -188,7 +205,7 @@ if (empty($error)) {
         ");
         $total_usuarios = $stmt_count->fetch()['total'] ?? 0;
     } catch (PDOException $e) {
-        error_log('Erro ao contar subscriptions: ' . $e->getMessage());
+        log_push_debug('Erro ao contar subscriptions: ' . $e->getMessage());
         $total_usuarios = 0;
     }
 }
