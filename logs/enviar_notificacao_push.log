@@ -1,0 +1,1 @@
+[2025-11-21 21:42:10] Erro na query de subscriptions: SQLSTATE[42000]: Syntax error or access violation: 1055 Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'rh-privus.os.usuario_id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by

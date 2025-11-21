@@ -288,8 +288,9 @@ function getIcon($name) {
                     <!--end:Menu item-->
                     
                     <!--begin:Menu item-->
-                    <div class="menu-item">
-                        <a class="menu-link <?= isActive('enviar_notificacao_push.php') ?>" href="enviar_notificacao_push.php">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('enviar_notificacao_push.php') || isActive('notificacoes_enviadas.php')) ? 'here show' : '' ?>">
+                        <!--begin:Menu link-->
+                        <span class="menu-link">
                             <span class="menu-icon">
                                 <i class="ki-duotone ki-<?= getIcon('notification') ?> fs-2">
                                     <span class="path1"></span>
@@ -297,22 +298,34 @@ function getIcon($name) {
                                     <span class="path3"></span>
                                 </i>
                             </span>
-                            <span class="menu-title">Enviar Notificação Push</span>
-                        </a>
-                    </div>
-                    <!--end:Menu item-->
-                <?php else: ?>
-                    <!--begin:Menu item-->
-                    <div class="menu-item">
-                        <a class="menu-link <?= isActive('colaborador_view.php') ?>" href="colaborador_view.php?id=<?= $usuario['colaborador_id'] ?>">
-                            <span class="menu-icon">
-                                <i class="ki-duotone ki-<?= getIcon('person') ?> fs-2">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </span>
-                            <span class="menu-title">Meu Perfil</span>
-                        </a>
+                            <span class="menu-title">Notificações Push</span>
+                            <span class="menu-arrow"></span>
+                        </span>
+                        <!--end:Menu link-->
+                        <!--begin:Menu sub-->
+                        <div class="menu-sub menu-sub-accordion">
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('enviar_notificacao_push.php') ?>" href="enviar_notificacao_push.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Enviar Notificação Push</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('notificacoes_enviadas.php') ?>" href="notificacoes_enviadas.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Notificações Enviadas</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                        </div>
+                        <!--end:Menu sub-->
                     </div>
                     <!--end:Menu item-->
                 <?php endif; ?>
@@ -393,6 +406,19 @@ function getIcon($name) {
                                 </i>
                             </span>
                             <span class="menu-title">Meu Perfil</span>
+                        </a>
+                    </div>
+                    <!--end:Menu item-->
+                    <!--begin:Menu item-->
+                    <div class="menu-item">
+                        <a class="menu-link <?= isActive('meus_pagamentos.php') ?>" href="meus_pagamentos.php">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-wallet fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Meus Pagamentos</span>
                         </a>
                     </div>
                     <!--end:Menu item-->

@@ -1,6 +1,6 @@
 // Service Worker - RH Privus PWA
 // OneSignal SDK será carregado automaticamente via OneSignalSDKWorker.js
-const CACHE_NAME = 'rh-privus-v4'; // Atualizado para corrigir redirects em dashboard.php
+const CACHE_NAME = 'rh-privus-v5'; // Incrementado para forçar atualização
 
 // Detecta BASE_PATH automaticamente
 // Funciona tanto em /rh-privus/ (localhost) quanto /rh/ (produção)
@@ -18,206 +18,191 @@ try {
     BASE_PATH = '/rh';
 }
 
-const urlsToCache = [
-  // Não inclui login.php, logout.php, index.php ou dashboard.php pois podem ter redirects dinâmicos baseados em autenticação
-  // Apenas arquivos estáticos são cacheados
-  BASE_PATH + '/assets/css/style.bundle.css',
-  BASE_PATH + '/assets/js/scripts.bundle.js',
-  BASE_PATH + '/assets/plugins/global/plugins.bundle.css',
-  BASE_PATH + '/assets/plugins/global/plugins.bundle.js'
+// Lista de extensões que NUNCA devem ser cacheadas
+const NO_CACHE_EXTENSIONS = ['.php', '.html', '.htm'];
+const NO_CACHE_PATHS = [
+    '/api/',
+    '/pages/',
+    '/includes/',
+    'login.php',
+    'logout.php',
+    'index.php',
+    'dashboard.php'
 ];
+
+// Verifica se uma URL não deve ser cacheada
+function shouldNotCache(url) {
+    const urlPath = url.pathname.toLowerCase();
+    
+    // Não cacheia requisições de API
+    if (urlPath.includes('/api/')) {
+        return true;
+    }
+    
+    // Não cacheia páginas PHP
+    if (urlPath.endsWith('.php')) {
+        return true;
+    }
+    
+    // Não cacheia páginas HTML dinâmicas
+    if (urlPath.endsWith('.html') || urlPath.endsWith('.htm')) {
+        return true;
+    }
+    
+    // Não cacheia caminhos específicos
+    for (const path of NO_CACHE_PATHS) {
+        if (urlPath.includes(path.toLowerCase())) {
+            return true;
+        }
+    }
+    
+    return false;
+}
 
 // Instalação do Service Worker
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Cache aberto');
-        return cache.addAll(urlsToCache);
-      })
-  );
-  self.skipWaiting();
+    console.log('[SW] Instalando Service Worker...');
+    // Não cacheia nada na instalação - apenas ativa imediatamente
+    self.skipWaiting();
 });
 
 // Ativação do Service Worker
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Removendo cache antigo:', cacheName);
-            return caches.delete(cacheName);
-          }
+    console.log('[SW] Ativando Service Worker...');
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    // Remove todos os caches antigos
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('[SW] Removendo cache antigo:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
         })
-      );
-    })
-  );
-  return self.clients.claim();
+    );
+    return self.clients.claim();
 });
 
 // Interceptação de requisições (cache)
 self.addEventListener('fetch', (event) => {
-  const request = event.request;
-  const url = new URL(request.url);
-  
-  // Ignora requisições que não são HTTP/HTTPS (chrome-extension, data:, etc)
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    return; // Não faz cache, deixa o browser lidar normalmente
-  }
-  
-  // Ignora requisições POST, PUT, DELETE, PATCH (não podem ser cacheadas)
-  if (request.method !== 'GET' && request.method !== 'HEAD') {
-    return fetch(request, { redirect: 'follow' });
-  }
-  
-  // Ignora requisições de API e OneSignal (não devem ser cacheadas)
-  if (url.pathname.includes('/api/') || url.pathname.includes('onesignal.com')) {
-    return fetch(request, { redirect: 'follow' });
-  }
-  
-  // Fallback: se a requisição é http -> https, deixa o navegador lidar
-  if (url.protocol === 'http:' && self.location.protocol === 'https:') {
-    return fetch(request, { redirect: 'follow' });
-  }
-  
-  // Ignora requisições que podem resultar em redirects (index.php, login.php, logout.php, dashboard.php, etc)
-  // Essas não devem ser cacheadas pelo Service Worker pois podem ter redirects dinâmicos baseados em autenticação
-  if (url.pathname === BASE_PATH + '/' || 
-      url.pathname === BASE_PATH + '/index.php' ||
-      url.pathname === BASE_PATH + '/login.php' ||
-      url.pathname === BASE_PATH + '/logout.php' ||
-      url.pathname === BASE_PATH + '/pages/dashboard.php' ||
-      url.pathname.endsWith('/login.php') ||
-      url.pathname.endsWith('/logout.php') ||
-      url.pathname.endsWith('/dashboard.php') ||
-      url.pathname.endsWith('/')) {
-    // Deixa o browser lidar normalmente com redirects
-    return fetch(request, { redirect: 'follow' });
-  }
-  
-  event.respondWith(
-    caches.match(request)
-      .then((response) => {
-        // Cache hit - retorna resposta do cache
-        if (response) {
-          return response;
-        }
-        
-        // Cria nova requisição com redirect: 'follow' explicitamente
-        const fetchOptions = {
-          redirect: 'follow',
-          credentials: request.credentials,
-          cache: 'default'
-        };
-        
-        return fetch(request, fetchOptions).then((response) => {
-          // Se a resposta foi um redirect (status 301, 302, etc), não faz cache
-          if (response.redirected || response.status === 301 || response.status === 302 || 
-              response.status === 303 || response.status === 307 || response.status === 308) {
-            return response; // Retorna sem fazer cache
-          }
-          
-          // Verifica se resposta é válida e pode ser cacheada
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-          
-          // Verifica novamente se é uma URL válida para cache
-          const responseUrl = new URL(response.url);
-          if (responseUrl.protocol !== 'http:' && responseUrl.protocol !== 'https:') {
-            return response; // Não faz cache
-          }
-          
-          // Não faz cache de páginas PHP que podem ter redirects dinâmicos baseados em autenticação
-          // Essas páginas devem sempre ser buscadas do servidor para garantir autenticação correta
-          if (responseUrl.pathname.endsWith('.php')) {
-            // Verifica se é uma página que pode ter redirects
-            const pathname = responseUrl.pathname.toLowerCase();
-            if (pathname.includes('index') || 
-                pathname.includes('login') ||
-                pathname.includes('logout') ||
-                pathname.includes('dashboard') ||
-                pathname.includes('auth') ||
-                pathname.includes('session')) {
-              return response; // Retorna sem fazer cache
-            }
-          }
-          
-          // Clone da resposta
-          const responseToCache = response.clone();
-          
-          // Tenta fazer cache, mas ignora erros
-          // Verifica novamente antes de fazer cache (proteção extra)
-          try {
-            const finalUrl = new URL(request.url);
-            if (finalUrl.protocol === 'http:' || finalUrl.protocol === 'https:') {
-              caches.open(CACHE_NAME)
-                .then((cache) => {
-                  cache.put(request, responseToCache).catch((err) => {
-                    // Ignora erros silenciosamente (chrome-extension, etc)
-                    if (err.message && !err.message.includes('chrome-extension')) {
-                      console.warn('Erro ao fazer cache:', err);
-                    }
-                  });
-                })
-                .catch((err) => {
-                  // Ignora erros silenciosamente
-                });
-            }
-          } catch (e) {
-            // Ignora erros de URL inválida
-          }
-          
-          return response;
-        }).catch((error) => {
-          console.warn('Erro no fetch:', error);
-          // Fallback para fetch normal com redirect: 'follow'
-          return fetch(request, { redirect: 'follow' });
+    const request = event.request;
+    const url = new URL(request.url);
+    
+    // Ignora requisições que não são HTTP/HTTPS
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return; // Deixa o browser lidar normalmente
+    }
+    
+    // Ignora requisições POST, PUT, DELETE, PATCH
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return fetch(request);
+    }
+    
+    // Ignora requisições de OneSignal
+    if (url.pathname.includes('onesignal.com') || url.pathname.includes('OneSignalSDKWorker')) {
+        return fetch(request);
+    }
+    
+    // CRÍTICO: NÃO cacheia páginas PHP, HTML ou caminhos dinâmicos
+    if (shouldNotCache(url)) {
+        // Para páginas dinâmicas, sempre busca do servidor (Network Only)
+        return fetch(request, {
+            cache: 'no-store',
+            redirect: 'follow'
         });
-      })
-  );
+    }
+    
+    // Para assets estáticos (CSS, JS, imagens), usa estratégia Network First
+    // Isso garante que sempre pegue a versão mais recente
+    event.respondWith(
+        fetch(request, {
+            cache: 'no-cache', // Sempre valida com servidor
+            redirect: 'follow'
+        })
+        .then((response) => {
+            // Só cacheia se for resposta válida de asset estático
+            if (response && response.status === 200 && response.type === 'basic') {
+                // Verifica se é um asset estático (CSS, JS, imagens, fonts)
+                const contentType = response.headers.get('content-type') || '';
+                const isStaticAsset = 
+                    contentType.includes('text/css') ||
+                    contentType.includes('application/javascript') ||
+                    contentType.includes('text/javascript') ||
+                    contentType.includes('image/') ||
+                    contentType.includes('font/') ||
+                    contentType.includes('application/font') ||
+                    url.pathname.match(/\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/i);
+                
+                if (isStaticAsset) {
+                    // Cache apenas assets estáticos com versionamento
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME)
+                        .then((cache) => {
+                            cache.put(request, responseToCache).catch(() => {
+                                // Ignora erros de cache silenciosamente
+                            });
+                        })
+                        .catch(() => {
+                            // Ignora erros
+                        });
+                }
+            }
+            
+            return response;
+        })
+        .catch((error) => {
+            // Se falhar ao buscar do servidor, tenta cache apenas para assets estáticos
+            return caches.match(request).then((cachedResponse) => {
+                if (cachedResponse) {
+                    return cachedResponse;
+                }
+                // Se não tiver cache, retorna erro
+                throw error;
+            });
+        })
+    );
 });
 
 // Recebe notificações push
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || 'RH Privus';
-  const options = {
-    body: data.body || 'Nova notificação',
-    icon: BASE_PATH + '/assets/media/logos/favicon.png',
-    badge: BASE_PATH + '/assets/media/logos/favicon.png',
-    data: data.data || {},
-    vibrate: [200, 100, 200],
-    tag: 'rh-privus-notification',
-    requireInteraction: false
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+    const data = event.data ? event.data.json() : {};
+    const title = data.title || 'RH Privus';
+    const options = {
+        body: data.body || 'Nova notificação',
+        icon: BASE_PATH + '/assets/media/logos/favicon.png',
+        badge: BASE_PATH + '/assets/media/logos/favicon.png',
+        data: data.data || {},
+        vibrate: [200, 100, 200],
+        tag: 'rh-privus-notification',
+        requireInteraction: false
+    };
+    
+    event.waitUntil(
+        self.registration.showNotification(title, options)
+    );
 });
 
 // Clique na notificação
 self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  
-  const urlToOpen = event.notification.data.url || BASE_PATH + '/pages/dashboard.php';
-  
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        // Tenta focar em janela existente
-        for (let client of clientList) {
-          if (client.url.includes(BASE_PATH) && 'focus' in client) {
-            return client.focus();
-          }
-        }
-        // Abre nova janela
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
-      })
-  );
+    event.notification.close();
+    
+    const urlToOpen = event.notification.data.url || BASE_PATH + '/pages/dashboard.php';
+    
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then((clientList) => {
+                // Tenta focar em janela existente
+                for (let client of clientList) {
+                    if (client.url.includes(BASE_PATH) && 'focus' in client) {
+                        return client.focus();
+                    }
+                }
+                // Abre nova janela
+                if (clients.openWindow) {
+                    return clients.openWindow(urlToOpen);
+                }
+            })
+    );
 });
-

@@ -3,6 +3,13 @@
  * Enviar Notificação Push - Lista usuários e permite enviar notificações
  */
 
+// Headers anti-cache para evitar problemas de cache do navegador
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
+header('Expires: Mon, 01 Jan 1990 00:00:00 GMT');
+header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
+
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/push_notifications.php';
@@ -174,32 +181,66 @@ $total_usuarios = 0;
 
 // Só executa queries se não houver erro anterior
 if (empty($error)) {
+    // Query reescrita para compatibilidade com sql_mode=only_full_group_by
+    // Usa subquery para garantir que todos os campos estejam agregados corretamente
     $sql = "
         SELECT 
-            os.usuario_id,
-            os.colaborador_id,
-            GROUP_CONCAT(DISTINCT os.player_id SEPARATOR ',') as player_ids,
-            GROUP_CONCAT(DISTINCT os.device_type SEPARATOR ',') as device_types,
-            MAX(os.created_at) as created_at,
-            MAX(u.nome) as usuario_nome,
-            MAX(u.email) as usuario_email,
-            MAX(u.role) as usuario_role,
-            MAX(c.nome_completo) as colaborador_nome,
-            COUNT(os.id) as total_dispositivos
-        FROM onesignal_subscriptions os
-        LEFT JOIN usuarios u ON os.usuario_id = u.id
-        LEFT JOIN colaboradores c ON os.colaborador_id = c.id
-        WHERE 1=1 {$whereClause}
-        GROUP BY COALESCE(os.usuario_id, 0), COALESCE(os.colaborador_id, 0)
-        ORDER BY MAX(os.created_at) DESC
+            usuario_id,
+            colaborador_id,
+            GROUP_CONCAT(DISTINCT player_id SEPARATOR ',') as player_ids,
+            GROUP_CONCAT(DISTINCT device_type SEPARATOR ',') as device_types,
+            MAX(created_at) as created_at,
+            MAX(usuario_nome) as usuario_nome,
+            MAX(usuario_email) as usuario_email,
+            MAX(usuario_role) as usuario_role,
+            MAX(colaborador_nome) as colaborador_nome,
+            COUNT(*) as total_dispositivos
+        FROM (
+            SELECT 
+                COALESCE(os.usuario_id, 0) as usuario_id,
+                COALESCE(os.colaborador_id, 0) as colaborador_id,
+                os.player_id,
+                os.device_type,
+                os.created_at,
+                u.nome as usuario_nome,
+                u.email as usuario_email,
+                u.role as usuario_role,
+                c.nome_completo as colaborador_nome
+            FROM onesignal_subscriptions os
+            LEFT JOIN usuarios u ON os.usuario_id = u.id
+            LEFT JOIN colaboradores c ON os.colaborador_id = c.id
+            WHERE 1=1 {$whereClause}
+        ) as subquery
+        GROUP BY usuario_id, colaborador_id
+        ORDER BY MAX(created_at) DESC
     ";
 
     try {
+        // Log da query para debug (apenas em desenvolvimento)
+        if (defined('DEBUG') && DEBUG) {
+            log_push_debug('Query SQL: ' . $sql);
+            log_push_debug('Parâmetros: ' . print_r($params, true));
+        }
+        
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
-        $subscriptions = $stmt->fetchAll();
+        $subscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Converte 0 para NULL nos IDs para manter compatibilidade
+        foreach ($subscriptions as &$sub) {
+            if ($sub['usuario_id'] == 0) {
+                $sub['usuario_id'] = null;
+            }
+            if ($sub['colaborador_id'] == 0) {
+                $sub['colaborador_id'] = null;
+            }
+        }
+        unset($sub);
+        
     } catch (PDOException $e) {
         log_push_debug('Erro na query de subscriptions: ' . $e->getMessage());
+        log_push_debug('SQL: ' . $sql);
+        log_push_debug('Params: ' . print_r($params, true));
         $subscriptions = [];
         $error = 'Erro ao carregar lista de usuários: ' . $e->getMessage();
     }
@@ -220,8 +261,18 @@ if (empty($error)) {
 }
 
 $page_title = 'Enviar Notificação Push';
+
+// Cache busting - versão baseada na última modificação deste arquivo
+$page_version = filemtime(__FILE__);
+
 include __DIR__ . '/../includes/header.php';
 ?>
+<!-- Versão da página: <?= $page_version ?> -->
+<!-- Force reload: <?= time() ?> -->
+
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 
 <!--begin::Content-->
 <div class="content d-flex flex-column flex-column-fluid" id="kt_content">
@@ -389,13 +440,7 @@ include __DIR__ . '/../includes/header.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if (empty($subscriptions)): ?>
-                                <tr>
-                                    <td colspan="7" class="text-center py-10">
-                                        <div class="text-muted">Nenhum usuário com push registrado encontrado.</div>
-                                    </td>
-                                </tr>
-                            <?php else: ?>
+                            <?php if (!empty($subscriptions)): ?>
                                 <?php foreach ($subscriptions as $sub): ?>
                                     <tr>
                                         <td>
@@ -439,8 +484,12 @@ include __DIR__ . '/../includes/header.php';
                                         </td>
                                         <td><?= !empty($sub['created_at']) ? date('d/m/Y H:i', strtotime($sub['created_at'])) : '-' ?></td>
                                         <td class="text-end">
+                                            <?php 
+                                            $usuario_id_val = (!empty($sub['usuario_id']) && $sub['usuario_id'] != 0) ? intval($sub['usuario_id']) : 'null';
+                                            $colaborador_id_val = (!empty($sub['colaborador_id']) && $sub['colaborador_id'] != 0) ? intval($sub['colaborador_id']) : 'null';
+                                            ?>
                                             <button type="button" class="btn btn-sm btn-primary" 
-                                                    onclick="enviarParaUsuario(<?= $sub['usuario_id'] ?? 'null' ?>, <?= $sub['colaborador_id'] ?? 'null' ?>, '<?= htmlspecialchars(addslashes(($sub['usuario_nome'] ?? '') ?: ($sub['colaborador_nome'] ?? '') ?: 'Usuário')) ?>')">
+                                                    onclick="enviarParaUsuario(<?= $usuario_id_val ?>, <?= $colaborador_id_val ?>, '<?= htmlspecialchars(addslashes(($sub['usuario_nome'] ?? '') ?: ($sub['colaborador_nome'] ?? '') ?: 'Usuário')) ?>')">
                                                 <i class="ki-duotone ki-notification-status fs-5">
                                                     <span class="path1"></span>
                                                     <span class="path2"></span>
@@ -451,6 +500,17 @@ include __DIR__ . '/../includes/header.php';
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-10">
+                                        <i class="ki-duotone ki-information-5 fs-3x mb-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div>Nenhum usuário com dispositivo registrado encontrado.</div>
+                                    </td>
+                                </tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -523,34 +583,125 @@ include __DIR__ . '/../includes/header.php';
 </div>
 <!--end::Modal Enviar Notificação-->
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
 
-<script>
-// Aguarda jQuery estar disponível antes de executar qualquer código
+<script data-version="<?= $page_version ?>" data-timestamp="<?= time() ?>">
+// VERSÃO DA PÁGINA: <?= $page_version ?> - TIMESTAMP: <?= time() ?> 
+console.log('[DEBUG_PUSH] Script da página iniciado (posicionado ANTES do footer)');
+console.log('[DEBUG_PUSH] Versão da página:', '<?= $page_version ?>', 'Timestamp:', '<?= time() ?>');
+
+// Monitor de erros global para esta página
+window.addEventListener('error', function(e) {
+    console.error('[DEBUG_PUSH] Erro global capturado:', e.message, 'em', e.filename, 'linha', e.lineno);
+});
+
+// Define a função globalmente IMEDIATAMENTE
+window.enviarParaUsuario = function(usuarioId, colaboradorId, nome) {
+    console.log('[DEBUG_PUSH] Clique em enviarParaUsuario detectado', { usuarioId, colaboradorId, nome });
+    
+    // Se a implementação real ainda não carregou
+    if (typeof window.appEnviarParaUsuario === 'function') {
+        window.appEnviarParaUsuario(usuarioId, colaboradorId, nome);
+    } else {
+        console.warn('[DEBUG_PUSH] Função appEnviarParaUsuario ainda não está pronta');
+        alert('Aguarde um momento, o sistema está carregando os componentes...');
+        
+        // Tenta novamente em breve (uma única vez)
+        setTimeout(function() {
+            if (typeof window.appEnviarParaUsuario === 'function') {
+                window.appEnviarParaUsuario(usuarioId, colaboradorId, nome);
+            }
+        }, 1000);
+    }
+};
+
 (function() {
     'use strict';
     
-    // Função auxiliar para aguardar jQuery
-    function waitForJQuery(callback) {
-        if (typeof window.jQuery !== 'undefined' && typeof window.jQuery.fn !== 'undefined') {
-            callback(window.jQuery);
-        } else {
-            setTimeout(function() {
-                waitForJQuery(callback);
-            }, 50);
-        }
+    console.log('[DEBUG_PUSH] Função auto-executável iniciada');
+    
+    function waitForResources(resources, callback) {
+        console.log('[DEBUG_PUSH] Iniciando espera por recursos:', resources);
+        
+        var attempts = 0;
+        var maxAttempts = 100; // 10 segundos
+        
+        var interval = setInterval(function() {
+            attempts++;
+            var allReady = true;
+            var debugStatus = {};
+            
+            // Verifica jQuery
+            if (typeof window.jQuery === 'undefined') {
+                allReady = false;
+                debugStatus.jQuery = 'missing';
+            } else {
+                debugStatus.jQuery = 'OK (' + window.jQuery.fn.jquery + ')';
+            }
+            
+            // Verifica DataTable se solicitado
+            if (resources.includes('DataTable')) {
+                if (typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.DataTable === 'undefined') {
+                    allReady = false;
+                    debugStatus.DataTable = 'missing';
+                } else {
+                    debugStatus.DataTable = 'OK';
+                }
+            }
+            
+            // Log a cada 5 tentativas ou quando mudar algo importante
+            if (attempts === 1 || attempts % 10 === 0 || allReady) {
+                console.log('[DEBUG_PUSH] Tentativa ' + attempts + ' status:', debugStatus);
+            }
+            
+            if (allReady) {
+                console.log('[DEBUG_PUSH] Todos os recursos carregados após ' + attempts + ' tentativas');
+                clearInterval(interval);
+                try {
+                    callback(window.jQuery);
+                } catch (e) {
+                    console.error('[DEBUG_PUSH] Erro ao executar callback principal:', e);
+                }
+            } else if (attempts >= maxAttempts) {
+                console.error('[DEBUG_PUSH] Timeout aguardando recursos. Status final:', debugStatus);
+                clearInterval(interval);
+                alert('Erro ao carregar componentes da página (Timeout). Verifique o console.');
+            }
+        }, 100);
     }
     
-    // Aguarda jQuery e então inicializa tudo
-    waitForJQuery(function($) {
-        // Função para enviar notificação para usuário
-        window.enviarParaUsuario = function(usuarioId, colaboradorId, nome) {
-            document.getElementById('modal_usuario_id').value = usuarioId || '';
-            document.getElementById('modal_colaborador_id').value = colaboradorId || '';
-            document.getElementById('modal_destinatario').value = nome || '';
+    // Aguarda jQuery E DataTable
+    waitForResources(['DataTable'], function($) {
+        console.log('[DEBUG_PUSH] Callback de inicialização executando');
+        
+        // Implementação real
+        window.appEnviarParaUsuario = function(usuarioId, colaboradorId, nome) {
+            console.log('[DEBUG_PUSH] Abrindo modal para', nome);
+            $('#modal_usuario_id').val(usuarioId || '');
+            $('#modal_colaborador_id').val(colaboradorId || '');
+            $('#modal_destinatario').val(nome || '');
             
-            const modal = new bootstrap.Modal(document.getElementById('modal_enviar_notificacao'));
-            modal.show();
+            var modalEl = document.getElementById('modal_enviar_notificacao');
+            
+            // Tenta abrir usando Bootstrap 5 API
+            try {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    var modal = bootstrap.Modal.getInstance(modalEl);
+                    if (!modal) {
+                        modal = new bootstrap.Modal(modalEl);
+                    }
+                    modal.show();
+                } else {
+                    console.log('[DEBUG_PUSH] Bootstrap global não encontrado, tentando via jQuery');
+                    $(modalEl).modal('show');
+                }
+            } catch (e) {
+                console.error('[DEBUG_PUSH] Erro ao abrir modal:', e);
+                // Fallback desesperado
+                $(modalEl).show(); 
+                $(modalEl).addClass('show');
+                $('body').addClass('modal-open');
+                $('body').append('<div class="modal-backdrop fade show"></div>');
+            }
         };
         
         // Limpa formulário quando modal fecha
@@ -560,14 +711,15 @@ include __DIR__ . '/../includes/header.php';
             $('#modal_colaborador_id').val('');
             $('#modal_destinatario').val('');
             
-            // Remove estado de loading do botão
             const submitBtn = $('#form_enviar_notificacao button[type="submit"]');
             submitBtn.prop('disabled', false);
-            submitBtn.html(submitBtn.html().replace('Enviando...', 'Enviar Notificação'));
+            submitBtn.html(submitBtn.html().replace('<span class="spinner-border spinner-border-sm me-2"></span>Enviando...', 'Enviar Notificação').replace('Enviando...', 'Enviar Notificação'));
         });
         
-        // Handler de submit do formulário
+        // Handler de submit
         $('#form_enviar_notificacao').on('submit', function(e) {
+            console.log('[DEBUG_PUSH] Submit do formulário iniciado');
+            // ... lógica de submit mantém a mesma ...
             const titulo = $(this).find('input[name="titulo"]').val().trim();
             const mensagem = $(this).find('textarea[name="mensagem"]').val().trim();
             const usuarioId = $(this).find('input[name="usuario_id"]').val().trim();
@@ -581,17 +733,15 @@ include __DIR__ . '/../includes/header.php';
             
             if (!usuarioId && !colaboradorId) {
                 e.preventDefault();
-                alert('Por favor, selecione um destinatário da tabela clicando no botão "Enviar" de um usuário!');
+                alert('Por favor, selecione um destinatário da tabela!');
                 return false;
             }
             
-            // Mostra feedback visual
             const submitBtn = $(this).find('button[type="submit"]');
             const originalHtml = submitBtn.html();
             submitBtn.prop('disabled', true);
             submitBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Enviando...');
             
-            // Se o formulário não for submetido em 30 segundos, reabilita o botão
             setTimeout(function() {
                 if (submitBtn.prop('disabled')) {
                     submitBtn.prop('disabled', false);
@@ -602,44 +752,59 @@ include __DIR__ . '/../includes/header.php';
             return true;
         });
         
-        // Inicializa DataTable quando DOM estiver pronto
-        $(document).ready(function() {
-            // Aguarda DataTables estar disponível
-            function waitForDataTables(callback) {
-                if (typeof $.fn.DataTable !== 'undefined') {
-                    callback();
-                } else {
-                    setTimeout(function() {
-                        waitForDataTables(callback);
-                    }, 100);
-                }
+        // Inicializa DataTable
+        function initDataTable() {
+            console.log('[DEBUG_PUSH] Iniciando setup do DataTable');
+            const tableEl = $('#kt_notificacoes_table');
+            
+            if (!tableEl.length) {
+                console.warn('[DEBUG_PUSH] Tabela não encontrada no DOM');
+                return;
             }
             
-            waitForDataTables(function() {
-                const table = $('#kt_notificacoes_table');
-                
-                // Verifica se a tabela existe e não foi inicializada
-                if (table.length && !table.hasClass('dataTable')) {
-                    try {
-                        table.DataTable({
-                            language: {
-                                url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
-                            },
-                            pageLength: 25,
-                            order: [[5, 'desc']], // Ordena por data de registro
-                            responsive: true,
-                            columnDefs: [
-                                { orderable: false, targets: 6 } // Coluna de ações não ordenável
-                            ],
-                            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                        });
-                    } catch (e) {
-                        console.error('Erro ao inicializar DataTable:', e);
-                    }
-                }
+            if ($.fn.DataTable.isDataTable(tableEl)) {
+                console.log('[DEBUG_PUSH] DataTable já estava inicializado');
+                return;
+            }
+            
+            // Verifica se há pelo menos uma linha de dados (não conta o "Nenhum registro" com colspan)
+            const tbody = tableEl.find('tbody');
+            const dataRows = tbody.find('tr').filter(function() {
+                return $(this).find('td[colspan]').length === 0;
             });
-        });
+            
+            if (dataRows.length === 0) {
+                console.log('[DEBUG_PUSH] Tabela vazia - DataTable não será inicializado');
+                return;
+            }
+            
+            try {
+                console.log('[DEBUG_PUSH] Configurando DataTable...');
+                tableEl.DataTable({
+                    language: {
+                        url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+                    },
+                    pageLength: 25,
+                    order: [[5, 'desc']],
+                    responsive: true,
+                    columnDefs: [
+                        { orderable: false, targets: 6 }
+                    ],
+                    dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                });
+                console.log('[DEBUG_PUSH] DataTable inicializado com SUCESSO');
+            } catch (e) {
+                console.error('[DEBUG_PUSH] EXCEÇÃO ao inicializar DataTable:', e);
+                console.error('[DEBUG_PUSH] Stack:', e.stack);
+            }
+        }
+        
+        // Tenta inicializar
+        initDataTable();
     });
 })();
 </script>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>
+
 

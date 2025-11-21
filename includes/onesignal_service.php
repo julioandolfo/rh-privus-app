@@ -140,6 +140,35 @@ if (!function_exists('onesignal_send_notification')) {
                 throw new Exception('Erro ao decodificar resposta do OneSignal: ' . json_last_error_msg());
             }
 
+            // Salva histórico da notificação
+            try {
+                $enviado_por = null;
+                if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['usuario']['id'])) {
+                    $enviado_por = intval($_SESSION['usuario']['id']);
+                }
+                
+                if ($enviado_por) {
+                    $stmt_history = $pdo->prepare("
+                        INSERT INTO push_notifications_history 
+                        (usuario_id, colaborador_id, enviado_por_usuario_id, titulo, mensagem, url, onesignal_id, total_dispositivos, sucesso)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+                    ");
+                    $stmt_history->execute([
+                        $usuario_id,
+                        $colaborador_id,
+                        $enviado_por,
+                        $titulo,
+                        $mensagem,
+                        $url,
+                        $result['id'] ?? null,
+                        count($subscriptions)
+                    ]);
+                }
+            } catch (Exception $e) {
+                $log('Erro ao salvar histórico: ' . $e->getMessage());
+                // Não interrompe o fluxo se falhar ao salvar histórico
+            }
+
             return [
                 'success' => true,
                 'enviadas' => count($subscriptions),
@@ -158,6 +187,36 @@ if (!function_exists('onesignal_send_notification')) {
         }
 
         $log('OneSignal Service - Erro: ' . $errorMessage . ' (HTTP ' . $httpCode . ')');
+        
+        // Salva histórico da notificação com erro
+        try {
+            $enviado_por = null;
+            if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['usuario']['id'])) {
+                $enviado_por = intval($_SESSION['usuario']['id']);
+            }
+            
+            if ($enviado_por) {
+                $stmt_history = $pdo->prepare("
+                    INSERT INTO push_notifications_history 
+                    (usuario_id, colaborador_id, enviado_por_usuario_id, titulo, mensagem, url, total_dispositivos, sucesso, erro_mensagem)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, ?)
+                ");
+                $stmt_history->execute([
+                    $usuario_id,
+                    $colaborador_id,
+                    $enviado_por,
+                    $titulo,
+                    $mensagem,
+                    $url,
+                    count($subscriptions),
+                    $errorMessage . ' (HTTP ' . $httpCode . ')'
+                ]);
+            }
+        } catch (Exception $e) {
+            $log('Erro ao salvar histórico de erro: ' . $e->getMessage());
+            // Não interrompe o fluxo se falhar ao salvar histórico
+        }
+        
         throw new Exception($errorMessage . ' (HTTP ' . $httpCode . ')');
     }
 }

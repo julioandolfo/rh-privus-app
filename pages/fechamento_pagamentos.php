@@ -325,16 +325,34 @@ if (isset($_GET['view'])) {
             redirect('fechamento_pagamentos.php', 'Você não tem permissão para visualizar este fechamento!', 'error');
         }
         
-        // Busca itens
+        // Busca itens (incluindo campos de documento)
         $stmt = $pdo->prepare("
-            SELECT i.*, c.nome_completo as colaborador_nome, c.id as colaborador_id
+            SELECT i.*, c.nome_completo as colaborador_nome, c.id as colaborador_id,
+                   i.documento_anexo, i.documento_status, i.documento_data_envio,
+                   i.documento_data_aprovacao, i.documento_observacoes,
+                   u_aprovador.nome as aprovador_nome
             FROM fechamentos_pagamento_itens i
             INNER JOIN colaboradores c ON i.colaborador_id = c.id
+            LEFT JOIN usuarios u_aprovador ON i.documento_aprovado_por = u_aprovador.id
             WHERE i.fechamento_id = ?
             ORDER BY c.nome_completo
         ");
         $stmt->execute([$fechamento_id]);
         $itens_fechamento = $stmt->fetchAll();
+        
+        // Calcula estatísticas de documentos
+        $stats_pendentes = 0;
+        $stats_enviados = 0;
+        $stats_aprovados = 0;
+        $stats_rejeitados = 0;
+        
+        foreach ($itens_fechamento as $item) {
+            $status = $item['documento_status'] ?? 'pendente';
+            if ($status === 'pendente') $stats_pendentes++;
+            elseif ($status === 'enviado') $stats_enviados++;
+            elseif ($status === 'aprovado') $stats_aprovados++;
+            elseif ($status === 'rejeitado') $stats_rejeitados++;
+        }
         
         // Busca período do fechamento para buscar bônus ativos
         $ano_mes = explode('-', $fechamento_view['mes_referencia']);
@@ -465,6 +483,77 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
                 
+                <?php if ($fechamento_view['status'] === 'fechado'): ?>
+                <!--begin::Estatísticas de Documentos-->
+                <div class="row g-3 mb-7">
+                    <div class="col-md-3">
+                        <div class="card bg-light-danger">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <span class="text-muted fw-semibold d-block">Pendentes</span>
+                                        <span class="text-gray-800 fw-bold fs-2"><?= $stats_pendentes ?></span>
+                                    </div>
+                                    <i class="ki-duotone ki-time fs-1 text-danger">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light-warning">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <span class="text-muted fw-semibold d-block">Enviados</span>
+                                        <span class="text-gray-800 fw-bold fs-2"><?= $stats_enviados ?></span>
+                                    </div>
+                                    <i class="ki-duotone ki-file-up fs-1 text-warning">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light-success">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <span class="text-muted fw-semibold d-block">Aprovados</span>
+                                        <span class="text-gray-800 fw-bold fs-2"><?= $stats_aprovados ?></span>
+                                    </div>
+                                    <i class="ki-duotone ki-check-circle fs-1 text-success">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light-info">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <span class="text-muted fw-semibold d-block">Total Itens</span>
+                                        <span class="text-gray-800 fw-bold fs-2"><?= count($itens_fechamento) ?></span>
+                                    </div>
+                                    <i class="ki-duotone ki-people fs-1 text-info">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Estatísticas de Documentos-->
+                <?php endif; ?>
+                
                 <table class="table table-bordered">
                     <thead>
                         <tr>
@@ -476,6 +565,9 @@ require_once __DIR__ . '/../includes/header.php';
                             <th>Descontos</th>
                             <th>Adicionais</th>
                             <th>Total</th>
+                            <?php if ($fechamento_view['status'] === 'fechado'): ?>
+                            <th>Documento</th>
+                            <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'aberto'): ?>
                             <th>Ações</th>
                             <?php endif; ?>
@@ -521,6 +613,55 @@ require_once __DIR__ . '/../includes/header.php';
                             <td>R$ <?= number_format($item['descontos'] ?? 0, 2, ',', '.') ?></td>
                             <td>R$ <?= number_format($item['adicionais'] ?? 0, 2, ',', '.') ?></td>
                             <td><strong>R$ <?= number_format($valor_total_com_bonus, 2, ',', '.') ?></strong></td>
+                            <?php if ($fechamento_view['status'] === 'fechado'): ?>
+                            <td>
+                                <?php
+                                $status_doc = $item['documento_status'] ?? 'pendente';
+                                $badges = [
+                                    'pendente' => '<span class="badge badge-light-danger">Pendente</span>',
+                                    'enviado' => '<span class="badge badge-light-warning">Enviado</span>',
+                                    'aprovado' => '<span class="badge badge-light-success">Aprovado</span>',
+                                    'rejeitado' => '<span class="badge badge-light-danger">Rejeitado</span>'
+                                ];
+                                echo $badges[$status_doc] ?? '<span class="badge badge-light-secondary">-</span>';
+                                ?>
+                                <?php if (!empty($item['documento_anexo'])): ?>
+                                    <br><button type="button" class="btn btn-sm btn-light-primary mt-1" 
+                                            onclick="verDocumentoAdmin(<?= $fechamento_view['id'] ?>, <?= $item['id'] ?>)">
+                                        <i class="ki-duotone ki-eye fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        Ver
+                                    </button>
+                                <?php endif; ?>
+                                <?php if ($status_doc === 'enviado'): ?>
+                                    <br><button type="button" class="btn btn-sm btn-success mt-1" 
+                                            onclick="aprovarDocumento(<?= $item['id'] ?>)">
+                                        <i class="ki-duotone ki-check fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Aprovar
+                                    </button>
+                                    <br><button type="button" class="btn btn-sm btn-danger mt-1" 
+                                            onclick="rejeitarDocumento(<?= $item['id'] ?>)">
+                                        <i class="ki-duotone ki-cross fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Rejeitar
+                                    </button>
+                                <?php endif; ?>
+                                <?php if ($item['documento_observacoes']): ?>
+                                    <br><small class="text-muted" title="<?= htmlspecialchars($item['documento_observacoes']) ?>">
+                                        <?= htmlspecialchars(mb_substr($item['documento_observacoes'], 0, 30)) ?>
+                                        <?= mb_strlen($item['documento_observacoes']) > 30 ? '...' : '' ?>
+                                    </small>
+                                <?php endif; ?>
+                            </td>
+                            <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'aberto'): ?>
                             <td>
                                 <button type="button" class="btn btn-sm btn-primary" onclick="editarItem(<?= htmlspecialchars(json_encode($item)) ?>)">
@@ -1124,6 +1265,173 @@ function fecharFechamento(id) {
             document.getElementById('form_fechar_' + id).submit();
         }
     });
+}
+
+// Aprovar documento
+function aprovarDocumento(itemId) {
+    Swal.fire({
+        title: 'Aprovar Documento?',
+        text: 'Tem certeza que deseja aprovar este documento?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, aprovar',
+        cancelButtonText: 'Cancelar',
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: "btn fw-bold btn-success",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const formData = new FormData();
+            formData.append('item_id', itemId);
+            formData.append('acao', 'aprovar');
+            formData.append('observacoes', '');
+            
+            fetch('../api/aprovar_documento_pagamento.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire('Sucesso!', data.message, 'success').then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire('Erro', data.message, 'error');
+                }
+            })
+            .catch(error => {
+                Swal.fire('Erro', 'Erro ao processar solicitação', 'error');
+            });
+        }
+    });
+}
+
+// Rejeitar documento
+function rejeitarDocumento(itemId) {
+    Swal.fire({
+        title: 'Rejeitar Documento',
+        input: 'textarea',
+        inputLabel: 'Motivo da rejeição',
+        inputPlaceholder: 'Digite o motivo da rejeição...',
+        inputAttributes: {
+            'aria-label': 'Digite o motivo da rejeição'
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Rejeitar',
+        cancelButtonText: 'Cancelar',
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: "btn fw-bold btn-danger",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        },
+        inputValidator: (value) => {
+            if (!value) {
+                return 'O motivo da rejeição é obrigatório!';
+            }
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const formData = new FormData();
+            formData.append('item_id', itemId);
+            formData.append('acao', 'rejeitar');
+            formData.append('observacoes', result.value);
+            
+            fetch('../api/aprovar_documento_pagamento.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire('Sucesso!', data.message, 'success').then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire('Erro', data.message, 'error');
+                }
+            })
+            .catch(error => {
+                Swal.fire('Erro', 'Erro ao processar solicitação', 'error');
+            });
+        }
+    });
+}
+
+// Ver documento (admin)
+function verDocumentoAdmin(fechamentoId, itemId) {
+    fetch(`../api/get_documento_pagamento.php?fechamento_id=${fechamentoId}&item_id=${itemId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const doc = data.data;
+                const isImage = doc.is_image;
+                
+                let html = '';
+                if (isImage) {
+                    html = `
+                        <div class="text-center">
+                            <img src="../${doc.documento_anexo}" class="img-fluid" alt="Documento" style="max-height: 600px;">
+                        </div>
+                        <div class="mt-5">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Status:</span>
+                                <span class="fw-bold">${doc.documento_status === 'aprovado' ? 'Aprovado' : doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado'}</span>
+                            </div>
+                            ${doc.documento_data_envio ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>${new Date(doc.documento_data_envio).toLocaleString('pt-BR')}</span></div>` : ''}
+                            ${doc.documento_data_aprovacao ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovação:</span><span>${new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR')}</span></div>` : ''}
+                            ${doc.documento_observacoes ? `<div class="mt-3"><strong>Observações:</strong><div class="text-gray-600">${doc.documento_observacoes}</div></div>` : ''}
+                        </div>
+                    `;
+                } else {
+                    html = `
+                        <div class="text-center py-10">
+                            <i class="ki-duotone ki-file fs-3x text-primary mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="text-gray-600 mb-3">Clique em "Download" para baixar o documento</div>
+                            <div class="text-muted fs-7 mb-5">${doc.documento_nome || 'documento'}</div>
+                            <div class="text-start">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted">Status:</span>
+                                    <span class="fw-bold">${doc.documento_status === 'aprovado' ? 'Aprovado' : doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado'}</span>
+                                </div>
+                                ${doc.documento_data_envio ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>${new Date(doc.documento_data_envio).toLocaleString('pt-BR')}</span></div>` : ''}
+                                ${doc.documento_data_aprovacao ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovação:</span><span>${new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR')}</span></div>` : ''}
+                                ${doc.documento_observacoes ? `<div class="mt-3"><strong>Observações:</strong><div class="text-gray-600">${doc.documento_observacoes}</div></div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                Swal.fire({
+                    title: 'Documento',
+                    html: html,
+                    width: isImage ? '80%' : '700px',
+                    showCancelButton: true,
+                    confirmButtonText: 'Download',
+                    cancelButtonText: 'Fechar',
+                    buttonsStyling: false,
+                    customClass: {
+                        popup: 'text-start',
+                        confirmButton: "btn fw-bold btn-primary",
+                        cancelButton: "btn fw-bold btn-active-light-primary"
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.open('../' + doc.documento_anexo, '_blank');
+                    }
+                });
+            } else {
+                Swal.fire('Erro', data.message || 'Erro ao carregar documento', 'error');
+            }
+        })
+        .catch(error => {
+            Swal.fire('Erro', 'Erro ao carregar documento', 'error');
+        });
 }
 </script>
 
