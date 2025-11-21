@@ -20,6 +20,36 @@ if (!isset($_SESSION['usuario'])) {
 
 try {
     $pdo = getDB();
+    
+    // Verifica e cria a tabela onesignal_subscriptions se não existir
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE 'onesignal_subscriptions'");
+        if ($stmt->rowCount() == 0) {
+            // Cria a tabela automaticamente
+            $pdo->exec("
+                CREATE TABLE onesignal_subscriptions (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    usuario_id INT NULL,
+                    colaborador_id INT NULL,
+                    player_id VARCHAR(255) NOT NULL UNIQUE,
+                    device_type VARCHAR(50),
+                    user_agent VARCHAR(500),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_usuario (usuario_id),
+                    INDEX idx_colaborador (colaborador_id),
+                    INDEX idx_player_id (player_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        }
+    } catch (PDOException $e) {
+        // Ignora se já existe
+        if (strpos($e->getMessage(), 'already exists') === false && 
+            strpos($e->getMessage(), '1050') === false) {
+            throw $e;
+        }
+    }
+    
     $usuario = $_SESSION['usuario'];
     $usuario_id = $usuario['id'] ?? null;
     $colaborador_id = $usuario['colaborador_id'] ?? null;

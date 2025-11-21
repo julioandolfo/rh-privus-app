@@ -9,18 +9,47 @@ const PWAInstallPrompt = {
     isAndroid: /Android/.test(navigator.userAgent),
     
     init() {
-        // Detecta quando o browser está pronto para instalar (Android)
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            this.deferredPrompt = e;
-            this.showInstallBanner();
-        });
-        
         // Verifica se já está instalado
         if (window.matchMedia('(display-mode: standalone)').matches) {
             console.log('✅ PWA já está instalado!');
             return;
         }
+        
+        // Verifica se foi dispensado há menos de 30 dias
+        const dismissed = localStorage.getItem('pwa-install-dismissed');
+        if (dismissed) {
+            const dismissedDate = parseInt(dismissed);
+            const thirtyDays = 30 * 24 * 60 * 60 * 1000; // 30 dias em milissegundos
+            const daysSinceDismissed = Date.now() - dismissedDate;
+            
+            if (daysSinceDismissed < thirtyDays) {
+                const daysRemaining = Math.ceil((thirtyDays - daysSinceDismissed) / (24 * 60 * 60 * 1000));
+                console.log(`Banner de instalação dispensado. Aparecerá novamente em ${daysRemaining} dias.`);
+                // Não mostra o banner, mas ainda escuta o evento para caso o usuário queira instalar manualmente
+            }
+        }
+        
+        // Detecta quando o browser está pronto para instalar (Android)
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredPrompt = e;
+            
+            // Só mostra o banner se não foi dispensado recentemente
+            const dismissed = localStorage.getItem('pwa-install-dismissed');
+            if (!dismissed) {
+                this.showInstallBanner();
+            } else {
+                const dismissedDate = parseInt(dismissed);
+                const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+                const daysSinceDismissed = Date.now() - dismissedDate;
+                
+                if (daysSinceDismissed >= thirtyDays) {
+                    // Limpa o registro antigo e mostra novamente
+                    localStorage.removeItem('pwa-install-dismissed');
+                    this.showInstallBanner();
+                }
+            }
+        });
         
         // Mostra instruções para iOS
         if (this.isIOS) {
@@ -34,6 +63,12 @@ const PWAInstallPrompt = {
     },
     
     showInstallBanner() {
+        // Verifica se já existe um banner na tela
+        if (document.getElementById('pwa-install-banner')) {
+            console.log('Banner já está sendo exibido');
+            return;
+        }
+        
         // Verifica se foi dispensado há menos de 30 dias
         const dismissed = localStorage.getItem('pwa-install-dismissed');
         if (dismissed) {
@@ -45,6 +80,9 @@ const PWAInstallPrompt = {
                 const daysRemaining = Math.ceil((thirtyDays - daysSinceDismissed) / (24 * 60 * 60 * 1000));
                 console.log(`Banner de instalação dispensado. Aparecerá novamente em ${daysRemaining} dias.`);
                 return; // Não mostra o banner
+            } else {
+                // Limpa o registro antigo (mais de 30 dias)
+                localStorage.removeItem('pwa-install-dismissed');
             }
         }
         
@@ -125,8 +163,14 @@ const PWAInstallPrompt = {
         if (outcome === 'accepted') {
             console.log('✅ Usuário aceitou instalação');
             document.getElementById('pwa-install-banner')?.remove();
+            // Remove o registro de dispensado já que foi instalado
+            localStorage.removeItem('pwa-install-dismissed');
         } else {
             console.log('❌ Usuário recusou instalação');
+            // Salva preferência para não mostrar novamente por 30 dias
+            localStorage.setItem('pwa-install-dismissed', Date.now());
+            document.getElementById('pwa-install-banner')?.remove();
+            console.log('Banner dispensado. Aparecerá novamente em 30 dias.');
         }
         
         this.deferredPrompt = null;

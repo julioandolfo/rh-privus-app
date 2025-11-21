@@ -53,6 +53,51 @@ if (empty($player_id)) {
 try {
     $pdo = getDB();
     
+    // Verifica e cria a tabela onesignal_subscriptions se não existir
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE 'onesignal_subscriptions'");
+        if ($stmt->rowCount() == 0) {
+            // Cria a tabela automaticamente
+            // Remove FOREIGN KEY temporariamente para evitar erros se tabelas referenciadas não existirem
+            $pdo->exec("
+                CREATE TABLE onesignal_subscriptions (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    usuario_id INT NULL,
+                    colaborador_id INT NULL,
+                    player_id VARCHAR(255) NOT NULL UNIQUE,
+                    device_type VARCHAR(50),
+                    user_agent VARCHAR(500),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_usuario (usuario_id),
+                    INDEX idx_colaborador (colaborador_id),
+                    INDEX idx_player_id (player_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+            
+            // Tenta adicionar FOREIGN KEY se as tabelas existirem
+            try {
+                $pdo->exec("ALTER TABLE onesignal_subscriptions 
+                    ADD CONSTRAINT fk_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE");
+            } catch (PDOException $e) {
+                // Ignora se não conseguir adicionar FOREIGN KEY
+            }
+            
+            try {
+                $pdo->exec("ALTER TABLE onesignal_subscriptions 
+                    ADD CONSTRAINT fk_colaborador FOREIGN KEY (colaborador_id) REFERENCES colaboradores(id) ON DELETE CASCADE");
+            } catch (PDOException $e) {
+                // Ignora se não conseguir adicionar FOREIGN KEY
+            }
+        }
+    } catch (PDOException $e) {
+        // Ignora se já existe
+        if (strpos($e->getMessage(), 'already exists') === false && 
+            strpos($e->getMessage(), '1050') === false) {
+            throw $e;
+        }
+    }
+    
     $usuario_id = $usuario['id'] ?? null;
     $colaborador_id = $usuario['colaborador_id'] ?? null;
     
