@@ -69,12 +69,21 @@ self.addEventListener('fetch', (event) => {
   
   // Ignora requisições POST, PUT, DELETE, PATCH (não podem ser cacheadas)
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    return fetch(request);
+    return fetch(request, { redirect: 'follow' });
   }
   
   // Ignora requisições de API e OneSignal (não devem ser cacheadas)
   if (url.pathname.includes('/api/') || url.pathname.includes('onesignal.com')) {
-    return fetch(request);
+    return fetch(request, { redirect: 'follow' });
+  }
+  
+  // Ignora requisições que podem resultar em redirects (index.php, etc)
+  // Essas não devem ser cacheadas pelo Service Worker
+  if (url.pathname === BASE_PATH + '/' || 
+      url.pathname === BASE_PATH + '/index.php' ||
+      url.pathname.endsWith('/')) {
+    // Deixa o browser lidar normalmente com redirects
+    return fetch(request, { redirect: 'follow' });
   }
   
   event.respondWith(
@@ -85,10 +94,20 @@ self.addEventListener('fetch', (event) => {
           return response;
         }
         
-        // Clone da requisição
-        const fetchRequest = request.clone();
+        // Cria nova requisição com redirect: 'follow' explicitamente
+        const fetchOptions = {
+          redirect: 'follow',
+          credentials: request.credentials,
+          cache: 'default'
+        };
         
-        return fetch(fetchRequest).then((response) => {
+        return fetch(request, fetchOptions).then((response) => {
+          // Se a resposta foi um redirect (status 301, 302, etc), não faz cache
+          if (response.redirected || response.status === 301 || response.status === 302 || 
+              response.status === 303 || response.status === 307 || response.status === 308) {
+            return response; // Retorna sem fazer cache
+          }
+          
           // Verifica se resposta é válida e pode ser cacheada
           if (!response || response.status !== 200 || response.type !== 'basic') {
             return response;
@@ -98,6 +117,14 @@ self.addEventListener('fetch', (event) => {
           const responseUrl = new URL(response.url);
           if (responseUrl.protocol !== 'http:' && responseUrl.protocol !== 'https:') {
             return response; // Não faz cache
+          }
+          
+          // Não faz cache de páginas PHP que podem ter redirects
+          if (responseUrl.pathname.endsWith('.php') && 
+              (responseUrl.pathname.includes('index') || 
+               responseUrl.pathname.includes('login') ||
+               responseUrl.pathname.includes('dashboard'))) {
+            return response; // Retorna sem fazer cache
           }
           
           // Clone da resposta
@@ -128,7 +155,8 @@ self.addEventListener('fetch', (event) => {
           return response;
         }).catch((error) => {
           console.warn('Erro no fetch:', error);
-          return fetch(request); // Fallback para fetch normal
+          // Fallback para fetch normal com redirect: 'follow'
+          return fetch(request, { redirect: 'follow' });
         });
       })
   );
