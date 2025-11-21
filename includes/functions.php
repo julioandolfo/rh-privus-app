@@ -111,7 +111,46 @@ function check_permission($role_required) {
  */
 function require_login() {
     if (!isset($_SESSION['usuario'])) {
-        header('Location: ' . get_login_url());
+        // Limpa qualquer output buffer antes do redirect
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        // Headers para evitar cache
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        // Obtém URL de login
+        $loginUrl = get_login_url();
+        
+        // Se URL é relativa, converte para absoluta se necessário
+        if (strpos($loginUrl, 'http') !== 0) {
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'];
+            $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
+            
+            // Remove /rh-privus ou /rh do caminho se necessário
+            $scriptPath = str_replace(['/rh-privus', '/rh'], '', $scriptPath);
+            $scriptPath = rtrim($scriptPath, '/');
+            
+            // Se loginUrl já começa com /, usa direto
+            if (strpos($loginUrl, '/') === 0) {
+                $loginUrl = $protocol . '://' . $host . $loginUrl;
+            } else {
+                // Se é relativa (ex: login.php ou ../login.php), resolve
+                if (strpos($loginUrl, '../') === 0) {
+                    // Remove ../ e adiciona /rh/
+                    $loginUrl = str_replace('../', '', $loginUrl);
+                    $loginUrl = $protocol . '://' . $host . '/rh/' . $loginUrl;
+                } else {
+                    // Relativa ao diretório atual
+                    $loginUrl = $protocol . '://' . $host . '/rh/' . $loginUrl;
+                }
+            }
+        }
+        
+        header('Location: ' . $loginUrl, true, 302);
         exit;
     }
 }

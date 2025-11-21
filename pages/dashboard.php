@@ -3,12 +3,26 @@
  * Dashboard - Página Inicial (Metronic Theme com Gráficos)
  */
 
+// IMPORTANTE: Garante que nenhum output seja enviado antes dos headers
+ob_start();
+
+// Headers para evitar cache e garantir resposta correta
+header('Cache-Control: no-cache, no-store, must-revalidate, private');
+header('Pragma: no-cache');
+header('Expires: 0');
+header('X-Content-Type-Options: nosniff');
+
 $page_title = 'Dashboard';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/header.php';
 
+// Verifica login ANTES de incluir o header
 require_login();
+
+// Limpa buffer antes de incluir header (que vai gerar HTML)
+ob_end_clean();
+
+require_once __DIR__ . '/../includes/header.php';
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
