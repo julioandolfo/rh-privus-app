@@ -22,22 +22,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 try {
     $pdo = getDB();
     
-    // Verifica se tabela existe
+    // Verifica e cria a tabela se não existir
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE 'onesignal_config'");
+        if ($stmt->rowCount() == 0) {
+            // Cria a tabela automaticamente
+            $pdo->exec("
+                CREATE TABLE onesignal_config (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    app_id VARCHAR(255) NOT NULL,
+                    rest_api_key VARCHAR(255) NOT NULL,
+                    safari_web_id VARCHAR(255) NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        }
+    } catch (PDOException $e) {
+        // Ignora se já existe
+        if (strpos($e->getMessage(), 'already exists') === false && 
+            strpos($e->getMessage(), '1050') === false) {
+            throw $e;
+        }
+    }
+    
+    // Busca configurações
     try {
         $stmt = $pdo->query("SELECT app_id, safari_web_id FROM onesignal_config ORDER BY id DESC LIMIT 1");
         $config = $stmt->fetch();
     } catch (PDOException $e) {
-        // Tabela não existe ainda
+        // Se ainda der erro, retorna sem configuração
         echo json_encode([
             'appId' => null,
             'safariWebId' => null,
-            'message' => 'Tabela onesignal_config não existe. Execute a migração primeiro.',
-            'error' => 'Table not found'
+            'message' => 'Erro ao buscar configurações do OneSignal. Verifique o banco de dados.',
+            'error' => $e->getMessage()
         ]);
         exit;
     }
     
-    if (!$config) {
+    if (!$config || empty($config['app_id'])) {
         echo json_encode([
             'appId' => null,
             'safariWebId' => null,
