@@ -21,7 +21,7 @@
     <!--begin::Javascript-->
     <script>var hostUrl = "../assets/";</script>
     <!--begin::jQuery (carregado primeiro para estar disponível para outros scripts)-->
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha256-3gJwYp4gkL8QaXQ5lH0hZGtIsfRSAxEPPVPBJ6+GIG8=" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=" crossorigin="anonymous"></script>
     <script>
         if (typeof window.jQuery === 'undefined') {
             document.write('<script src="../assets/vendor/jquery/jquery-3.6.1.min.js"><\/script>');
