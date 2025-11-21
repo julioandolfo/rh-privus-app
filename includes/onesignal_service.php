@@ -90,8 +90,14 @@ if (!function_exists('onesignal_send_notification')) {
         $payload = [
             'app_id' => $config['app_id'],
             'include_player_ids' => $subscriptions,
-            'headings' => ['pt' => $titulo],
-            'contents' => ['pt' => $mensagem],
+            'headings' => [
+                'pt' => $titulo,
+                'en' => $titulo,
+            ],
+            'contents' => [
+                'pt' => $mensagem,
+                'en' => $mensagem,
+            ],
             'url' => $url,
             'chrome_web_icon' => $icone,
             'chrome_web_badge' => $badge,
