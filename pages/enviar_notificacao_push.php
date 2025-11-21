@@ -14,13 +14,22 @@ if (!function_exists('log_push_debug')) {
         $formatted = "[{$timestamp}] {$message}";
         error_log($formatted);
         
-        $logDir = __DIR__ . '/../storage/logs';
+        $projectRoot = dirname(__DIR__);
+        $logDir = $projectRoot . '/logs';
+        
         if (!is_dir($logDir)) {
-            @mkdir($logDir, 0775, true);
+            $created = @mkdir($logDir, 0775, true);
+            if (!$created && !is_dir($logDir)) {
+                error_log("[LOG_PUSH_DEBUG] Falha ao criar diretório de logs em: {$logDir}");
+                return;
+            }
         }
         
         $logFile = $logDir . '/enviar_notificacao_push.log';
-        file_put_contents($logFile, $formatted . PHP_EOL, FILE_APPEND);
+        $result = @file_put_contents($logFile, $formatted . PHP_EOL, FILE_APPEND | LOCK_EX);
+        if ($result === false) {
+            error_log("[LOG_PUSH_DEBUG] Falha ao escrever no arquivo de log: {$logFile}");
+        }
     }
 }
 
