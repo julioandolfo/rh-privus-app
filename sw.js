@@ -1,6 +1,6 @@
 // Service Worker - RH Privus PWA
 // OneSignal SDK será carregado automaticamente via OneSignalSDKWorker.js
-const CACHE_NAME = 'rh-privus-v3'; // Atualizado para corrigir redirects em login/logout
+const CACHE_NAME = 'rh-privus-v4'; // Atualizado para corrigir redirects em dashboard.php
 
 // Detecta BASE_PATH automaticamente
 // Funciona tanto em /rh-privus/ (localhost) quanto /rh/ (produção)
@@ -19,8 +19,8 @@ try {
 }
 
 const urlsToCache = [
-  // Não inclui login.php, logout.php ou index.php pois podem ter redirects dinâmicos
-  BASE_PATH + '/pages/dashboard.php',
+  // Não inclui login.php, logout.php, index.php ou dashboard.php pois podem ter redirects dinâmicos baseados em autenticação
+  // Apenas arquivos estáticos são cacheados
   BASE_PATH + '/assets/css/style.bundle.css',
   BASE_PATH + '/assets/js/scripts.bundle.js',
   BASE_PATH + '/assets/plugins/global/plugins.bundle.css',
@@ -81,14 +81,16 @@ self.addEventListener('fetch', (event) => {
     return fetch(request, { redirect: 'follow' });
   }
   
-  // Ignora requisições que podem resultar em redirects (index.php, login.php, logout.php, etc)
-  // Essas não devem ser cacheadas pelo Service Worker
+  // Ignora requisições que podem resultar em redirects (index.php, login.php, logout.php, dashboard.php, etc)
+  // Essas não devem ser cacheadas pelo Service Worker pois podem ter redirects dinâmicos baseados em autenticação
   if (url.pathname === BASE_PATH + '/' || 
       url.pathname === BASE_PATH + '/index.php' ||
       url.pathname === BASE_PATH + '/login.php' ||
       url.pathname === BASE_PATH + '/logout.php' ||
+      url.pathname === BASE_PATH + '/pages/dashboard.php' ||
       url.pathname.endsWith('/login.php') ||
       url.pathname.endsWith('/logout.php') ||
+      url.pathname.endsWith('/dashboard.php') ||
       url.pathname.endsWith('/')) {
     // Deixa o browser lidar normalmente com redirects
     return fetch(request, { redirect: 'follow' });
@@ -127,13 +129,19 @@ self.addEventListener('fetch', (event) => {
             return response; // Não faz cache
           }
           
-          // Não faz cache de páginas PHP que podem ter redirects
-          if (responseUrl.pathname.endsWith('.php') && 
-              (responseUrl.pathname.includes('index') || 
-               responseUrl.pathname.includes('login') ||
-               responseUrl.pathname.includes('logout') ||
-               responseUrl.pathname.includes('dashboard'))) {
-            return response; // Retorna sem fazer cache
+          // Não faz cache de páginas PHP que podem ter redirects dinâmicos baseados em autenticação
+          // Essas páginas devem sempre ser buscadas do servidor para garantir autenticação correta
+          if (responseUrl.pathname.endsWith('.php')) {
+            // Verifica se é uma página que pode ter redirects
+            const pathname = responseUrl.pathname.toLowerCase();
+            if (pathname.includes('index') || 
+                pathname.includes('login') ||
+                pathname.includes('logout') ||
+                pathname.includes('dashboard') ||
+                pathname.includes('auth') ||
+                pathname.includes('session')) {
+              return response; // Retorna sem fazer cache
+            }
           }
           
           // Clone da resposta
