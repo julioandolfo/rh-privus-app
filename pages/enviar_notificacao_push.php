@@ -523,289 +523,123 @@ include __DIR__ . '/../includes/header.php';
 </div>
 <!--end::Modal Enviar Notificação-->
 
+<?php include __DIR__ . '/../includes/footer.php'; ?>
+
 <script>
-function enviarParaUsuario(usuarioId, colaboradorId, nome) {
-    document.getElementById('modal_usuario_id').value = usuarioId || '';
-    document.getElementById('modal_colaborador_id').value = colaboradorId || '';
-    document.getElementById('modal_destinatario').value = nome || '';
-    
-    const modal = new bootstrap.Modal(document.getElementById('modal_enviar_notificacao'));
-    modal.show();
-}
-
-// Limpa formulário quando modal fecha
-document.getElementById('modal_enviar_notificacao').addEventListener('hidden.bs.modal', function() {
-    document.getElementById('form_enviar_notificacao').reset();
-    document.getElementById('modal_usuario_id').value = '';
-    document.getElementById('modal_colaborador_id').value = '';
-    document.getElementById('modal_destinatario').value = '';
-    
-    // Remove estado de loading do botão
-    const submitBtn = document.querySelector('#form_enviar_notificacao button[type="submit"]');
-    if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = submitBtn.innerHTML.replace('Enviando...', 'Enviar Notificação');
-    }
-});
-
-// Handler de submit do formulário - executa quando DOM estiver pronto
+// Aguarda jQuery estar disponível antes de executar qualquer código
 (function() {
-    var formHandlerInitialized = false;
+    'use strict';
     
-    function initFormHandler() {
-        if (formHandlerInitialized) {
-            return; // Já foi inicializado
+    // Função auxiliar para aguardar jQuery
+    function waitForJQuery(callback) {
+        if (typeof window.jQuery !== 'undefined' && typeof window.jQuery.fn !== 'undefined') {
+            callback(window.jQuery);
+        } else {
+            setTimeout(function() {
+                waitForJQuery(callback);
+            }, 50);
         }
-        
-        const form = document.getElementById('form_enviar_notificacao');
-        if (!form) {
-            console.warn('Formulário #form_enviar_notificacao não encontrado ainda, tentando novamente...');
-            setTimeout(initFormHandler, 100);
-            return;
-        }
-        
-        // Adiciona listener apenas uma vez
-        form.addEventListener('submit', function(e) {
-            console.log('=== SUBMIT DO FORMULÁRIO DETECTADO ===');
+    }
+    
+    // Aguarda jQuery e então inicializa tudo
+    waitForJQuery(function($) {
+        // Função para enviar notificação para usuário
+        window.enviarParaUsuario = function(usuarioId, colaboradorId, nome) {
+            document.getElementById('modal_usuario_id').value = usuarioId || '';
+            document.getElementById('modal_colaborador_id').value = colaboradorId || '';
+            document.getElementById('modal_destinatario').value = nome || '';
             
-            // Validação básica
-            const titulo = form.querySelector('input[name="titulo"]').value.trim();
-            const mensagem = form.querySelector('textarea[name="mensagem"]').value.trim();
-            const usuarioId = form.querySelector('input[name="usuario_id"]').value.trim();
-            const colaboradorId = form.querySelector('input[name="colaborador_id"]').value.trim();
+            const modal = new bootstrap.Modal(document.getElementById('modal_enviar_notificacao'));
+            modal.show();
+        };
+        
+        // Limpa formulário quando modal fecha
+        $('#modal_enviar_notificacao').on('hidden.bs.modal', function() {
+            $('#form_enviar_notificacao')[0].reset();
+            $('#modal_usuario_id').val('');
+            $('#modal_colaborador_id').val('');
+            $('#modal_destinatario').val('');
             
-            console.log('Dados do formulário:', {
-                titulo: titulo,
-                mensagem: mensagem,
-                usuario_id: usuarioId,
-                colaborador_id: colaboradorId
-            });
+            // Remove estado de loading do botão
+            const submitBtn = $('#form_enviar_notificacao button[type="submit"]');
+            submitBtn.prop('disabled', false);
+            submitBtn.html(submitBtn.html().replace('Enviando...', 'Enviar Notificação'));
+        });
+        
+        // Handler de submit do formulário
+        $('#form_enviar_notificacao').on('submit', function(e) {
+            const titulo = $(this).find('input[name="titulo"]').val().trim();
+            const mensagem = $(this).find('textarea[name="mensagem"]').val().trim();
+            const usuarioId = $(this).find('input[name="usuario_id"]').val().trim();
+            const colaboradorId = $(this).find('input[name="colaborador_id"]').val().trim();
             
             if (!titulo || !mensagem) {
                 e.preventDefault();
-                e.stopPropagation();
                 alert('Por favor, preencha o título e a mensagem!');
                 return false;
             }
             
             if (!usuarioId && !colaboradorId) {
                 e.preventDefault();
-                e.stopPropagation();
                 alert('Por favor, selecione um destinatário da tabela clicando no botão "Enviar" de um usuário!');
                 return false;
             }
             
             // Mostra feedback visual
-            const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                const originalHtml = submitBtn.innerHTML;
-                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
-                
-                // Se o formulário não for submetido em 30 segundos, reabilita o botão
-                setTimeout(function() {
-                    if (submitBtn.disabled) {
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = originalHtml;
-                        console.warn('Timeout: Formulário não foi submetido em 30 segundos');
-                    }
-                }, 30000);
-            }
+            const submitBtn = $(this).find('button[type="submit"]');
+            const originalHtml = submitBtn.html();
+            submitBtn.prop('disabled', true);
+            submitBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Enviando...');
             
-            console.log('Formulário validado, permitindo submit...');
-            // Permite o submit normal do formulário
-            return true;
-        });
-        
-        formHandlerInitialized = true;
-        console.log('Handler de submit do formulário inicializado');
-    }
-    
-    // Tenta inicializar imediatamente
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initFormHandler);
-    } else {
-        // DOM já está pronto
-        setTimeout(initFormHandler, 100); // Pequeno delay para garantir que o modal está renderizado
-    }
-    
-    // Também tenta quando o modal é aberto
-    const modal = document.getElementById('modal_enviar_notificacao');
-    if (modal) {
-        modal.addEventListener('shown.bs.modal', function() {
-            setTimeout(initFormHandler, 50);
-        });
-    }
-})();
-</script>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>
-
-<script>
-// Aguarda o footer carregar completamente antes de executar
-(function() {
-    'use strict';
-    
-    // Inicializa DataTables após jQuery estar carregado (no footer)
-    var dataTableInstance = null;
-    var initialized = false;
-    var jQueryInstance = null;
-    
-    function getJQuery() {
-        if (jQueryInstance && typeof jQueryInstance === 'function') {
-            return jQueryInstance;
-        }
-        if (typeof window.jQuery === 'function') {
-            jQueryInstance = window.jQuery;
-            return jQueryInstance;
-        }
-        return null;
-    }
-    
-    function initDataTable() {
-        var jq = getJQuery();
-        if (!jq) {
-            console.warn('jQuery não está disponível ainda');
-            return false;
-        }
-        
-        if (typeof jq.fn === 'undefined') {
-            console.warn('jQuery.fn não está disponível');
-            return false;
-        }
-        
-        var tableElement = jq('#kt_notificacoes_table');
-        if (!tableElement.length) {
-            console.warn('Tabela #kt_notificacoes_table não encontrada');
-            return false;
-        }
-        
-        // Evita inicialização duplicada
-        if (initialized) {
-            console.log('DataTable já foi inicializado');
-            return true;
-        }
-        
-        try {
-            // Destrói instância anterior se existir
-            if (dataTableInstance) {
-                try {
-                    dataTableInstance.destroy();
-                } catch (e) {
-                    // Ignora erros ao destruir
-                }
-                dataTableInstance = null;
-            }
-            
-            // Verifica se já foi inicializado pelo DataTables
-            if (tableElement.hasClass('dataTable')) {
-                console.log('DataTable já possui classe dataTable, pulando inicialização');
-                initialized = true;
-                return true;
-            }
-            
-            // Verifica se DataTable está disponível
-            if (typeof jq.fn.DataTable === 'undefined') {
-                console.error('Plugin DataTable não está disponível');
-                return false;
-            }
-            
-            // Inicializa DataTable
-            dataTableInstance = tableElement.DataTable({
-                language: {
-                    url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
-                },
-                pageLength: 25,
-                order: [[5, 'desc']], // Ordena por data de registro
-                responsive: true,
-                columnDefs: [
-                    { orderable: false, targets: 6 } // Coluna de ações não ordenável
-                ],
-                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-            });
-            initialized = true;
-            console.log('DataTable inicializado com sucesso');
-            return true;
-        } catch (e) {
-            console.error('Erro ao inicializar DataTable:', e);
-            return false;
-        }
-    }
-    
-    // Função para aguardar jQuery
-    function waitForJQuery(callback, timeout) {
-        timeout = timeout || 10000; // 10 segundos padrão
-        var startTime = Date.now();
-        
-        function check() {
-            var jq = typeof window.jQuery === 'function' ? window.jQuery : null;
-            if (jq && typeof jq.fn !== 'undefined') {
-                jQueryInstance = jq;
-                console.log('jQuery detectado, executando callback');
-                callback(jq);
-            } else if (Date.now() - startTime < timeout) {
-                setTimeout(check, 100);
-            } else {
-                console.error('jQuery não foi carregado após ' + (timeout / 1000) + ' segundos');
-            }
-        }
-        
-        check();
-    }
-    
-    // Função para aguardar jQuery e DataTables
-    function waitForDataTables(callback, timeout) {
-        timeout = timeout || 10000;
-        var startTime = Date.now();
-        
-        function check() {
-            var jq = getJQuery();
-            if (jq && typeof jq.fn !== 'undefined' && typeof jq.fn.DataTable !== 'undefined') {
-                console.log('DataTables detectado, executando callback');
-                callback(jq);
-            } else if (Date.now() - startTime < timeout) {
-                setTimeout(check, 100);
-            } else {
-                console.error('DataTables não foi carregado após ' + (timeout / 1000) + ' segundos');
-            }
-        }
-        
-        check();
-    }
-    
-    function scheduleInit(delay) {
-        var jq = getJQuery();
-        if (!jq) {
-            console.warn('jQuery não disponível para agendar init');
-            return;
-        }
-        jq(function() {
-            console.log('DOM pronto, inicializando DataTable em ' + delay + 'ms...');
+            // Se o formulário não for submetido em 30 segundos, reabilita o botão
             setTimeout(function() {
-                initDataTable();
-            }, delay);
+                if (submitBtn.prop('disabled')) {
+                    submitBtn.prop('disabled', false);
+                    submitBtn.html(originalHtml);
+                }
+            }, 30000);
+            
+            return true;
         });
-    }
-    
-    // Aguarda window.load para garantir que todos os scripts foram carregados
-    if (document.readyState === 'complete') {
-        // Página já carregou completamente
-        waitForJQuery(function() {
+        
+        // Inicializa DataTable quando DOM estiver pronto
+        $(document).ready(function() {
+            // Aguarda DataTables estar disponível
+            function waitForDataTables(callback) {
+                if (typeof $.fn.DataTable !== 'undefined') {
+                    callback();
+                } else {
+                    setTimeout(function() {
+                        waitForDataTables(callback);
+                    }, 100);
+                }
+            }
+            
             waitForDataTables(function() {
-                scheduleInit(500);
+                const table = $('#kt_notificacoes_table');
+                
+                // Verifica se a tabela existe e não foi inicializada
+                if (table.length && !table.hasClass('dataTable')) {
+                    try {
+                        table.DataTable({
+                            language: {
+                                url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+                            },
+                            pageLength: 25,
+                            order: [[5, 'desc']], // Ordena por data de registro
+                            responsive: true,
+                            columnDefs: [
+                                { orderable: false, targets: 6 } // Coluna de ações não ordenável
+                            ],
+                            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                        });
+                    } catch (e) {
+                        console.error('Erro ao inicializar DataTable:', e);
+                    }
+                }
             });
         });
-    } else {
-        // Aguarda window.load
-        window.addEventListener('load', function() {
-            console.log('Window load completo, aguardando jQuery...');
-            waitForJQuery(function() {
-                waitForDataTables(function() {
-                    scheduleInit(500);
-                });
-            });
-        });
-    }
+    });
 })();
 </script>
 
