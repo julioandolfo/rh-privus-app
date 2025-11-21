@@ -35,38 +35,55 @@ try {
 
 // Processa envio de notificação
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_notificacao'])) {
-    $usuario_id = $_POST['usuario_id'] ?? null;
-    $colaborador_id = $_POST['colaborador_id'] ?? null;
+    error_log('=== INÍCIO PROCESSAMENTO NOTIFICAÇÃO ===');
+    error_log('POST data: ' . print_r($_POST, true));
+    
+    $usuario_id = !empty($_POST['usuario_id']) ? intval($_POST['usuario_id']) : null;
+    $colaborador_id = !empty($_POST['colaborador_id']) ? intval($_POST['colaborador_id']) : null;
     $titulo = trim($_POST['titulo'] ?? '');
     $mensagem = trim($_POST['mensagem'] ?? '');
     $url = trim($_POST['url'] ?? '');
     
+    error_log("Valores processados - usuario_id: {$usuario_id}, colaborador_id: {$colaborador_id}, titulo: {$titulo}, mensagem: " . substr($mensagem, 0, 50));
+    
     if (empty($titulo) || empty($mensagem)) {
         $error = 'Título e mensagem são obrigatórios!';
+        error_log('ERRO: Título ou mensagem vazios');
     } elseif (!$usuario_id && !$colaborador_id) {
         $error = 'Selecione um destinatário!';
+        error_log('ERRO: Nenhum destinatário selecionado');
     } else {
         try {
+            error_log('Iniciando envio de notificação...');
+            
             if ($colaborador_id) {
+                error_log("Enviando para colaborador_id: {$colaborador_id}");
                 $resultado = enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url ?: null);
             } else {
+                error_log("Enviando para usuario_id: {$usuario_id}");
                 $resultado = enviar_push_usuario($usuario_id, $titulo, $mensagem, $url ?: null);
             }
             
+            error_log('Resultado do envio: ' . print_r($resultado, true));
+            
             if ($resultado['success']) {
                 $success = "Notificação enviada com sucesso para {$resultado['enviadas']} dispositivo(s)!";
+                error_log("SUCESSO: {$success}");
                 // Recarrega a página após 1 segundo para atualizar a lista
                 header('Location: ' . $_SERVER['PHP_SELF'] . '?success=' . urlencode($success));
                 exit;
             } else {
                 $error = $resultado['message'] ?? 'Erro desconhecido ao enviar notificação';
+                error_log("ERRO no resultado: {$error}");
             }
         } catch (Exception $e) {
             $error = 'Erro ao enviar notificação: ' . $e->getMessage();
-            error_log('Erro ao enviar push notification: ' . $e->getMessage());
+            error_log('EXCEÇÃO ao enviar push notification: ' . $e->getMessage());
             error_log('Stack trace: ' . $e->getTraceAsString());
         }
     }
+    
+    error_log('=== FIM PROCESSAMENTO NOTIFICAÇÃO ===');
 }
 
 // Busca subscriptions com informações dos usuários
@@ -405,11 +422,11 @@ include __DIR__ . '/../includes/header.php';
                     </i>
                 </div>
             </div>
-            <form method="POST" id="form_enviar_notificacao">
+            <form method="POST" id="form_enviar_notificacao" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">
                 <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
                     <input type="hidden" name="enviar_notificacao" value="1">
-                    <input type="hidden" name="usuario_id" id="modal_usuario_id">
-                    <input type="hidden" name="colaborador_id" id="modal_colaborador_id">
+                    <input type="hidden" name="usuario_id" id="modal_usuario_id" value="">
+                    <input type="hidden" name="colaborador_id" id="modal_colaborador_id" value="">
                     
                     <div class="mb-5">
                         <label class="form-label required">Destinatário</label>
@@ -466,7 +483,104 @@ document.getElementById('modal_enviar_notificacao').addEventListener('hidden.bs.
     document.getElementById('modal_usuario_id').value = '';
     document.getElementById('modal_colaborador_id').value = '';
     document.getElementById('modal_destinatario').value = '';
+    
+    // Remove estado de loading do botão
+    const submitBtn = document.querySelector('#form_enviar_notificacao button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = submitBtn.innerHTML.replace('Enviando...', 'Enviar Notificação');
+    }
 });
+
+// Handler de submit do formulário - executa quando DOM estiver pronto
+(function() {
+    var formHandlerInitialized = false;
+    
+    function initFormHandler() {
+        if (formHandlerInitialized) {
+            return; // Já foi inicializado
+        }
+        
+        const form = document.getElementById('form_enviar_notificacao');
+        if (!form) {
+            console.warn('Formulário #form_enviar_notificacao não encontrado ainda, tentando novamente...');
+            setTimeout(initFormHandler, 100);
+            return;
+        }
+        
+        // Adiciona listener apenas uma vez
+        form.addEventListener('submit', function(e) {
+            console.log('=== SUBMIT DO FORMULÁRIO DETECTADO ===');
+            
+            // Validação básica
+            const titulo = form.querySelector('input[name="titulo"]').value.trim();
+            const mensagem = form.querySelector('textarea[name="mensagem"]').value.trim();
+            const usuarioId = form.querySelector('input[name="usuario_id"]').value.trim();
+            const colaboradorId = form.querySelector('input[name="colaborador_id"]').value.trim();
+            
+            console.log('Dados do formulário:', {
+                titulo: titulo,
+                mensagem: mensagem,
+                usuario_id: usuarioId,
+                colaborador_id: colaboradorId
+            });
+            
+            if (!titulo || !mensagem) {
+                e.preventDefault();
+                e.stopPropagation();
+                alert('Por favor, preencha o título e a mensagem!');
+                return false;
+            }
+            
+            if (!usuarioId && !colaboradorId) {
+                e.preventDefault();
+                e.stopPropagation();
+                alert('Por favor, selecione um destinatário da tabela clicando no botão "Enviar" de um usuário!');
+                return false;
+            }
+            
+            // Mostra feedback visual
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                const originalHtml = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+                
+                // Se o formulário não for submetido em 30 segundos, reabilita o botão
+                setTimeout(function() {
+                    if (submitBtn.disabled) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalHtml;
+                        console.warn('Timeout: Formulário não foi submetido em 30 segundos');
+                    }
+                }, 30000);
+            }
+            
+            console.log('Formulário validado, permitindo submit...');
+            // Permite o submit normal do formulário
+            return true;
+        });
+        
+        formHandlerInitialized = true;
+        console.log('Handler de submit do formulário inicializado');
+    }
+    
+    // Tenta inicializar imediatamente
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initFormHandler);
+    } else {
+        // DOM já está pronto
+        setTimeout(initFormHandler, 100); // Pequeno delay para garantir que o modal está renderizado
+    }
+    
+    // Também tenta quando o modal é aberto
+    const modal = document.getElementById('modal_enviar_notificacao');
+    if (modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+            setTimeout(initFormHandler, 50);
+        });
+    }
+})();
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
