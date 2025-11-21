@@ -20,6 +20,10 @@
     
     <!--begin::Javascript-->
     <script>var hostUrl = "../assets/";</script>
+    <!--begin::jQuery (carregado primeiro para estar disponível para outros scripts)-->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <!--end::jQuery-->
+    
     <!--begin::Global Javascript Bundle(mandatory for all pages)-->
     <script src="../assets/plugins/global/plugins.bundle.js"></script>
     <script src="../assets/js/scripts.bundle.js"></script>
@@ -38,10 +42,6 @@
     <script src="../assets/js/pwa-install-prompt.js"></script>
     <!--end::PWA Install Prompt-->
     
-    <!--begin::Custom Javascript-->
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <!--end::Custom Javascript-->
-    
     <!--begin::Vendors Javascript(used for this page only)-->
     <script src="../assets/plugins/custom/datatables/datatables.bundle.js"></script>
     <!--end::Vendors Javascript-->
@@ -58,6 +58,17 @@
     <script>
         // Sistema de Troca de Tema
         (function() {
+            // Aguarda jQuery estar disponível (proteção extra)
+            function waitForJQuery(callback) {
+                if (typeof window.jQuery !== 'undefined' || typeof window.$ !== 'undefined') {
+                    callback();
+                } else {
+                    setTimeout(function() {
+                        waitForJQuery(callback);
+                    }, 50);
+                }
+            }
+            
             var themeMode = localStorage.getItem("data-bs-theme") || "light";
             
             // Função para aplicar o tema
@@ -69,32 +80,45 @@
                 document.documentElement.setAttribute("data-bs-theme", mode);
                 localStorage.setItem("data-bs-theme", savedMode);
                 
-                // Atualiza ícones
-                if (mode === "dark") {
-                    $('.theme-light-show').hide();
-                    $('.theme-dark-show').show();
-                } else {
-                    $('.theme-light-show').show();
-                    $('.theme-dark-show').hide();
-                }
+                // Atualiza ícones usando jQuery se disponível
+                waitForJQuery(function() {
+                    var $ = window.jQuery || window.$;
+                    if ($) {
+                        if (mode === "dark") {
+                            $('.theme-light-show').hide();
+                            $('.theme-dark-show').show();
+                        } else {
+                            $('.theme-light-show').show();
+                            $('.theme-dark-show').hide();
+                        }
+                    }
+                });
             }
             
             // Aplica tema inicial após jQuery estar carregado
-            $(document).ready(function() {
-                setTheme(themeMode);
-                
-                // Listener para mudanças no sistema
-                if (themeMode === "system") {
-                    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function() {
-                        setTheme("system");
-                    });
+            waitForJQuery(function() {
+                var $ = window.jQuery || window.$;
+                if (!$) {
+                    console.warn('jQuery não disponível para sistema de tema');
+                    return;
                 }
                 
-                // Handler para cliques no menu de tema
-                $(document).on('click', '[data-kt-element="mode"]', function(e) {
-                    e.preventDefault();
-                    themeMode = $(this).attr('data-kt-value');
+                $(document).ready(function() {
                     setTheme(themeMode);
+                    
+                    // Listener para mudanças no sistema
+                    if (themeMode === "system") {
+                        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function() {
+                            setTheme("system");
+                        });
+                    }
+                    
+                    // Handler para cliques no menu de tema
+                    $(document).on('click', '[data-kt-element="mode"]', function(e) {
+                        e.preventDefault();
+                        themeMode = $(this).attr('data-kt-value');
+                        setTheme(themeMode);
+                    });
                 });
             });
         })();
@@ -386,24 +410,32 @@
         })();
         
         // Inicializa DataTables em tabelas com classe .datatable
-        $(document).ready(function() {
-            $('.datatable').each(function() {
-                if (!$(this).hasClass('dataTable') && !$(this).attr('id')) {
-                    var dt = $(this).DataTable({
-                        language: {
-                            url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
-                        },
-                        pageLength: 25,
-                        order: [[0, 'desc']],
-                        responsive: true,
-                        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+        // Aguarda jQuery estar disponível
+        (function waitForJQuery() {
+            if (typeof window.jQuery !== 'undefined' || typeof window.$ !== 'undefined') {
+                var $ = window.jQuery || window.$;
+                $(document).ready(function() {
+                    $('.datatable').each(function() {
+                        if (!$(this).hasClass('dataTable') && !$(this).attr('id')) {
+                            var dt = $(this).DataTable({
+                                language: {
+                                    url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+                                },
+                                pageLength: 25,
+                                order: [[0, 'desc']],
+                                responsive: true,
+                                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                            });
+                            
+                            // Hook no evento draw - não reinicializa menus para evitar conflito com menu lateral
+                            // Cada página específica deve reinicializar apenas seus próprios menus
+                        }
                     });
-                    
-                    // Hook no evento draw - não reinicializa menus para evitar conflito com menu lateral
-                    // Cada página específica deve reinicializar apenas seus próprios menus
-                }
-            });
-        });
+                });
+            } else {
+                setTimeout(waitForJQuery, 50);
+            }
+        })();
     </script>
     <!--end::Custom Javascript-->
     

@@ -37,6 +37,10 @@ function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = nul
         
         // Chama API do OneSignal internamente
         $apiUrl = get_base_url() . '/api/onesignal/send.php';
+        
+        // Log da URL para debug
+        error_log("enviar_push_colaborador - Tentando acessar: {$apiUrl}");
+        
         $ch = curl_init($apiUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
@@ -63,15 +67,22 @@ function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = nul
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
+        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
         curl_close($ch);
         
         // Log detalhado para debug
         error_log("enviar_push_colaborador - HTTP Code: {$httpCode}");
+        error_log("enviar_push_colaborador - URL Efetiva: {$effectiveUrl}");
         error_log("enviar_push_colaborador - Response: " . substr($response, 0, 500));
         
         if ($curlError) {
             error_log("enviar_push_colaborador - cURL Error: {$curlError}");
             throw new Exception('Erro cURL: ' . $curlError);
+        }
+        
+        if ($httpCode === 404) {
+            error_log("enviar_push_colaborador - Erro 404: Arquivo não encontrado em {$apiUrl}");
+            throw new Exception("API não encontrada (404). URL tentada: {$apiUrl}");
         }
         
         if ($httpCode === 200 || $httpCode === 201) {
@@ -135,6 +146,10 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null) {
         }
         
         $apiUrl = get_base_url() . '/api/onesignal/send.php';
+        
+        // Log da URL para debug
+        error_log("enviar_push_usuario - Tentando acessar: {$apiUrl}");
+        
         $ch = curl_init($apiUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
@@ -161,15 +176,22 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null) {
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
+        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
         curl_close($ch);
         
         // Log detalhado para debug
         error_log("enviar_push_usuario - HTTP Code: {$httpCode}");
+        error_log("enviar_push_usuario - URL Efetiva: {$effectiveUrl}");
         error_log("enviar_push_usuario - Response: " . substr($response, 0, 500));
         
         if ($curlError) {
             error_log("enviar_push_usuario - cURL Error: {$curlError}");
             throw new Exception('Erro cURL: ' . $curlError);
+        }
+        
+        if ($httpCode === 404) {
+            error_log("enviar_push_usuario - Erro 404: Arquivo não encontrado em {$apiUrl}");
+            throw new Exception("API não encontrada (404). URL tentada: {$apiUrl}");
         }
         
         if ($httpCode === 200 || $httpCode === 201) {

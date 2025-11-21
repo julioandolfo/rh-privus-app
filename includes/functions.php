@@ -40,16 +40,44 @@ function getDB() {
 function get_base_url() {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'];
-    $script = $_SERVER['SCRIPT_NAME'];
-    $path = dirname($script);
     
-    // Remove barras duplas e ajusta
-    $path = rtrim($path, '/');
-    if ($path === '.') {
-        $path = '';
+    // Detecta o caminho base automaticamente
+    $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+    $documentRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+    
+    // Remove query string do REQUEST_URI
+    $requestUri = strtok($requestUri, '?');
+    
+    // Detecta se está em /rh-privus/ (localhost) ou /rh/ (produção)
+    $basePath = '/rh'; // Padrão para produção
+    
+    // Prioridade 1: REQUEST_URI (mais confiável)
+    if (!empty($requestUri)) {
+        if (strpos($requestUri, '/rh-privus/') !== false || strpos($requestUri, '/rh-privus') !== false) {
+            $basePath = '/rh-privus';
+        } elseif (strpos($requestUri, '/rh/') !== false || preg_match('#^/rh[^a-z]#', $requestUri)) {
+            $basePath = '/rh';
+        }
     }
     
-    return $protocol . '://' . $host . $path;
+    // Prioridade 2: SCRIPT_NAME (fallback)
+    if ($basePath === '/rh' && !empty($scriptName)) {
+        if (strpos($scriptName, '/rh-privus') !== false) {
+            $basePath = '/rh-privus';
+        } elseif (strpos($scriptName, '/rh') !== false && strpos($scriptName, '/rh-privus') === false) {
+            $basePath = '/rh';
+        }
+    }
+    
+    // Prioridade 3: DOCUMENT_ROOT (último recurso)
+    if ($basePath === '/rh' && !empty($documentRoot)) {
+        if (strpos($documentRoot, 'rh-privus') !== false) {
+            $basePath = '/rh-privus';
+        }
+    }
+    
+    return $protocol . '://' . $host . $basePath;
 }
 
 /**
