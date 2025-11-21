@@ -145,9 +145,16 @@ try {
     $badge = $baseUrl . $basePath . '/assets/media/logos/favicon.png';
     
     // Envia notificação via OneSignal REST API
+    error_log("OneSignal API - Iniciando envio para " . count($subscriptions) . " player(s)");
+    error_log("OneSignal API - Título: {$titulo}");
+    error_log("OneSignal API - Mensagem: " . substr($mensagem, 0, 50));
+    
     $ch = curl_init('https://onesignal.com/api/v1/notifications');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Timeout de 90 segundos para OneSignal
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30); // Timeout de conexão de 30 segundos
+    curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'Authorization: Basic ' . $config['rest_api_key']
@@ -165,7 +172,11 @@ try {
     
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     
+    $startTime = microtime(true);
     $response = curl_exec($ch);
+    $elapsedTime = microtime(true) - $startTime;
+    
+    error_log("OneSignal API - Requisição concluída em " . round($elapsedTime, 2) . " segundos");
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlError = curl_error($ch);
     curl_close($ch);
@@ -177,7 +188,16 @@ try {
     
     if ($curlError) {
         error_log("OneSignal API - cURL Error: {$curlError}");
-        throw new Exception('Erro cURL: ' . $curlError);
+        error_log("OneSignal API - HTTP Code: {$httpCode}");
+        error_log("OneSignal API - Tempo decorrido: " . round($elapsedTime, 2) . " segundos");
+        error_log("OneSignal API - Número de subscriptions: " . count($subscriptions));
+        
+        // Mensagem mais amigável para timeout
+        if (strpos($curlError, 'timeout') !== false || strpos($curlError, 'timed out') !== false) {
+            throw new Exception('A requisição ao OneSignal demorou muito para responder. Isso pode acontecer se houver muitos dispositivos para notificar. Tente novamente em alguns instantes.');
+        }
+        
+        throw new Exception('Erro ao comunicar com OneSignal: ' . $curlError);
     }
     
     if ($httpCode === 200 || $httpCode === 201) {

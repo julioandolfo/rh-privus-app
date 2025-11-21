@@ -181,10 +181,17 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null) {
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Timeout de conexão de 10 segundos
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120); // Timeout de 120 segundos (2 minutos)
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30); // Timeout de conexão de 30 segundos
+        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+        
+        error_log("enviar_push_usuario - Iniciando requisição cURL para: {$apiUrl}");
+        $startTime = microtime(true);
         
         $response = curl_exec($ch);
+        $elapsedTime = microtime(true) - $startTime;
+        
+        error_log("enviar_push_usuario - Requisição cURL concluída em " . round($elapsedTime, 2) . " segundos");
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
         $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
@@ -197,7 +204,15 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null) {
         
         if ($curlError) {
             error_log("enviar_push_usuario - cURL Error: {$curlError}");
-            throw new Exception('Erro cURL: ' . $curlError);
+            error_log("enviar_push_usuario - HTTP Code: {$httpCode}");
+            error_log("enviar_push_usuario - Tempo decorrido: " . round($elapsedTime, 2) . " segundos");
+            
+            // Mensagem mais amigável para timeout
+            if (strpos($curlError, 'timeout') !== false || strpos($curlError, 'timed out') !== false) {
+                throw new Exception('A requisição demorou muito para responder. Isso pode acontecer se houver muitos dispositivos para notificar ou se o servidor estiver sobrecarregado. Tente novamente em alguns instantes.');
+            }
+            
+            throw new Exception('Erro ao comunicar com o servidor: ' . $curlError);
         }
         
         if ($httpCode === 404) {
