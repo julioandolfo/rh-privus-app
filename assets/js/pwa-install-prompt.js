@@ -9,6 +9,15 @@ const PWAInstallPrompt = {
     isAndroid: /Android/.test(navigator.userAgent),
     
     init() {
+        try {
+            if (localStorage.getItem('pwa-install-disabled') === '1') {
+                console.log('Banner de instalação desativado pelo usuário.');
+                return;
+            }
+        } catch (err) {
+            console.warn('Não foi possível acessar o localStorage para o PWA:', err);
+        }
+        
         // Verifica se já está instalado
         if (window.matchMedia('(display-mode: standalone)').matches) {
             console.log('✅ PWA já está instalado!');
@@ -16,7 +25,12 @@ const PWAInstallPrompt = {
         }
         
         // Verifica se foi dispensado há menos de 30 dias
-        const dismissed = localStorage.getItem('pwa-install-dismissed');
+        let dismissed = null;
+        try {
+            dismissed = localStorage.getItem('pwa-install-dismissed');
+        } catch (err) {
+            console.warn('Não foi possível ler estado do banner PWA:', err);
+        }
         if (dismissed) {
             const dismissedDate = parseInt(dismissed);
             const thirtyDays = 30 * 24 * 60 * 60 * 1000; // 30 dias em milissegundos
@@ -35,7 +49,12 @@ const PWAInstallPrompt = {
             this.deferredPrompt = e;
             
             // Só mostra o banner se não foi dispensado recentemente
-            const dismissed = localStorage.getItem('pwa-install-dismissed');
+            let dismissed = null;
+            try {
+                dismissed = localStorage.getItem('pwa-install-dismissed');
+            } catch (err) {
+                console.warn('Não foi possível ler estado do banner PWA:', err);
+            }
             if (!dismissed) {
                 this.showInstallBanner();
             } else {
@@ -70,7 +89,16 @@ const PWAInstallPrompt = {
         }
         
         // Verifica se foi dispensado há menos de 30 dias
-        const dismissed = localStorage.getItem('pwa-install-dismissed');
+        if (localStorage.getItem('pwa-install-disabled') === '1') {
+            return;
+        }
+        
+        let dismissed = null;
+        try {
+            dismissed = localStorage.getItem('pwa-install-dismissed');
+        } catch (err) {
+            console.warn('Não foi possível ler estado do banner PWA:', err);
+        }
         if (dismissed) {
             const dismissedDate = parseInt(dismissed);
             const thirtyDays = 30 * 24 * 60 * 60 * 1000; // 30 dias em milissegundos
@@ -141,9 +169,13 @@ const PWAInstallPrompt = {
         // Botão de fechar
         document.getElementById('pwa-install-close').addEventListener('click', () => {
             banner.remove();
-            // Salva preferência para não mostrar novamente por 30 dias
-            localStorage.setItem('pwa-install-dismissed', Date.now());
-            console.log('Banner dispensado. Aparecerá novamente em 30 dias.');
+            try {
+                localStorage.setItem('pwa-install-disabled', '1');
+                localStorage.setItem('pwa-install-dismissed', Date.now());
+            } catch (err) {
+                console.warn('Não foi possível registrar a preferência do usuário para o PWA:', err);
+            }
+            console.log('Banner do PWA desativado pelo usuário. Para reativar, limpe o storage do navegador.');
         });
     },
     
@@ -168,9 +200,14 @@ const PWAInstallPrompt = {
         } else {
             console.log('❌ Usuário recusou instalação');
             // Salva preferência para não mostrar novamente por 30 dias
-            localStorage.setItem('pwa-install-dismissed', Date.now());
+            try {
+                localStorage.setItem('pwa-install-disabled', '1');
+                localStorage.setItem('pwa-install-dismissed', Date.now());
+            } catch (err) {
+                console.warn('Não foi possível registrar a preferência do usuário para o PWA:', err);
+            }
             document.getElementById('pwa-install-banner')?.remove();
-            console.log('Banner dispensado. Aparecerá novamente em 30 dias.');
+            console.log('Banner do PWA desativado pelo usuário após recusa no prompt.');
         }
         
         this.deferredPrompt = null;

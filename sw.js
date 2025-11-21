@@ -77,6 +77,11 @@ self.addEventListener('fetch', (event) => {
     return fetch(request, { redirect: 'follow' });
   }
   
+  // Fallback: se a requisição é http -> https, deixa o navegador lidar
+  if (url.protocol === 'http:' && self.location.protocol === 'https:') {
+    return fetch(request, { redirect: 'follow' });
+  }
+  
   // Ignora requisições que podem resultar em redirects (index.php, etc)
   // Essas não devem ser cacheadas pelo Service Worker
   if (url.pathname === BASE_PATH + '/' || 

@@ -21,7 +21,16 @@
     <!--begin::Javascript-->
     <script>var hostUrl = "../assets/";</script>
     <!--begin::jQuery (carregado primeiro para estar disponível para outros scripts)-->
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha256-3gJwYp4gkL8QaXQ5lH0hZGtIsfRSAxEPPVPBJ6+GIG8=" crossorigin="anonymous"></script>
+    <script>
+        if (typeof window.jQuery === 'undefined') {
+            document.write('<script src="../assets/vendor/jquery/jquery-3.6.1.min.js"><\/script>');
+            console.warn('Fallback local do jQuery carregado (CDN indisponível).');
+        }
+        if (typeof window.$ === 'undefined' && typeof window.jQuery !== 'undefined') {
+            window.$ = window.jQuery;
+        }
+    </script>
     <!--end::jQuery-->
     
     <!--begin::Global Javascript Bundle(mandatory for all pages)-->
