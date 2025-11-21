@@ -80,152 +80,25 @@ if (!$usuario_id && !$colaborador_id && !isset($input['broadcast'])) {
     exit;
 }
 
+require_once __DIR__ . '/../../includes/onesignal_service.php';
+
 try {
-    if (!function_exists('getDB')) {
-        throw new Exception('Função getDB não encontrada');
-    }
-    
-    $pdo = getDB();
-    
-    if (!$pdo) {
-        throw new Exception('Não foi possível conectar ao banco de dados');
-    }
-    
-    // Busca configurações do OneSignal
-    try {
-        $stmt = $pdo->query("SELECT app_id, rest_api_key FROM onesignal_config ORDER BY id DESC LIMIT 1");
-        $config = $stmt->fetch();
-    } catch (PDOException $e) {
-        error_log("Erro ao buscar configuração OneSignal: " . $e->getMessage());
-        throw new Exception('Erro ao buscar configuração do OneSignal: ' . $e->getMessage());
-    }
-    
-    if (!$config || empty($config['app_id']) || empty($config['rest_api_key'])) {
-        throw new Exception('OneSignal não configurado corretamente');
-    }
-    
-    // Busca player_ids baseado no critério
-    if ($colaborador_id) {
-        $stmt = $pdo->prepare("SELECT player_id FROM onesignal_subscriptions WHERE colaborador_id = ?");
-        $stmt->execute([$colaborador_id]);
-    } elseif ($usuario_id) {
-        $stmt = $pdo->prepare("SELECT player_id FROM onesignal_subscriptions WHERE usuario_id = ?");
-        $stmt->execute([$usuario_id]);
-    } else {
-        // Broadcast: envia para todos
-        $stmt = $pdo->query("SELECT player_id FROM onesignal_subscriptions");
-    }
-    
-    $subscriptions = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    
-    if (empty($subscriptions)) {
-        echo json_encode([
-            'success' => false,
-            'message' => 'Nenhuma subscription encontrada para o destinatário'
-        ]);
-        exit;
-    }
-    
-    // Prepara URL completa
-    $baseUrl = get_base_url();
-    if (strpos($url, 'http') !== 0) {
-        $url = $baseUrl . '/' . ltrim($url, '/');
-    }
-    
-    // Prepara ícone completo
-    if (!empty($icone)) {
-        if (strpos($icone, 'http') !== 0) {
-            $icone = $baseUrl . '/' . ltrim($icone, '/');
-        }
-    } else {
-        $icone = $baseUrl . $basePath . '/assets/media/logos/favicon.png';
-    }
-    
-    // Prepara badge
-    $badge = $baseUrl . $basePath . '/assets/media/logos/favicon.png';
-    
-    // Envia notificação via OneSignal REST API
-    error_log("OneSignal API - Iniciando envio para " . count($subscriptions) . " player(s)");
-    error_log("OneSignal API - Título: {$titulo}");
-    error_log("OneSignal API - Mensagem: " . substr($mensagem, 0, 50));
-    
-    $ch = curl_init('https://onesignal.com/api/v1/notifications');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 90); // Timeout de 90 segundos para OneSignal
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30); // Timeout de conexão de 30 segundos
-    curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Basic ' . $config['rest_api_key']
+    $result = onesignal_send_notification([
+        'usuario_id' => $usuario_id,
+        'colaborador_id' => $colaborador_id,
+        'broadcast' => isset($input['broadcast']) ? (bool)$input['broadcast'] : false,
+        'titulo' => $titulo,
+        'mensagem' => $mensagem,
+        'url' => $url,
+        'icone' => $icone,
     ]);
     
-    $payload = [
-        'app_id' => $config['app_id'],
-        'include_player_ids' => $subscriptions,
-        'headings' => ['pt' => $titulo],
-        'contents' => ['pt' => $mensagem],
-        'url' => $url,
-        'chrome_web_icon' => $icone,
-        'chrome_web_badge' => $badge
-    ];
-    
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-    
-    $startTime = microtime(true);
-    $response = curl_exec($ch);
-    $elapsedTime = microtime(true) - $startTime;
-    
-    error_log("OneSignal API - Requisição concluída em " . round($elapsedTime, 2) . " segundos");
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-    
-    // Log detalhado para debug
-    error_log("OneSignal API - HTTP Code: {$httpCode}");
-    error_log("OneSignal API - Player IDs: " . implode(', ', $subscriptions));
-    error_log("OneSignal API - Response: " . substr($response, 0, 1000));
-    
-    if ($curlError) {
-        error_log("OneSignal API - cURL Error: {$curlError}");
-        error_log("OneSignal API - HTTP Code: {$httpCode}");
-        error_log("OneSignal API - Tempo decorrido: " . round($elapsedTime, 2) . " segundos");
-        error_log("OneSignal API - Número de subscriptions: " . count($subscriptions));
-        
-        // Mensagem mais amigável para timeout
-        if (strpos($curlError, 'timeout') !== false || strpos($curlError, 'timed out') !== false) {
-            throw new Exception('A requisição ao OneSignal demorou muito para responder. Isso pode acontecer se houver muitos dispositivos para notificar. Tente novamente em alguns instantes.');
-        }
-        
-        throw new Exception('Erro ao comunicar com OneSignal: ' . $curlError);
-    }
-    
-    if ($httpCode === 200 || $httpCode === 201) {
-        $result = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("OneSignal API - JSON Decode Error: " . json_last_error_msg());
-            throw new Exception('Erro ao decodificar resposta do OneSignal: ' . json_last_error_msg());
-        }
-        error_log("OneSignal API - Sucesso! OneSignal ID: " . ($result['id'] ?? 'N/A'));
-        echo json_encode([
-            'success' => true,
-            'enviadas' => count($subscriptions),
-            'onesignal_id' => $result['id'] ?? null,
-            'response' => $result
-        ]);
-    } else {
-        $error = json_decode($response, true);
-        $errorMessage = 'Erro ao enviar notificação';
-        if (isset($error['errors']) && is_array($error['errors']) && !empty($error['errors'])) {
-            $errorMessage = is_array($error['errors'][0]) ? ($error['errors'][0]['message'] ?? $errorMessage) : $error['errors'][0];
-        } elseif (isset($error['message'])) {
-            $errorMessage = $error['message'];
-        }
-        error_log("OneSignal API - Erro: {$errorMessage} (HTTP {$httpCode})");
-        error_log("OneSignal API - Error Response: " . print_r($error, true));
-        throw new Exception($errorMessage . ' (HTTP ' . $httpCode . ')');
-    }
-    
+    echo json_encode([
+        'success' => true,
+        'enviadas' => $result['enviadas'],
+        'onesignal_id' => $result['onesignal_id'] ?? null,
+        'response' => $result['response'] ?? null,
+    ]);
 } catch (Throwable $e) {
     error_log("Erro em send.php: " . $e->getMessage());
     error_log("Arquivo: " . $e->getFile() . ":" . $e->getLine());

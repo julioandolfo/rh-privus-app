@@ -4,6 +4,18 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/onesignal_service.php';
+
+if (!function_exists('push_log')) {
+    function push_log($message)
+    {
+        if (function_exists('log_push_debug')) {
+            log_push_debug($message);
+        } else {
+            error_log($message);
+        }
+    }
+}
 
 /**
  * Envia notificação push para um colaborador específico
@@ -18,103 +30,35 @@ function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = nul
     try {
         $pdo = getDB();
         
-        // Busca dados do colaborador para URL padrão
         if (!$url) {
             $stmt = $pdo->prepare("SELECT id FROM colaboradores WHERE id = ?");
             $stmt->execute([$colaborador_id]);
-            $colab = $stmt->fetch();
-            if ($colab) {
+            if ($stmt->fetch()) {
                 $basePath = get_base_url();
                 $url = $basePath . '/pages/colaborador_view.php?id=' . $colaborador_id;
             }
         }
         
-        // Prepara URL completa se for relativa
         if (strpos($url, 'http') !== 0) {
             $basePath = get_base_url();
             $url = $basePath . '/' . ltrim($url, '/');
         }
         
-        // Chama API do OneSignal internamente
-        $apiUrl = get_base_url() . '/api/onesignal/send.php';
-        
-        // Log da URL para debug
-        error_log("enviar_push_colaborador - Tentando acessar: {$apiUrl}");
-        
-        $ch = curl_init($apiUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        $result = onesignal_send_notification([
             'colaborador_id' => $colaborador_id,
             'titulo' => $titulo,
             'mensagem' => $mensagem,
-            'url' => $url
-        ]));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json'
-        ]);
+            'url' => $url,
+        ], 'push_log');
         
-        // Passa cookie de sessão se disponível
-        if (session_status() === PHP_SESSION_ACTIVE && isset($_COOKIE[session_name()])) {
-            curl_setopt($ch, CURLOPT_COOKIE, session_name() . '=' . $_COOKIE[session_name()]);
-        }
-        
-        // Para requisições internas, também passa variáveis de sessão via header
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-        curl_close($ch);
-        
-        // Log detalhado para debug
-        error_log("enviar_push_colaborador - HTTP Code: {$httpCode}");
-        error_log("enviar_push_colaborador - URL Efetiva: {$effectiveUrl}");
-        error_log("enviar_push_colaborador - Response: " . substr($response, 0, 500));
-        
-        if ($curlError) {
-            error_log("enviar_push_colaborador - cURL Error: {$curlError}");
-            throw new Exception('Erro cURL: ' . $curlError);
-        }
-        
-        if ($httpCode === 404) {
-            error_log("enviar_push_colaborador - Erro 404: Arquivo não encontrado em {$apiUrl}");
-            throw new Exception("API não encontrada (404). URL tentada: {$apiUrl}");
-        }
-        
-        if ($httpCode === 200 || $httpCode === 201) {
-            $data = json_decode($response, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                error_log("enviar_push_colaborador - JSON Decode Error: " . json_last_error_msg());
-                throw new Exception('Erro ao decodificar resposta: ' . json_last_error_msg());
-            }
-            error_log("enviar_push_colaborador - Sucesso! Enviadas: " . ($data['enviadas'] ?? 0));
-            return [
-                'success' => true,
-                'enviadas' => $data['enviadas'] ?? 0,
-                'message' => 'Notificação enviada com sucesso'
-            ];
-        } else {
-            $error = json_decode($response, true);
-            $errorMessage = 'Erro ao enviar notificação';
-            if (isset($error['message'])) {
-                $errorMessage = $error['message'];
-            } elseif (isset($error['errors']) && is_array($error['errors']) && !empty($error['errors'])) {
-                $errorMessage = is_array($error['errors'][0]) ? ($error['errors'][0]['message'] ?? $errorMessage) : $error['errors'][0];
-            }
-            error_log("enviar_push_colaborador - Erro: {$errorMessage} (HTTP {$httpCode})");
-            return [
-                'success' => false,
-                'enviadas' => 0,
-                'message' => $errorMessage . ' (HTTP ' . $httpCode . ')'
-            ];
-        }
+        return [
+            'success' => true,
+            'enviadas' => $result['enviadas'],
+            'message' => 'Notificação enviada com sucesso',
+        ];
         
     } catch (Exception $e) {
-        error_log("enviar_push_colaborador - Exceção: " . $e->getMessage());
+        push_log("enviar_push_colaborador - Exceção: " . $e->getMessage());
         return [
             'success' => false,
             'enviadas' => 0,
@@ -139,117 +83,26 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null) {
             $url = $basePath . '/pages/dashboard.php';
         }
         
-        // Prepara URL completa se for relativa
         if (strpos($url, 'http') !== 0) {
             $basePath = get_base_url();
             $url = $basePath . '/' . ltrim($url, '/');
         }
         
-        $apiUrl = get_base_url() . '/api/onesignal/send.php';
-        
-        // Log da URL para debug
-        error_log("enviar_push_usuario - Tentando acessar: {$apiUrl}");
-        
-        $ch = curl_init($apiUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        $result = onesignal_send_notification([
             'usuario_id' => $usuario_id,
             'titulo' => $titulo,
             'mensagem' => $mensagem,
-            'url' => $url
-        ]));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json'
-        ]);
+            'url' => $url,
+        ], 'push_log');
         
-        // Passa cookie de sessão se disponível
-        $cookieString = '';
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            if (isset($_COOKIE[session_name()])) {
-                $cookieString = session_name() . '=' . $_COOKIE[session_name()];
-            }
-            if (!empty($cookieString)) {
-                curl_setopt($ch, CURLOPT_COOKIE, $cookieString);
-                error_log("enviar_push_usuario - Cookie passado: " . session_name());
-            } else {
-                error_log("enviar_push_usuario - AVISO: Cookie de sessão não encontrado");
-            }
-        }
-        
-        // Para requisições internas, também passa variáveis de sessão via header
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 120); // Timeout de 120 segundos (2 minutos)
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30); // Timeout de conexão de 30 segundos
-        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-        
-        error_log("enviar_push_usuario - Iniciando requisição cURL para: {$apiUrl}");
-        $startTime = microtime(true);
-        
-        $response = curl_exec($ch);
-        $elapsedTime = microtime(true) - $startTime;
-        
-        error_log("enviar_push_usuario - Requisição cURL concluída em " . round($elapsedTime, 2) . " segundos");
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-        curl_close($ch);
-        
-        // Log detalhado para debug
-        error_log("enviar_push_usuario - HTTP Code: {$httpCode}");
-        error_log("enviar_push_usuario - URL Efetiva: {$effectiveUrl}");
-        error_log("enviar_push_usuario - Response: " . substr($response, 0, 500));
-        
-        if ($curlError) {
-            error_log("enviar_push_usuario - cURL Error: {$curlError}");
-            error_log("enviar_push_usuario - HTTP Code: {$httpCode}");
-            error_log("enviar_push_usuario - Tempo decorrido: " . round($elapsedTime, 2) . " segundos");
-            
-            // Mensagem mais amigável para timeout
-            if (strpos($curlError, 'timeout') !== false || strpos($curlError, 'timed out') !== false) {
-                throw new Exception('A requisição demorou muito para responder. Isso pode acontecer se houver muitos dispositivos para notificar ou se o servidor estiver sobrecarregado. Tente novamente em alguns instantes.');
-            }
-            
-            throw new Exception('Erro ao comunicar com o servidor: ' . $curlError);
-        }
-        
-        if ($httpCode === 404) {
-            error_log("enviar_push_usuario - Erro 404: Arquivo não encontrado em {$apiUrl}");
-            throw new Exception("API não encontrada (404). URL tentada: {$apiUrl}");
-        }
-        
-        if ($httpCode === 200 || $httpCode === 201) {
-            $data = json_decode($response, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                error_log("enviar_push_usuario - JSON Decode Error: " . json_last_error_msg());
-                throw new Exception('Erro ao decodificar resposta: ' . json_last_error_msg());
-            }
-            error_log("enviar_push_usuario - Sucesso! Enviadas: " . ($data['enviadas'] ?? 0));
-            return [
-                'success' => true,
-                'enviadas' => $data['enviadas'] ?? 0,
-                'message' => 'Notificação enviada com sucesso'
-            ];
-        } else {
-            $error = json_decode($response, true);
-            $errorMessage = 'Erro ao enviar notificação';
-            if (isset($error['message'])) {
-                $errorMessage = $error['message'];
-            } elseif (isset($error['errors']) && is_array($error['errors']) && !empty($error['errors'])) {
-                $errorMessage = is_array($error['errors'][0]) ? ($error['errors'][0]['message'] ?? $errorMessage) : $error['errors'][0];
-            }
-            error_log("enviar_push_usuario - Erro: {$errorMessage} (HTTP {$httpCode})");
-            return [
-                'success' => false,
-                'enviadas' => 0,
-                'message' => $errorMessage . ' (HTTP ' . $httpCode . ')'
-            ];
-        }
+        return [
+            'success' => true,
+            'enviadas' => $result['enviadas'],
+            'message' => 'Notificação enviada com sucesso'
+        ];
         
     } catch (Exception $e) {
-        error_log("enviar_push_usuario - Exceção: " . $e->getMessage());
+        push_log("enviar_push_usuario - Exceção: " . $e->getMessage());
         return [
             'success' => false,
             'enviadas' => 0,
