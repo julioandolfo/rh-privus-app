@@ -108,6 +108,20 @@ function get_page_permissions() {
         // Feedbacks - todos podem enviar e ver seus próprios feedbacks
         'feedback_enviar.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         'feedback_meus.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'ver_feedback.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        
+        // Notificações - todos podem ver suas próprias notificações
+        'notificacoes.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        
+        // Gestão > Engajamento - ADMIN, RH e GESTOR
+        'gestao_engajamento.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'reunioes_1on1.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'celebracoes.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'pesquisas_satisfacao.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'pesquisas_rapidas.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'pesquisas_colaborador.php' => ['COLABORADOR'],
+        'pdis.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'responder_pesquisa.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'], // Página pública para responder pesquisas
     ];
     
     // Carrega permissões customizadas (se existir)

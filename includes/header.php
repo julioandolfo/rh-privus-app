@@ -322,7 +322,14 @@ $usuario = $_SESSION['usuario'];
                                     <!--end::Notifications list-->
                                     <!--begin::Footer-->
                                     <div class="menu-item px-3 py-2">
-                                        <div class="text-center">
+                                        <div class="d-flex gap-2 justify-content-center">
+                                            <button id="btn_marcar_todas_lidas" class="btn btn-sm btn-light-success" style="display: none;">
+                                                <i class="ki-duotone ki-check fs-6">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Marcar todas como lidas
+                                            </button>
                                             <a href="notificacoes.php" class="btn btn-sm btn-light-primary">Ver todas</a>
                                         </div>
                                     </div>

@@ -26,8 +26,13 @@ try {
     
     $limite = intval($_GET['limite'] ?? 20);
     
+    // Log para debug
+    error_log("API Notificações - Usuario ID: " . ($usuario_id ?? 'NULL') . ", Colaborador ID: " . ($colaborador_id ?? 'NULL') . ", Limite: $limite");
+    
     $notificacoes = obter_notificacoes_nao_lidas($usuario_id, $colaborador_id, $limite);
     $total_nao_lidas = contar_notificacoes_nao_lidas($usuario_id, $colaborador_id);
+    
+    error_log("API Notificações - Retornando: " . count($notificacoes) . " notificações, Total não lidas: $total_nao_lidas");
     
     echo json_encode([
         'success' => true,
@@ -36,6 +41,7 @@ try {
     ]);
     
 } catch (Exception $e) {
+    error_log("API Notificações - Erro: " . $e->getMessage());
     http_response_code(400);
     echo json_encode([
         'success' => false,

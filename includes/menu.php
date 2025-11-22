@@ -450,6 +450,98 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
+                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
+                    <!--begin:Menu separator-->
+                    <div class="menu-item pt-5">
+                        <div class="menu-content">
+                            <span class="menu-heading fw-bold text-uppercase fs-7">Gestão</span>
+                        </div>
+                    </div>
+                    <!--end:Menu separator-->
+                    
+                    <!--begin:Menu item-->
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('gestao_engajamento.php') || isActive('reunioes_1on1.php') || isActive('celebracoes.php') || isActive('pesquisas_satisfacao.php') || isActive('pesquisas_rapidas.php') || isActive('pdis.php')) ? 'here show' : '' ?>">
+                        <!--begin:Menu link-->
+                        <span class="menu-link">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-chart-simple fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Engajamento</span>
+                            <span class="menu-arrow"></span>
+                        </span>
+                        <!--end:Menu link-->
+                        <!--begin:Menu sub-->
+                        <div class="menu-sub menu-sub-accordion">
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('gestao_engajamento.php') ?>" href="gestao_engajamento.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Painel de Engajamento</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('reunioes_1on1.php') ?>" href="reunioes_1on1.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Reuniões 1:1</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('celebracoes.php') ?>" href="celebracoes.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Celebrações</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('pesquisas_satisfacao.php') ?>" href="pesquisas_satisfacao.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Pesquisas de Satisfação</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('pesquisas_rapidas.php') ?>" href="pesquisas_rapidas.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Pesquisas Rápidas</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('pdis.php') ?>" href="pdis.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">PDIs</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                        </div>
+                        <!--end:Menu sub-->
+                    </div>
+                    <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <?php if (can_show_menu('ADMIN')): ?>
                     <!--begin:Menu separator-->
                     <div class="menu-item pt-5">
@@ -536,6 +628,64 @@ function getIcon($name) {
                 <?php endif; ?>
                 
                 <?php if (can_show_menu('COLABORADOR')): ?>
+                    <!--begin:Menu item-->
+                    <div class="menu-item">
+                        <a class="menu-link <?= isActive('reunioes_1on1.php') ?>" href="reunioes_1on1.php">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-calendar-8 fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                    <span class="path5"></span>
+                                    <span class="path6"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Reuniões 1:1</span>
+                        </a>
+                    </div>
+                    <!--end:Menu item-->
+                    <!--begin:Menu item-->
+                    <div class="menu-item">
+                        <a class="menu-link <?= isActive('pesquisas_colaborador.php') ?>" href="pesquisas_colaborador.php">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-chart-simple fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Pesquisas</span>
+                        </a>
+                    </div>
+                    <!--end:Menu item-->
+                    <!--begin:Menu item-->
+                    <div class="menu-item">
+                        <a class="menu-link <?= isActive('celebracoes.php') ?>" href="celebracoes.php">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-star fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Celebrações</span>
+                        </a>
+                    </div>
+                    <!--end:Menu item-->
+                    <!--begin:Menu item-->
+                    <div class="menu-item">
+                        <a class="menu-link <?= isActive('pdis.php') ?>" href="pdis.php">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-notepad fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Meus PDIs</span>
+                        </a>
+                    </div>
+                    <!--end:Menu item-->
                     <?php if (can_access_page('meus_pagamentos.php')): ?>
                     <!--begin:Menu item-->
                     <div class="menu-item">

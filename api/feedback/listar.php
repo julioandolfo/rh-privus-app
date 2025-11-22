@@ -34,16 +34,31 @@ try {
     $params = [];
     
     if ($tipo === 'enviados') {
+        // Enviados: busca feedbacks onde o usuário atual é o remetente
+        $enviados_conditions = [];
+        $enviados_params = [];
+        
+        // Verifica por usuario_id
         if ($remetente_usuario_id) {
-            $where_conditions[] = "f.remetente_usuario_id = ?";
-            $params[] = $remetente_usuario_id;
-        } elseif ($remetente_colaborador_id) {
-            $where_conditions[] = "f.remetente_colaborador_id = ?";
-            $params[] = $remetente_colaborador_id;
-        } else {
+            $enviados_conditions[] = "f.remetente_usuario_id = ?";
+            $enviados_params[] = $remetente_usuario_id;
+        }
+        
+        // Verifica por colaborador_id (se existir na sessão)
+        if ($remetente_colaborador_id) {
+            $enviados_conditions[] = "f.remetente_colaborador_id = ?";
+            $enviados_params[] = $remetente_colaborador_id;
+        }
+        
+        // Se não tem nenhum ID, retorna vazio
+        if (empty($enviados_conditions)) {
             echo json_encode(['success' => true, 'data' => [], 'total' => 0]);
             exit;
         }
+        
+        // Usa OR para pegar feedbacks enviados com qualquer um dos IDs
+        $where_conditions[] = "(" . implode(" OR ", $enviados_conditions) . ")";
+        $params = array_merge($params, $enviados_params);
     } elseif ($tipo === 'recebidos') {
         if ($remetente_usuario_id) {
             $where_conditions[] = "f.destinatario_usuario_id = ?";
@@ -81,6 +96,7 @@ try {
         FROM feedbacks f
         $where_sql
     ";
+    
     $stmt_count = $pdo->prepare($count_sql);
     $stmt_count->execute($params);
     $total = $stmt_count->fetch()['total'];
@@ -108,7 +124,8 @@ try {
             COALESCE(dc.foto, NULL) as destinatario_foto,
             -- Verifica se é remetente ou destinatário
             CASE 
-                WHEN (f.remetente_usuario_id = ? OR f.remetente_colaborador_id = ?) THEN 'remetente'
+                WHEN f.remetente_usuario_id = ? THEN 'remetente'
+                WHEN (? > 0 AND COALESCE(f.remetente_colaborador_id, 0) = ?) THEN 'remetente'
                 ELSE 'destinatario'
             END as tipo_relacao
         FROM feedbacks f
@@ -121,10 +138,35 @@ try {
         LIMIT $limit OFFSET $offset
     ";
     
-    $params_query = array_merge($params, [
-        $remetente_usuario_id ?? 0,
-        $remetente_colaborador_id ?? 0
-    ]);
+    // Prepara parâmetros para o CASE
+    $usuario_id_for_case = $remetente_usuario_id ?? 0;
+    $colaborador_id_for_case = $remetente_colaborador_id ?? 0;
+    
+    // Se não tem colaborador_id na sessão, busca relacionado ao usuario_id
+    if ($usuario_id_for_case && !$colaborador_id_for_case) {
+        $stmt_colab_case = $pdo->prepare("SELECT colaborador_id FROM usuarios WHERE id = ?");
+        $stmt_colab_case->execute([$usuario_id_for_case]);
+        $usuario_colab_case = $stmt_colab_case->fetch(PDO::FETCH_ASSOC);
+        if ($usuario_colab_case && !empty($usuario_colab_case['colaborador_id'])) {
+            $colaborador_id_for_case = $usuario_colab_case['colaborador_id'];
+        }
+    }
+    
+    // Monta parâmetros na ordem correta dos placeholders no SQL
+    // Ordem no SQL:
+    // 1. CASE: f.remetente_usuario_id = ? (usuario_id)
+    // 2. CASE: ? > 0 (colaborador_id para verificação)
+    // 3. CASE: COALESCE(f.remetente_colaborador_id, 0) = ? (colaborador_id)
+    // 4. WHERE: f.remetente_usuario_id = ? (usuario_id - já está em $params)
+    
+    $case_params = [
+        $usuario_id_for_case,           // Para: f.remetente_usuario_id = ?
+        $colaborador_id_for_case,       // Para: ? > 0
+        $colaborador_id_for_case        // Para: COALESCE(f.remetente_colaborador_id, 0) = ?
+    ];
+    
+    // Os parâmetros do WHERE já estão em $params, então só adiciona os do CASE antes
+    $params_query = array_merge($case_params, $params);
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params_query);

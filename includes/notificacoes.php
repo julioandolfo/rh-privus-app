@@ -199,17 +199,17 @@ function obter_notificacoes_nao_lidas($usuario_id = null, $colaborador_id = null
         }
         
         $where_sql = implode(' AND ', $where);
-        $params[] = $limite;
+        $limite = (int)$limite; // Garante que é inteiro
         
         $stmt = $pdo->prepare("
             SELECT * FROM notificacoes_sistema
             WHERE $where_sql AND lida = 0
             ORDER BY created_at DESC
-            LIMIT ?
+            LIMIT $limite
         ");
         $stmt->execute($params);
         
-        return $stmt->fetchAll();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
         
     } catch (PDOException $e) {
         error_log("Erro ao obter notificações: " . $e->getMessage());
@@ -253,15 +253,60 @@ function contar_notificacoes_nao_lidas($usuario_id = null, $colaborador_id = nul
 
 /**
  * Marca notificação como lida
+ * Verifica se a notificação pertence ao usuário antes de marcar
  */
-function marcar_notificacao_lida($notificacao_id) {
+function marcar_notificacao_lida($notificacao_id, $usuario_id = null, $colaborador_id = null) {
     try {
         $pdo = getDB();
         
+        // Se não passou usuario_id/colaborador_id, tenta pegar da sessão
+        if ($usuario_id === null && $colaborador_id === null) {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            if (isset($_SESSION['usuario'])) {
+                $usuario = $_SESSION['usuario'];
+                $usuario_id = $usuario['id'] ?? null;
+                $colaborador_id = $usuario['colaborador_id'] ?? null;
+            }
+        }
+        
+        // Primeiro verifica se a notificação existe
+        $stmt_check = $pdo->prepare("SELECT id, usuario_id, colaborador_id, lida FROM notificacoes_sistema WHERE id = ?");
+        $stmt_check->execute([$notificacao_id]);
+        $notif = $stmt_check->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$notif) {
+            error_log("Notificação $notificacao_id não encontrada no banco");
+            return false;
+        }
+        
+        // Verifica se a notificação pertence ao usuário
+        $pertence = false;
+        if ($usuario_id && $notif['usuario_id'] == $usuario_id) {
+            $pertence = true;
+        } else if ($colaborador_id && $notif['colaborador_id'] == $colaborador_id) {
+            $pertence = true;
+        }
+        
+        if (!$pertence) {
+            error_log("Notificação $notificacao_id não pertence ao usuário");
+            error_log("Notificação tem - Usuario ID: " . ($notif['usuario_id'] ?? 'NULL') . ", Colaborador ID: " . ($notif['colaborador_id'] ?? 'NULL'));
+            error_log("Usuário tem - Usuario ID: " . ($usuario_id ?? 'NULL') . ", Colaborador ID: " . ($colaborador_id ?? 'NULL'));
+            return false;
+        }
+        
+        // Se já está marcada como lida, retorna true (idempotente)
+        if ($notif['lida'] == 1) {
+            error_log("Notificação $notificacao_id já está marcada como lida");
+            return true;
+        }
+        
+        // Atualiza a notificação
         $stmt = $pdo->prepare("UPDATE notificacoes_sistema SET lida = 1 WHERE id = ?");
         $stmt->execute([$notificacao_id]);
         
-        return true;
+        return $stmt->rowCount() > 0;
         
     } catch (PDOException $e) {
         error_log("Erro ao marcar notificação como lida: " . $e->getMessage());

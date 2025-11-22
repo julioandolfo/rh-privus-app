@@ -123,6 +123,7 @@ try {
     
     // Envia notificação para admin/rh (se OneSignal configurado)
     try {
+        require_once __DIR__ . '/../includes/push_preferences.php';
         require_once __DIR__ . '/../includes/onesignal_service.php';
         
         // Busca usuários admin/rh da empresa
@@ -136,12 +137,15 @@ try {
         
         foreach ($admins as $admin_id) {
             try {
-                onesignal_send_notification([
-                    'usuario_id' => $admin_id,
-                    'titulo' => 'Novo Documento de Pagamento',
-                    'mensagem' => 'Colaborador enviou documento para fechamento de pagamento',
-                    'url' => get_base_url() . '/pages/fechamento_pagamentos.php?view=' . $fechamento_id
-                ]);
+                // Verifica preferência antes de enviar
+                if (verificar_preferencia_push($admin_id, null, 'documento_pagamento_enviado')) {
+                    onesignal_send_notification([
+                        'usuario_id' => $admin_id,
+                        'titulo' => 'Novo Documento de Pagamento',
+                        'mensagem' => 'Colaborador enviou documento para fechamento de pagamento',
+                        'url' => get_base_url() . '/pages/fechamento_pagamentos.php?view=' . $fechamento_id
+                    ]);
+                }
             } catch (Exception $e) {
                 // Ignora erros de notificação
             }

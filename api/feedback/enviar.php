@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    // Função auxiliar para log em arquivo customizado
+    // Funções auxiliares dentro do escopo try
     function logFeedback($message) {
         $logDir = __DIR__ . '/../../logs';
         if (!is_dir($logDir)) {
@@ -28,6 +28,20 @@ try {
         $timestamp = date('Y-m-d H:i:s');
         $logMessage = "[$timestamp] $message" . PHP_EOL;
         file_put_contents($logFile, $logMessage, FILE_APPEND);
+    }
+    
+    function releaseFeedbackLock($pdoInstance, $requestId, $context = '') {
+        if (!$requestId || !$pdoInstance) {
+            return;
+        }
+        try {
+            $lockName = 'feedback_' . $requestId;
+            $stmtRelease = $pdoInstance->prepare("SELECT RELEASE_LOCK(?) as release_result");
+            $stmtRelease->execute([$lockName]);
+            logFeedback("🔓 Lock liberado" . ($context ? " ($context)" : ""));
+        } catch (Exception $releaseEx) {
+            logFeedback("⚠️ Erro ao liberar lock ($context): " . $releaseEx->getMessage());
+        }
     }
     
     // Log de entrada da API
@@ -51,26 +65,29 @@ try {
     logFeedback("Remetente Usuario ID: " . ($remetente_usuario_id ?? 'NULL'));
     logFeedback("Remetente Colaborador ID: " . ($remetente_colaborador_id ?? 'NULL'));
     
-    // Proteção contra requisições duplicadas usando request_id na sessão
-    $session_key = 'last_feedback_request';
-    $session_time_key = 'last_feedback_time';
-    
-    // Limpa requisições antigas (mais de 5 segundos)
-    if (isset($_SESSION[$session_time_key])) {
-        $time_diff = time() - $_SESSION[$session_time_key];
-        if ($time_diff > 5) {
-            unset($_SESSION[$session_key]);
-            unset($_SESSION[$session_time_key]);
+    // Proteção ATÔMICA contra requisições duplicadas usando GET_LOCK do MySQL
+    // GET_LOCK é atômico e perfeito para evitar race conditions
+    if ($request_id) {
+        logFeedback("🔒 Tentando obter lock atômico do MySQL para Request ID: $request_id");
+        
+        // Timeout de 0 = não espera, retorna imediatamente se já estiver locked
+        $lockName = 'feedback_' . $request_id;
+        $stmt = $pdo->prepare("SELECT GET_LOCK(?, 0) as lock_result");
+        $stmt->execute([$lockName]);
+        $lockResult = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($lockResult['lock_result'] != 1) {
+            logFeedback("❌ BLOQUEADO: Lock já obtido por outra requisição (Request ID: $request_id). Respondendo sucesso idempotente.");
+            echo json_encode([
+                'success' => true,
+                'already_processed' => true,
+                'message' => 'Feedback já está sendo processado.'
+            ]);
+            return;
         }
+        
+        logFeedback("✅ Lock obtido com sucesso! Continuando...");
     }
-    
-    // Verifica se é requisição duplicada
-    if ($request_id && isset($_SESSION[$session_key]) && $_SESSION[$session_key] === $request_id) {
-        logFeedback("❌ BLOQUEADO: Requisição duplicada via session (Request ID: $request_id)");
-        throw new Exception('Requisição duplicada detectada. Feedback já está sendo processado.');
-    }
-    
-    logFeedback("✅ Request ID validado, continuando...");
     
     $destinatario_colaborador_id = $_POST['destinatario_colaborador_id'] ?? null;
     $template_id = $_POST['template_id'] ?? 0;
@@ -118,17 +135,11 @@ try {
         }
     }
     
-    // Marca esta requisição como processada com timestamp
-    if ($request_id) {
-        $_SESSION[$session_key] = $request_id;
-        $_SESSION[$session_time_key] = time();
-    }
-    
     // Verifica duplicação: feedback idêntico nos últimos 30 segundos
     $stmt_check = $pdo->prepare("
         SELECT id FROM feedbacks 
         WHERE remetente_usuario_id = ? 
-        AND remetente_colaborador_id = ?
+        AND COALESCE(remetente_colaborador_id, 0) = COALESCE(?, 0)
         AND destinatario_colaborador_id = ?
         AND conteudo = ?
         AND COALESCE(template_id, 0) = COALESCE(?, 0)
@@ -143,10 +154,14 @@ try {
         $template_id > 0 ? $template_id : 0
     ]);
     if ($stmt_check->fetch()) {
-        logFeedback("❌ BLOQUEADO: Feedback duplicado detectado no banco (30s)");
-        unset($_SESSION[$session_key]);
-        unset($_SESSION[$session_time_key]);
-        throw new Exception('Feedback duplicado detectado. Aguarde alguns segundos antes de enviar novamente.');
+        logFeedback("❌ BLOQUEADO: Feedback duplicado detectado no banco (30s). Respondendo sucesso idempotente.");
+        releaseFeedbackLock($pdo, $request_id, 'duplicacao_pre_tx');
+        echo json_encode([
+            'success' => true,
+            'already_processed' => true,
+            'message' => 'Feedback já foi registrado recentemente.'
+        ]);
+        return;
     }
     
     logFeedback("✅ Verificação de duplicação passou, iniciando transação...");
@@ -168,7 +183,7 @@ try {
         $stmt_check2 = $pdo->prepare("
             SELECT id FROM feedbacks 
             WHERE remetente_usuario_id = ? 
-            AND remetente_colaborador_id = ?
+            AND COALESCE(remetente_colaborador_id, 0) = COALESCE(?, 0)
             AND destinatario_colaborador_id = ?
             AND conteudo = ?
             AND COALESCE(template_id, 0) = COALESCE(?, 0)
@@ -184,11 +199,15 @@ try {
             $template_id > 0 ? $template_id : 0
         ]);
         if ($stmt_check2->fetch()) {
-            logFeedback("❌ BLOQUEADO: Feedback duplicado detectado no double-check com lock");
+            logFeedback("❌ BLOQUEADO: Feedback duplicado detectado no double-check com lock. Respondendo sucesso idempotente.");
             $pdo->rollBack();
-            unset($_SESSION[$session_key]);
-            unset($_SESSION[$session_time_key]);
-            throw new Exception('Feedback duplicado detectado. Aguarde alguns segundos antes de enviar novamente.');
+            releaseFeedbackLock($pdo, $request_id, 'duplicacao_double_check');
+            echo json_encode([
+                'success' => true,
+                'already_processed' => true,
+                'message' => 'Feedback já foi registrado recentemente.'
+            ]);
+            return;
         }
         
         logFeedback("✅ Double-check passou, inserindo feedback no banco...");
@@ -244,10 +263,12 @@ try {
         
         logFeedback("✅ Transação committed com sucesso");
         
-        // Limpa a flag de requisição após sucesso
-        if (isset($session_key)) {
-            unset($_SESSION[$session_key]);
-            unset($_SESSION[$session_time_key]);
+        // Libera o lock do MySQL
+        if ($request_id) {
+            $lockName = 'feedback_' . $request_id;
+            $stmt = $pdo->prepare("SELECT RELEASE_LOCK(?) as release_result");
+            $stmt->execute([$lockName]);
+            logFeedback("🔓 Lock liberado");
         }
         
         // Adiciona pontos por enviar feedback
@@ -272,23 +293,35 @@ try {
     } catch (Exception $e) {
         logFeedback("❌ ERRO na transação: " . $e->getMessage());
         $pdo->rollBack();
-        // Limpa a flag de requisição em caso de erro também
-        if (isset($session_key)) {
-            unset($_SESSION[$session_key]);
-            unset($_SESSION[$session_time_key]);
+        
+        // Libera o lock em caso de erro também
+        if (isset($request_id) && $request_id) {
+            try {
+                $lockName = 'feedback_' . $request_id;
+                $stmt = $pdo->prepare("SELECT RELEASE_LOCK(?) as release_result");
+                $stmt->execute([$lockName]);
+                logFeedback("🔓 Lock liberado após erro");
+            } catch (Exception $lockEx) {
+                logFeedback("⚠️ Erro ao liberar lock: " . $lockEx->getMessage());
+            }
         }
+        
         throw $e;
     }
     
 } catch (Exception $e) {
-    // Limpa a flag de requisição em caso de erro
-    $session_key = 'last_feedback_request';
-    $session_time_key = 'last_feedback_time';
-    if (isset($_SESSION[$session_key])) {
-        unset($_SESSION[$session_key]);
-    }
-    if (isset($_SESSION[$session_time_key])) {
-        unset($_SESSION[$session_time_key]);
+    // Libera o lock em caso de erro geral
+    if (isset($request_id) && $request_id && isset($pdo)) {
+        try {
+            $lockName = 'feedback_' . $request_id;
+            $stmt = $pdo->prepare("SELECT RELEASE_LOCK(?) as release_result");
+            $stmt->execute([$lockName]);
+            if (function_exists('logFeedback')) {
+                logFeedback("🔓 Lock liberado após erro geral");
+            }
+        } catch (Exception $lockEx) {
+            // Ignora erro ao liberar lock
+        }
     }
     
     if (function_exists('logFeedback')) {

@@ -204,6 +204,18 @@ function enviar_email_feedback_recebido($feedback_id) {
  */
 function enviar_push_feedback_recebido($feedback_id, $destinatario_usuario_id, $destinatario_colaborador_id, $remetente_nome, $anonimo = false) {
     try {
+        // Verifica preferência de notificação push antes de enviar
+        require_once __DIR__ . '/push_preferences.php';
+        
+        if (!verificar_preferencia_push($destinatario_usuario_id, $destinatario_colaborador_id, 'feedback_recebido')) {
+            // Usuário desativou notificações push para este tipo
+            return [
+                'success' => true, 
+                'enviadas' => 0,
+                'message' => 'Notificação push desativada pelo usuário'
+            ];
+        }
+        
         $titulo = 'Novo Feedback Recebido';
         $mensagem = $anonimo ? 'Você recebeu um feedback anônimo' : "$remetente_nome enviou um feedback para você";
         $url = '../pages/feedback_meus.php?tipo=recebidos';

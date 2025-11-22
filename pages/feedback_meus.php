@@ -187,6 +187,10 @@ function renderizarFeedbacks(feedbacks) {
         const destinatarioNome = feedback.destinatario_nome || 'Usuário';
         const destinatarioInicial = destinatarioNome.charAt(0).toUpperCase();
         
+        // Limita o conteúdo para preview (primeiras 200 caracteres)
+        const conteudoPreview = feedback.conteudo.length > 200 ? feedback.conteudo.substring(0, 200) + '...' : feedback.conteudo;
+        const temMaisConteudo = feedback.conteudo.length > 200;
+        
         html += `
             <div class="card card-flush mb-5" data-feedback-id="${feedback.id}">
                 <div class="card-body">
@@ -210,20 +214,23 @@ function renderizarFeedbacks(feedbacks) {
                                     ${feedback.presencial ? '<span class="badge badge-light-info ms-2">Presencial</span>' : ''}
                                     ${feedback.anonimo && !isRemetente ? '<span class="badge badge-light-warning ms-2">Anônimo</span>' : ''}
                                 </div>
-                                <span class="text-muted fs-7">${formatarData(feedback.created_at)}</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted fs-7">${formatarData(feedback.created_at)}</span>
+                                    <a href="ver_feedback.php?id=${feedback.id}" class="btn btn-sm btn-light-primary">
+                                        <i class="ki-duotone ki-eye fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        Ver detalhes
+                                    </a>
+                                </div>
                             </div>
                             ${renderizarAvaliacoes(feedback.avaliacoes)}
-                            <div class="text-gray-700 mb-3">${feedback.conteudo.replace(/\n/g, '<br>')}</div>
-                            ${renderizarRespostas(feedback.respostas, feedback.id)}
-                            
-                            ${!isRemetente ? `
-                                <div class="mt-4">
-                                    <form class="form-resposta" data-feedback-id="${feedback.id}">
-                                        <div class="d-flex gap-2">
-                                            <textarea name="resposta" class="form-control form-control-solid" rows="2" placeholder="Responder ao feedback..." required></textarea>
-                                            <button type="submit" class="btn btn-primary">Enviar</button>
-                                        </div>
-                                    </form>
+                            <div class="text-gray-700 mb-3">${conteudoPreview.replace(/\n/g, '<br>')}</div>
+                            ${feedback.respostas && feedback.respostas.length > 0 ? `
+                                <div class="mb-3">
+                                    <span class="badge badge-light-info">${feedback.respostas.length} resposta(s)</span>
                                 </div>
                             ` : ''}
                         </div>
@@ -235,20 +242,46 @@ function renderizarFeedbacks(feedbacks) {
     
     container.innerHTML = html;
     
-    // Adiciona listeners para formulários de resposta
+    // Adiciona listeners para formulários de resposta com proteção anti-duplicação
+    const respostasEnviando = new Set();
+    
     document.querySelectorAll('.form-resposta').forEach(function(form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
+            e.stopImmediatePropagation();
+            
             const feedbackId = this.getAttribute('data-feedback-id');
             const resposta = this.querySelector('[name="resposta"]').value.trim();
+            const btn = this.querySelector('button[type="submit"]');
             
             if (!resposta) {
                 return;
             }
             
+            // Previne múltiplos envios da mesma resposta
+            const respostaKey = `${feedbackId}-${resposta}`;
+            if (respostasEnviando.has(respostaKey)) {
+                console.warn('Bloqueado: Resposta já está sendo enviada');
+                return;
+            }
+            
+            // Marca como enviando
+            respostasEnviando.add(respostaKey);
+            if (btn) {
+                btn.disabled = true;
+                const btnOriginal = btn.innerHTML;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            }
+            
             const formData = new FormData();
             formData.append('feedback_id', feedbackId);
             formData.append('resposta', resposta);
+            
+            // Adiciona request_id único
+            const requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            formData.append('request_id', requestId);
+            
+            console.log('Enviando resposta... Request ID:', requestId);
             
             fetch('../api/feedback/responder.php', {
                 method: 'POST',
@@ -291,6 +324,16 @@ function renderizarFeedbacks(feedbacks) {
                         confirmButton: "btn btn-primary"
                     }
                 });
+            })
+            .finally(() => {
+                // Libera após delay
+                setTimeout(() => {
+                    respostasEnviando.delete(respostaKey);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = btn.innerHTML.includes('spinner') ? 'Enviar' : btn.innerHTML;
+                    }
+                }, 2000);
             });
         });
     });

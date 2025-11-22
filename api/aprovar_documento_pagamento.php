@@ -122,18 +122,35 @@ try {
     
     // Envia notificação para o colaborador
     try {
+        require_once __DIR__ . '/../includes/push_preferences.php';
         require_once __DIR__ . '/../includes/onesignal_service.php';
         
-        $mensagem = $acao === 'aprovar' 
-            ? 'Seu documento de pagamento foi aprovado!'
-            : 'Seu documento de pagamento foi rejeitado. Motivo: ' . $observacoes;
+        // Busca usuario_id do colaborador se existir
+        $usuario_id_colab = null;
+        $stmt_user = $pdo->prepare("SELECT id FROM usuarios WHERE colaborador_id = ? LIMIT 1");
+        $stmt_user->execute([$item['colaborador_id']]);
+        $user_colab = $stmt_user->fetch();
+        if ($user_colab) {
+            $usuario_id_colab = $user_colab['id'];
+        }
         
-        onesignal_send_notification([
-            'colaborador_id' => $item['colaborador_id'],
-            'titulo' => $acao === 'aprovar' ? 'Documento Aprovado' : 'Documento Rejeitado',
-            'mensagem' => $mensagem,
-            'url' => get_base_url() . '/pages/meus_pagamentos.php'
-        ]);
+        $tipo_notificacao = $acao === 'aprovar' 
+            ? 'documento_pagamento_aprovado' 
+            : 'documento_pagamento_rejeitado';
+        
+        // Verifica preferência antes de enviar
+        if (verificar_preferencia_push($usuario_id_colab, $item['colaborador_id'], $tipo_notificacao)) {
+            $mensagem = $acao === 'aprovar' 
+                ? 'Seu documento de pagamento foi aprovado!'
+                : 'Seu documento de pagamento foi rejeitado. Motivo: ' . $observacoes;
+            
+            onesignal_send_notification([
+                'colaborador_id' => $item['colaborador_id'],
+                'titulo' => $acao === 'aprovar' ? 'Documento Aprovado' : 'Documento Rejeitado',
+                'mensagem' => $mensagem,
+                'url' => get_base_url() . '/pages/meus_pagamentos.php'
+            ]);
+        }
     } catch (Exception $e) {
         // Ignora erros de notificação
     }

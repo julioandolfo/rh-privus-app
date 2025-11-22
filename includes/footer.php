@@ -450,12 +450,22 @@
         (function() {
             function carregarNotificacoes() {
                 fetch('../api/notificacoes/listar.php?limite=5')
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Erro na resposta: ' + response.status);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('📬 Dados de notificações recebidos:', data);
+                        
                         if (data.success) {
                             const badge = document.getElementById('kt_notifications_badge');
                             const count = document.getElementById('kt_notifications_count');
                             const list = document.getElementById('kt_notifications_list');
+                            
+                            console.log('📊 Total não lidas:', data.total_nao_lidas);
+                            console.log('📋 Notificações recebidas:', data.notificacoes ? data.notificacoes.length : 0);
                             
                             if (data.total_nao_lidas > 0) {
                                 if (badge) badge.style.display = 'block';
@@ -468,29 +478,57 @@
                                 if (count) count.style.display = 'none';
                             }
                             
-                            if (list && data.notificacoes.length > 0) {
+                            if (list) {
+                                // Limpa a lista primeiro
                                 list.innerHTML = '';
-                                data.notificacoes.forEach(function(notif) {
-                                    const item = document.createElement('div');
-                                    item.className = 'menu-item px-3';
-                                    item.innerHTML = `
-                                        <a href="${notif.link || '#'}" class="menu-link px-3 py-2" onclick="marcarNotificacaoLida(${notif.id})">
-                                            <div class="d-flex flex-column">
-                                                <span class="fw-bold text-gray-800">${notif.titulo}</span>
-                                                <span class="text-muted fs-7">${notif.mensagem}</span>
-                                                <span class="text-muted fs-8 mt-1">${formatarData(notif.created_at)}</span>
+                                
+                                // Mostra/oculta botão "Marcar todas como lidas"
+                                const btnMarcarTodas = document.getElementById('btn_marcar_todas_lidas');
+                                if (btnMarcarTodas) {
+                                    if (data.total_nao_lidas > 0) {
+                                        btnMarcarTodas.style.display = 'inline-block';
+                                    } else {
+                                        btnMarcarTodas.style.display = 'none';
+                                    }
+                                }
+                                
+                                if (data.notificacoes && Array.isArray(data.notificacoes) && data.notificacoes.length > 0) {
+                                    console.log('✅ Renderizando', data.notificacoes.length, 'notificações');
+                                    data.notificacoes.forEach(function(notif) {
+                                        const item = document.createElement('div');
+                                        item.className = 'menu-item px-3';
+                                        item.innerHTML = `
+                                            <div class="d-flex align-items-center">
+                                                <a href="${notif.link || '#'}" class="menu-link px-3 py-2 flex-grow-1" onclick="marcarNotificacaoLida(${notif.id}, event)">
+                                                    <div class="d-flex flex-column">
+                                                        <span class="fw-bold text-gray-800">${notif.titulo || 'Sem título'}</span>
+                                                        <span class="text-muted fs-7">${notif.mensagem || ''}</span>
+                                                        <span class="text-muted fs-8 mt-1">${formatarData(notif.created_at)}</span>
+                                                    </div>
+                                                </a>
+                                                <button class="btn btn-sm btn-icon btn-light-success ms-2" onclick="marcarNotificacaoLida(${notif.id}, event)" title="Marcar como lida">
+                                                    <i class="ki-duotone ki-check fs-5">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                </button>
                                             </div>
-                                        </a>
-                                    `;
-                                    list.appendChild(item);
-                                });
-                            } else if (list) {
-                                list.innerHTML = '<div class="text-center text-muted py-10"><p>Nenhuma notificação</p></div>';
+                                        `;
+                                        list.appendChild(item);
+                                    });
+                                } else {
+                                    console.log('⚠️ Nenhuma notificação para exibir');
+                                    list.innerHTML = '<div class="text-center text-muted py-10"><p>Nenhuma notificação</p></div>';
+                                }
+                            } else {
+                                console.error('❌ Elemento kt_notifications_list não encontrado');
                             }
+                        } else {
+                            console.error('❌ Erro na API:', data.message);
                         }
                     })
                     .catch(error => {
-                        console.error('Erro ao carregar notificações:', error);
+                        console.error('❌ Erro ao carregar notificações:', error);
                     });
             }
             
@@ -510,7 +548,14 @@
                 return data.toLocaleDateString('pt-BR');
             }
             
-            window.marcarNotificacaoLida = function(notificacaoId) {
+            window.marcarNotificacaoLida = function(notificacaoId, event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                
+                console.log('🔔 Marcando notificação como lida:', notificacaoId);
+                
                 const formData = new FormData();
                 formData.append('notificacao_id', notificacaoId);
                 
@@ -518,13 +563,103 @@
                     method: 'POST',
                     body: formData
                 })
+                .then(response => {
+                    console.log('📡 Resposta da API:', response.status, response.statusText);
+                    return response.text().then(text => {
+                        try {
+                            const data = JSON.parse(text);
+                            if (!response.ok) {
+                                throw new Error(data.message || 'Erro na requisição');
+                            }
+                            return data;
+                        } catch (e) {
+                            console.error('❌ Erro ao parsear JSON:', text);
+                            throw new Error('Resposta inválida do servidor: ' + text.substring(0, 100));
+                        }
+                    });
+                })
+                .then(data => {
+                    console.log('✅ Dados recebidos:', data);
+                    if (data.success) {
+                        carregarNotificacoes();
+                    } else {
+                        Swal.fire({
+                            text: data.message || 'Erro ao marcar notificação como lida',
+                            icon: "error",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Erro ao marcar notificação:', error);
+                    Swal.fire({
+                        text: error.message || 'Erro ao marcar notificação como lida',
+                        icon: "error",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    });
+                });
+            };
+            
+            window.marcarTodasNotificacoesLidas = function() {
+                fetch('../api/notificacoes/marcar_todas_lidas.php', {
+                    method: 'POST'
+                })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        carregarNotificacoes();
+                        Swal.fire({
+                            text: data.message,
+                            icon: "success",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        }).then(function() {
+                            carregarNotificacoes();
+                        });
+                    } else {
+                        Swal.fire({
+                            text: data.message || 'Erro ao marcar notificações como lidas',
+                            icon: "error",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        });
                     }
+                })
+                .catch(error => {
+                    console.error('Erro ao marcar todas as notificações:', error);
+                    Swal.fire({
+                        text: 'Erro ao marcar notificações como lidas',
+                        icon: "error",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    });
                 });
             };
+            
+            // Adiciona listener ao botão "Marcar todas como lidas" usando event delegation
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('#btn_marcar_todas_lidas')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.marcarTodasNotificacoesLidas();
+                }
+            });
             
             // Carrega notificações ao carregar a página
             if (document.readyState === 'loading') {

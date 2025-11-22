@@ -125,13 +125,11 @@
     ],
     "endomarketing_datas_comemorativas.php": [
         "ADMIN",
-        "RH",
-        "GESTOR"
+        "RH"
     ],
     "endomarketing_acoes.php": [
         "ADMIN",
-        "RH",
-        "GESTOR"
+        "RH"
     ],
     "relatorio_ocorrencias.php": [
         "ADMIN",

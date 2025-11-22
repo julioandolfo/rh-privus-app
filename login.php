@@ -94,6 +94,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 require_once __DIR__ . '/includes/pontuacao.php';
                 adicionar_pontos('acesso_diario', $usuario['id'], $usuario['colaborador_id'] ?? null);
                 
+                // Registra acesso no histórico
+                require_once __DIR__ . '/includes/engajamento.php';
+                registrar_acesso($usuario['id'], $usuario['colaborador_id'] ?? null);
+                
                 header('Location: index.php');
                 exit;
             } else {
@@ -148,6 +152,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'colaborador_id' => $colaborador['id']
                         ];
                     }
+                    
+                    // Registra acesso no histórico
+                    require_once __DIR__ . '/includes/engajamento.php';
+                    registrar_acesso($colaborador['usuario_id'] ?? null, $colaborador['id']);
                     
                     header('Location: index.php');
                     exit;

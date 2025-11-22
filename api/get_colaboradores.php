@@ -17,8 +17,23 @@ $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
 $empresa_id = $_GET['empresa_id'] ?? 0;
+$lider_id = $_GET['lider_id'] ?? 0;
 $status = $_GET['status'] ?? '';
 $com_salario = $_GET['com_salario'] ?? '0';
+
+// Se tem lider_id, busca liderados desse líder
+if ($lider_id) {
+    $where = ["lider_id = ?", "status = 'ativo'"];
+    $params = [$lider_id];
+    
+    $sql = "SELECT id, nome_completo, foto FROM colaboradores WHERE " . implode(' AND ', $where) . " ORDER BY nome_completo";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $colaboradores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode($colaboradores);
+    exit;
+}
 
 if (empty($empresa_id)) {
     echo json_encode([]);
