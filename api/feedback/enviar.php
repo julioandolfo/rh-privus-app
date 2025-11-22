@@ -18,10 +18,23 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    // Função auxiliar para log em arquivo customizado
+    function logFeedback($message) {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+        $logFile = $logDir . '/feedback.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[$timestamp] $message" . PHP_EOL;
+        file_put_contents($logFile, $logMessage, FILE_APPEND);
+    }
+    
     // Log de entrada da API
-    error_log("=== FEEDBACK API CHAMADA ===");
-    error_log("Request ID: " . ($_POST['request_id'] ?? 'N/A'));
-    error_log("Timestamp: " . date('Y-m-d H:i:s'));
+    logFeedback("=== FEEDBACK API CHAMADA ===");
+    logFeedback("Request ID: " . ($_POST['request_id'] ?? 'N/A'));
+    logFeedback("Method: " . $_SERVER['REQUEST_METHOD']);
+    logFeedback("Remote Addr: " . ($_SERVER['REMOTE_ADDR'] ?? 'N/A'));
     
     $pdo = getDB();
     $usuario = $_SESSION['usuario'];
@@ -35,8 +48,8 @@ try {
     $remetente_colaborador_id = $usuario['colaborador_id'] ?? null;
     $request_id = $_POST['request_id'] ?? null;
     
-    error_log("Remetente Usuario ID: " . ($remetente_usuario_id ?? 'NULL'));
-    error_log("Remetente Colaborador ID: " . ($remetente_colaborador_id ?? 'NULL'));
+    logFeedback("Remetente Usuario ID: " . ($remetente_usuario_id ?? 'NULL'));
+    logFeedback("Remetente Colaborador ID: " . ($remetente_colaborador_id ?? 'NULL'));
     
     // Proteção contra requisições duplicadas usando request_id na sessão
     $session_key = 'last_feedback_request';
@@ -53,11 +66,11 @@ try {
     
     // Verifica se é requisição duplicada
     if ($request_id && isset($_SESSION[$session_key]) && $_SESSION[$session_key] === $request_id) {
-        error_log("❌ BLOQUEADO: Requisição duplicada via session (Request ID: $request_id)");
+        logFeedback("❌ BLOQUEADO: Requisição duplicada via session (Request ID: $request_id)");
         throw new Exception('Requisição duplicada detectada. Feedback já está sendo processado.');
     }
     
-    error_log("✅ Request ID validado, continuando...");
+    logFeedback("✅ Request ID validado, continuando...");
     
     $destinatario_colaborador_id = $_POST['destinatario_colaborador_id'] ?? null;
     $template_id = $_POST['template_id'] ?? 0;
@@ -130,13 +143,13 @@ try {
         $template_id > 0 ? $template_id : 0
     ]);
     if ($stmt_check->fetch()) {
-        error_log("❌ BLOQUEADO: Feedback duplicado detectado no banco (30s)");
+        logFeedback("❌ BLOQUEADO: Feedback duplicado detectado no banco (30s)");
         unset($_SESSION[$session_key]);
         unset($_SESSION[$session_time_key]);
         throw new Exception('Feedback duplicado detectado. Aguarde alguns segundos antes de enviar novamente.');
     }
     
-    error_log("✅ Verificação de duplicação passou, iniciando transação...");
+    logFeedback("✅ Verificação de duplicação passou, iniciando transação...");
     
     // Busca usuario_id do destinatário se existir
     $destinatario_usuario_id = null;
@@ -171,14 +184,14 @@ try {
             $template_id > 0 ? $template_id : 0
         ]);
         if ($stmt_check2->fetch()) {
-            error_log("❌ BLOQUEADO: Feedback duplicado detectado no double-check com lock");
+            logFeedback("❌ BLOQUEADO: Feedback duplicado detectado no double-check com lock");
             $pdo->rollBack();
             unset($_SESSION[$session_key]);
             unset($_SESSION[$session_time_key]);
             throw new Exception('Feedback duplicado detectado. Aguarde alguns segundos antes de enviar novamente.');
         }
         
-        error_log("✅ Double-check passou, inserindo feedback no banco...");
+        logFeedback("✅ Double-check passou, inserindo feedback no banco...");
         
         // Insere feedback
         $stmt = $pdo->prepare("
@@ -203,7 +216,7 @@ try {
         
         $feedback_id = $pdo->lastInsertId();
         
-        error_log("✅ Feedback inserido com ID: $feedback_id");
+        logFeedback("✅ Feedback inserido com ID: $feedback_id");
         
         // Insere avaliações (estrelas)
         if (!empty($avaliacoes) && is_array($avaliacoes)) {
@@ -229,7 +242,7 @@ try {
         
         $pdo->commit();
         
-        error_log("✅ Transação committed com sucesso");
+        logFeedback("✅ Transação committed com sucesso");
         
         // Limpa a flag de requisição após sucesso
         if (isset($session_key)) {
@@ -241,14 +254,15 @@ try {
         require_once __DIR__ . '/../../includes/pontuacao.php';
         adicionar_pontos('enviar_feedback', $remetente_usuario_id, $remetente_colaborador_id, $feedback_id, 'feedback');
         
-        error_log("✅ Pontos adicionados");
+        logFeedback("✅ Pontos adicionados");
         
         // Notifica destinatário (email, push, notificação interna)
         require_once __DIR__ . '/../../includes/feedback_notificacoes.php';
         notificar_feedback_recebido($feedback_id);
         
-        error_log("✅ Notificações enviadas");
-        error_log("=== FEEDBACK API FINALIZADA COM SUCESSO ===");
+        logFeedback("✅ Notificações enviadas");
+        logFeedback("=== FEEDBACK API FINALIZADA COM SUCESSO ===");
+        logFeedback(""); // Linha em branco para separar logs
         
         echo json_encode([
             'success' => true,
@@ -256,6 +270,7 @@ try {
         ]);
         
     } catch (Exception $e) {
+        logFeedback("❌ ERRO na transação: " . $e->getMessage());
         $pdo->rollBack();
         // Limpa a flag de requisição em caso de erro também
         if (isset($session_key)) {
@@ -275,6 +290,13 @@ try {
     if (isset($_SESSION[$session_time_key])) {
         unset($_SESSION[$session_time_key]);
     }
+    
+    if (function_exists('logFeedback')) {
+        logFeedback("❌ ERRO GERAL: " . $e->getMessage());
+        logFeedback("=== FEEDBACK API FINALIZADA COM ERRO ===");
+        logFeedback(""); // Linha em branco
+    }
+    
     http_response_code(400);
     echo json_encode([
         'success' => false,
