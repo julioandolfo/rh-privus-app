@@ -65,6 +65,68 @@ function getIcon($name) {
                 </div>
                 <!--end:Menu item-->
                 
+                <!--begin:Menu item-->
+                <div class="menu-item">
+                    <!--begin:Menu link-->
+                    <a class="menu-link <?= isActive('feed.php') ?>" href="feed.php">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-message-text-2 fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Feed Privus</span>
+                    </a>
+                    <!--end:Menu link-->
+                </div>
+                <!--end:Menu item-->
+                
+                <!--begin:Menu item-->
+                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('endomarketing_datas_comemorativas.php') || isActive('endomarketing_acoes.php')) ? 'here show' : '' ?>">
+                    <!--begin:Menu link-->
+                    <span class="menu-link">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-gift fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Endomarketing</span>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <!--end:Menu link-->
+                    <!--begin:Menu sub-->
+                    <div class="menu-sub menu-sub-accordion">
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('endomarketing_datas_comemorativas.php') ?>" href="endomarketing_datas_comemorativas.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Datas Comemorativas</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('endomarketing_acoes.php') ?>" href="endomarketing_acoes.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Ações</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                    </div>
+                    <!--end:Menu sub-->
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('empresas.php') || isActive('setores.php') || isActive('cargos.php')) ? 'here show' : '' ?>">
@@ -162,7 +224,7 @@ function getIcon($name) {
                 
                 <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('colaboradores.php') || isActive('promocoes.php') || isActive('horas_extras.php') || isActive('fechamento_pagamentos.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('colaboradores.php') || isActive('emocoes_analise.php') || isActive('promocoes.php') || isActive('horas_extras.php') || isActive('fechamento_pagamentos.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -184,6 +246,16 @@ function getIcon($name) {
                                         <span class="bullet bullet-dot"></span>
                                     </span>
                                     <span class="menu-title">Listar Colaboradores</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('emocoes_analise.php') ?>" href="emocoes_analise.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Análise de Emoções</span>
                                 </a>
                             </div>
                             <!--end:Menu item-->
@@ -403,6 +475,16 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('configuracoes_pontos.php') ?>" href="configuracoes_pontos.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Pontos</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
                         </div>
                         <!--end:Menu sub-->
                     </div>
@@ -410,19 +492,6 @@ function getIcon($name) {
                 <?php endif; ?>
                 
                 <?php if (can_show_menu('COLABORADOR')): ?>
-                    <!--begin:Menu item-->
-                    <div class="menu-item">
-                        <a class="menu-link <?= isActive('colaborador_view.php') ?>" href="colaborador_view.php?id=<?= $usuario['colaborador_id'] ?>">
-                            <span class="menu-icon">
-                                <i class="ki-duotone ki-<?= getIcon('person') ?> fs-2">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </span>
-                            <span class="menu-title">Meu Perfil</span>
-                        </a>
-                    </div>
-                    <!--end:Menu item-->
                     <?php if (can_access_page('meus_pagamentos.php')): ?>
                     <!--begin:Menu item-->
                     <div class="menu-item">

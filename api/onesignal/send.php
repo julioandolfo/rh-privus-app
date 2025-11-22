@@ -67,7 +67,7 @@ if (strpos($requestUri, '/rh-privus') !== false) {
 }
 
 $url = $input['url'] ?? $basePath . '/pages/dashboard.php';
-$icone = $input['icone'] ?? $basePath . '/assets/media/logos/favicon.png';
+$icone = $input['icone'] ?? $basePath . '/assets/avatar-privus.png';
 
 if (empty($mensagem)) {
     echo json_encode(['success' => false, 'message' => 'Mensagem é obrigatória']);

@@ -46,49 +46,49 @@ $manifest = [
     'orientation' => 'portrait-primary',
     'icons' => [
         [
-            'src' => $basePath . '/assets/media/logos/favicon.png',
+            'src' => $basePath . '/assets/avatar-privus.png',
             'sizes' => '72x72',
             'type' => 'image/png',
             'purpose' => 'any maskable'
         ],
         [
-            'src' => $basePath . '/assets/media/logos/favicon.png',
+            'src' => $basePath . '/assets/avatar-privus.png',
             'sizes' => '96x96',
             'type' => 'image/png',
             'purpose' => 'any maskable'
         ],
         [
-            'src' => $basePath . '/assets/media/logos/favicon.png',
+            'src' => $basePath . '/assets/avatar-privus.png',
             'sizes' => '128x128',
             'type' => 'image/png',
             'purpose' => 'any maskable'
         ],
         [
-            'src' => $basePath . '/assets/media/logos/favicon.png',
+            'src' => $basePath . '/assets/avatar-privus.png',
             'sizes' => '144x144',
             'type' => 'image/png',
             'purpose' => 'any maskable'
         ],
         [
-            'src' => $basePath . '/assets/media/logos/favicon.png',
+            'src' => $basePath . '/assets/avatar-privus.png',
             'sizes' => '152x152',
             'type' => 'image/png',
             'purpose' => 'any maskable'
         ],
         [
-            'src' => $basePath . '/assets/media/logos/favicon.png',
+            'src' => $basePath . '/assets/avatar-privus.png',
             'sizes' => '192x192',
             'type' => 'image/png',
             'purpose' => 'any maskable'
         ],
         [
-            'src' => $basePath . '/assets/media/logos/favicon.png',
+            'src' => $basePath . '/assets/avatar-privus.png',
             'sizes' => '384x384',
             'type' => 'image/png',
             'purpose' => 'any maskable'
         ],
         [
-            'src' => $basePath . '/assets/media/logos/favicon.png',
+            'src' => $basePath . '/assets/avatar-privus.png',
             'sizes' => '512x512',
             'type' => 'image/png',
             'purpose' => 'any maskable'

@@ -82,10 +82,10 @@ if (!function_exists('onesignal_send_notification')) {
                 $icone = $baseUrl . '/' . ltrim($icone, '/');
             }
         } else {
-            $icone = $baseUrl . '/assets/media/logos/favicon.png';
+            $icone = $baseUrl . '/assets/avatar-privus.png';
         }
 
-        $badge = $baseUrl . '/assets/media/logos/favicon.png';
+        $badge = $baseUrl . '/assets/avatar-privus.png';
 
         $payload = [
             'app_id' => $config['app_id'],

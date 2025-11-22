@@ -445,6 +445,98 @@
                 setTimeout(waitForJQuery, 50);
             }
         })();
+        
+        // Sistema de Notificações
+        (function() {
+            function carregarNotificacoes() {
+                fetch('../api/notificacoes/listar.php?limite=5')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const badge = document.getElementById('kt_notifications_badge');
+                            const count = document.getElementById('kt_notifications_count');
+                            const list = document.getElementById('kt_notifications_list');
+                            
+                            if (data.total_nao_lidas > 0) {
+                                if (badge) badge.style.display = 'block';
+                                if (count) {
+                                    count.textContent = data.total_nao_lidas;
+                                    count.style.display = 'inline-block';
+                                }
+                            } else {
+                                if (badge) badge.style.display = 'none';
+                                if (count) count.style.display = 'none';
+                            }
+                            
+                            if (list && data.notificacoes.length > 0) {
+                                list.innerHTML = '';
+                                data.notificacoes.forEach(function(notif) {
+                                    const item = document.createElement('div');
+                                    item.className = 'menu-item px-3';
+                                    item.innerHTML = `
+                                        <a href="${notif.link || '#'}" class="menu-link px-3 py-2" onclick="marcarNotificacaoLida(${notif.id})">
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-bold text-gray-800">${notif.titulo}</span>
+                                                <span class="text-muted fs-7">${notif.mensagem}</span>
+                                                <span class="text-muted fs-8 mt-1">${formatarData(notif.created_at)}</span>
+                                            </div>
+                                        </a>
+                                    `;
+                                    list.appendChild(item);
+                                });
+                            } else if (list) {
+                                list.innerHTML = '<div class="text-center text-muted py-10"><p>Nenhuma notificação</p></div>';
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar notificações:', error);
+                    });
+            }
+            
+            function formatarData(dataStr) {
+                const data = new Date(dataStr);
+                const agora = new Date();
+                const diffMs = agora - data;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+                
+                if (diffMins < 1) return 'Agora';
+                if (diffMins < 60) return `${diffMins} min atrás`;
+                if (diffHours < 24) return `${diffHours}h atrás`;
+                if (diffDays < 7) return `${diffDays}d atrás`;
+                
+                return data.toLocaleDateString('pt-BR');
+            }
+            
+            window.marcarNotificacaoLida = function(notificacaoId) {
+                const formData = new FormData();
+                formData.append('notificacao_id', notificacaoId);
+                
+                fetch('../api/notificacoes/marcar_lida.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        carregarNotificacoes();
+                    }
+                });
+            };
+            
+            // Carrega notificações ao carregar a página
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(carregarNotificacoes, 1000);
+                    setInterval(carregarNotificacoes, 60000); // Atualiza a cada minuto
+                });
+            } else {
+                setTimeout(carregarNotificacoes, 1000);
+                setInterval(carregarNotificacoes, 60000);
+            }
+        })();
     </script>
     <!--end::Custom Javascript-->
     

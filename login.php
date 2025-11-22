@@ -90,6 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'colaborador_id' => $usuario['colaborador_id']
                 ];
                 
+                // Adiciona pontos por acesso diário
+                require_once __DIR__ . '/includes/pontuacao.php';
+                adicionar_pontos('acesso_diario', $usuario['id'], $usuario['colaborador_id'] ?? null);
+                
                 header('Location: index.php');
                 exit;
             } else {
@@ -158,14 +162,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR" data-theme="dark" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <title>Login - RH Privus</title>
     <meta name="description" content="Sistema de Gestão de RH - Grupo Privus" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="canonical" href="https://preview.keenthemes.com/metronic8" />
-    <link rel="shortcut icon" href="assets/media/logos/favicon.png" />
+    <link rel="shortcut icon" href="assets/avatar-privus.png" />
     
     <!--begin::PWA Manifest-->
     <link rel="manifest" href="manifest.php">
@@ -173,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="RH Privus">
-    <link rel="apple-touch-icon" href="assets/media/logos/favicon.png">
+    <link rel="apple-touch-icon" href="assets/avatar-privus.png">
     <!--end::PWA Manifest-->
     
     
@@ -188,14 +192,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     <style>
         body {
-            background-image: url('assets/media/misc/auth-bg.png');
-            background-repeat: no-repeat;
-            background-position: center center;
-            background-size: cover;
+            background-color: #1E1E2D;
+            background-image: none;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+        
+        /* Card de login ocupa 100% da largura em mobile */
+        @media (max-width: 991.98px) {
+            body {
+                padding: 0 !important;
+            }
+            
+            .login-container {
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+            }
+            
+            .login-card {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                border-radius: 0 !important;
+                border-left: none !important;
+                border-right: none !important;
+                box-shadow: none !important;
+            }
+            
+            .login-card .card-body {
+                padding: 2rem 1.5rem !important;
+            }
         }
     </style>
 </head>
@@ -203,11 +233,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!--begin::Body-->
 <body id="kt_body" class="bg-body">
     <!--begin::Main-->
-    <div class="d-flex flex-center flex-column flex-row-fluid min-vh-100 p-10">
+    <div class="d-flex flex-center flex-column flex-row-fluid min-vh-100 p-5 p-lg-10 login-container">
         <!--begin::Card-->
-        <div class="card shadow-lg w-100 w-lg-500px">
+        <div class="card shadow-lg w-100 w-lg-500px login-card">
             <!--begin::Card body-->
-            <div class="card-body p-10">
+            <div class="card-body p-5 p-lg-10">
                 <!--begin::Form-->
                 <form class="form w-100" novalidate="novalidate" method="POST" id="kt_sign_in_form">
                     <!--begin::Heading-->
@@ -253,7 +283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="d-flex flex-stack flex-wrap gap-3 fs-base fw-semibold mb-8">
                         <div></div>
                         <!--begin::Link-->
-                        <a href="#" class="link-primary">Esqueceu a senha?</a>
+                        <a href="esqueci_senha.php" class="link-primary">Esqueceu a senha?</a>
                         <!--end::Link-->
                     </div>
                     <!--end::Wrapper-->
@@ -274,17 +304,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <!--end::Form-->
             </div>
             <!--end::Card body-->
-            <!--begin::Card footer-->
-            <div class="card-footer border-0 pt-0 pb-10">
-                <!--begin::Links-->
-                <div class="d-flex flex-center flex-wrap fs-base fw-semibold">
-                    <a href="#" class="px-5 text-gray-600 text-hover-primary" target="_blank">Termos</a>
-                    <a href="#" class="px-5 text-gray-600 text-hover-primary" target="_blank">Planos</a>
-                    <a href="#" class="px-5 text-gray-600 text-hover-primary" target="_blank">Contato</a>
-                </div>
-                <!--end::Links-->
-            </div>
-            <!--end::Card footer-->
         </div>
         <!--end::Card-->
     </div>

@@ -1,0 +1,58 @@
+{
+    "card_emocao_diaria": [
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR",
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR"
+    ],
+    "card_historico_emocoes": [
+        "ADMIN",
+        "RH",
+        "ADMIN",
+        "RH"
+    ],
+    "card_media_emocoes": [
+        "ADMIN",
+        "RH",
+        "ADMIN",
+        "RH"
+    ],
+    "card_ultimas_emocoes": [
+        "ADMIN",
+        "RH",
+        "ADMIN",
+        "RH"
+    ],
+    "card_ranking_pontos": [
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR",
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR"
+    ],
+    "card_ocorrencias_mes": [
+        "ADMIN",
+        "RH",
+        "ADMIN",
+        "RH"
+    ],
+    "card_colaboradores_status": [
+        "ADMIN",
+        "RH",
+        "ADMIN",
+        "RH"
+    ],
+    "card_estatisticas_colaboradores": [
+        "ADMIN",
+        "RH",
+        "ADMIN",
+        "RH"
+    ]
+}

@@ -1,0 +1,141 @@
+{
+    "dashboard.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR"
+    ],
+    "emocoes.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR"
+    ],
+    "emocoes_analise.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "feed.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR"
+    ],
+    "empresas.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "setores.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "cargos.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "hierarquia.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "niveis_hierarquicos.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "colaboradores.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR"
+    ],
+    "colaborador_add.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "colaborador_view.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR"
+    ],
+    "colaborador_edit.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "promocoes.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "horas_extras.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "fechamento_pagamentos.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "tipos_bonus.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "ocorrencias_list.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR"
+    ],
+    "ocorrencias_add.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR"
+    ],
+    "tipos_ocorrencias.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "meus_pagamentos.php": [
+        "COLABORADOR"
+    ],
+    "usuarios.php": [
+        "ADMIN"
+    ],
+    "enviar_notificacao_push.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "notificacoes_enviadas.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "minha_conta.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR",
+        "COLABORADOR"
+    ],
+    "configuracoes_email.php": [
+        "ADMIN"
+    ],
+    "configuracoes_onesignal.php": [
+        "ADMIN"
+    ],
+    "configuracoes_pontos.php": [
+        "ADMIN"
+    ],
+    "templates_email.php": [
+        "ADMIN"
+    ],
+    "endomarketing_datas_comemorativas.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR"
+    ],
+    "endomarketing_acoes.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR"
+    ],
+    "relatorio_ocorrencias.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR"
+    ]
+}

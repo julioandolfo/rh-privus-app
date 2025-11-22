@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/select_colaborador.php';
 
 require_page_permission('promocoes.php');
 
@@ -74,14 +75,22 @@ $stmt = $pdo->prepare("
 $stmt->execute($params);
 $promocoes = $stmt->fetchAll();
 
-// Busca colaboradores para o select
-if ($usuario['role'] === 'ADMIN') {
-    $stmt = $pdo->query("SELECT id, nome_completo, salario, empresa_id FROM colaboradores WHERE status = 'ativo' ORDER BY nome_completo");
-} else {
-    $stmt = $pdo->prepare("SELECT id, nome_completo, salario, empresa_id FROM colaboradores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_completo");
-    $stmt->execute([$usuario['empresa_id']]);
+// Busca colaboradores para o select usando função padronizada
+$colaboradores_raw = get_colaboradores_disponiveis($pdo, $usuario);
+
+// Adiciona dados extras necessários (salario, empresa_id)
+$colaboradores = [];
+foreach ($colaboradores_raw as $colab) {
+    $stmt = $pdo->prepare("SELECT salario, empresa_id FROM colaboradores WHERE id = ?");
+    $stmt->execute([$colab['id']]);
+    $colab_data = $stmt->fetch();
+    if ($colab_data) {
+        $colaboradores[] = array_merge($colab, [
+            'salario' => $colab_data['salario'],
+            'empresa_id' => $colab_data['empresa_id']
+        ]);
+    }
 }
-$colaboradores = $stmt->fetchAll();
 
 $page_title = 'Promoções';
 require_once __DIR__ . '/../includes/header.php';
@@ -219,14 +228,19 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="row mb-7">
                         <div class="col-md-12">
                             <label class="required fw-semibold fs-6 mb-2">Colaborador</label>
-                            <select name="colaborador_id" id="colaborador_id" class="form-select form-select-solid" required>
-                                <option value="">Selecione o colaborador...</option>
-                                <?php foreach ($colaboradores as $colab): ?>
-                                <option value="<?= $colab['id'] ?>" data-salario="<?= $colab['salario'] ?? 0 ?>">
-                                    <?= htmlspecialchars($colab['nome_completo']) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
+                            <?= render_select_colaborador('colaborador_id', 'colaborador_id', null, $colaboradores, true) ?>
+                            <?php if (empty($colaboradores)): ?>
+                            <div class="alert alert-warning mt-2">
+                                <i class="ki-duotone ki-information-5 fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <strong>Atenção:</strong> Nenhum colaborador encontrado.
+                            </div>
+                            <?php else: ?>
+                            <small class="text-muted"><?= count($colaboradores) ?> colaborador(es) disponível(is)</small>
+                            <?php endif; ?>
                         </div>
                     </div>
                     
@@ -314,6 +328,99 @@ document.addEventListener('DOMContentLoaded', function() {
 // Também aplica quando o modal for aberto
 document.getElementById('kt_modal_promocao')?.addEventListener('shown.bs.modal', function() {
     aplicarMascarasSalario();
+    
+    // Inicializa Select2 quando o modal for aberto
+    setTimeout(function() {
+        console.log('Modal de promoção aberto - inicializando Select2...');
+        
+        // Verifica se jQuery está disponível
+        if (typeof jQuery === 'undefined') {
+            console.error('jQuery não está disponível');
+            return;
+        }
+        
+        var $select = jQuery('#colaborador_id');
+        console.log('Select encontrado:', $select.length);
+        
+        // Verifica se Select2 está carregado
+        if (typeof jQuery.fn.select2 === 'undefined') {
+            console.error('Select2 não está carregado');
+            
+            // Tenta carregar Select2
+            if (!jQuery('script[src*="select2"]').length) {
+                console.log('Carregando Select2...');
+                jQuery.getScript('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', function() {
+                    console.log('Select2 carregado! Inicializando...');
+                    initSelect2OnModal();
+                });
+            }
+            return;
+        }
+        
+        initSelect2OnModal();
+        
+        function initSelect2OnModal() {
+            var $select = jQuery('#colaborador_id');
+            
+            // Se já foi inicializado, destrói primeiro
+            if ($select.hasClass('select2-hidden-accessible')) {
+                console.log('Destruindo Select2 existente...');
+                $select.select2('destroy');
+            }
+            
+            console.log('Inicializando Select2...');
+            
+            $select.select2({
+                placeholder: 'Selecione um colaborador...',
+                allowClear: true,
+                width: '100%',
+                dropdownParent: jQuery('#kt_modal_promocao'), // IMPORTANTE: define o parent como o modal
+                minimumResultsForSearch: 0,
+                language: {
+                    noResults: function() { return 'Nenhum colaborador encontrado'; },
+                    searching: function() { return 'Buscando...'; }
+                },
+                templateResult: function(data) {
+                    if (!data.id) return data.text;
+                    if (!data.element) return data.text;
+                    
+                    var $option = jQuery(data.element);
+                    var foto = $option.attr('data-foto') || null;
+                    var nome = $option.attr('data-nome') || data.text || '';
+                    
+                    var html = '<span style="display: flex; align-items: center;">';
+                    if (foto) {
+                        html += '<img src="' + foto + '" class="rounded-circle me-2" width="32" height="32" style="object-fit: cover;" onerror="this.src=\'../assets/media/avatars/blank.png\'" />';
+                    } else {
+                        var inicial = nome.charAt(0).toUpperCase();
+                        html += '<span class="symbol symbol-circle symbol-32px me-2"><span class="symbol-label fs-6 fw-semibold bg-primary text-white">' + inicial + '</span></span>';
+                    }
+                    html += '<span>' + nome + '</span></span>';
+                    return jQuery(html);
+                },
+                templateSelection: function(data) {
+                    if (!data.id) return data.text;
+                    if (!data.element) return data.text;
+                    
+                    var $option = jQuery(data.element);
+                    var foto = $option.attr('data-foto') || null;
+                    var nome = $option.attr('data-nome') || data.text || '';
+                    
+                    var html = '<span style="display: flex; align-items: center;">';
+                    if (foto) {
+                        html += '<img src="' + foto + '" class="rounded-circle me-2" width="24" height="24" style="object-fit: cover;" onerror="this.src=\'../assets/media/avatars/blank.png\'" />';
+                    } else {
+                        var inicial = nome.charAt(0).toUpperCase();
+                        html += '<span class="symbol symbol-circle symbol-24px me-2"><span class="symbol-label fs-7 fw-semibold bg-primary text-white">' + inicial + '</span></span>';
+                    }
+                    html += '<span>' + nome + '</span></span>';
+                    return jQuery(html);
+                }
+            });
+            
+            console.log('Select2 inicializado com sucesso!');
+        }
+    }, 350);
 });
 
 // DataTables
@@ -358,6 +465,34 @@ function waitForDependencies() {
 }
 waitForDependencies();
 </script>
+
+<!--begin::Select2 CSS-->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    /* Ajusta a altura do Select2 */
+    .select2-container .select2-selection--single {
+        height: 44px !important;
+        padding: 0.75rem 1rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 44px !important;
+        padding-left: 0 !important;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 42px !important;
+    }
+    
+    .select2-container .select2-selection--single .select2-selection__rendered {
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>
+<!--end::Select2 CSS-->
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

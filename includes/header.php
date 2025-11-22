@@ -34,7 +34,7 @@ $usuario = $_SESSION['usuario'];
     <link href="../assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
     <!--end::Global Stylesheets Bundle-->
     
-    <link rel="shortcut icon" href="../assets/media/logos/favicon.ico" />
+    <link rel="shortcut icon" href="../assets/avatar-privus.png" />
     
     <!--begin::PWA Manifest-->
     <link rel="manifest" href="../manifest.php">
@@ -42,7 +42,7 @@ $usuario = $_SESSION['usuario'];
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="RH Privus">
-    <link rel="apple-touch-icon" href="../assets/media/logos/favicon.png">
+    <link rel="apple-touch-icon" href="../assets/avatar-privus.png">
     <!--end::PWA Manifest-->
     
     
@@ -154,7 +154,7 @@ $usuario = $_SESSION['usuario'];
 <body id="kt_body" class="header-tablet-and-mobile-fixed aside-enabled">
     <!--begin::Theme mode setup on page load-->
     <script>
-        var defaultThemeMode = "light";
+        var defaultThemeMode = "dark";
         var themeMode;
         if (document.documentElement) {
             if (document.documentElement.hasAttribute("data-bs-theme-mode")) {
@@ -289,6 +289,48 @@ $usuario = $_SESSION['usuario'];
                                 <!--end::Menu-->
                             </div>
                             <!--end::Theme mode-->
+                            <!--begin::Notifications-->
+                            <div class="d-flex align-items-center ms-1 ms-lg-3">
+                                <!--begin::Menu wrapper-->
+                                <div class="btn btn-icon btn-color-white btn-active-color-primary position-relative w-30px h-30px" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end" id="kt_notifications_menu">
+                                    <i class="ki-duotone ki-notification-status fs-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <span class="bullet bullet-dot bg-success h-6px w-6px position-absolute translate-middle top-0 start-50 animation-blink" id="kt_notifications_badge" style="display: none;"></span>
+                                </div>
+                                <!--begin::Menu-->
+                                <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-800 menu-state-bg menu-state-color fw-semibold py-4 fs-6 w-350px" data-kt-menu="true" id="kt_notifications_dropdown">
+                                    <!--begin::Heading-->
+                                    <div class="menu-item px-3">
+                                        <div class="menu-content d-flex align-items-center px-3">
+                                            <h3 class="fw-bold px-2 mb-0">Notificações</h3>
+                                            <span class="badge badge-light-primary" id="kt_notifications_count">0</span>
+                                        </div>
+                                    </div>
+                                    <!--end::Heading-->
+                                    <!--begin::Separator-->
+                                    <div class="separator mb-2 opacity-75"></div>
+                                    <!--end::Separator-->
+                                    <!--begin::Notifications list-->
+                                    <div class="menu-item px-3" id="kt_notifications_list">
+                                        <div class="text-center text-muted py-10">
+                                            <p>Nenhuma notificação</p>
+                                        </div>
+                                    </div>
+                                    <!--end::Notifications list-->
+                                    <!--begin::Footer-->
+                                    <div class="menu-item px-3 py-2">
+                                        <div class="text-center">
+                                            <a href="notificacoes.php" class="btn btn-sm btn-light-primary">Ver todas</a>
+                                        </div>
+                                    </div>
+                                    <!--end::Footer-->
+                                </div>
+                                <!--end::Menu-->
+                            </div>
+                            <!--end::Notifications-->
                             <!--begin::User-->
                             <div class="d-flex align-items-center ms-1 ms-lg-3">
                                 <!--begin::Menu wrapper-->

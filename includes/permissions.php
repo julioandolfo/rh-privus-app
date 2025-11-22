@@ -44,6 +44,9 @@ function get_page_permissions() {
         // Dashboard - todos podem acessar
         'dashboard.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         
+        // Análise de Emoções - ADMIN, RH e GESTOR
+        'emocoes_analise.php' => ['ADMIN', 'RH', 'GESTOR'],
+        
         // Estrutura - apenas ADMIN e RH
         'empresas.php' => ['ADMIN', 'RH'],
         'setores.php' => ['ADMIN', 'RH'],
@@ -89,6 +92,18 @@ function get_page_permissions() {
         
         // Gerenciamento de Permissões - apenas ADMIN
         'permissoes.php' => ['ADMIN'],
+        
+        // Feed e Emoções - todos podem acessar
+        'feed.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'emocoes.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        
+        // Configuração de Pontos - apenas ADMIN
+        'configuracoes_pontos.php' => ['ADMIN'],
+        
+        // Endomarketing - ADMIN, RH e GESTOR
+        'endomarketing_datas_comemorativas.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'endomarketing_acoes.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'endomarketing_acao_view.php' => ['ADMIN', 'RH', 'GESTOR'],
     ];
     
     // Carrega permissões customizadas (se existir)
@@ -220,5 +235,57 @@ function can_show_menu($roles) {
  */
 function get_current_page() {
     return basename($_SERVER['PHP_SELF']);
+}
+
+/**
+ * Carrega permissões de cards do dashboard
+ * 
+ * @return array Array com permissões de cards do dashboard
+ */
+function get_dashboard_cards_permissions() {
+    $dashboard_cards_file = __DIR__ . '/../config/dashboard_cards.json';
+    
+    if (file_exists($dashboard_cards_file)) {
+        $permissions = json_decode(file_get_contents($dashboard_cards_file), true);
+        if (is_array($permissions)) {
+            return $permissions;
+        }
+    }
+    
+    // Retorna array vazio se não há permissões customizadas (comportamento padrão: todos podem ver)
+    return [];
+}
+
+/**
+ * Verifica se o usuário atual pode ver um card específico do dashboard
+ * 
+ * @param string $card_key Chave do card (ex: 'card_emocao_diaria')
+ * @return bool True se pode ver, False caso contrário
+ */
+function can_see_dashboard_card($card_key) {
+    if (!isset($_SESSION['usuario'])) {
+        return false;
+    }
+    
+    $user_role = $_SESSION['usuario']['role'] ?? null;
+    
+    if (!$user_role) {
+        return false;
+    }
+    
+    // ADMIN sempre pode ver tudo
+    if ($user_role === 'ADMIN') {
+        return true;
+    }
+    
+    $card_permissions = get_dashboard_cards_permissions();
+    
+    // Se não há permissões customizadas, permite acesso (comportamento padrão)
+    if (empty($card_permissions) || !isset($card_permissions[$card_key])) {
+        return true;
+    }
+    
+    // Verifica se o role do usuário está na lista de permissões do card
+    return in_array($user_role, $card_permissions[$card_key]);
 }
 

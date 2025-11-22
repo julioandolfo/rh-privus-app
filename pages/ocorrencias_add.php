@@ -378,6 +378,34 @@ document.getElementById('kt_form_ocorrencia').addEventListener('submit', functio
 });
 </script>
 
+<!--begin::Select2 CSS-->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    /* Ajusta a altura do Select2 */
+    .select2-container .select2-selection--single {
+        height: 44px !important;
+        padding: 0.75rem 1rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 44px !important;
+        padding-left: 0 !important;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 42px !important;
+    }
+    
+    .select2-container .select2-selection--single .select2-selection__rendered {
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>
+<!--end::Select2 CSS-->
+
 <!--begin::Select Colaborador Script-->
 <script src="../assets/js/select-colaborador.js"></script>
 <!--end::Select Colaborador Script-->

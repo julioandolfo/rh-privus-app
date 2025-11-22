@@ -295,6 +295,13 @@ require_once __DIR__ . '/../includes/header.php';
                                         <a href="colaborador_view.php?id=<?= $colab['id'] ?>" class="menu-link px-3">Visualizar</a>
                                     </div>
                                     <!--end::Menu item-->
+                                    <?php if ($usuario['role'] !== 'GESTOR' && $colab['status'] !== 'desligado'): ?>
+                                    <!--begin::Menu item-->
+                                    <div class="menu-item px-3">
+                                        <a href="#" class="menu-link px-3" onclick="abrirModalDemissao(<?= $colab['id'] ?>, '<?= htmlspecialchars($colab['nome_completo'], ENT_QUOTES) ?>')">Demitir</a>
+                                    </div>
+                                    <!--end::Menu item-->
+                                    <?php endif; ?>
                                     <?php if ($usuario['role'] !== 'GESTOR'): ?>
                                     <!--begin::Menu item-->
                                     <div class="menu-item px-3">
@@ -378,6 +385,93 @@ var KTColaboradoresList = function() {
         KTColaboradoresList.init();
     });
 })();
+
+// Modal de Demissão
+function abrirModalDemissao(colaboradorId, nomeColaborador) {
+    Swal.fire({
+        title: 'Registrar Demissão',
+        html: `
+            <form id="form_demissao">
+                <div class="mb-3">
+                    <label class="form-label">Colaborador</label>
+                    <input type="text" class="form-control" value="${nomeColaborador}" readonly>
+                    <input type="hidden" name="colaborador_id" value="${colaboradorId}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Data da Demissão <span class="text-danger">*</span></label>
+                    <input type="date" name="data_demissao" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tipo de Demissão <span class="text-danger">*</span></label>
+                    <select name="tipo_demissao" class="form-select" required>
+                        <option value="">Selecione...</option>
+                        <option value="sem_justa_causa">Sem Justa Causa</option>
+                        <option value="justa_causa">Justa Causa</option>
+                        <option value="pedido_demissao">Pedido de Demissão</option>
+                        <option value="aposentadoria">Aposentadoria</option>
+                        <option value="falecimento">Falecimento</option>
+                        <option value="outro">Outro</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Motivo</label>
+                    <textarea name="motivo" class="form-control" rows="3" placeholder="Descreva o motivo da demissão..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Observações</label>
+                    <textarea name="observacoes" class="form-control" rows="2" placeholder="Observações adicionais..."></textarea>
+                </div>
+            </form>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Registrar Demissão',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-danger',
+            cancelButton: 'btn btn-light'
+        },
+        didOpen: () => {
+            const form = document.getElementById('form_demissao');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                });
+            }
+        },
+        preConfirm: () => {
+            const form = document.getElementById('form_demissao');
+            if (!form) return false;
+            
+            const formData = new FormData(form);
+            
+            return fetch('../api/demitir_colaborador.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Erro ao registrar demissão');
+                }
+                return data;
+            });
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                text: 'Demissão registrada com sucesso!',
+                icon: 'success',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok',
+                customClass: {
+                    confirmButton: 'btn btn-primary'
+                }
+            }).then(() => {
+                location.reload();
+            });
+        }
+    });
+}
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

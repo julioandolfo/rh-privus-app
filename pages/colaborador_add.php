@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $cpf = preg_replace('/[^0-9]/', '', $_POST['cpf'] ?? '');
     $rg = sanitize($_POST['rg'] ?? '');
     $data_nascimento = $_POST['data_nascimento'] ?? null;
+    $estado_civil = $_POST['estado_civil'] ?? null;
     $telefone = sanitize($_POST['telefone'] ?? '');
     $email_pessoal = sanitize($_POST['email_pessoal'] ?? '');
     $data_inicio = $_POST['data_inicio'] ?? null;
@@ -73,18 +74,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $stmt = $pdo->prepare("
             INSERT INTO colaboradores 
-            (empresa_id, setor_id, cargo_id, nivel_hierarquico_id, lider_id, nome_completo, cpf, cnpj, rg, data_nascimento, telefone, email_pessoal, data_inicio, status, tipo_contrato, salario, pix, banco, agencia, conta, tipo_conta, cep, logradouro, numero, complemento, bairro, cidade_endereco, estado_endereco, observacoes, foto, senha_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, setor_id, cargo_id, nivel_hierarquico_id, lider_id, nome_completo, cpf, cnpj, rg, data_nascimento, estado_civil, telefone, email_pessoal, data_inicio, status, tipo_contrato, salario, pix, banco, agencia, conta, tipo_conta, cep, logradouro, numero, complemento, bairro, cidade_endereco, estado_endereco, observacoes, foto, senha_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $empresa_id, $setor_id, $cargo_id, $nivel_hierarquico_id, $lider_id, $nome_completo, $cpf, 
-            !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $telefone, $email_pessoal, $data_inicio, 
+            !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $estado_civil ?: null, $telefone, $email_pessoal, $data_inicio, 
             $status, $tipo_contrato, $salario, $pix, $banco, $agencia, $conta, $tipo_conta, 
             !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco, 
             !empty($estado_endereco) ? $estado_endereco : null, $observacoes, $foto_path, $senha_hash
         ]);
         
         $colaborador_id = $pdo->lastInsertId();
+        
+        // Processa filhos
+        if (isset($_POST['filhos']) && is_array($_POST['filhos'])) {
+            foreach ($_POST['filhos'] as $filho) {
+                if (!empty($filho['nome'])) {
+                    $nome_filho = sanitize($filho['nome']);
+                    $data_nasc_filho = !empty($filho['data_nascimento']) ? $filho['data_nascimento'] : null;
+                    $idade_filho = !empty($filho['idade']) ? (int)$filho['idade'] : null;
+                    
+                    // Calcula idade se tiver data de nascimento
+                    if ($data_nasc_filho && !$idade_filho) {
+                        $data_nasc = new DateTime($data_nasc_filho);
+                        $hoje = new DateTime();
+                        $idade_filho = $hoje->diff($data_nasc)->y;
+                    }
+                    
+                    $stmt_filho = $pdo->prepare("
+                        INSERT INTO colaboradores_filhos (colaborador_id, nome, data_nascimento, idade)
+                        VALUES (?, ?, ?, ?)
+                    ");
+                    $stmt_filho->execute([$colaborador_id, $nome_filho, $data_nasc_filho, $idade_filho]);
+                }
+            }
+        }
+        
+        // Processa formações
+        if (isset($_POST['formacoes']) && is_array($_POST['formacoes'])) {
+            foreach ($_POST['formacoes'] as $formacao) {
+                if (!empty($formacao['nome'])) {
+                    $stmt_formacao = $pdo->prepare("
+                        INSERT INTO colaboradores_formacoes 
+                        (colaborador_id, tipo, nome, instituicao, data_inicio, data_conclusao, carga_horaria, status, observacoes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt_formacao->execute([
+                        $colaborador_id,
+                        $formacao['tipo'] ?? 'curso',
+                        sanitize($formacao['nome']),
+                        !empty($formacao['instituicao']) ? sanitize($formacao['instituicao']) : null,
+                        !empty($formacao['data_inicio']) ? $formacao['data_inicio'] : null,
+                        !empty($formacao['data_conclusao']) ? $formacao['data_conclusao'] : null,
+                        !empty($formacao['carga_horaria']) ? (int)$formacao['carga_horaria'] : null,
+                        $formacao['status'] ?? 'concluido',
+                        !empty($formacao['observacoes']) ? sanitize($formacao['observacoes']) : null
+                    ]);
+                }
+            }
+        }
         
         // Envia email de boas-vindas se template estiver ativo
         if (!empty($email_pessoal)) {
@@ -213,12 +262,64 @@ require_once __DIR__ . '/../includes/header.php';
                                 <input type="date" name="data_nascimento" class="form-control">
                             </div>
                             <div class="col-md-3 mb-3">
+                                <label class="form-label">Estado Civil</label>
+                                <select name="estado_civil" class="form-select">
+                                    <option value="">Selecione...</option>
+                                    <option value="solteiro">Solteiro(a)</option>
+                                    <option value="casado">Casado(a)</option>
+                                    <option value="divorciado">Divorciado(a)</option>
+                                    <option value="viuvo">Viúvo(a)</option>
+                                    <option value="uniao_estavel">União Estável</option>
+                                    <option value="outro">Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
                                 <label class="form-label">Telefone</label>
                                 <input type="text" name="telefone" class="form-control" placeholder="(00) 00000-0000">
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Email Pessoal</label>
                                 <input type="email" name="email_pessoal" class="form-control">
+                            </div>
+                        </div>
+                        
+                        <!-- Filhos -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Filhos</h5>
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="adicionarFilho()">
+                                        <i class="ki-duotone ki-plus fs-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Adicionar Filho
+                                    </button>
+                                </div>
+                                <div id="filhos_container">
+                                    <!-- Filhos serão adicionados aqui dinamicamente -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Formações -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Cursos e Formações</h5>
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="adicionarFormacao()">
+                                        <i class="ki-duotone ki-plus fs-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Adicionar Formação
+                                    </button>
+                                </div>
+                                <div id="formacoes_container">
+                                    <!-- Formações serão adicionadas aqui dinamicamente -->
+                                </div>
                             </div>
                         </div>
                         
@@ -665,6 +766,167 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 });
 <?php endif; ?>
+</script>
+
+<script>
+// Gerenciamento de Filhos
+let filhosCount = 0;
+
+function adicionarFilho() {
+    filhosCount++;
+    const container = document.getElementById('filhos_container');
+    const filhoDiv = document.createElement('div');
+    filhoDiv.className = 'card card-flush mb-3';
+    filhoDiv.id = 'filho_' + filhosCount;
+    filhoDiv.innerHTML = `
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Filho ${filhosCount}</h6>
+                <button type="button" class="btn btn-sm btn-light-danger" onclick="removerFilho(${filhosCount})">
+                    <i class="ki-duotone ki-trash fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                    </i>
+                    Remover
+                </button>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Nome *</label>
+                    <input type="text" name="filhos[${filhosCount}][nome]" class="form-control" required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Data de Nascimento</label>
+                    <input type="date" name="filhos[${filhosCount}][data_nascimento]" class="form-control" onchange="calcularIdadeFilho(${filhosCount}, this.value)">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Idade</label>
+                    <input type="number" name="filhos[${filhosCount}][idade]" id="idade_filho_${filhosCount}" class="form-control" min="0" max="120">
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(filhoDiv);
+}
+
+function removerFilho(id) {
+    const filhoDiv = document.getElementById('filho_' + id);
+    if (filhoDiv) {
+        filhoDiv.remove();
+    }
+}
+
+function calcularIdadeFilho(id, dataNascimento) {
+    if (dataNascimento) {
+        const dataNasc = new Date(dataNascimento);
+        const hoje = new Date();
+        const idade = hoje.getFullYear() - dataNasc.getFullYear();
+        const mes = hoje.getMonth() - dataNasc.getMonth();
+        const idadeCalculada = mes < 0 || (mes === 0 && hoje.getDate() < dataNasc.getDate()) ? idade - 1 : idade;
+        document.getElementById('idade_filho_' + id).value = idadeCalculada;
+    }
+}
+
+// Gerenciamento de Formações
+let formacoesCount = 0;
+
+function adicionarFormacao() {
+    formacoesCount++;
+    const container = document.getElementById('formacoes_container');
+    const formacaoDiv = document.createElement('div');
+    formacaoDiv.className = 'card card-flush mb-3';
+    formacaoDiv.id = 'formacao_' + formacoesCount;
+    formacaoDiv.innerHTML = `
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Formação ${formacoesCount}</h6>
+                <button type="button" class="btn btn-sm btn-light-danger" onclick="removerFormacao(${formacoesCount})">
+                    <i class="ki-duotone ki-trash fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                    </i>
+                    Remover
+                </button>
+            </div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Tipo *</label>
+                    <select name="formacoes[${formacoesCount}][tipo]" class="form-select" required>
+                        <option value="curso">Curso</option>
+                        <option value="graduacao">Graduação</option>
+                        <option value="pos_graduacao">Pós-Graduação</option>
+                        <option value="mestrado">Mestrado</option>
+                        <option value="doutorado">Doutorado</option>
+                        <option value="tecnico">Técnico</option>
+                        <option value="certificacao">Certificação</option>
+                        <option value="outro">Outro</option>
+                    </select>
+                </div>
+                <div class="col-md-5 mb-3">
+                    <label class="form-label">Nome do Curso/Formação *</label>
+                    <input type="text" name="formacoes[${formacoesCount}][nome]" class="form-control" required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Instituição</label>
+                    <input type="text" name="formacoes[${formacoesCount}][instituicao]" class="form-control">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" name="formacoes[${formacoesCount}][data_inicio]" class="form-control">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Data Conclusão</label>
+                    <input type="date" name="formacoes[${formacoesCount}][data_conclusao]" class="form-control">
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">Carga Horária</label>
+                    <input type="number" name="formacoes[${formacoesCount}][carga_horaria]" class="form-control" min="0" placeholder="Horas">
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">Status</label>
+                    <select name="formacoes[${formacoesCount}][status]" class="form-select">
+                        <option value="concluido" selected>Concluído</option>
+                        <option value="em_andamento">Em Andamento</option>
+                        <option value="trancado">Trancado</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-flex align-items-end h-100">
+                        <button type="button" class="btn btn-sm btn-light" onclick="removerFormacao(${formacoesCount})">
+                            <i class="ki-duotone ki-trash fs-2 text-danger">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-12 mb-3">
+                    <label class="form-label">Observações</label>
+                    <textarea name="formacoes[${formacoesCount}][observacoes]" class="form-control" rows="2"></textarea>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(formacaoDiv);
+}
+
+function removerFormacao(id) {
+    const formacaoDiv = document.getElementById('formacao_' + id);
+    if (formacaoDiv) {
+        formacaoDiv.remove();
+    }
+}
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
