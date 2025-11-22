@@ -7,8 +7,10 @@ if (!isset($_SESSION['usuario'])) {
     return;
 }
 
+require_once __DIR__ . '/permissions.php';
+
 $usuario = $_SESSION['usuario'];
-$current_page = basename($_SERVER['PHP_SELF']);
+$current_page = get_current_page();
 
 function isActive($page) {
     global $current_page;
@@ -28,6 +30,8 @@ function getIcon($name) {
         'gear' => 'setting-2',
         'email' => 'sms',
         'notification' => 'notification-status',
+        'shield' => 'shield-check',
+        'wallet' => 'wallet',
     ];
     return $icons[$name] ?? 'element-11';
 }
@@ -61,7 +65,7 @@ function getIcon($name) {
                 </div>
                 <!--end:Menu item-->
                 
-                <?php if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH'): ?>
+                <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('empresas.php') || isActive('setores.php') || isActive('cargos.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -156,7 +160,7 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
-                <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('colaboradores.php') || isActive('promocoes.php') || isActive('horas_extras.php') || isActive('fechamento_pagamentos.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -183,7 +187,7 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
-                            <?php if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH'): ?>
+                            <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('promocoes.php') ?>" href="promocoes.php">
@@ -256,7 +260,7 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
-                            <?php if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH'): ?>
+                            <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('tipos_ocorrencias.php') ?>" href="tipos_ocorrencias.php">
@@ -330,7 +334,7 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
-                <?php if ($usuario['role'] === 'ADMIN'): ?>
+                <?php if (can_show_menu('ADMIN')): ?>
                     <!--begin:Menu separator-->
                     <div class="menu-item pt-5">
                         <div class="menu-content">
@@ -354,7 +358,7 @@ function getIcon($name) {
                     <!--end:Menu item-->
                     
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -369,6 +373,16 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('permissoes.php') ?>" href="permissoes.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Permissões</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('configuracoes_email.php') ?>" href="configuracoes_email.php">
@@ -395,7 +409,7 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
-                <?php if ($usuario['role'] === 'COLABORADOR'): ?>
+                <?php if (can_show_menu('COLABORADOR')): ?>
                     <!--begin:Menu item-->
                     <div class="menu-item">
                         <a class="menu-link <?= isActive('colaborador_view.php') ?>" href="colaborador_view.php?id=<?= $usuario['colaborador_id'] ?>">
@@ -409,6 +423,7 @@ function getIcon($name) {
                         </a>
                     </div>
                     <!--end:Menu item-->
+                    <?php if (can_access_page('meus_pagamentos.php')): ?>
                     <!--begin:Menu item-->
                     <div class="menu-item">
                         <a class="menu-link <?= isActive('meus_pagamentos.php') ?>" href="meus_pagamentos.php">
@@ -422,6 +437,7 @@ function getIcon($name) {
                         </a>
                     </div>
                     <!--end:Menu item-->
+                    <?php endif; ?>
                 <?php endif; ?>
                 
                 <!--begin:Menu item-->

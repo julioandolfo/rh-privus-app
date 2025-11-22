@@ -5,17 +5,13 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/upload_documento.php';
 
-require_login();
+require_page_permission('meus_pagamentos.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
-
-// Apenas colaboradores podem acessar
-if ($usuario['role'] !== 'COLABORADOR' || empty($usuario['colaborador_id'])) {
-    redirect('dashboard.php', 'Você não tem permissão para acessar esta página.', 'error');
-}
 
 $colaborador_id = $usuario['colaborador_id'];
 

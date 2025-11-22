@@ -6,8 +6,9 @@
 $page_title = 'Visualizar Colaborador';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
-require_login();
+require_page_permission('colaborador_view.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];

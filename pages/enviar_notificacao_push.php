@@ -12,6 +12,7 @@ header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/push_notifications.php';
 
 if (!function_exists('log_push_debug')) {
@@ -45,7 +46,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_login();
+require_page_permission('enviar_notificacao_push.php');
 
 // Apenas ADMIN e RH podem acessar
 if (!in_array($_SESSION['usuario']['role'], ['ADMIN', 'RH'])) {

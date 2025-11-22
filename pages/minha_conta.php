@@ -5,9 +5,10 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/upload_foto.php';
 
-require_login();
+require_page_permission('minha_conta.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
@@ -15,7 +16,7 @@ $usuario_id = $usuario['id'] ?? null;
 $colaborador_id = $usuario['colaborador_id'] ?? null;
 
 // Se for colaborador sem usuário vinculado (id é null), busca dados do colaborador
-if ($usuario['role'] === 'COLABORADOR' && empty($usuario_id) && !empty($colaborador_id)) {
+if (is_colaborador_sem_usuario()) {
     // Busca dados do colaborador diretamente
     $stmt = $pdo->prepare("
         SELECT c.id as colaborador_id_full,
@@ -160,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($action === 'atualizar_dados') {
         // Se for colaborador sem usuário vinculado, só atualiza dados do colaborador
-        if ($usuario['role'] === 'COLABORADOR' && empty($usuario_id) && !empty($colaborador_id)) {
+        if (is_colaborador_sem_usuario()) {
             $telefone = sanitize($_POST['telefone'] ?? '');
             
             try {
@@ -228,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Se for colaborador sem usuário vinculado, altera senha do colaborador
-        if ($usuario['role'] === 'COLABORADOR' && empty($usuario_id) && !empty($colaborador_id)) {
+        if (is_colaborador_sem_usuario()) {
             // Verifica senha atual do colaborador
             $stmt = $pdo->prepare("SELECT senha_hash FROM colaboradores WHERE id = ?");
             $stmt->execute([$colaborador_id]);
@@ -271,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'atualizar_foto') {
         if (isset($_FILES['foto']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK) {
             // Se for colaborador sem usuário vinculado, atualiza foto do colaborador
-            if ($usuario['role'] === 'COLABORADOR' && empty($usuario_id) && !empty($colaborador_id)) {
+            if (is_colaborador_sem_usuario()) {
                 // Deleta foto antiga se existir
                 if (!empty($dados_usuario['colaborador_foto'])) {
                     require_once __DIR__ . '/../includes/upload_foto.php';
@@ -449,7 +450,7 @@ require_once __DIR__ . '/../includes/header.php';
                         $mostrar_info_completas = false;
                         if (!empty($dados_usuario['colaborador_id']) && !empty($dados_usuario['colaborador_nome'])) {
                             $mostrar_info_completas = true;
-                        } elseif ($usuario['role'] === 'COLABORADOR' && empty($usuario_id) && !empty($dados_usuario['colaborador_nome'])) {
+                        } elseif (is_colaborador_sem_usuario() && !empty($dados_usuario['colaborador_nome'])) {
                             $mostrar_info_completas = true;
                         }
                         ?>
@@ -486,7 +487,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <form method="POST" class="form mt-7">
                                     <input type="hidden" name="action" value="atualizar_dados">
                                     
-                                    <?php if ($usuario['role'] === 'COLABORADOR' && empty($usuario_id)): ?>
+                                    <?php if (is_colaborador_sem_usuario()): ?>
                                     <!-- Colaborador sem usuário vinculado - só pode editar telefone -->
                                     <div class="alert alert-info mb-7">
                                         <i class="ki-duotone ki-information-5 fs-2">

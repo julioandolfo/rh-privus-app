@@ -15,9 +15,10 @@ header('X-Content-Type-Options: nosniff');
 $page_title = 'Dashboard';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
 // Verifica login ANTES de incluir o header
-require_login();
+require_page_permission('dashboard.php');
 
 // Limpa buffer antes de incluir header (que vai gerar HTML)
 ob_end_clean();
@@ -29,7 +30,7 @@ $usuario = $_SESSION['usuario'];
 $colaborador_id = $usuario['colaborador_id'] ?? null;
 
 // Se for colaborador, mostra dashboard personalizado
-if ($usuario['role'] === 'COLABORADOR' && !empty($colaborador_id)) {
+if (is_colaborador() && !empty($colaborador_id)) {
     // Dashboard do Colaborador - Informações pessoais
     try {
         // Busca dados do colaborador
@@ -407,7 +408,7 @@ if ($usuario['role'] === 'COLABORADOR' && !empty($colaborador_id)) {
             </div>
         <?php endif; ?>
         
-        <?php if ($usuario['role'] === 'COLABORADOR' && !empty($colaborador_id)): ?>
+        <?php if (is_colaborador() && !empty($colaborador_id)): ?>
         <!-- Dashboard do Colaborador -->
         
         <!--begin::Row - Cards de Estatísticas -->
@@ -717,6 +718,7 @@ if ($usuario['role'] === 'COLABORADOR' && !empty($colaborador_id)) {
         <?php else: ?>
         <!-- Dashboard Admin/RH/GESTOR -->
         
+        <?php if (has_role(['ADMIN', 'RH', 'GESTOR'])): ?>
         <!--begin::Row-->
         <div class="row g-5 g-xl-8 mb-5">
             <!--begin::Col-->
@@ -788,6 +790,7 @@ if ($usuario['role'] === 'COLABORADOR' && !empty($colaborador_id)) {
             <!--end::Col-->
         </div>
         <!--end::Row-->
+        <?php endif; ?>
         
         <!--begin::Row-->
         <div class="row g-5 g-xl-8 mb-5">
@@ -977,7 +980,7 @@ if (ctxOcorrenciasMes) {
     });
 }
 
-<?php if ($usuario['role'] !== 'COLABORADOR' || empty($colaborador_id)): ?>
+<?php if (!is_colaborador() || empty($colaborador_id)): ?>
 // Gráfico de Colaboradores por Status (apenas Admin/RH/GESTOR)
 const ctxColaboradoresStatus = document.getElementById('kt_chart_colaboradores_status');
 if (ctxColaboradoresStatus && <?= json_encode(!empty($colaboradores_status)) ?>) {

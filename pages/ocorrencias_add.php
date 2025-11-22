@@ -5,12 +5,10 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/select_colaborador.php';
 
-require_login();
-
-if ($_SESSION['usuario']['role'] === 'COLABORADOR') {
-    redirect('dashboard.php', 'Você não tem permissão para lançar ocorrências.', 'error');
-}
+require_page_permission('ocorrencias_add.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
@@ -89,25 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Busca colaboradores disponíveis
-if ($usuario['role'] === 'ADMIN') {
-    $stmt = $pdo->query("SELECT id, nome_completo FROM colaboradores WHERE status = 'ativo' ORDER BY nome_completo");
-} elseif ($usuario['role'] === 'RH') {
-    $stmt = $pdo->prepare("SELECT id, nome_completo FROM colaboradores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_completo");
-    $stmt->execute([$usuario['empresa_id']]);
-} elseif ($usuario['role'] === 'GESTOR') {
-    // Busca setor do gestor
-    $stmt_user = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
-    $stmt_user->execute([$usuario['id']]);
-    $user_data = $stmt_user->fetch();
-    $setor_id = $user_data['setor_id'] ?? 0;
-    
-    $stmt = $pdo->prepare("SELECT id, nome_completo FROM colaboradores WHERE setor_id = ? AND status = 'ativo' ORDER BY nome_completo");
-    $stmt->execute([$setor_id]);
-} else {
-    $colaboradores = [];
+// Busca colaboradores disponíveis com foto
+$colaboradores = get_colaboradores_disponiveis($pdo, $usuario);
+
+// Debug: verifica se colaboradores foram encontrados
+if (empty($colaboradores)) {
+    error_log("Nenhum colaborador encontrado para role: " . ($usuario['role'] ?? 'N/A'));
 }
-$colaboradores = isset($stmt) ? $stmt->fetchAll() : [];
 
 // Busca tipos de ocorrências ativos do banco
 try {
@@ -178,14 +164,20 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="row mb-7">
                         <div class="col-md-12">
                             <label class="required fw-semibold fs-6 mb-2">Colaborador</label>
-                            <select name="colaborador_id" id="colaborador_id" class="form-select form-select-solid" required>
-                                <option value="">Selecione...</option>
-                                <?php foreach ($colaboradores as $colab): ?>
-                                <option value="<?= $colab['id'] ?>" <?= $colaborador_id == $colab['id'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($colab['nome_completo']) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
+                            <?= render_select_colaborador('colaborador_id', 'colaborador_id', $colaborador_id, $colaboradores, true) ?>
+                            <?php if (empty($colaboradores)): ?>
+                            <div class="alert alert-warning mt-2">
+                                <i class="ki-duotone ki-information-5 fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <strong>Atenção:</strong> Nenhum colaborador encontrado. Verifique se há colaboradores ativos no sistema.
+                                <br><small>Role atual: <?= htmlspecialchars($usuario['role'] ?? 'N/A') ?></small>
+                            </div>
+                            <?php else: ?>
+                            <small class="text-muted"><?= count($colaboradores) ?> colaborador(es) disponível(is)</small>
+                            <?php endif; ?>
                         </div>
                     </div>
                     
@@ -385,5 +377,9 @@ document.getElementById('kt_form_ocorrencia').addEventListener('submit', functio
     }
 });
 </script>
+
+<!--begin::Select Colaborador Script-->
+<script src="../assets/js/select-colaborador.js"></script>
+<!--end::Select Colaborador Script-->
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

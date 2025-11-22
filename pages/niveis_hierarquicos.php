@@ -5,13 +5,9 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
-require_login();
-
-// Apenas ADMIN e RH podem acessar
-if (!check_permission('ADMIN') && !check_permission('RH')) {
-    redirect('dashboard.php', 'Você não tem permissão para acessar esta página.', 'error');
-}
+require_page_permission('niveis_hierarquicos.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];

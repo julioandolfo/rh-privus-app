@@ -12,18 +12,14 @@ header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
 // Inicia sessão se não estiver iniciada
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require_login();
-
-// Apenas ADMIN e RH podem acessar
-if (!in_array($_SESSION['usuario']['role'], ['ADMIN', 'RH'])) {
-    redirect('dashboard.php', 'Você não tem permissão para acessar esta página.', 'error');
-}
+require_page_permission('notificacoes_enviadas.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];

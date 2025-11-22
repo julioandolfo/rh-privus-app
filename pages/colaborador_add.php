@@ -5,13 +5,10 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/upload_foto.php';
 
-require_login();
-
-if ($_SESSION['usuario']['role'] === 'GESTOR' || $_SESSION['usuario']['role'] === 'COLABORADOR') {
-    redirect('dashboard.php', 'Você não tem permissão para acessar esta página.', 'error');
-}
+require_page_permission('colaborador_add.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];

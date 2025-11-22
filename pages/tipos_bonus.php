@@ -1,9 +1,9 @@
 <?php
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
-require_login();
-check_permission(['ADMIN', 'RH']);
+require_page_permission('tipos_bonus.php');
 
 $pdo = getDB();
 

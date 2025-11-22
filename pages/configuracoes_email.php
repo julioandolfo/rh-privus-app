@@ -5,13 +5,9 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
-require_login();
-
-// Apenas ADMIN pode acessar
-if (!check_permission('ADMIN')) {
-    redirect('dashboard.php', 'Você não tem permissão para acessar esta página.', 'error');
-}
+require_page_permission('configuracoes_email.php');
 
 $pdo = getDB();
 

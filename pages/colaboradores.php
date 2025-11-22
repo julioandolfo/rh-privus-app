@@ -5,12 +5,9 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
-require_login();
-
-if ($_SESSION['usuario']['role'] === 'COLABORADOR') {
-    redirect('colaborador_view.php?id=' . $_SESSION['usuario']['colaborador_id']);
-}
+require_page_permission('colaboradores.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
