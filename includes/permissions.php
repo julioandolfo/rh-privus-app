@@ -104,6 +104,10 @@ function get_page_permissions() {
         'endomarketing_datas_comemorativas.php' => ['ADMIN', 'RH', 'GESTOR'],
         'endomarketing_acoes.php' => ['ADMIN', 'RH', 'GESTOR'],
         'endomarketing_acao_view.php' => ['ADMIN', 'RH', 'GESTOR'],
+        
+        // Feedbacks - todos podem enviar e ver seus próprios feedbacks
+        'feedback_enviar.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'feedback_meus.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
     ];
     
     // Carrega permissões customizadas (se existir)

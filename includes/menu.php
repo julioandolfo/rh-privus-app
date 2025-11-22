@@ -84,6 +84,50 @@ function getIcon($name) {
                 <!--end:Menu item-->
                 
                 <!--begin:Menu item-->
+                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('feedback_enviar.php') || isActive('feedback_meus.php')) ? 'here show' : '' ?>">
+                    <!--begin:Menu link-->
+                    <span class="menu-link">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-message-text fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Feedbacks</span>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <!--end:Menu link-->
+                    <!--begin:Menu sub-->
+                    <div class="menu-sub menu-sub-accordion">
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('feedback_enviar.php') ?>" href="feedback_enviar.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Enviar Feedback</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('feedback_meus.php') ?>" href="feedback_meus.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Meus Feedbacks</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                    </div>
+                    <!--end:Menu sub-->
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
+                <!--begin:Menu item-->
                 <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('endomarketing_datas_comemorativas.php') || isActive('endomarketing_acoes.php')) ? 'here show' : '' ?>">
                     <!--begin:Menu link-->
