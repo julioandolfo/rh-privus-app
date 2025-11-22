@@ -14,7 +14,7 @@ $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 $id = $_GET['id'] ?? 0;
 
-// Busca colaborador
+// Busca colaborador com informações completas
 $stmt = $pdo->prepare("
     SELECT c.*, 
            e.nome_fantasia as empresa_nome,
@@ -22,7 +22,8 @@ $stmt = $pdo->prepare("
            car.nome_cargo,
            nh.nome as nivel_nome,
            nh.codigo as nivel_codigo,
-           l.nome_completo as lider_nome
+           l.nome_completo as lider_nome,
+           l.foto as lider_foto
     FROM colaboradores c
     LEFT JOIN empresas e ON c.empresa_id = e.id
     LEFT JOIN setores s ON c.setor_id = s.id
@@ -140,7 +141,18 @@ require_once __DIR__ . '/../includes/header.php';
                     <!--begin::Tabs-->
                     <ul class="nav nav-stretch nav-line-tabs nav-line-tabs-2x border-transparent fs-5 fw-bold overflow-auto flex-nowrap" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
                         <li class="nav-item mt-2 flex-shrink-0">
-                            <a class="nav-link text-active-primary ms-0 me-5 me-md-10 py-5 active" data-bs-toggle="tab" href="#kt_tab_pane_dados">
+                            <a class="nav-link text-active-primary ms-0 me-5 me-md-10 py-5 active" data-bs-toggle="tab" href="#kt_tab_pane_jornada">
+                                <i class="ki-duotone ki-chart-simple fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <span class="d-none d-md-inline">Jornada</span>
+                                <span class="d-md-none">Jornada</span>
+                            </a>
+                        </li>
+                        <li class="nav-item mt-2 flex-shrink-0">
+                            <a class="nav-link text-active-primary me-5 me-md-10 py-5" data-bs-toggle="tab" href="#kt_tab_pane_dados">
                                 <i class="ki-duotone ki-profile-user fs-2 me-2">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
@@ -200,6 +212,97 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="card-body pt-0">
                 <!--begin::Tab Content-->
                 <div class="tab-content">
+                    <!--begin::Tab Pane - Jornada-->
+                    <div class="tab-pane fade show active" id="kt_tab_pane_jornada" role="tabpanel">
+                        <!-- Cabeçalho rico com foto e informações -->
+                        <div class="card mb-5">
+                            <div class="card-body p-6">
+                                <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-5">
+                                    <!-- Foto do colaborador -->
+                                    <div class="flex-shrink-0">
+                                        <?php if ($colaborador['foto']): ?>
+                                        <img src="<?= htmlspecialchars($colaborador['foto']) ?>" class="rounded-circle" width="120" height="120" style="object-fit: cover;" alt="<?= htmlspecialchars($colaborador['nome_completo']) ?>">
+                                        <?php else: ?>
+                                        <div class="symbol symbol-circle symbol-120px">
+                                            <div class="symbol-label bg-primary text-white fs-2x fw-bold">
+                                                <?= strtoupper(substr($colaborador['nome_completo'], 0, 1)) ?>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <!-- Informações principais -->
+                                    <div class="flex-grow-1">
+                                        <h2 class="fw-bold text-gray-900 mb-2"><?= htmlspecialchars($colaborador['nome_completo']) ?></h2>
+                                        <h5 class="text-gray-600 mb-1"><?= htmlspecialchars($colaborador['nome_cargo']) ?></h5>
+                                        <p class="text-gray-500 mb-2"><?= htmlspecialchars($colaborador['nome_setor']) ?></p>
+                                        <?php if ($colaborador['empresa_nome']): ?>
+                                        <p class="text-gray-500 mb-3"><?= htmlspecialchars($colaborador['empresa_nome']) ?></p>
+                                        <?php endif; ?>
+                                        
+                                        <div class="d-flex flex-wrap gap-2 mb-3">
+                                            <span class="badge badge-light-<?= $colaborador['status'] === 'ativo' ? 'success' : ($colaborador['status'] === 'pausado' ? 'warning' : 'secondary') ?>">
+                                                <?= ucfirst($colaborador['status']) ?>
+                                            </span>
+                                        </div>
+                                        
+                                        <!-- Liderança -->
+                                        <?php if ($colaborador['lider_nome']): ?>
+                                        <div class="d-flex align-items-center gap-3 mt-4">
+                                            <label class="fw-semibold text-gray-700">Liderança:</label>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <?php if ($colaborador['lider_foto']): ?>
+                                                <img src="<?= htmlspecialchars($colaborador['lider_foto']) ?>" class="rounded-circle" width="30" height="30" style="object-fit: cover;" alt="">
+                                                <?php else: ?>
+                                                <div class="symbol symbol-circle symbol-30px">
+                                                    <div class="symbol-label bg-info text-white fs-7">
+                                                        <?= strtoupper(substr($colaborador['lider_nome'], 0, 1)) ?>
+                                                    </div>
+                                                </div>
+                                                <?php endif; ?>
+                                                <div>
+                                                    <p class="mb-0 fw-semibold text-gray-800"><?= htmlspecialchars($colaborador['lider_nome']) ?></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Filtros de data -->
+                        <div class="card mb-5">
+                            <div class="card-body">
+                                <div class="row align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold">Data de Início</label>
+                                        <input type="date" class="form-control form-control-solid" id="filtro-data-inicio" value="">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold">Data Final</label>
+                                        <input type="date" class="form-control form-control-solid" id="filtro-data-fim" value="">
+                                    </div>
+                                    <div class="col-md-6 d-flex gap-2 justify-content-end">
+                                        <button type="button" class="btn btn-light" id="btn-limpar-filtros">Limpar filtros</button>
+                                        <button type="button" class="btn btn-primary" id="btn-filtrar">Filtrar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Métricas e gráficos -->
+                        <div id="metricas-container">
+                            <!-- Será carregado via AJAX -->
+                            <div class="text-center py-10">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Carregando...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Tab Pane - Jornada-->
+                    
                     <!--begin::Tab Pane - Dados Pessoais-->
                     <div class="tab-pane fade show active" id="kt_tab_pane_dados" role="tabpanel">
                         <div class="row">
@@ -661,9 +764,488 @@ require_once __DIR__ . '/../includes/header.php';
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
-<?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
 <script>
 const colaboradorId = <?= $id ?>;
+let humorChart = null;
+let feedbackRadarChart = null;
+
+// Carrega métricas ao abrir a aba Jornada
+document.addEventListener('DOMContentLoaded', function() {
+    // Carrega métricas quando a aba Jornada é aberta
+    const tabJornada = document.getElementById('kt_tab_pane_jornada');
+    if (tabJornada && tabJornada.classList.contains('active')) {
+        carregarMetricas();
+    }
+    
+    // Listener para quando a aba Jornada é clicada
+    const linkJornada = document.querySelector('[href="#kt_tab_pane_jornada"]');
+    if (linkJornada) {
+        linkJornada.addEventListener('shown.bs.tab', function() {
+            carregarMetricas();
+        });
+    }
+    
+    // Botões de filtro
+    document.getElementById('btn-filtrar')?.addEventListener('click', function() {
+        carregarMetricas();
+    });
+    
+    document.getElementById('btn-limpar-filtros')?.addEventListener('click', function() {
+        document.getElementById('filtro-data-inicio').value = '';
+        document.getElementById('filtro-data-fim').value = '';
+        carregarMetricas();
+    });
+});
+
+function carregarMetricas() {
+    const dataInicio = document.getElementById('filtro-data-inicio').value;
+    const dataFim = document.getElementById('filtro-data-fim').value;
+    
+    const params = new URLSearchParams({
+        colaborador_id: colaboradorId
+    });
+    if (dataInicio) params.append('data_inicio', dataInicio);
+    if (dataFim) params.append('data_fim', dataFim);
+    
+    fetch(`<?= get_base_url() ?>/api/colaborador/metricas.php?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderizarMetricas(data);
+            } else {
+                console.error('Erro ao carregar métricas:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar métricas:', error);
+        });
+}
+
+function renderizarMetricas(data) {
+    const container = document.getElementById('metricas-container');
+    const metricas = data.metricas;
+    
+    // Mapeia nível de humor para emoji
+    const humorEmojis = {
+        1: '😢',
+        2: '😔',
+        3: '😐',
+        4: '🙂',
+        5: '😄'
+    };
+    
+    const humorEmoji = metricas.media_humor ? humorEmojis[Math.round(metricas.media_humor)] || '😐' : '😐';
+    
+    container.innerHTML = `
+        <!-- Métricas principais -->
+        <div class="row mb-5">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center p-6">
+                        <h4 class="mb-4">Termômetro de Humor</h4>
+                        <div class="mb-3">
+                            <span style="font-size: 80px;">${humorEmoji}</span>
+                        </div>
+                        <h3 class="text-gray-800">Média ${metricas.media_humor || 'N/A'}</h3>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body p-6">
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <div class="text-center">
+                                    <div class="fs-2x fw-bold text-gray-800">${metricas.feedbacks_enviados}</div>
+                                    <div class="text-gray-600">Feedbacks Enviados</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="text-center">
+                                    <div class="fs-2x fw-bold text-gray-800">${metricas.feedbacks_recebidos}</div>
+                                    <div class="text-gray-600">Feedbacks Recebidos</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="text-center">
+                                    <div class="fs-2x fw-bold text-gray-800">${metricas.humores_respondidos}</div>
+                                    <div class="text-gray-600">Humores Respondidos</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="text-center">
+                                    <div class="fs-2x fw-bold text-gray-800">${metricas.reunioes_1on1_colaborador}</div>
+                                    <div class="text-gray-600">1:1 como colaborador</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="text-center">
+                                    <div class="fs-2x fw-bold text-gray-800">${metricas.celebracoes_enviadas}</div>
+                                    <div class="text-gray-600">Celebrações Enviadas</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="text-center">
+                                    <div class="fs-2x fw-bold text-gray-800">${metricas.reunioes_1on1_gestor}</div>
+                                    <div class="text-gray-600">1:1 como gestor</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Gráficos -->
+        <div class="row mb-5">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="mb-4">Histórico de Humor</h4>
+                        <canvas id="humor-chart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="mb-4">Radar de Feedbacks</h4>
+                        <canvas id="feedback-radar-chart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Histórico de Humores -->
+        <div class="card mb-5" id="historico-humores-section">
+            <div class="card-header">
+                <h3 class="card-title">Histórico de Humor</h3>
+            </div>
+            <div class="card-body">
+                <div id="historico-humores-container">
+                    ${renderizarHistoricoHumores(data.historico_humores)}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Feedbacks Recebidos -->
+        <div class="card mb-5" id="feedbacks-recebidos-section">
+            <div class="card-header">
+                <h3 class="card-title">Histórico de Feedbacks recebidos</h3>
+            </div>
+            <div class="card-body">
+                <div id="feedbacks-recebidos-container">
+                    ${renderizarFeedbacksRecebidos(data.feedbacks_recebidos)}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Reuniões 1:1 -->
+        <div class="card mb-5" id="reunioes-1on1-section">
+            <div class="card-header">
+                <h3 class="card-title">Reuniões de 1:1</h3>
+            </div>
+            <div class="card-body">
+                <div id="reunioes-1on1-container">
+                    ${renderizarReunioes1on1(data.reunioes_1on1)}
+                </div>
+            </div>
+        </div>
+        
+        <!-- PDIs -->
+        <div class="card mb-5" id="pdis-section">
+            <div class="card-header">
+                <h3 class="card-title">Planos de Desenvolvimento</h3>
+            </div>
+            <div class="card-body">
+                <div id="pdis-container">
+                    ${renderizarPDIs(data.pdis)}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Renderiza gráficos
+    setTimeout(() => {
+        renderizarGraficoHumor(data.historico_humores);
+        renderizarGraficoRadar(data.feedbacks_recebidos);
+    }, 100);
+}
+
+function renderizarHistoricoHumores(humores) {
+    if (!humores || humores.length === 0) {
+        return '<div class="alert alert-info">Nenhum humor registrado no período selecionado.</div>';
+    }
+    
+    const humorEmojis = {1: '😢', 2: '😔', 3: '😐', 4: '🙂', 5: '😄'};
+    
+    return `
+        <div class="row">
+            ${humores.map(h => `
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="mb-2">
+                                <span style="font-size: 40px;">${humorEmojis[h.nivel_emocao] || '😐'}</span>
+                            </div>
+                            <div class="text-gray-600 small">${formatarData(h.data_registro)} ${h.created_at ? formatarHora(h.created_at) : ''}</div>
+                            <div class="text-gray-800 mt-2">${h.descricao || 'sem comentário'}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderizarFeedbacksRecebidos(feedbacks) {
+    if (!feedbacks || feedbacks.length === 0) {
+        return '<div class="alert alert-info">Nenhum feedback recebido no período selecionado.</div>';
+    }
+    
+    return `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th width="30%">Enviado por</th>
+                        <th width="20%">Conteúdo</th>
+                        <th width="30%">Avaliação</th>
+                        <th width="20%">Criado em</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${feedbacks.map((fb, idx) => `
+                        <tr>
+                            <td>
+                                ${fb.remetente_foto ? `<img src="${fb.remetente_foto}" class="rounded-circle me-2" width="32" height="32" style="object-fit: cover;">` : ''}
+                                ${fb.remetente_nome || 'Anônimo'}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-light" onclick="abrirModalFeedback(${fb.id}, ${idx})">
+                                    Ler Feedback
+                                </button>
+                            </td>
+                            <td>
+                                ${fb.avaliacoes && fb.avaliacoes.length > 0 ? fb.avaliacoes.map(av => `
+                                    <span class="badge badge-light-${av.nota >= 4 ? 'success' : (av.nota >= 3 ? 'warning' : 'danger')} me-1">
+                                        ${av.item_nome || 'Avaliação'}: ${av.nota}
+                                    </span>
+                                `).join('') : '-'}
+                            </td>
+                            <td>${formatarData(fb.created_at)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderizarReunioes1on1(reunioes) {
+    if (!reunioes || reunioes.length === 0) {
+        return '<div class="alert alert-info">Nenhuma reunião 1:1 encontrada no período selecionado.</div>';
+    }
+    
+    return `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th width="25%">Líder</th>
+                        <th width="25%">Liderado</th>
+                        <th width="20%">Data</th>
+                        <th width="15%">Status</th>
+                        <th width="15%">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${reunioes.map(r => `
+                        <tr>
+                            <td>
+                                ${r.lider_foto ? `<img src="${r.lider_foto}" class="rounded-circle me-2" width="35" height="35" style="object-fit: cover;">` : ''}
+                                ${r.lider_nome}
+                            </td>
+                            <td>
+                                ${r.liderado_foto ? `<img src="${r.liderado_foto}" class="rounded-circle me-2" width="35" height="35" style="object-fit: cover;">` : ''}
+                                ${r.liderado_nome}
+                            </td>
+                            <td>${formatarData(r.data_reuniao)}</td>
+                            <td>
+                                <span class="badge badge-light-${r.status === 'realizada' ? 'success' : (r.status === 'cancelada' ? 'danger' : 'warning')}">
+                                    ${r.status === 'realizada' ? 'Realizada' : (r.status === 'cancelada' ? 'Cancelada' : (r.status === 'reagendada' ? 'Reagendada' : 'Agendada'))}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="reuniao_1on1_view.php?id=${r.id}" class="btn btn-sm btn-light" target="_blank">
+                                    Visualizar
+                                </a>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderizarPDIs(pdis) {
+    if (!pdis || pdis.length === 0) {
+        return '<div class="alert alert-info">Nenhum PDI encontrado.</div>';
+    }
+    
+    return `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Status</th>
+                        <th>Data Início</th>
+                        <th>Data Fim Prevista</th>
+                        <th>Objetivos</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${pdis.map(p => `
+                        <tr>
+                            <td>${p.titulo || '-'}</td>
+                            <td>
+                                <span class="badge badge-light-${p.status === 'ativo' ? 'success' : (p.status === 'concluido' ? 'primary' : 'secondary')}">
+                                    ${p.status === 'ativo' ? 'Ativo' : (p.status === 'concluido' ? 'Concluído' : 'Rascunho')}
+                                </span>
+                            </td>
+                            <td>${formatarData(p.data_inicio)}</td>
+                            <td>${p.data_fim_prevista ? formatarData(p.data_fim_prevista) : '-'}</td>
+                            <td>${p.total_objetivos || 0}</td>
+                            <td>${p.total_acoes || 0}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderizarGraficoHumor(humores) {
+    if (!humores || humores.length === 0) return;
+    
+    const ctx = document.getElementById('humor-chart');
+    if (!ctx) return;
+    
+    if (humorChart) humorChart.destroy();
+    
+    const labels = humores.map(h => formatarData(h.data_registro)).reverse();
+    const data = humores.map(h => h.nivel_emocao).reverse();
+    
+    humorChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Nível de Humor',
+                data: data,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 5,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderizarGraficoRadar(feedbacks) {
+    if (!feedbacks || feedbacks.length === 0) return;
+    
+    const ctx = document.getElementById('feedback-radar-chart');
+    if (!ctx) return;
+    
+    if (feedbackRadarChart) feedbackRadarChart.destroy();
+    
+    // Agrupa avaliações por tipo
+    const avaliacoesPorTipo = {};
+    feedbacks.forEach(fb => {
+        if (fb.avaliacoes) {
+            fb.avaliacoes.forEach(av => {
+                const tipo = av.item_nome || 'Geral';
+                if (!avaliacoesPorTipo[tipo]) {
+                    avaliacoesPorTipo[tipo] = [];
+                }
+                avaliacoesPorTipo[tipo].push(av.nota);
+            });
+        }
+    });
+    
+    const tipos = Object.keys(avaliacoesPorTipo);
+    const medias = tipos.map(tipo => {
+        const notas = avaliacoesPorTipo[tipo];
+        return notas.reduce((a, b) => a + b, 0) / notas.length;
+    });
+    
+    if (tipos.length === 0) return;
+    
+    feedbackRadarChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: tipos,
+            datasets: [{
+                label: 'Média de Avaliações',
+                data: medias,
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 5
+                }
+            }
+        }
+    });
+}
+
+function formatarData(data) {
+    if (!data) return '-';
+    const d = new Date(data);
+    return d.toLocaleDateString('pt-BR');
+}
+
+function formatarHora(data) {
+    if (!data) return '';
+    const d = new Date(data);
+    return d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+}
+
+function abrirModalFeedback(feedbackId, index) {
+    // Implementar modal de feedback
+    alert('Modal de feedback será implementado');
+}
+</script>
+
+<?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+<script>
+// colaboradorId já está declarado acima
 
 function novoBonus() {
     document.getElementById('kt_modal_bonus_header').querySelector('h2').textContent = 'Adicionar Bônus';

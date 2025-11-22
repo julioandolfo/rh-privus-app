@@ -82,7 +82,7 @@ $where = [];
 $params = [];
 
 if ($usuario['role'] === 'RH') {
-    $where[] = "(publico_alvo = 'todos' OR (publico_alvo = 'empresa' AND empresa_id = ?))";
+    $where[] = "(ea.publico_alvo = 'todos' OR (ea.publico_alvo = 'empresa' AND ea.empresa_id = ?))";
     $params[] = $usuario['empresa_id'];
 } elseif ($usuario['role'] === 'GESTOR') {
     $stmt = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
@@ -90,7 +90,7 @@ if ($usuario['role'] === 'RH') {
     $user_data = $stmt->fetch();
     $setor_id = $user_data['setor_id'] ?? 0;
     
-    $where[] = "(publico_alvo = 'todos' OR (publico_alvo = 'setor' AND setor_id = ?))";
+    $where[] = "(ea.publico_alvo = 'todos' OR (ea.publico_alvo = 'setor' AND ea.setor_id = ?))";
     $params[] = $setor_id;
 }
 

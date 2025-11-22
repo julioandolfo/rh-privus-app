@@ -316,36 +316,37 @@ if (is_colaborador() && !empty($colaborador_id)) {
         }
         $colaboradores_status = isset($stmt) ? $stmt->fetchAll() : [];
         
-        // Ranking de ocorrências (últimos 30 dias)
+        // Ranking de ocorrências (últimos 30 dias) - com foto
         $data_inicio = date('Y-m-d', strtotime('-30 days'));
         if ($usuario['role'] === 'ADMIN') {
             $stmt = $pdo->prepare("
-                SELECT c.nome_completo, COUNT(o.id) as total_ocorrencias
+                SELECT c.id, c.nome_completo, c.foto, COUNT(o.id) as total_ocorrencias
                 FROM colaboradores c
                 LEFT JOIN ocorrencias o ON c.id = o.colaborador_id AND o.data_ocorrencia >= ?
-                GROUP BY c.id, c.nome_completo
+                WHERE c.status = 'ativo'
+                GROUP BY c.id, c.nome_completo, c.foto
                 ORDER BY total_ocorrencias DESC
                 LIMIT 10
             ");
             $stmt->execute([$data_inicio]);
         } elseif ($usuario['role'] === 'RH') {
             $stmt = $pdo->prepare("
-                SELECT c.nome_completo, COUNT(o.id) as total_ocorrencias
+                SELECT c.id, c.nome_completo, c.foto, COUNT(o.id) as total_ocorrencias
                 FROM colaboradores c
                 LEFT JOIN ocorrencias o ON c.id = o.colaborador_id AND o.data_ocorrencia >= ?
-                WHERE c.empresa_id = ?
-                GROUP BY c.id, c.nome_completo
+                WHERE c.empresa_id = ? AND c.status = 'ativo'
+                GROUP BY c.id, c.nome_completo, c.foto
                 ORDER BY total_ocorrencias DESC
                 LIMIT 10
             ");
             $stmt->execute([$data_inicio, $usuario['empresa_id']]);
         } elseif ($usuario['role'] === 'GESTOR') {
             $stmt = $pdo->prepare("
-                SELECT c.nome_completo, COUNT(o.id) as total_ocorrencias
+                SELECT c.id, c.nome_completo, c.foto, COUNT(o.id) as total_ocorrencias
                 FROM colaboradores c
                 LEFT JOIN ocorrencias o ON c.id = o.colaborador_id AND o.data_ocorrencia >= ?
-                WHERE c.setor_id = ?
-                GROUP BY c.id, c.nome_completo
+                WHERE c.setor_id = ? AND c.status = 'ativo'
+                GROUP BY c.id, c.nome_completo, c.foto
                 ORDER BY total_ocorrencias DESC
                 LIMIT 10
             ");
@@ -355,6 +356,93 @@ if (is_colaborador() && !empty($colaborador_id)) {
         }
         
         $ranking = isset($stmt) ? $stmt->fetchAll() : [];
+        
+        // Próximos aniversários (próximos 30 dias)
+        $hoje = date('Y-m-d');
+        $ano_atual = date('Y');
+        $mes_dia_hoje = date('m-d');
+        
+        // Busca colaboradores com aniversário nos próximos 30 dias
+        if ($usuario['role'] === 'ADMIN') {
+            $stmt = $pdo->query("
+                SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
+                       DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia
+                FROM colaboradores c
+                WHERE c.status = 'ativo' 
+                AND c.data_nascimento IS NOT NULL
+                ORDER BY 
+                    CASE 
+                        WHEN DATE_FORMAT(c.data_nascimento, '%m-%d') >= '$mes_dia_hoje'
+                        THEN DATE_FORMAT(c.data_nascimento, '%m-%d')
+                        ELSE CONCAT('12-31-', DATE_FORMAT(c.data_nascimento, '%m-%d'))
+                    END ASC
+                LIMIT 10
+            ");
+        } elseif ($usuario['role'] === 'RH') {
+            $stmt = $pdo->prepare("
+                SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
+                       DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia
+                FROM colaboradores c
+                WHERE c.empresa_id = ? 
+                AND c.status = 'ativo'
+                AND c.data_nascimento IS NOT NULL
+                ORDER BY 
+                    CASE 
+                        WHEN DATE_FORMAT(c.data_nascimento, '%m-%d') >= '$mes_dia_hoje'
+                        THEN DATE_FORMAT(c.data_nascimento, '%m-%d')
+                        ELSE CONCAT('12-31-', DATE_FORMAT(c.data_nascimento, '%m-%d'))
+                    END ASC
+                LIMIT 10
+            ");
+            $stmt->execute([$usuario['empresa_id']]);
+        } elseif ($usuario['role'] === 'GESTOR') {
+            $stmt = $pdo->prepare("
+                SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
+                       DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia
+                FROM colaboradores c
+                WHERE c.setor_id = ? 
+                AND c.status = 'ativo'
+                AND c.data_nascimento IS NOT NULL
+                ORDER BY 
+                    CASE 
+                        WHEN DATE_FORMAT(c.data_nascimento, '%m-%d') >= '$mes_dia_hoje'
+                        THEN DATE_FORMAT(c.data_nascimento, '%m-%d')
+                        ELSE CONCAT('12-31-', DATE_FORMAT(c.data_nascimento, '%m-%d'))
+                    END ASC
+                LIMIT 10
+            ");
+            $stmt->execute([$setor_id]);
+        } else {
+            $proximos_aniversarios = [];
+        }
+        
+        $proximos_aniversarios = isset($stmt) ? $stmt->fetchAll() : [];
+        
+        // Processa aniversários para calcular dias até o aniversário
+        foreach ($proximos_aniversarios as &$aniv) {
+            $mes_dia = date('m-d', strtotime($aniv['data_nascimento']));
+            $data_aniversario_ano = $ano_atual . '-' . $mes_dia;
+            
+            if (strtotime($data_aniversario_ano) < strtotime($hoje)) {
+                $data_aniversario_ano = ($ano_atual + 1) . '-' . $mes_dia;
+            }
+            
+            $dias_ate = (strtotime($data_aniversario_ano) - strtotime($hoje)) / (60 * 60 * 24);
+            $aniv['dias_ate'] = $dias_ate;
+            $aniv['data_formatada'] = date('d/m', strtotime($data_aniversario_ano));
+            
+            // Filtra apenas os próximos 30 dias
+            if ($dias_ate > 30) {
+                unset($aniv);
+            }
+        }
+        unset($aniv);
+        
+        // Reindexa array após filtro
+        $proximos_aniversarios = array_values($proximos_aniversarios);
+        
+        // Reindexa array após filtro
+        $proximos_aniversarios = array_values($proximos_aniversarios);
         
     } catch (PDOException $e) {
         $error = 'Erro ao carregar dados: ' . $e->getMessage();
@@ -366,6 +454,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         $ocorrencias_por_tipo = [];
         $colaboradores_status = [];
         $ranking = [];
+        $proximos_aniversarios = [];
     }
 }
 ?>
@@ -1565,10 +1654,11 @@ if (is_colaborador() && !empty($colaborador_id)) {
         </div>
         <!--end::Row-->
         
-        <!--begin::Row-->
-        <?php if (!empty($ranking)): ?>
-        <div class="row g-5 g-xl-8">
-            <div class="col-xl-12">
+        <!--begin::Row - Ranking e Aniversários lado a lado -->
+        <div class="row g-5 g-xl-8 mb-5">
+            <!--begin::Col - Ranking de Ocorrências -->
+            <?php if (!empty($ranking)): ?>
+            <div class="col-xl-6">
                 <!--begin::Tables Widget 9-->
                 <div class="card card-xl-stretch mb-5 mb-xl-8">
                     <!--begin::Header-->
@@ -1610,7 +1700,22 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <span class="text-gray-900 fw-bold d-block fs-6"><?= htmlspecialchars($item['nome_completo']) ?></span>
+                                            <div class="d-flex align-items-center">
+                                                <!--begin::Avatar-->
+                                                <div class="symbol symbol-circle symbol-40px me-3">
+                                                    <?php if (!empty($item['foto'])): ?>
+                                                        <img alt="<?= htmlspecialchars($item['nome_completo']) ?>" src="../<?= htmlspecialchars($item['foto']) ?>" />
+                                                    <?php else: ?>
+                                                        <div class="symbol-label fs-2 fw-semibold bg-primary text-white">
+                                                            <?= strtoupper(substr($item['nome_completo'], 0, 1)) ?>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <!--end::Avatar-->
+                                                <!--begin::Name-->
+                                                <span class="text-gray-900 fw-bold fs-6"><?= htmlspecialchars($item['nome_completo']) ?></span>
+                                                <!--end::Name-->
+                                            </div>
                                         </td>
                                         <td class="text-end">
                                             <?php 
@@ -1631,6 +1736,263 @@ if (is_colaborador() && !empty($colaborador_id)) {
                 </div>
                 <!--end::Tables Widget 9-->
             </div>
+            <!--end::Col-->
+            <?php endif; ?>
+            
+            <!--begin::Col - Próximos Aniversários -->
+            <?php if (!empty($proximos_aniversarios)): ?>
+            <div class="col-xl-6">
+                <!--begin::Tables Widget 10-->
+                <div class="card card-xl-stretch mb-5 mb-xl-8">
+                    <!--begin::Header-->
+                    <div class="card-header border-0 pt-5">
+                        <h3 class="card-title align-items-start flex-column">
+                            <span class="card-label fw-bold fs-3 mb-1">Próximos Aniversários</span>
+                            <span class="text-muted fw-semibold fs-7">Próximos 30 dias</span>
+                        </h3>
+                        <div class="card-toolbar">
+                            <a href="aniversariantes.php" class="btn btn-sm btn-primary">
+                                Ver Todos
+                                <i class="ki-duotone ki-arrow-right fs-2 ms-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </a>
+                        </div>
+                    </div>
+                    <!--end::Header-->
+                    <!--begin::Body-->
+                    <div class="card-body py-3">
+                        <!--begin::Table container-->
+                        <div class="table-responsive">
+                            <!--begin::Table-->
+                            <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                <!--begin::Table head-->
+                                <thead>
+                                    <tr class="fw-bold text-muted">
+                                        <th class="min-w-200px">Colaborador</th>
+                                        <th class="min-w-100px">Data</th>
+                                        <th class="min-w-100px text-end">Dias</th>
+                                    </tr>
+                                </thead>
+                                <!--end::Table head-->
+                                <!--begin::Table body-->
+                                <tbody>
+                                    <?php foreach ($proximos_aniversarios as $aniv): ?>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <!--begin::Avatar-->
+                                                <div class="symbol symbol-circle symbol-40px me-3">
+                                                    <?php if (!empty($aniv['foto'])): ?>
+                                                        <img alt="<?= htmlspecialchars($aniv['nome_completo']) ?>" src="../<?= htmlspecialchars($aniv['foto']) ?>" />
+                                                    <?php else: ?>
+                                                        <div class="symbol-label fs-2 fw-semibold bg-success text-white">
+                                                            <?= strtoupper(substr($aniv['nome_completo'], 0, 1)) ?>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <!--end::Avatar-->
+                                                <!--begin::Name-->
+                                                <span class="text-gray-900 fw-bold fs-6"><?= htmlspecialchars($aniv['nome_completo']) ?></span>
+                                                <!--end::Name-->
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="text-gray-800 fw-semibold"><?= $aniv['data_formatada'] ?></span>
+                                        </td>
+                                        <td class="text-end">
+                                            <?php if ($aniv['dias_ate'] == 0): ?>
+                                                <span class="badge badge-success fs-7">Hoje! 🎉</span>
+                                            <?php elseif ($aniv['dias_ate'] == 1): ?>
+                                                <span class="badge badge-warning fs-7">Amanhã</span>
+                                            <?php else: ?>
+                                                <span class="badge badge-light-primary fs-7"><?= $aniv['dias_ate'] ?> dias</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                                <!--end::Table body-->
+                            </table>
+                            <!--end::Table-->
+                        </div>
+                        <!--end::Table container-->
+                    </div>
+                    <!--end::Body-->
+                </div>
+                <!--end::Tables Widget 10-->
+            </div>
+            <!--end::Col-->
+            <?php endif; ?>
+        </div>
+        <!--end::Row-->
+        
+        <!--begin::Row - Anotações e Histórico -->
+        <?php if (has_role(['ADMIN', 'RH', 'GESTOR'])): ?>
+        <div class="row g-5 g-xl-8 mb-5">
+            <!--begin::Col - Anotações -->
+            <div class="col-xl-6">
+                <div class="card card-xl-stretch mb-5 mb-xl-8">
+                    <div class="card-header border-0 pt-5">
+                        <h3 class="card-title align-items-start flex-column">
+                            <span class="card-label fw-bold fs-3 mb-1">Anotações</span>
+                            <span class="text-muted fw-semibold fs-7">Anotações gerais do sistema</span>
+                        </h3>
+                        <div class="card-toolbar">
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modal_nova_anotacao">
+                                <i class="ki-duotone ki-plus fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Nova Anotação
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body pt-5">
+                        <div class="mb-5">
+                            <div class="d-flex gap-2 mb-3">
+                                <select id="filtro_status_anotacoes" class="form-select form-select-sm" style="width: auto;">
+                                    <option value="ativa">Ativas</option>
+                                    <option value="todas">Todas</option>
+                                    <option value="concluida">Concluídas</option>
+                                    <option value="arquivada">Arquivadas</option>
+                                </select>
+                                <select id="filtro_prioridade_anotacoes" class="form-select form-select-sm" style="width: auto;">
+                                    <option value="">Todas Prioridades</option>
+                                    <option value="urgente">Urgente</option>
+                                    <option value="alta">Alta</option>
+                                    <option value="media">Média</option>
+                                    <option value="baixa">Baixa</option>
+                                </select>
+                                <button type="button" id="btn_fixadas_anotacoes" class="btn btn-sm btn-light">
+                                    <i class="ki-duotone ki-pin fs-4">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Fixadas
+                                </button>
+                            </div>
+                        </div>
+                        <div id="lista_anotacoes">
+                            <div class="text-center text-muted py-5">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                Carregando anotações...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!--end::Col-->
+            
+            <!--begin::Col - Histórico de Cargos/Salários -->
+            <div class="col-xl-6">
+                <div class="card card-xl-stretch mb-5 mb-xl-8">
+                    <div class="card-header border-0 pt-5">
+                        <h3 class="card-title align-items-start flex-column">
+                            <span class="card-label fw-bold fs-3 mb-1">Histórico de Promoções</span>
+                            <span class="text-muted fw-semibold fs-7">Últimas promoções e alterações salariais</span>
+                        </h3>
+                    </div>
+                    <div class="card-body pt-5">
+                        <?php
+                        // Busca histórico de promoções
+                        if ($usuario['role'] === 'ADMIN') {
+                            $stmt = $pdo->prepare("
+                                SELECT p.*, c.nome_completo as colaborador_nome, c.foto as colaborador_foto,
+                                       u.nome as usuario_nome
+                                FROM promocoes p
+                                INNER JOIN colaboradores c ON p.colaborador_id = c.id
+                                LEFT JOIN usuarios u ON p.usuario_id = u.id
+                                ORDER BY p.data_promocao DESC, p.created_at DESC
+                                LIMIT 10
+                            ");
+                            $stmt->execute();
+                        } elseif ($usuario['role'] === 'RH') {
+                            $stmt = $pdo->prepare("
+                                SELECT p.*, c.nome_completo as colaborador_nome, c.foto as colaborador_foto,
+                                       u.nome as usuario_nome
+                                FROM promocoes p
+                                INNER JOIN colaboradores c ON p.colaborador_id = c.id
+                                LEFT JOIN usuarios u ON p.usuario_id = u.id
+                                WHERE c.empresa_id = ?
+                                ORDER BY p.data_promocao DESC, p.created_at DESC
+                                LIMIT 10
+                            ");
+                            $stmt->execute([$usuario['empresa_id']]);
+                        } elseif ($usuario['role'] === 'GESTOR') {
+                            $stmt = $pdo->prepare("
+                                SELECT p.*, c.nome_completo as colaborador_nome, c.foto as colaborador_foto,
+                                       u.nome as usuario_nome
+                                FROM promocoes p
+                                INNER JOIN colaboradores c ON p.colaborador_id = c.id
+                                LEFT JOIN usuarios u ON p.usuario_id = u.id
+                                WHERE c.setor_id = ?
+                                ORDER BY p.data_promocao DESC, p.created_at DESC
+                                LIMIT 10
+                            ");
+                            $stmt->execute([$setor_id]);
+                        } else {
+                            $historico_promocoes = [];
+                        }
+                        
+                        $historico_promocoes = isset($stmt) ? $stmt->fetchAll() : [];
+                        ?>
+                        
+                        <?php if (empty($historico_promocoes)): ?>
+                            <div class="text-center text-muted py-10">
+                                <p>Nenhuma promoção registrada ainda.</p>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                    <thead>
+                                        <tr class="fw-bold text-muted">
+                                            <th class="min-w-150px">Colaborador</th>
+                                            <th class="min-w-100px">Data</th>
+                                            <th class="min-w-120px">Salário Anterior</th>
+                                            <th class="min-w-120px">Novo Salário</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($historico_promocoes as $promo): ?>
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="symbol symbol-circle symbol-30px me-3">
+                                                        <?php if (!empty($promo['colaborador_foto'])): ?>
+                                                            <img alt="<?= htmlspecialchars($promo['colaborador_nome']) ?>" src="../<?= htmlspecialchars($promo['colaborador_foto']) ?>" />
+                                                        <?php else: ?>
+                                                            <div class="symbol-label fs-7 fw-semibold bg-primary text-white">
+                                                                <?= strtoupper(substr($promo['colaborador_nome'], 0, 1)) ?>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <span class="text-gray-800 fw-semibold fs-7"><?= htmlspecialchars($promo['colaborador_nome']) ?></span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="text-gray-600 fs-7"><?= formatar_data($promo['data_promocao']) ?></span>
+                                            </td>
+                                            <td>
+                                                <span class="text-gray-600 fs-7">R$ <?= number_format($promo['salario_anterior'], 2, ',', '.') ?></span>
+                                            </td>
+                                            <td>
+                                                <span class="text-success fw-bold fs-7">R$ <?= number_format($promo['salario_novo'], 2, ',', '.') ?></span>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-end mt-5">
+                                <a href="promocoes.php" class="btn btn-sm btn-primary">Ver Todas</a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <!--end::Col-->
         </div>
         <!--end::Row-->
         <?php endif; ?>
@@ -1930,7 +2292,527 @@ input[type="radio"]:checked + .emocao-option {
     border-color: #009ef7;
     background-color: #f1faff;
 }
+
+.anotacao-item {
+    border-left: 4px solid #e4e6ef;
+    transition: all 0.3s;
+}
+
+.anotacao-item.urgente {
+    border-left-color: #f1416c;
+}
+
+.anotacao-item.alta {
+    border-left-color: #ffc700;
+}
+
+.anotacao-item.media {
+    border-left-color: #009ef7;
+}
+
+.anotacao-item.baixa {
+    border-left-color: #50cd89;
+}
+
+.anotacao-item.fixada {
+    background-color: #f8f9fa;
+}
 </style>
 <!--end::Emoções Script-->
+
+<?php if (has_role(['ADMIN', 'RH', 'GESTOR'])): ?>
+<!--begin::Modal - Nova Anotação-->
+<div class="modal fade" id="modal_nova_anotacao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-800px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold" id="modal_anotacao_titulo">Nova Anotação</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="form_nova_anotacao">
+                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <input type="hidden" name="id" id="anotacao_id">
+                    
+                    <div class="mb-5">
+                        <label class="form-label required">Título</label>
+                        <input type="text" name="titulo" class="form-control form-control-solid" placeholder="Digite o título da anotação" required>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label required">Conteúdo</label>
+                        <textarea name="conteudo" class="form-control form-control-solid" rows="5" placeholder="Digite o conteúdo da anotação" required></textarea>
+                    </div>
+                    
+                    <div class="row mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo</label>
+                            <select name="tipo" class="form-select form-select-solid">
+                                <option value="geral">Geral</option>
+                                <option value="lembrete">Lembrete</option>
+                                <option value="importante">Importante</option>
+                                <option value="urgente">Urgente</option>
+                                <option value="informacao">Informação</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Prioridade</label>
+                            <select name="prioridade" class="form-select form-select-solid">
+                                <option value="baixa">Baixa</option>
+                                <option value="media" selected>Média</option>
+                                <option value="alta">Alta</option>
+                                <option value="urgente">Urgente</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label">Categoria</label>
+                            <input type="text" name="categoria" class="form-control form-control-solid" placeholder="Ex: RH, Financeiro, etc">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data de Vencimento</label>
+                            <input type="date" name="data_vencimento" class="form-control form-control-solid">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label">Tags (separadas por vírgula)</label>
+                        <input type="text" name="tags_input" class="form-control form-control-solid" placeholder="Ex: importante, urgente, reunião">
+                        <div class="form-text">Separe as tags por vírgula</div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label">Público Alvo</label>
+                        <select name="publico_alvo" id="publico_alvo_anotacao" class="form-select form-select-solid">
+                            <option value="especifico">Específico</option>
+                            <option value="todos">Todos</option>
+                            <option value="empresa">Empresa</option>
+                            <option value="setor">Setor</option>
+                            <option value="cargo">Cargo</option>
+                        </select>
+                    </div>
+                    
+                    <div id="destinatarios_especificos" class="mb-5">
+                        <label class="form-label">Destinatários</label>
+                        <div class="form-text mb-2">Selecione usuários ou colaboradores específicos</div>
+                        <div class="d-flex gap-2">
+                            <select id="select_destinatarios_usuarios" class="form-select form-select-solid" multiple style="min-height: 100px;">
+                                <!-- Será preenchido via JavaScript -->
+                            </select>
+                            <select id="select_destinatarios_colaboradores" class="form-select form-select-solid" multiple style="min-height: 100px;">
+                                <!-- Será preenchido via JavaScript -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <div class="form-check form-check-custom form-check-solid mb-3">
+                            <input class="form-check-input" type="checkbox" name="fixada" id="anotacao_fixada" value="1">
+                            <label class="form-check-label" for="anotacao_fixada">
+                                Fixar no topo
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <h4 class="fw-bold mb-5">Notificações</h4>
+                    
+                    <div class="mb-5">
+                        <div class="form-check form-check-custom form-check-solid mb-3">
+                            <input class="form-check-input" type="checkbox" name="notificar_email" id="notificar_email_anotacao" value="1">
+                            <label class="form-check-label" for="notificar_email_anotacao">
+                                Enviar notificação por Email
+                            </label>
+                        </div>
+                        <div class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" name="notificar_push" id="notificar_push_anotacao" value="1">
+                            <label class="form-check-label" for="notificar_push_anotacao">
+                                Enviar notificação Push
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5" id="campo_data_notificacao" style="display: none;">
+                        <label class="form-label">Data/Hora da Notificação</label>
+                        <input type="datetime-local" name="data_notificacao" class="form-control form-control-solid">
+                        <div class="form-text">Deixe em branco para enviar imediatamente</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="indicator-label">Salvar</span>
+                        <span class="indicator-progress">Salvando...
+                            <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!--end::Modal-->
+
+<!--begin::Script Anotações-->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Carrega anotações ao abrir a página
+    carregarAnotacoes();
+    
+    // Filtros
+    document.getElementById('filtro_status_anotacoes')?.addEventListener('change', carregarAnotacoes);
+    document.getElementById('filtro_prioridade_anotacoes')?.addEventListener('change', carregarAnotacoes);
+    document.getElementById('btn_fixadas_anotacoes')?.addEventListener('click', function() {
+        const url = new URL(window.location);
+        url.searchParams.set('fixadas', '1');
+        window.location = url;
+    });
+    
+    // Mostra/oculta campo de data de notificação
+    const checkEmail = document.getElementById('notificar_email_anotacao');
+    const checkPush = document.getElementById('notificar_push_anotacao');
+    const campoDataNotif = document.getElementById('campo_data_notificacao');
+    
+    function atualizarCampoDataNotif() {
+        if (checkEmail?.checked || checkPush?.checked) {
+            campoDataNotif.style.display = 'block';
+        } else {
+            campoDataNotif.style.display = 'none';
+        }
+    }
+    
+    checkEmail?.addEventListener('change', atualizarCampoDataNotif);
+    checkPush?.addEventListener('change', atualizarCampoDataNotif);
+    
+    // Submit do formulário
+    const formAnotacao = document.getElementById('form_nova_anotacao');
+    if (formAnotacao) {
+        formAnotacao.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const btn = this.querySelector('button[type="submit"]');
+            const indicator = btn.querySelector('.indicator-label');
+            const progress = btn.querySelector('.indicator-progress');
+            
+            // Processa tags
+            const tagsInput = formData.get('tags_input');
+            if (tagsInput) {
+                const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
+                formData.delete('tags_input');
+                formData.append('tags', JSON.stringify(tags));
+            }
+            
+            // Processa destinatários
+            const usuariosSelect = document.getElementById('select_destinatarios_usuarios');
+            const colabsSelect = document.getElementById('select_destinatarios_colaboradores');
+            const usuariosIds = Array.from(usuariosSelect?.selectedOptions || []).map(o => parseInt(o.value));
+            const colabsIds = Array.from(colabsSelect?.selectedOptions || []).map(o => parseInt(o.value));
+            
+            if (usuariosIds.length > 0) {
+                formData.append('destinatarios_usuarios', JSON.stringify(usuariosIds));
+            }
+            if (colabsIds.length > 0) {
+                formData.append('destinatarios_colaboradores', JSON.stringify(colabsIds));
+            }
+            
+            btn.setAttribute('data-kt-indicator', 'on');
+            indicator.style.display = 'none';
+            progress.style.display = 'inline-block';
+            
+            const anotacaoId = formData.get('id');
+            const url = anotacaoId ? '../api/anotacoes/editar.php' : '../api/anotacoes/criar.php';
+            
+            fetch(url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        text: data.message,
+                        icon: "success",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    }).then(function() {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('modal_nova_anotacao'));
+                        modal.hide();
+                        formAnotacao.reset();
+                        carregarAnotacoes();
+                    });
+                } else {
+                    Swal.fire({
+                        text: data.message,
+                        icon: "error",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    text: "Erro ao salvar anotação",
+                    icon: "error",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                });
+            })
+            .finally(() => {
+                btn.removeAttribute('data-kt-indicator');
+                indicator.style.display = 'inline-block';
+                progress.style.display = 'none';
+            });
+        });
+    }
+    
+    // Carrega anotações
+    function carregarAnotacoes() {
+        const status = document.getElementById('filtro_status_anotacoes')?.value || 'ativa';
+        const prioridade = document.getElementById('filtro_prioridade_anotacoes')?.value || '';
+        const fixadas = new URLSearchParams(window.location.search).get('fixadas') || '0';
+        
+        const params = new URLSearchParams({
+            status: status,
+            limite: 20
+        });
+        
+        if (prioridade) params.append('prioridade', prioridade);
+        if (fixadas === '1') params.append('fixadas', '1');
+        
+        fetch('../api/anotacoes/listar.php?' + params.toString())
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    renderizarAnotacoes(data.anotacoes);
+                } else {
+                    document.getElementById('lista_anotacoes').innerHTML = 
+                        '<div class="text-center text-muted py-5"><p>Erro ao carregar anotações.</p></div>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('lista_anotacoes').innerHTML = 
+                    '<div class="text-center text-muted py-5"><p>Erro ao carregar anotações.</p></div>';
+            });
+    }
+    
+    // Renderiza anotações
+    function renderizarAnotacoes(anotacoes) {
+        const container = document.getElementById('lista_anotacoes');
+        
+        if (!anotacoes || anotacoes.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-5"><p>Nenhuma anotação encontrada.</p></div>';
+            return;
+        }
+        
+        let html = '<div class="d-flex flex-column gap-4">';
+        
+        anotacoes.forEach(anotacao => {
+            const prioridadeClass = anotacao.prioridade || 'media';
+            const fixadaClass = anotacao.fixada ? 'fixada' : '';
+            const statusBadge = {
+                'ativa': '<span class="badge badge-success">Ativa</span>',
+                'concluida': '<span class="badge badge-info">Concluída</span>',
+                'arquivada': '<span class="badge badge-secondary">Arquivada</span>'
+            }[anotacao.status] || '';
+            
+            html += `
+                <div class="card anotacao-item ${prioridadeClass} ${fixadaClass}" id="anotacao_${anotacao.id}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div class="flex-grow-1">
+                                <h5 class="fw-bold mb-1">
+                                    ${anotacao.fixada ? '<i class="ki-duotone ki-pin fs-5 text-warning me-2"><span class="path1"></span><span class="path2"></span></i>' : ''}
+                                    ${anotacao.titulo || 'Sem título'}
+                                </h5>
+                                <div class="d-flex gap-2 align-items-center mb-2">
+                                    ${statusBadge}
+                                    <span class="badge badge-light-${prioridadeClass === 'urgente' ? 'danger' : prioridadeClass === 'alta' ? 'warning' : prioridadeClass === 'media' ? 'primary' : 'success'}">${anotacao.prioridade || 'Média'}</span>
+                                    ${anotacao.tipo ? `<span class="badge badge-light">${anotacao.tipo}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-icon" data-bs-toggle="dropdown">
+                                    <i class="ki-duotone ki-dots-vertical fs-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick="editarAnotacao(${anotacao.id}); return false;">Editar</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="marcarVisualizada(${anotacao.id}); return false;">Marcar como visualizada</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="excluirAnotacao(${anotacao.id}); return false;">Excluir</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-3">${anotacao.conteudo || ''}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-muted small">
+                                <span>Criado por: ${anotacao.usuario_nome || 'Sistema'}</span>
+                                ${anotacao.data_notificacao_formatada ? `<br>Notificar em: ${anotacao.data_notificacao_formatada}` : ''}
+                                ${anotacao.data_vencimento_formatada ? `<br>Vencimento: ${anotacao.data_vencimento_formatada}` : ''}
+                            </div>
+                            <div class="text-muted small">
+                                ${anotacao.total_visualizacoes || 0} visualizações
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+    }
+    
+    // Funções globais
+    window.editarAnotacao = function(id) {
+        fetch('../api/anotacoes/detalhes.php?id=' + id)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.anotacao) {
+                    const anotacao = data.anotacao;
+                    document.getElementById('anotacao_id').value = anotacao.id;
+                    document.querySelector('[name="titulo"]').value = anotacao.titulo || '';
+                    document.querySelector('[name="conteudo"]').value = anotacao.conteudo || '';
+                    document.querySelector('[name="tipo"]').value = anotacao.tipo || 'geral';
+                    document.querySelector('[name="prioridade"]').value = anotacao.prioridade || 'media';
+                    document.querySelector('[name="categoria"]').value = anotacao.categoria || '';
+                    document.querySelector('[name="data_vencimento"]').value = anotacao.data_vencimento || '';
+                    document.querySelector('[name="tags_input"]').value = (anotacao.tags || []).join(', ');
+                    document.getElementById('anotacao_fixada').checked = anotacao.fixada == 1;
+                    document.getElementById('notificar_email_anotacao').checked = anotacao.notificar_email == 1;
+                    document.getElementById('notificar_push_anotacao').checked = anotacao.notificar_push == 1;
+                    document.querySelector('[name="publico_alvo"]').value = anotacao.publico_alvo || 'especifico';
+                    
+                    if (anotacao.data_notificacao) {
+                        const dt = new Date(anotacao.data_notificacao.replace(' ', 'T'));
+                        document.querySelector('[name="data_notificacao"]').value = dt.toISOString().slice(0, 16);
+                        atualizarCampoDataNotif();
+                    }
+                    
+                    document.getElementById('modal_anotacao_titulo').textContent = 'Editar Anotação';
+                    const modal = new bootstrap.Modal(document.getElementById('modal_nova_anotacao'));
+                    modal.show();
+                } else {
+                    Swal.fire({
+                        text: data.message || 'Erro ao carregar anotação',
+                        icon: "error",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    text: "Erro ao carregar anotação",
+                    icon: "error",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                });
+            });
+    };
+    
+    window.excluirAnotacao = function(id) {
+        Swal.fire({
+            text: "Tem certeza que deseja excluir esta anotação?",
+            icon: "warning",
+            showCancelButton: true,
+            buttonsStyling: false,
+            confirmButtonText: "Sim, excluir",
+            cancelButtonText: "Cancelar",
+            customClass: {
+                confirmButton: "btn btn-danger",
+                cancelButton: "btn btn-light"
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const formData = new FormData();
+                formData.append('id', id);
+                
+                fetch('../api/anotacoes/excluir.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire({
+                            text: data.message,
+                            icon: "success",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        });
+                        carregarAnotacoes();
+                    } else {
+                        Swal.fire({
+                            text: data.message,
+                            icon: "error",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    };
+    
+    window.marcarVisualizada = function(id) {
+        const formData = new FormData();
+        formData.append('id', id);
+        
+        fetch('../api/anotacoes/marcar_visualizada.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                carregarAnotacoes();
+            }
+        });
+    };
+    
+    // Limpa formulário ao fechar modal
+    document.getElementById('modal_nova_anotacao')?.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('form_nova_anotacao').reset();
+        document.getElementById('anotacao_id').value = '';
+        document.getElementById('modal_anotacao_titulo').textContent = 'Nova Anotação';
+        document.getElementById('campo_data_notificacao').style.display = 'none';
+    });
+});
+</script>
+<!--end::Script Anotações-->
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

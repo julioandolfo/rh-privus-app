@@ -83,7 +83,7 @@ $where = [];
 $params = [];
 
 if ($usuario['role'] === 'RH') {
-    $where[] = "(tipo IN ('nacional', 'internacional', 'empresa') AND (empresa_id IS NULL OR empresa_id = ?))";
+    $where[] = "(dc.tipo IN ('nacional', 'internacional', 'empresa') AND (dc.empresa_id IS NULL OR dc.empresa_id = ?))";
     $params[] = $usuario['empresa_id'];
 } elseif ($usuario['role'] === 'GESTOR') {
     $stmt = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
@@ -91,7 +91,7 @@ if ($usuario['role'] === 'RH') {
     $user_data = $stmt->fetch();
     $setor_id = $user_data['setor_id'] ?? 0;
     
-    $where[] = "(tipo IN ('nacional', 'internacional', 'setor') AND (setor_id IS NULL OR setor_id = ?))";
+    $where[] = "(dc.tipo IN ('nacional', 'internacional', 'setor') AND (dc.setor_id IS NULL OR dc.setor_id = ?))";
     $params[] = $setor_id;
 }
 
