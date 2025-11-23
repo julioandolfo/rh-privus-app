@@ -39,13 +39,23 @@ try {
         throw new Exception('Formulário não encontrado');
     }
     
-    // Verifica se está sendo usado em alguma etapa
-    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM processo_seletivo_etapas WHERE formulario_cultura_id = ?");
+    // Verifica se está sendo usado em respostas de candidaturas
+    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM formularios_cultura_respostas WHERE formulario_id = ?");
     $stmt->execute([$formulario_id]);
-    $uso = $stmt->fetch();
+    $uso_respostas = $stmt->fetch();
     
-    if ($uso['total'] > 0) {
-        throw new Exception('Este formulário está sendo usado em ' . $uso['total'] . ' etapa(s). Remova das etapas antes de excluir.');
+    if ($uso_respostas['total'] > 0) {
+        throw new Exception('Este formulário possui ' . $uso_respostas['total'] . ' resposta(s) de candidaturas. Não é possível excluir formulários com respostas.');
+    }
+    
+    // Verifica se está vinculado a alguma etapa (opcional - apenas informativo)
+    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM formularios_cultura WHERE id = ? AND etapa_id IS NOT NULL");
+    $stmt->execute([$formulario_id]);
+    $vinculado = $stmt->fetch();
+    
+    if ($vinculado['total'] > 0) {
+        // Apenas aviso, não impede exclusão
+        // O formulário está vinculado a uma etapa, mas isso não impede a exclusão
     }
     
     // Exclui campos primeiro (cascade)

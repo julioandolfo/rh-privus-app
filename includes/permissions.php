@@ -136,6 +136,8 @@ function get_page_permissions() {
         'etapas_processo.php' => ['ADMIN', 'RH'],
         'automatizacoes_kanban.php' => ['ADMIN', 'RH'],
         'formularios_cultura.php' => ['ADMIN', 'RH'],
+        'formulario_cultura_editar.php' => ['ADMIN', 'RH'],
+        'formulario_cultura_analytics.php' => ['ADMIN', 'RH'],
         'entrevistas.php' => ['ADMIN', 'RH', 'GESTOR'],
         'onboarding.php' => ['ADMIN', 'RH'],
         'kanban_onboarding.php' => ['ADMIN', 'RH'],

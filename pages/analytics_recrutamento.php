@@ -588,6 +588,157 @@ $vagas_filtro = $stmt_vagas->fetchAll();
                     </div>
                 </div>
                 
+                <!-- Seção: Formulários de Cultura -->
+                <?php
+                // Busca formulários de cultura com respostas
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        fc.id,
+                        fc.nome,
+                        COUNT(DISTINCT fr.candidatura_id) as total_respostas,
+                        COUNT(DISTINCT fr.campo_id) as total_campos_respondidos
+                    FROM formularios_cultura fc
+                    INNER JOIN formularios_cultura_respostas fr ON fc.id = fr.formulario_id
+                    INNER JOIN candidaturas c ON fr.candidatura_id = c.id
+                    INNER JOIN vagas v ON c.vaga_id = v.id
+                    WHERE fc.ativo = 1
+                    AND DATE(fr.created_at) BETWEEN ? AND ?
+                    $where_acesso_sql
+                    $where_filtros_sql
+                    GROUP BY fc.id, fc.nome
+                    ORDER BY total_respostas DESC
+                ");
+                $params_formularios = array_merge([$data_inicio, $data_fim], $params_acesso, $params_filtros);
+                $stmt->execute($params_formularios);
+                $formularios_cultura = $stmt->fetchAll();
+                
+                // Busca respostas mais frequentes de formulários de cultura (para campos radio/checkbox/select)
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        fc.id as formulario_id,
+                        fc.nome as formulario_nome,
+                        fcc.label as campo_label,
+                        fcc.tipo_campo,
+                        fr.resposta,
+                        COUNT(*) as total_respostas
+                    FROM formularios_cultura_respostas fr
+                    INNER JOIN formularios_cultura fc ON fr.formulario_id = fc.id
+                    INNER JOIN formularios_cultura_campos fcc ON fr.campo_id = fcc.id
+                    INNER JOIN candidaturas c ON fr.candidatura_id = c.id
+                    INNER JOIN vagas v ON c.vaga_id = v.id
+                    WHERE DATE(fr.created_at) BETWEEN ? AND ?
+                    AND fcc.tipo_campo IN ('radio', 'checkbox', 'select')
+                    AND fc.ativo = 1
+                    $where_acesso_sql
+                    $where_filtros_sql
+                    GROUP BY fc.id, fc.nome, fcc.label, fcc.tipo_campo, fr.resposta
+                    ORDER BY total_respostas DESC
+                    LIMIT 20
+                ");
+                $stmt->execute($params_formularios);
+                $respostas_frequentes = $stmt->fetchAll();
+                
+                // Agrupa respostas por formulário
+                $respostas_por_formulario = [];
+                foreach ($respostas_frequentes as $resp) {
+                    $form_id = $resp['formulario_id'];
+                    if (!isset($respostas_por_formulario[$form_id])) {
+                        $respostas_por_formulario[$form_id] = [
+                            'nome' => $resp['formulario_nome'],
+                            'respostas' => []
+                        ];
+                    }
+                    $respostas_por_formulario[$form_id]['respostas'][] = $resp;
+                }
+                ?>
+                
+                <?php if (!empty($formularios_cultura)): ?>
+                <div class="row g-5 g-xl-8 mb-5">
+                    <div class="col-xl-12">
+                        <div class="card">
+                            <div class="card-header border-0 pt-6">
+                                <div class="card-title">
+                                    <h2 class="mb-0">Formulários de Cultura</h2>
+                                    <span class="text-muted fs-6 ms-2">Análise de respostas dos formulários de alinhamento cultural</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Cards de Métricas -->
+                                <div class="row g-3 mb-5">
+                                    <?php foreach ($formularios_cultura as $form): ?>
+                                    <div class="col-md-3">
+                                        <div class="card bg-light-primary border border-primary border-opacity-25">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="flex-grow-1">
+                                                        <span class="text-muted fw-semibold d-block fs-7"><?= htmlspecialchars($form['nome']) ?></span>
+                                                        <span class="text-primary fw-bold fs-3"><?= $form['total_respostas'] ?></span>
+                                                        <span class="text-muted fs-8">respostas</span>
+                                                    </div>
+                                                    <div class="flex-shrink-0">
+                                                        <a href="formulario_cultura_analytics.php?id=<?= $form['id'] ?>" class="btn btn-sm btn-primary">
+                                                            Ver Analytics
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                
+                                <!-- Respostas Mais Frequentes -->
+                                <?php if (!empty($respostas_por_formulario)): ?>
+                                <div class="row">
+                                    <?php foreach ($respostas_por_formulario as $form_id => $dados_form): ?>
+                                    <div class="col-xl-6 mb-5">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h3 class="card-title"><?= htmlspecialchars($dados_form['nome']) ?></h3>
+                                                <div class="card-toolbar">
+                                                    <a href="formulario_cultura_analytics.php?id=<?= $form_id ?>" class="btn btn-sm btn-light-primary">
+                                                        Ver Completo
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-hover">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Campo</th>
+                                                                <th>Resposta</th>
+                                                                <th class="text-end">Quantidade</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <?php foreach ($dados_form['respostas'] as $resp): ?>
+                                                            <tr>
+                                                                <td>
+                                                                    <span class="badge badge-light-info"><?= htmlspecialchars($resp['campo_label']) ?></span>
+                                                                    <small class="text-muted d-block"><?= htmlspecialchars($resp['tipo_campo']) ?></small>
+                                                                </td>
+                                                                <td><?= htmlspecialchars($resp['resposta']) ?></td>
+                                                                <td class="text-end">
+                                                                    <span class="badge badge-light-primary"><?= $resp['total_respostas'] ?></span>
+                                                                </td>
+                                                            </tr>
+                                                            <?php endforeach; ?>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
             </div>
         </div>
     </div>

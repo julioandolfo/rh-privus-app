@@ -89,9 +89,28 @@ $etapas = $stmt->fetchAll();
                                         </td>
                                         <td>
                                             <div class="d-flex gap-2">
+                                                <a href="formulario_cultura_analytics.php?id=<?= $formulario['id'] ?>" class="btn btn-sm btn-light-info">
+                                                    <i class="ki-duotone ki-chart-simple fs-2 me-1">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                    Ver
+                                                </a>
                                                 <a href="formulario_cultura_editar.php?id=<?= $formulario['id'] ?>" class="btn btn-sm btn-light-primary">
                                                     Editar
                                                 </a>
+                                                <?php if (!$formulario['etapa_nome']): ?>
+                                                <button class="btn btn-sm btn-light-info btn-vincular-etapa" 
+                                                        data-formulario-id="<?= $formulario['id'] ?>"
+                                                        data-formulario-nome="<?= htmlspecialchars($formulario['nome']) ?>"
+                                                        title="Vincular à Etapa">
+                                                    <i class="ki-duotone ki-link fs-2 me-1">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                    Vincular
+                                                </button>
+                                                <?php endif; ?>
                                                 <button class="btn btn-sm btn-light-danger btn-excluir-formulario" 
                                                         data-formulario-id="<?= $formulario['id'] ?>"
                                                         data-formulario-nome="<?= htmlspecialchars($formulario['nome']) ?>">
@@ -172,6 +191,122 @@ document.getElementById('formFormulario').addEventListener('submit', async funct
     } catch (error) {
         alert('Erro ao criar formulário');
     }
+});
+
+// Vincular etapa
+const etapasOptions = <?= json_encode(array_map(function($e) {
+    return ['id' => $e['id'], 'nome' => $e['nome']];
+}, $etapas)) ?>;
+
+document.querySelectorAll('.btn-vincular-etapa').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const formularioId = this.dataset.formularioId;
+        const formularioNome = this.dataset.formularioNome;
+        
+        // Busca dados do formulário
+        let formularioData = null;
+        try {
+            const response = await fetch(`../api/recrutamento/formularios_cultura/detalhes.php?id=${formularioId}`);
+            const data = await response.json();
+            if (data.success) {
+                formularioData = data.formulario;
+            }
+        } catch (error) {
+            console.error('Erro ao buscar dados do formulário:', error);
+        }
+        
+        let optionsHtml = '<option value="">Nenhuma (aplicar manualmente)</option>';
+        etapasOptions.forEach(etapa => {
+            const selected = formularioData && formularioData.etapa_id == etapa.id ? 'selected' : '';
+            optionsHtml += `<option value="${etapa.id}" ${selected}>${etapa.nome}</option>`;
+        });
+        
+        const modalHtml = `
+            <div class="modal fade" id="modalVincularEtapa" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Vincular Formulário à Etapa</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="formVincularEtapa">
+                            <input type="hidden" name="formulario_id" value="${formularioId}">
+                            <div class="modal-body">
+                                <p class="mb-3">Formulário: <strong>${formularioNome}</strong></p>
+                                <div class="mb-3">
+                                    <label class="form-label">Selecione a Etapa</label>
+                                    <select name="etapa_id" class="form-select">
+                                        ${optionsHtml}
+                                    </select>
+                                    <div class="form-text">
+                                        Se vinculado, o formulário será aplicado automaticamente quando o candidato chegar nesta etapa.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove modal anterior se existir
+        const existingModal = document.getElementById('modalVincularEtapa');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Adiciona modal ao body
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Mostra modal
+        const modalEl = document.getElementById('modalVincularEtapa');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        
+        // Handler do formulário
+        const formHandler = async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            // Adiciona outros campos necessários
+            if (formularioData) {
+                formData.append('nome', formularioData.nome || '');
+                formData.append('descricao', formularioData.descricao || '');
+                formData.append('ativo', formularioData.ativo || '1');
+            }
+            
+            try {
+                const response = await fetch('../api/recrutamento/formularios_cultura/atualizar.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Etapa vinculada com sucesso!');
+                    modal.hide();
+                    location.reload();
+                } else {
+                    alert('Erro: ' + data.message);
+                }
+            } catch (error) {
+                alert('Erro ao vincular etapa');
+                console.error(error);
+            }
+        };
+        
+        document.getElementById('formVincularEtapa').addEventListener('submit', formHandler);
+        
+        // Remove modal quando fechado
+        modalEl.addEventListener('hidden.bs.modal', function() {
+            this.remove();
+        });
+    });
 });
 
 // Excluir formulário

@@ -477,6 +477,11 @@ require_once __DIR__ . '/../includes/header.php';
                                     Foto de Perfil
                                 </a>
                             </li>
+                            <li class="nav-item mt-2">
+                                <a class="nav-link text-active-primary py-5" data-bs-toggle="tab" href="#kt_tab_pane_4">
+                                    Notificações Push
+                                </a>
+                            </li>
                         </ul>
                         <!--end::Tabs-->
                         
@@ -766,6 +771,103 @@ require_once __DIR__ . '/../includes/header.php';
                                 </form>
                             </div>
                             <!--end::Tab Pane 3-->
+                            
+                            <!--begin::Tab Pane 4 - Notificações Push-->
+                            <div class="tab-pane fade" id="kt_tab_pane_4" role="tabpanel">
+                                <div class="mt-7">
+                                    <div class="card card-flush mb-7">
+                                        <div class="card-header">
+                                            <h3 class="card-title align-items-start flex-column">
+                                                <span class="card-label fw-bold text-gray-800">Status das Notificações</span>
+                                                <span class="text-muted fw-semibold fs-7 mt-1">Gerencie suas notificações push</span>
+                                            </h3>
+                                        </div>
+                                        <div class="card-body pt-6">
+                                            <div class="d-flex flex-column gap-7">
+                                                <!-- Status Atual -->
+                                                <div class="d-flex align-items-center justify-content-between p-5 bg-light-primary rounded">
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="ki-duotone ki-notification-status fs-2x text-primary me-4">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                            <span class="path3"></span>
+                                                        </i>
+                                                        <div>
+                                                            <div class="fw-bold fs-5 text-gray-800 mb-1">Status Atual</div>
+                                                            <div class="text-muted fs-6" id="status_notificacao_texto">
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                Verificando...
+                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div id="status_badge">
+                                                        <span class="badge badge-lg badge-light-warning">Verificando...</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Informações -->
+                                                <div class="separator separator-dashed"></div>
+                                                <div class="alert alert-info d-flex align-items-center p-5">
+                                                    <i class="ki-duotone ki-information-5 fs-2x text-info me-4">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                        <span class="path3"></span>
+                                                    </i>
+                                                    <div class="d-flex flex-column">
+                                                        <h4 class="mb-1">Sobre Notificações Push</h4>
+                                                        <span class="fs-6">Receba notificações importantes mesmo com o sistema fechado. Você pode ativar ou desativar a qualquer momento.</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Ações -->
+                                                <div class="d-flex flex-wrap gap-3 justify-content-end">
+                                                    <button type="button" class="btn btn-light-danger" id="btn_desativar_notificacoes" style="display: none;">
+                                                        <i class="ki-duotone ki-cross fs-2">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                        Desativar Notificações
+                                                    </button>
+                                                    <button type="button" class="btn btn-light-primary" id="btn_resetar_notificacoes" style="display: none;">
+                                                        <i class="ki-duotone ki-arrows-circle fs-2">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                        Resetar Permissão
+                                                    </button>
+                                                    <button type="button" class="btn btn-primary" id="btn_ativar_notificacoes" style="display: none;">
+                                                        <i class="ki-duotone ki-notification-bing fs-2">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                            <span class="path3"></span>
+                                                        </i>
+                                                        Ativar Notificações
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Dispositivos Registrados -->
+                                    <div class="card card-flush">
+                                        <div class="card-header">
+                                            <h3 class="card-title align-items-start flex-column">
+                                                <span class="card-label fw-bold text-gray-800">Dispositivos Registrados</span>
+                                                <span class="text-muted fw-semibold fs-7 mt-1">Dispositivos que recebem notificações</span>
+                                            </h3>
+                                        </div>
+                                        <div class="card-body pt-6">
+                                            <div id="dispositivos_lista">
+                                                <div class="text-center py-10">
+                                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                    <span class="text-muted">Carregando dispositivos...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end::Tab Pane 4-->
                         </div>
                         <!--end::Tab Content-->
                     </div>
@@ -795,6 +897,273 @@ document.getElementById('foto_perfil')?.addEventListener('change', function(e) {
         document.getElementById('foto_preview').style.display = 'none';
     }
 });
+
+// Gerenciamento de Notificações Push
+(function() {
+    let checkInterval = null;
+    
+    // Verifica status das notificações
+    async function verificarStatusNotificacoes() {
+        try {
+            if (typeof OneSignal === 'undefined') {
+                atualizarStatus('nao_suportado', 'Push notifications não são suportadas neste navegador');
+                return;
+            }
+            
+            return new Promise((resolve) => {
+                OneSignal.push(function() {
+                    OneSignal.isPushNotificationsEnabled(function(isEnabled) {
+                        if (isEnabled) {
+                            OneSignal.getNotificationPermission(function(permission) {
+                                if (permission === 'granted') {
+                                    atualizarStatus('ativo', 'Notificações ativas');
+                                    mostrarBotoes(['desativar', 'resetar']);
+                                } else {
+                                    atualizarStatus('erro', 'Erro ao verificar permissão');
+                                    mostrarBotoes(['ativar', 'resetar']);
+                                }
+                                resolve();
+                            });
+                        } else {
+                            OneSignal.getNotificationPermission(function(permission) {
+                                if (permission === 'denied') {
+                                    atualizarStatus('negado', 'Permissão negada. Use o botão "Resetar Permissão" para tentar novamente.');
+                                    mostrarBotoes(['resetar']);
+                                } else if (permission === 'default') {
+                                    atualizarStatus('inativo', 'Notificações não ativadas');
+                                    mostrarBotoes(['ativar']);
+                                } else {
+                                    atualizarStatus('inativo', 'Notificações não ativadas');
+                                    mostrarBotoes(['ativar']);
+                                }
+                                resolve();
+                            });
+                        }
+                    });
+                });
+            });
+        } catch (error) {
+            console.error('Erro ao verificar status:', error);
+            atualizarStatus('erro', 'Erro ao verificar status: ' + error.message);
+        }
+    }
+    
+    // Atualiza status na interface
+    function atualizarStatus(status, texto) {
+        const statusTexto = document.getElementById('status_notificacao_texto');
+        const statusBadge = document.getElementById('status_badge');
+        
+        if (!statusTexto || !statusBadge) return;
+        
+        statusTexto.textContent = texto;
+        
+        let badgeClass = 'badge-light-warning';
+        let badgeText = 'Verificando...';
+        
+        switch(status) {
+            case 'ativo':
+                badgeClass = 'badge-light-success';
+                badgeText = 'Ativo';
+                break;
+            case 'inativo':
+                badgeClass = 'badge-light-warning';
+                badgeText = 'Inativo';
+                break;
+            case 'negado':
+                badgeClass = 'badge-light-danger';
+                badgeText = 'Negado';
+                break;
+            case 'nao_suportado':
+                badgeClass = 'badge-light-secondary';
+                badgeText = 'Não Suportado';
+                break;
+            case 'erro':
+                badgeClass = 'badge-light-danger';
+                badgeText = 'Erro';
+                break;
+        }
+        
+        statusBadge.innerHTML = `<span class="badge badge-lg ${badgeClass}">${badgeText}</span>`;
+    }
+    
+    // Mostra botões baseado no status
+    function mostrarBotoes(botoes) {
+        document.getElementById('btn_ativar_notificacoes').style.display = botoes.includes('ativar') ? 'inline-flex' : 'none';
+        document.getElementById('btn_desativar_notificacoes').style.display = botoes.includes('desativar') ? 'inline-flex' : 'none';
+        document.getElementById('btn_resetar_notificacoes').style.display = botoes.includes('resetar') ? 'inline-flex' : 'none';
+    }
+    
+    // Carrega dispositivos registrados
+    async function carregarDispositivos() {
+        try {
+            const path = window.location.pathname;
+            let apiPath;
+            if (path.includes('/pages/')) {
+                apiPath = '../api/onesignal/dispositivos.php';
+            } else {
+                apiPath = '/rh-privus/api/onesignal/dispositivos.php';
+            }
+            
+            const response = await fetch(apiPath);
+            const data = await response.json();
+            
+            const lista = document.getElementById('dispositivos_lista');
+            if (!lista) return;
+            
+            if (data.success && data.dispositivos && data.dispositivos.length > 0) {
+                let html = '<div class="table-responsive"><table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
+                html += '<thead><tr class="text-gray-600 fw-bold"><th>Dispositivo</th><th>Tipo</th><th>Registrado em</th></tr></thead><tbody>';
+                
+                data.dispositivos.forEach(function(disp) {
+                    const dataRegistro = new Date(disp.created_at).toLocaleString('pt-BR');
+                    html += `<tr>
+                        <td class="text-gray-800">${disp.user_agent || 'Dispositivo desconhecido'}</td>
+                        <td><span class="badge badge-light-primary">${disp.device_type || 'web'}</span></td>
+                        <td class="text-gray-600">${dataRegistro}</td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table></div>';
+                lista.innerHTML = html;
+            } else {
+                lista.innerHTML = '<div class="text-center py-10"><span class="text-muted">Nenhum dispositivo registrado</span></div>';
+            }
+        } catch (error) {
+            console.error('Erro ao carregar dispositivos:', error);
+            document.getElementById('dispositivos_lista').innerHTML = '<div class="text-center py-10"><span class="text-danger">Erro ao carregar dispositivos</span></div>';
+        }
+    }
+    
+    // Ativa notificações
+    async function ativarNotificacoes() {
+        try {
+            if (typeof OneSignal === 'undefined') {
+                Swal.fire('Erro', 'OneSignal não está carregado', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('btn_ativar_notificacoes');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ativando...';
+            
+            const sucesso = await OneSignalInit.subscribe();
+            
+            if (sucesso) {
+                Swal.fire('Sucesso!', 'Notificações ativadas com sucesso!', 'success');
+                setTimeout(() => {
+                    verificarStatusNotificacoes();
+                    carregarDispositivos();
+                }, 1000);
+            } else {
+                Swal.fire('Atenção', 'Não foi possível ativar as notificações. Verifique as configurações do navegador.', 'warning');
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        } catch (error) {
+            console.error('Erro ao ativar:', error);
+            Swal.fire('Erro', 'Erro ao ativar notificações: ' + error.message, 'error');
+            document.getElementById('btn_ativar_notificacoes').disabled = false;
+        }
+    }
+    
+    // Desativa notificações
+    async function desativarNotificacoes() {
+        try {
+            Swal.fire({
+                title: 'Desativar Notificações?',
+                text: 'Você não receberá mais notificações push. Deseja continuar?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, desativar',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    if (typeof OneSignal === 'undefined') {
+                        Swal.fire('Erro', 'OneSignal não está carregado', 'error');
+                        return;
+                    }
+                    
+                    const btn = document.getElementById('btn_desativar_notificacoes');
+                    const originalHtml = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Desativando...';
+                    
+                    await OneSignalInit.unsubscribe();
+                    
+                    Swal.fire('Desativado', 'Notificações desativadas com sucesso', 'success');
+                    
+                    setTimeout(() => {
+                        verificarStatusNotificacoes();
+                        carregarDispositivos();
+                    }, 1000);
+                    
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            });
+        } catch (error) {
+            console.error('Erro ao desativar:', error);
+            Swal.fire('Erro', 'Erro ao desativar notificações: ' + error.message, 'error');
+        }
+    }
+    
+    // Reseta permissão (para quando foi negada)
+    async function resetarPermissao() {
+        try {
+            Swal.fire({
+                title: 'Resetar Permissão?',
+                text: 'Isso tentará solicitar a permissão novamente. Deseja continuar?',
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, resetar',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    // Nota: Não há uma API direta para resetar permissão negada no navegador
+                    // Mas podemos tentar solicitar novamente
+                    Swal.fire({
+                        title: 'Instruções',
+                        html: 'Para resetar a permissão negada:<br><br>' +
+                              '1. Clique no ícone de bloqueio/cadeado na barra de endereço<br>' +
+                              '2. Procure por "Notificações"<br>' +
+                              '3. Altere para "Permitir"<br>' +
+                              '4. Recarregue a página<br><br>' +
+                              'Ou tente ativar novamente usando o botão "Ativar Notificações".',
+                        icon: 'info',
+                        confirmButtonText: 'Entendi'
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('Erro ao resetar:', error);
+            Swal.fire('Erro', 'Erro ao resetar permissão: ' + error.message, 'error');
+        }
+    }
+    
+    // Event listeners
+    document.getElementById('btn_ativar_notificacoes')?.addEventListener('click', ativarNotificacoes);
+    document.getElementById('btn_desativar_notificacoes')?.addEventListener('click', desativarNotificacoes);
+    document.getElementById('btn_resetar_notificacoes')?.addEventListener('click', resetarPermissao);
+    
+    // Verifica quando a aba é aberta
+    const tabNotificacoes = document.querySelector('a[href="#kt_tab_pane_4"]');
+    if (tabNotificacoes) {
+        tabNotificacoes.addEventListener('shown.bs.tab', function() {
+            verificarStatusNotificacoes();
+            carregarDispositivos();
+        });
+    }
+    
+    // Verifica imediatamente se a aba já está ativa
+    if (document.querySelector('#kt_tab_pane_4.active')) {
+        setTimeout(() => {
+            verificarStatusNotificacoes();
+            carregarDispositivos();
+        }, 500);
+    }
+})();
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

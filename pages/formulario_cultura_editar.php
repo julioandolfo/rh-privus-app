@@ -35,6 +35,10 @@ $stmt = $pdo->prepare("SELECT * FROM formularios_cultura_campos WHERE formulario
 $stmt->execute([$formulario_id]);
 $campos = $stmt->fetchAll();
 
+// Busca etapas para vincular
+$stmt = $pdo->query("SELECT * FROM processo_seletivo_etapas WHERE vaga_id IS NULL AND ativo = 1 ORDER BY ordem ASC");
+$etapas = $stmt->fetchAll();
+
 $tipos_campo = [
     'text' => 'Texto',
     'textarea' => 'Área de Texto',
@@ -51,16 +55,88 @@ $tipos_campo = [
             <div id="kt_content_container" class="container-xxl">
                 
                 <div class="card mb-5">
-                    <div class="card-header">
-                        <h2><?= htmlspecialchars($formulario['nome']) ?></h2>
+                    <div class="card-header border-0 pt-6">
+                        <div class="card-title">
+                            <h2 class="mb-0"><?= htmlspecialchars($formulario['nome']) ?></h2>
+                        </div>
                         <div class="card-toolbar">
-                            <a href="formularios_cultura.php" class="btn btn-light">Voltar</a>
+                            <a href="formulario_cultura_analytics.php?id=<?= $formulario_id ?>" class="btn btn-info me-2">
+                                <i class="ki-duotone ki-chart-simple fs-2"></i>
+                                Ver Analytics
+                            </a>
+                            <a href="formularios_cultura.php" class="btn btn-light">
+                                <i class="ki-duotone ki-arrow-left fs-2"></i>
+                                Voltar
+                            </a>
                         </div>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body pt-0">
                         <?php if ($formulario['descricao']): ?>
                         <p class="text-muted"><?= htmlspecialchars($formulario['descricao']) ?></p>
                         <?php endif; ?>
+                    </div>
+                </div>
+                
+                <!-- Card: Configurações do Formulário -->
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h3 class="card-title">Configurações do Formulário</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="formConfigFormulario">
+                            <input type="hidden" name="formulario_id" value="<?= $formulario_id ?>">
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-5">
+                                        <label class="form-label">Nome do Formulário *</label>
+                                        <input type="text" name="nome" class="form-control" value="<?= htmlspecialchars($formulario['nome']) ?>" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="mb-5">
+                                        <label class="form-label">Status</label>
+                                        <select name="ativo" class="form-select">
+                                            <option value="1" <?= $formulario['ativo'] ? 'selected' : '' ?>>Ativo</option>
+                                            <option value="0" <?= !$formulario['ativo'] ? 'selected' : '' ?>>Inativo</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-5">
+                                <label class="form-label">Descrição</label>
+                                <textarea name="descricao" class="form-control" rows="3"><?= htmlspecialchars($formulario['descricao'] ?? '') ?></textarea>
+                            </div>
+                            
+                            <div class="mb-5">
+                                <label class="form-label">Vincular à Etapa do Processo Seletivo</label>
+                                <select name="etapa_id" class="form-select">
+                                    <option value="">Nenhuma (aplicar manualmente)</option>
+                                    <?php foreach ($etapas as $etapa): ?>
+                                    <option value="<?= $etapa['id'] ?>" <?= $formulario['etapa_id'] == $etapa['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($etapa['nome']) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">
+                                    <i class="ki-duotone ki-information-5 fs-6 text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Se vinculado a uma etapa, o formulário será aplicado automaticamente quando o candidato chegar nesta etapa.
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="ki-duotone ki-check fs-2"></i>
+                                    Salvar Configurações
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
                 
@@ -547,6 +623,53 @@ document.querySelectorAll('.btn-excluir-campo').forEach(btn => {
             console.error(error);
         }
     });
+});
+// Salvar configurações do formulário
+document.getElementById('formConfigFormulario').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    const btnSubmit = this.querySelector('button[type="submit"]');
+    const originalText = btnSubmit.innerHTML;
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
+    
+    try {
+        const response = await fetch('../api/recrutamento/formularios_cultura/atualizar.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: data.message,
+                timer: 2000,
+                showConfirmButton: false
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message
+            });
+        }
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao salvar configurações'
+        });
+        console.error(error);
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = originalText;
+    }
 });
 </script>
 
