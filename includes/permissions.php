@@ -67,6 +67,9 @@ function get_page_permissions() {
         // Ocorrências - todos podem acessar (com restrições de dados)
         'ocorrencias_list.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         'ocorrencias_add.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'ocorrencias_rapida.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'categorias_ocorrencias.php' => ['ADMIN', 'RH'],
+        'relatorio_ocorrencias_avancado.php' => ['ADMIN', 'RH', 'GESTOR'],
         'tipos_ocorrencias.php' => ['ADMIN', 'RH'],
         
         // Pagamentos - colaborador

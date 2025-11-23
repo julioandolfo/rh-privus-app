@@ -87,6 +87,20 @@
         "RH",
         "GESTOR"
     ],
+    "ocorrencias_rapida.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR"
+    ],
+    "categorias_ocorrencias.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "relatorio_ocorrencias_avancado.php": [
+        "ADMIN",
+        "RH",
+        "GESTOR"
+    ],
     "tipos_ocorrencias.php": [
         "ADMIN",
         "RH"
