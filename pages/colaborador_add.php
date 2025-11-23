@@ -479,18 +479,26 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
             .then(r => r.json())
             .then(data => {
                 setorSelect.innerHTML = '<option value="">Selecione...</option>';
-                data.forEach(setor => {
+                const setores = Array.isArray(data) ? data : (data.setores || []);
+                setores.forEach(setor => {
                     setorSelect.innerHTML += `<option value="${setor.id}">${setor.nome_setor}</option>`;
                 });
+            })
+            .catch(() => {
+                setorSelect.innerHTML = '<option value="">Erro ao carregar</option>';
             });
         
         fetch(`../api/get_cargos.php?empresa_id=${empresaId}`)
             .then(r => r.json())
             .then(data => {
                 cargoSelect.innerHTML = '<option value="">Selecione...</option>';
-                data.forEach(cargo => {
+                const cargos = Array.isArray(data) ? data : (data.cargos || []);
+                cargos.forEach(cargo => {
                     cargoSelect.innerHTML += `<option value="${cargo.id}">${cargo.nome_cargo}</option>`;
                 });
+            })
+            .catch(() => {
+                cargoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
             });
     } else {
         setorSelect.innerHTML = '<option value="">Selecione...</option>';
@@ -520,7 +528,8 @@ function carregarLideres() {
         .then(r => r.json())
         .then(data => {
             liderSelect.innerHTML = '<option value="">Nenhum</option>';
-            data.forEach(lider => {
+            const lideres = Array.isArray(data) ? data : (data.lideres || []);
+            lideres.forEach(lider => {
                 const nivelInfo = lider.nivel_nome ? ` - ${lider.nivel_nome}` : '';
                 liderSelect.innerHTML += `<option value="${lider.id}">${lider.nome_completo}${nivelInfo}</option>`;
             });
@@ -751,18 +760,26 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(r => r.json())
         .then(data => {
             setorSelect.innerHTML = '<option value="">Selecione...</option>';
-            data.forEach(setor => {
+            const setores = Array.isArray(data) ? data : (data.setores || []);
+            setores.forEach(setor => {
                 setorSelect.innerHTML += `<option value="${setor.id}">${setor.nome_setor}</option>`;
             });
+        })
+        .catch(() => {
+            setorSelect.innerHTML = '<option value="">Erro ao carregar</option>';
         });
     
     fetch(`../api/get_cargos.php?empresa_id=${empresaId}`)
         .then(r => r.json())
         .then(data => {
             cargoSelect.innerHTML = '<option value="">Selecione...</option>';
-            data.forEach(cargo => {
+            const cargos = Array.isArray(data) ? data : (data.cargos || []);
+            cargos.forEach(cargo => {
                 cargoSelect.innerHTML += `<option value="${cargo.id}">${cargo.nome_cargo}</option>`;
             });
+        })
+        .catch(() => {
+            cargoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
         });
 });
 <?php endif; ?>
