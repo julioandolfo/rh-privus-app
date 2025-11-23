@@ -17,16 +17,22 @@ if (empty($token)) {
 $pdo = getDB();
 
 // Busca configuração do portal (para usar cores e logo)
-$stmt = $pdo->query("SELECT * FROM portal_vagas_config WHERE ativo = 1 LIMIT 1");
-$portal_config = $stmt->fetch();
+$portal_config = [
+    'cor_primaria' => '#009ef7',
+    'cor_secundaria' => '#50cd89',
+    'logo_url' => null,
+    'titulo_pagina' => 'RH Privus'
+];
 
-if (!$portal_config) {
-    $portal_config = [
-        'cor_primaria' => '#009ef7',
-        'cor_secundaria' => '#50cd89',
-        'logo_url' => null,
-        'titulo_pagina' => 'RH Privus'
-    ];
+try {
+    $stmt = $pdo->query("SELECT * FROM portal_vagas_config WHERE ativo = 1 LIMIT 1");
+    $config_db = $stmt->fetch();
+    if ($config_db) {
+        $portal_config = array_merge($portal_config, $config_db);
+    }
+} catch (PDOException $e) {
+    // Se a tabela não existir, usa valores padrão
+    error_log('Erro ao buscar configuração do portal: ' . $e->getMessage());
 }
 
 // Busca candidatura por token
@@ -37,38 +43,57 @@ if (!$candidatura) {
 }
 
 // Busca histórico de etapas
-$stmt = $pdo->prepare("
-    SELECT ce.*, e.nome as etapa_nome, e.codigo as etapa_codigo, e.cor as etapa_cor,
-           u.nome as avaliador_nome
-    FROM candidaturas_etapas ce
-    INNER JOIN processo_seletivo_etapas e ON ce.etapa_id = e.id
-    LEFT JOIN usuarios u ON ce.avaliador_id = u.id
-    WHERE ce.candidatura_id = ?
-    ORDER BY ce.created_at ASC
-");
-$stmt->execute([$candidatura['id']]);
-$etapas = $stmt->fetchAll();
+$etapas = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT ce.*, e.nome as etapa_nome, e.codigo as etapa_codigo, 
+               COALESCE(e.cor_kanban, '#6c757d') as etapa_cor,
+               u.nome as avaliador_nome
+        FROM candidaturas_etapas ce
+        INNER JOIN processo_seletivo_etapas e ON ce.etapa_id = e.id
+        LEFT JOIN usuarios u ON ce.avaliador_id = u.id
+        WHERE ce.candidatura_id = ?
+        ORDER BY ce.created_at ASC
+    ");
+    $stmt->execute([$candidatura['id']]);
+    $etapas = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Erro ao buscar etapas: ' . $e->getMessage());
+    $etapas = [];
+}
 
 // Busca entrevistas agendadas
-$stmt = $pdo->prepare("
-    SELECT * FROM entrevistas
-    WHERE candidatura_id = ? AND status IN ('agendada', 'reagendada')
-    ORDER BY data_agendada ASC
-");
-$stmt->execute([$candidatura['id']]);
-$entrevistas = $stmt->fetchAll();
+$entrevistas = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT * FROM entrevistas
+        WHERE candidatura_id = ? AND status IN ('agendada', 'reagendada')
+        ORDER BY data_agendada ASC
+    ");
+    $stmt->execute([$candidatura['id']]);
+    $entrevistas = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Erro ao buscar entrevistas: ' . $e->getMessage());
+    $entrevistas = [];
+}
 
 // Busca comentários/mensagens
-$stmt = $pdo->prepare("
-    SELECT cc.*, u.nome as usuario_nome
-    FROM candidaturas_comentarios cc
-    LEFT JOIN usuarios u ON cc.usuario_id = u.id
-    WHERE cc.candidatura_id = ?
-    ORDER BY cc.created_at DESC
-    LIMIT 10
-");
-$stmt->execute([$candidatura['id']]);
-$comentarios = $stmt->fetchAll();
+$comentarios = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT cc.*, u.nome as usuario_nome
+        FROM candidaturas_comentarios cc
+        LEFT JOIN usuarios u ON cc.usuario_id = u.id
+        WHERE cc.candidatura_id = ?
+        ORDER BY cc.created_at DESC
+        LIMIT 10
+    ");
+    $stmt->execute([$candidatura['id']]);
+    $comentarios = $stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Erro ao buscar comentários: ' . $e->getMessage());
+    $comentarios = [];
+}
 
 // Calcula progresso
 $total_etapas = count($etapas);
