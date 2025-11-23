@@ -82,6 +82,11 @@ function get_page_permissions() {
         'enviar_notificacao_push.php' => ['ADMIN', 'RH'],
         'notificacoes_enviadas.php' => ['ADMIN', 'RH'],
         
+        // Chat - ADMIN e RH para gestão, COLABORADOR para visualização
+        'chat_gestao.php' => ['ADMIN', 'RH'],
+        'chat_colaborador.php' => ['COLABORADOR'],
+        'chat_configuracoes.php' => ['ADMIN', 'RH'],
+        
         // Perfil/Conta - todos podem acessar
         'minha_conta.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         

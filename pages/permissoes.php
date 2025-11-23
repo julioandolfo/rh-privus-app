@@ -122,20 +122,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Mapeamento de nomes de arquivos para descrições amigáveis
+$descricoes_paginas = [
+    'dashboard.php' => 'Dashboard',
+    'emocoes.php' => 'Emoções',
+    'emocoes_analise.php' => 'Análise de Emoções',
+    'feed.php' => 'Feed Privus',
+    'chat_gestao.php' => 'Chat - Gestão',
+    'chat_colaborador.php' => 'Chat - Colaborador',
+    'chat_configuracoes.php' => 'Configurações do Chat',
+    'feedback_enviar.php' => 'Enviar Feedback',
+    'feedback_meus.php' => 'Meus Feedbacks',
+    'ver_feedback.php' => 'Visualizar Feedback',
+    'gestao_engajamento.php' => 'Painel de Engajamento',
+    'reunioes_1on1.php' => 'Reuniões 1:1',
+    'celebracoes.php' => 'Celebrações',
+    'pesquisas_satisfacao.php' => 'Pesquisas de Satisfação',
+    'pesquisas_rapidas.php' => 'Pesquisas Rápidas',
+    'pesquisas_colaborador.php' => 'Pesquisas - Colaborador',
+    'pdis.php' => 'PDIs (Planos de Desenvolvimento Individual)',
+    'responder_pesquisa.php' => 'Responder Pesquisa',
+    'vagas.php' => 'Vagas',
+    'vaga_add.php' => 'Criar Vaga',
+    'vaga_edit.php' => 'Editar Vaga',
+    'vaga_view.php' => 'Visualizar Vaga',
+    'vaga_landing_page.php' => 'Landing Page de Vaga',
+    'portal_vagas_config.php' => 'Configurar Portal de Vagas',
+    'candidaturas.php' => 'Candidaturas',
+    'candidatura_view.php' => 'Visualizar Candidatura',
+    'kanban_selecao.php' => 'Kanban de Seleção',
+    'etapas_processo.php' => 'Etapas do Processo',
+    'automatizacoes_kanban.php' => 'Automações do Kanban',
+    'formularios_cultura.php' => 'Formulários de Cultura',
+    'formulario_cultura_editar.php' => 'Editar Formulário de Cultura',
+    'formulario_cultura_analytics.php' => 'Analytics de Formulários',
+    'entrevistas.php' => 'Entrevistas',
+    'onboarding.php' => 'Onboarding',
+    'kanban_onboarding.php' => 'Kanban de Onboarding',
+    'analytics_recrutamento.php' => 'Analytics de Recrutamento',
+    'empresas.php' => 'Empresas',
+    'setores.php' => 'Setores',
+    'cargos.php' => 'Cargos',
+    'hierarquia.php' => 'Organograma',
+    'niveis_hierarquicos.php' => 'Níveis Hierárquicos',
+    'colaboradores.php' => 'Listar Colaboradores',
+    'colaborador_add.php' => 'Adicionar Colaborador',
+    'colaborador_view.php' => 'Visualizar Colaborador',
+    'colaborador_edit.php' => 'Editar Colaborador',
+    'promocoes.php' => 'Promoções',
+    'horas_extras.php' => 'Horas Extras',
+    'fechamento_pagamentos.php' => 'Fechamento de Pagamentos',
+    'tipos_bonus.php' => 'Tipos de Bônus',
+    'ocorrencias_list.php' => 'Listar Ocorrências',
+    'ocorrencias_add.php' => 'Adicionar Ocorrência',
+    'ocorrencias_rapida.php' => 'Ocorrência Rápida',
+    'tipos_ocorrencias.php' => 'Tipos de Ocorrências',
+    'categorias_ocorrencias.php' => 'Categorias de Ocorrências',
+    'relatorio_ocorrencias_avancado.php' => 'Relatório Avançado de Ocorrências',
+    'meus_pagamentos.php' => 'Meus Pagamentos',
+    'usuarios.php' => 'Usuários',
+    'enviar_notificacao_push.php' => 'Enviar Notificação Push',
+    'notificacoes_enviadas.php' => 'Notificações Enviadas',
+    'notificacoes.php' => 'Notificações',
+    'minha_conta.php' => 'Minha Conta',
+    'configuracoes_email.php' => 'Configurações de Email',
+    'configuracoes_onesignal.php' => 'Configurações OneSignal',
+    'configuracoes_pontos.php' => 'Configurações de Pontos',
+    'templates_email.php' => 'Templates de Email',
+    'permissoes.php' => 'Permissões',
+    'endomarketing_datas_comemorativas.php' => 'Datas Comemorativas',
+    'endomarketing_acoes.php' => 'Ações de Endomarketing',
+    'endomarketing_acao_view.php' => 'Visualizar Ação de Endomarketing',
+    'relatorio_ocorrencias.php' => 'Relatório de Ocorrências',
+];
+
 // Agrupa páginas por categoria para melhor visualização
 $paginas_por_categoria = [
     'Dashboard' => ['dashboard.php'],
     'Emoções' => ['emocoes.php', 'emocoes_analise.php'],
     'Feed' => ['feed.php'],
+    'Chat' => ['chat_gestao.php', 'chat_colaborador.php', 'chat_configuracoes.php'],
+    'Feedbacks' => ['feedback_enviar.php', 'feedback_meus.php', 'ver_feedback.php'],
+    'Engajamento' => ['gestao_engajamento.php', 'reunioes_1on1.php', 'celebracoes.php', 'pesquisas_satisfacao.php', 'pesquisas_rapidas.php', 'pesquisas_colaborador.php', 'pdis.php', 'responder_pesquisa.php'],
+    'Recrutamento' => ['vagas.php', 'vaga_add.php', 'vaga_edit.php', 'vaga_view.php', 'vaga_landing_page.php', 'portal_vagas_config.php', 'candidaturas.php', 'candidatura_view.php', 'kanban_selecao.php', 'etapas_processo.php', 'automatizacoes_kanban.php', 'formularios_cultura.php', 'formulario_cultura_editar.php', 'formulario_cultura_analytics.php', 'entrevistas.php', 'onboarding.php', 'kanban_onboarding.php', 'analytics_recrutamento.php'],
     'Estrutura' => ['empresas.php', 'setores.php', 'cargos.php', 'hierarquia.php', 'niveis_hierarquicos.php'],
     'Colaboradores' => ['colaboradores.php', 'colaborador_add.php', 'colaborador_view.php', 'colaborador_edit.php', 'promocoes.php', 'horas_extras.php', 'fechamento_pagamentos.php', 'tipos_bonus.php'],
-    'Ocorrências' => ['ocorrencias_list.php', 'ocorrencias_add.php', 'tipos_ocorrencias.php'],
+    'Ocorrências' => ['ocorrencias_list.php', 'ocorrencias_add.php', 'ocorrencias_rapida.php', 'tipos_ocorrencias.php', 'categorias_ocorrencias.php', 'relatorio_ocorrencias_avancado.php'],
     'Pagamentos' => ['meus_pagamentos.php'],
     'Usuários' => ['usuarios.php'],
-    'Notificações' => ['enviar_notificacao_push.php', 'notificacoes_enviadas.php'],
+    'Notificações' => ['enviar_notificacao_push.php', 'notificacoes_enviadas.php', 'notificacoes.php'],
     'Perfil/Conta' => ['minha_conta.php'],
-    'Configurações' => ['configuracoes_email.php', 'configuracoes_onesignal.php', 'configuracoes_pontos.php', 'templates_email.php'],
-    'Endomarketing' => ['endomarketing_datas_comemorativas.php', 'endomarketing_acoes.php'],
+    'Configurações' => ['configuracoes_email.php', 'configuracoes_onesignal.php', 'configuracoes_pontos.php', 'templates_email.php', 'permissoes.php'],
+    'Endomarketing' => ['endomarketing_datas_comemorativas.php', 'endomarketing_acoes.php', 'endomarketing_acao_view.php'],
     'Relatórios' => ['relatorio_ocorrencias.php'],
 ];
 
@@ -231,9 +309,10 @@ require_once __DIR__ . '/../includes/header.php';
                                     <?php if (isset($all_permissions[$pagina])): ?>
                                     <tr>
                                         <td>
-                                            <span class="text-gray-900 fw-bold d-block fs-6"><?= htmlspecialchars($pagina) ?></span>
+                                            <span class="text-gray-900 fw-bold d-block fs-6"><?= htmlspecialchars($descricoes_paginas[$pagina] ?? $pagina) ?></span>
+                                            <span class="text-muted fs-7"><?= htmlspecialchars($pagina) ?></span>
                                             <?php if (isset($custom_permissions[$pagina])): ?>
-                                            <span class="badge badge-light-warning fs-7">Customizado</span>
+                                            <span class="badge badge-light-warning fs-7 ms-2">Customizado</span>
                                             <?php endif; ?>
                                         </td>
                                         <?php foreach ($roles_disponiveis as $role): ?>
