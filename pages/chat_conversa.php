@@ -130,7 +130,7 @@ $categorias = $stmt->fetchAll();
                                 </div>
                             <?php endif; ?>
                             
-                            <div class="chat-mensagem-wrapper <?= $eh_minha_mensagem ? 'mensagem-rh' : 'mensagem-colaborador' ?>" data-msg-id="<?= $msg['id'] ?>">
+                                <div class="chat-mensagem-wrapper <?= $eh_minha_mensagem ? 'mensagem-rh' : 'mensagem-colaborador' ?>" data-msg-id="<?= $msg['id'] ?>" data-msg-date="<?= $data_atual ?>">
                                 <!-- Avatar -->
                                 <?php if ($avatar): ?>
                                 <img src="../<?= htmlspecialchars($avatar) ?>" 
@@ -155,7 +155,7 @@ $categorias = $stmt->fetchAll();
                                     <div class="chat-mensagem-conteudo">
                                         <?php if ($msg['tipo'] === 'voz' && $msg['voz_caminho']): ?>
                                             <div class="chat-mensagem-voz">
-                                                <audio controls style="max-width: 250px;">
+                                                <audio controls>
                                                     <source src="../<?= htmlspecialchars($msg['voz_caminho']) ?>" type="audio/mpeg">
                                                 </audio>
                                                 <?php if ($msg['voz_transcricao']): ?>
@@ -241,35 +241,10 @@ $categorias = $stmt->fetchAll();
 </div>
 
 <script>
-// Script simplificado para enviar mensagens
-document.getElementById('chat-form-resposta')?.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    
-    fetch('../api/chat/mensagens/enviar.php', {
-        method: 'POST',
-        body: formData
-    })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                this.reset();
-                location.reload();
-            } else {
-                Swal.fire('Erro', data.message || 'Erro ao enviar mensagem', 'error');
-            }
-        })
-        .catch(err => {
-            Swal.fire('Erro', 'Erro ao enviar mensagem', 'error');
-        });
-});
-
-</script>
-
-<script>
     // Define ID do colaborador logado para o JavaScript
     window.CHAT_COLABORADOR_ID = <?= $usuario['colaborador_id'] ?? 'null' ?>;
 </script>
+<script src="../assets/js/chat-conversa.js"></script>
 <script src="../assets/js/chat-audio.js"></script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

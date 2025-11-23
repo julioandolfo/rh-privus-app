@@ -1,25 +1,23 @@
 /**
- * JavaScript para Gestão de Chat - RH
+ * JavaScript para Chat do Colaborador
  */
 
 (function() {
     'use strict';
     
-    const ChatGestao = {
+    const ChatConversa = {
         conversaId: null,
         ultimaMensagemId: 0,
         pollingInterval: null,
-        gravacaoVoz: null,
-        mediaRecorder: null,
-        usuarioId: null,
+        colaboradorId: null,
         
         init: function() {
-            // Obtém ID do usuário logado (deve ser definido na página)
-            this.usuarioId = window.CHAT_USUARIO_ID || null;
+            // Obtém ID do colaborador logado (deve ser definido na página)
+            this.colaboradorId = window.CHAT_COLABORADOR_ID || null;
             
-            // Verifica se há conversa aberta
+            // Obtém ID da conversa da URL
             const urlParams = new URLSearchParams(window.location.search);
-            this.conversaId = urlParams.get('conversa');
+            this.conversaId = urlParams.get('id');
             
             if (this.conversaId) {
                 this.conversaId = parseInt(this.conversaId);
@@ -37,9 +35,8 @@
                     }
                 }
                 
-                // Se não encontrou mensagem, inicializa com 0 para buscar todas
+                // Se não encontrou mensagem, inicializa buscando do servidor
                 if (this.ultimaMensagemId === 0) {
-                    // Busca o ID da última mensagem do servidor
                     this.buscarUltimaMensagemId();
                 }
                 
@@ -66,7 +63,15 @@
                 method: 'POST',
                 body: formData
             })
-                .then(r => r.json())
+                .then(async response => {
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        const text = await response.text();
+                        console.error('Resposta não é JSON:', text);
+                        throw new Error('Resposta inválida do servidor');
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         form.reset();
@@ -75,71 +80,27 @@
                             this.verificarNovasMensagens();
                         }, 500);
                     } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro',
-                            text: data.message || 'Erro ao enviar mensagem'
-                        });
+                        Swal.fire('Erro', data.message || 'Erro ao enviar mensagem', 'error');
                     }
                 })
                 .catch(err => {
-                    console.error('Erro:', err);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: 'Erro ao enviar mensagem. Tente novamente.'
-                    });
+                    console.error('Erro ao enviar mensagem:', err);
+                    Swal.fire('Erro', 'Erro ao enviar mensagem', 'error');
                 });
-        },
-        
-        carregarMensagens: function() {
-            if (!this.conversaId) return;
-            
-            fetch(`../api/chat/mensagens/listar.php?conversa_id=${this.conversaId}`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        this.renderMensagens(data.data);
-                        if (data.data.length > 0) {
-                            this.ultimaMensagemId = data.data[data.data.length - 1].id;
-                        }
-                    }
-                })
-                .catch(err => console.error('Erro ao carregar mensagens:', err));
-        },
-        
-        renderMensagens: function(mensagens) {
-            const container = document.getElementById('chat-mensagens');
-            if (!container) return;
-            
-            // Verifica se já há mensagens renderizadas pelo PHP
-            const mensagensExistentes = container.querySelectorAll('.chat-mensagem-wrapper');
-            const temMensagensPHP = mensagensExistentes.length > 0;
-            
-            // Se já há mensagens renderizadas pelo PHP, apenas adiciona as novas
-            if (temMensagensPHP) {
-                mensagens.forEach(msg => {
-                    const msgExistente = container.querySelector(`[data-msg-id="${msg.id}"]`);
-                    if (!msgExistente) {
-                        this.adicionarMensagem(msg);
-                    }
-                });
-                return;
-            }
-            
-            // Se não há mensagens, renderiza todas (caso de carregamento inicial via AJAX)
-            // Mas isso não deve acontecer normalmente, pois o PHP já renderiza
-            mensagens.forEach(msg => {
-                this.adicionarMensagem(msg);
-            });
         },
         
         buscarUltimaMensagemId: function() {
             // Busca o ID da última mensagem para inicializar o polling
             fetch(`../api/chat/mensagens/listar.php?conversa_id=${this.conversaId}&page=1`)
-                .then(r => r.json())
+                .then(async response => {
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        return null;
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    if (data.success && data.data.length > 0) {
+                    if (data && data.success && data.data.length > 0) {
                         // Pega o ID da última mensagem
                         const ultimaMsg = data.data[data.data.length - 1];
                         this.ultimaMensagemId = ultimaMsg.id;
@@ -212,8 +173,8 @@
                 return; // Mensagem já existe, não adiciona novamente
             }
             
-            // Verifica se é minha mensagem (enviada pelo usuário logado)
-            const ehMinhaMensagem = msg.enviado_por_usuario_id && msg.enviado_por_usuario_id == ChatGestao.usuarioId;
+            // Verifica se é minha mensagem (enviada pelo colaborador logado)
+            const ehMinhaMensagem = msg.enviado_por_colaborador_id && msg.enviado_por_colaborador_id == ChatConversa.colaboradorId;
             const classeWrapper = ehMinhaMensagem ? 'mensagem-rh' : 'mensagem-colaborador';
             const nomeAutor = msg.autor ? msg.autor.nome : 'Usuário';
             const dataAtual = new Date(msg.created_at).toLocaleDateString('pt-BR');
@@ -234,16 +195,12 @@
                 
                 if (!ultimaMsgDataAttr) {
                     // Se não tem atributo de data, precisa verificar
-                    // Busca o timestamp da última mensagem no DOM ou compara com a data atual
                     const ultimoSeparador = container.querySelector('.chat-data-separator:last-child');
                     if (ultimoSeparador) {
                         const textoSeparador = ultimoSeparador.textContent.trim();
                         const textoEsperado = dataAtual === hoje ? 'Hoje' : dataAtual;
                         precisaSeparador = textoSeparador !== textoEsperado;
                     } else {
-                        // Não há separador, mas há mensagens - verifica se a data mudou
-                        // Para simplificar, vamos comparar com a data da última mensagem
-                        // Se não conseguir determinar, não cria separador
                         precisaSeparador = false;
                     }
                 } else {
@@ -307,7 +264,6 @@
                     </div>
                     <div class="chat-mensagem-timestamp">
                         <span>${dataFormatada}</span>
-                        ${ehMinhaMensagem && msg.lida ? '<i class="ki-duotone ki-check fs-8 text-primary"><span class="path1"></span><span class="path2"></span></i>' : ''}
                     </div>
                 </div>
             `;
@@ -325,13 +281,8 @@
         },
         
         tocarSomNotificacao: function() {
-            // Verifica preferências
-            fetch('../api/chat/preferencias/salvar.php')
-                .then(r => r.json())
-                .then(data => {
-                    // Toca som se ativado (implementar áudio)
-                })
-                .catch(() => {});
+            // Verifica preferências e toca som se configurado
+            // Implementar áudio se necessário
         },
         
         escapeHtml: function(text) {
@@ -345,134 +296,13 @@
         }
     };
     
-    // Funções globais
-    window.atribuirConversa = function(conversaId) {
-        Swal.fire({
-            title: 'Atribuir Conversa',
-            html: '<select id="swal-usuario" class="swal2-input"><option value="">Selecione...</option></select>',
-            showCancelButton: true,
-            confirmButtonText: 'Atribuir',
-            preConfirm: () => {
-                const usuarioId = document.getElementById('swal-usuario').value;
-                if (!usuarioId) {
-                    Swal.showValidationMessage('Selecione um usuário');
-                    return false;
-                }
-                return usuarioId;
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const formData = new FormData();
-                formData.append('conversa_id', conversaId);
-                formData.append('usuario_id', result.value);
-                
-                fetch('../api/chat/conversas/atribuir.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.success) {
-                            Swal.fire('Sucesso', 'Conversa atribuída!', 'success').then(() => {
-                                location.reload();
-                            });
-                        } else {
-                            Swal.fire('Erro', data.message, 'error');
-                        }
-                    });
-            }
-        });
-    };
-    
-    window.gerarResumoIA = function(conversaId) {
-        Swal.fire({
-            title: 'Gerando Resumo...',
-            text: 'Aguarde enquanto a IA processa a conversa',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-        
-        const formData = new FormData();
-        formData.append('conversa_id', conversaId);
-        
-        fetch('../api/chat/ia/gerar_resumo.php', {
-            method: 'POST',
-            body: formData
-        })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    Swal.fire({
-                        title: 'Resumo Gerado',
-                        html: `<div style="text-align: left; max-height: 400px; overflow-y: auto;">${data.resumo.replace(/\n/g, '<br>')}</div>`,
-                        width: '600px',
-                        confirmButtonText: 'OK'
-                    }).then(() => {
-                        location.reload();
-                    });
-                } else {
-                    Swal.fire('Erro', data.message || 'Erro ao gerar resumo', 'error');
-                }
-            })
-            .catch(err => {
-                Swal.fire('Erro', 'Erro ao gerar resumo', 'error');
-            });
-    };
-    
-    window.fecharConversa = function(conversaId) {
-        Swal.fire({
-            title: 'Fechar Conversa',
-            input: 'text',
-            inputLabel: 'Motivo (opcional)',
-            inputPlaceholder: 'Digite o motivo do fechamento...',
-            showCancelButton: true,
-            confirmButtonText: 'Fechar',
-            cancelButtonText: 'Cancelar'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const formData = new FormData();
-                formData.append('conversa_id', conversaId);
-                if (result.value) {
-                    formData.append('motivo', result.value);
-                }
-                
-                fetch('../api/chat/conversas/fechar.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.success) {
-                            Swal.fire('Sucesso', 'Conversa fechada!', 'success').then(() => {
-                                window.location.href = 'chat_gestao.php';
-                            });
-                        } else {
-                            Swal.fire('Erro', data.message, 'error');
-                        }
-                    });
-            }
-        });
-    };
-    
-    // Função de gravação movida para chat-audio.js
-    // Mantida aqui apenas para compatibilidade, mas será sobrescrita pelo chat-audio.js
-    window.iniciarGravacaoVoz = window.iniciarGravacaoVoz || function(conversaId) {
-        if (typeof ChatAudio !== 'undefined') {
-            ChatAudio.iniciarGravacao(conversaId);
-        } else {
-            Swal.fire('Erro', 'Sistema de áudio não carregado. Recarregue a página.', 'error');
-        }
-    };
-    
     // Inicializa quando DOM estiver pronto
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => ChatGestao.init());
+        document.addEventListener('DOMContentLoaded', () => ChatConversa.init());
     } else {
-        ChatGestao.init();
+        ChatConversa.init();
     }
     
-    window.ChatGestao = ChatGestao;
+    window.ChatConversa = ChatConversa;
 })();
 

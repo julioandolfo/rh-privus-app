@@ -358,7 +358,7 @@ if ($conversa_id > 0) {
                                             </div>
                                         <?php endif; ?>
                                         
-                                        <div class="chat-mensagem-wrapper <?= $eh_minha_mensagem ? 'mensagem-rh' : 'mensagem-colaborador' ?>" data-msg-id="<?= $msg['id'] ?>">
+                                        <div class="chat-mensagem-wrapper <?= $eh_minha_mensagem ? 'mensagem-rh' : 'mensagem-colaborador' ?>" data-msg-id="<?= $msg['id'] ?>" data-msg-date="<?= $data_atual ?>">
                                             <!-- Avatar -->
                                             <?php if ($avatar): ?>
                                             <img src="../<?= htmlspecialchars($avatar) ?>" 
@@ -383,7 +383,7 @@ if ($conversa_id > 0) {
                                                 <div class="chat-mensagem-conteudo">
                                                     <?php if ($msg['tipo'] === 'voz' && $msg['voz_caminho']): ?>
                                                         <div class="chat-mensagem-voz">
-                                                            <audio controls style="max-width: 250px;">
+                                                            <audio controls>
                                                                 <source src="../<?= htmlspecialchars($msg['voz_caminho']) ?>" type="audio/mpeg">
                                                             </audio>
                                                             <?php if ($msg['voz_transcricao']): ?>

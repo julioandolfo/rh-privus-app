@@ -293,6 +293,10 @@ function upload_voz_chat($file, $conversa_id) {
     }
     
     if (!$mime_permitido) {
+        // Log para debug
+        if (function_exists('chat_log')) {
+            chat_log("Upload de voz rejeitado - MIME: {$mime_type}, Extensão: {$extension}, Nome arquivo: " . ($file['name'] ?? 'N/A'));
+        }
         return ['success' => false, 'error' => "Tipo de arquivo de áudio não permitido. Tipo detectado: {$mime_type}, Extensão: {$extension}"];
     }
     

@@ -265,13 +265,22 @@ const ChatAudio = {
                 showConfirmButton: false
             });
             
-            // Recarrega mensagens se função existir
-            if (typeof ChatGestao !== 'undefined' && ChatGestao.carregarMensagens) {
-                ChatGestao.carregarMensagens();
-            } else {
-                // Recarrega página se não tiver função de atualizar
-                setTimeout(() => location.reload(), 2000);
-            }
+            // Aguarda um pouco e verifica novas mensagens em vez de recarregar tudo
+            setTimeout(() => {
+                // Tenta ChatGestao (RH) primeiro
+                if (typeof ChatGestao !== 'undefined' && ChatGestao.verificarNovasMensagens) {
+                    ChatGestao.verificarNovasMensagens();
+                } else if (typeof ChatGestao !== 'undefined' && ChatGestao.carregarMensagens) {
+                    ChatGestao.carregarMensagens();
+                } 
+                // Tenta ChatConversa (Colaborador)
+                else if (typeof ChatConversa !== 'undefined' && ChatConversa.verificarNovasMensagens) {
+                    ChatConversa.verificarNovasMensagens();
+                } else {
+                    // Último recurso: recarrega página
+                    location.reload();
+                }
+            }, 1000);
         })
         .catch(error => {
             console.error('Erro ao enviar áudio:', error);

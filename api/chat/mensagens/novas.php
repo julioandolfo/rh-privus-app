@@ -80,7 +80,8 @@ try {
             ] : null,
             'autor' => [
                 'tipo' => $msg['enviado_por_usuario_id'] ? 'rh' : 'colaborador',
-                'nome' => $msg['usuario_nome'] ?? $msg['colaborador_nome']
+                'nome' => $msg['usuario_nome'] ?? $msg['colaborador_nome'],
+                'foto' => $msg['usuario_foto'] ?? $msg['colaborador_foto']
             ],
             'created_at' => $msg['created_at']
         ];

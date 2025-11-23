@@ -211,7 +211,7 @@
 
 /* Container da mensagem */
 .chat-mensagem {
-    max-width: 65%;
+    max-width: 75%;
     min-width: 120px;
     padding: 12px 16px;
     border-radius: 12px;
@@ -335,7 +335,8 @@
 
 .chat-mensagem-voz audio {
     width: 100%;
-    max-width: 300px;
+    min-width: 280px;
+    max-width: 100%;
 }
 
 .chat-voz-transcricao {
