@@ -43,11 +43,75 @@ try {
     
     // Destinatários
     $publico_alvo = $_POST['publico_alvo'] ?? 'especifico';
-    $empresa_id = !empty($_POST['empresa_id']) ? (int)$_POST['empresa_id'] : null;
-    $setor_id = !empty($_POST['setor_id']) ? (int)$_POST['setor_id'] : null;
-    $cargo_id = !empty($_POST['cargo_id']) ? (int)$_POST['cargo_id'] : null;
-    $destinatarios_usuarios = !empty($_POST['destinatarios_usuarios']) ? json_encode($_POST['destinatarios_usuarios']) : null;
-    $destinatarios_colaboradores = !empty($_POST['destinatarios_colaboradores']) ? json_encode($_POST['destinatarios_colaboradores']) : null;
+    
+    // Processa empresas, setores e cargos (múltiplos)
+    $empresas_ids = [];
+    $setores_ids = [];
+    $cargos_ids = [];
+    
+    if (!empty($_POST['empresas_ids'])) {
+        if (is_string($_POST['empresas_ids'])) {
+            $empresas_ids = json_decode($_POST['empresas_ids'], true) ?: [];
+        } elseif (is_array($_POST['empresas_ids'])) {
+            $empresas_ids = $_POST['empresas_ids'];
+        }
+    }
+    
+    if (!empty($_POST['setores_ids'])) {
+        if (is_string($_POST['setores_ids'])) {
+            $setores_ids = json_decode($_POST['setores_ids'], true) ?: [];
+        } elseif (is_array($_POST['setores_ids'])) {
+            $setores_ids = $_POST['setores_ids'];
+        }
+    }
+    
+    if (!empty($_POST['cargos_ids'])) {
+        if (is_string($_POST['cargos_ids'])) {
+            $cargos_ids = json_decode($_POST['cargos_ids'], true) ?: [];
+        } elseif (is_array($_POST['cargos_ids'])) {
+            $cargos_ids = $_POST['cargos_ids'];
+        }
+    }
+    
+    // Para compatibilidade com campos únicos (mantém null se múltiplos)
+    $empresa_id = !empty($empresas_ids) && count($empresas_ids) === 1 ? (int)$empresas_ids[0] : null;
+    $setor_id = !empty($setores_ids) && count($setores_ids) === 1 ? (int)$setores_ids[0] : null;
+    $cargo_id = !empty($cargos_ids) && count($cargos_ids) === 1 ? (int)$cargos_ids[0] : null;
+    
+    // Salva arrays como JSON para uso futuro
+    $empresas_ids_json = !empty($empresas_ids) ? json_encode($empresas_ids) : null;
+    $setores_ids_json = !empty($setores_ids) ? json_encode($setores_ids) : null;
+    $cargos_ids_json = !empty($cargos_ids) ? json_encode($cargos_ids) : null;
+    
+    // Processa destinatários
+    $destinatarios_usuarios_array = [];
+    $destinatarios_colaboradores_array = [];
+    
+    // Se for "atribuir_mim", adiciona o usuário atual
+    if ($publico_alvo === 'atribuir_mim') {
+        $destinatarios_usuarios_array[] = $usuario['id'];
+        $publico_alvo = 'especifico'; // Salva como específico no banco
+    } else {
+        // Processa destinatários enviados
+        if (!empty($_POST['destinatarios_usuarios'])) {
+            if (is_string($_POST['destinatarios_usuarios'])) {
+                $destinatarios_usuarios_array = json_decode($_POST['destinatarios_usuarios'], true) ?: [];
+            } elseif (is_array($_POST['destinatarios_usuarios'])) {
+                $destinatarios_usuarios_array = $_POST['destinatarios_usuarios'];
+            }
+        }
+        
+        if (!empty($_POST['destinatarios_colaboradores'])) {
+            if (is_string($_POST['destinatarios_colaboradores'])) {
+                $destinatarios_colaboradores_array = json_decode($_POST['destinatarios_colaboradores'], true) ?: [];
+            } elseif (is_array($_POST['destinatarios_colaboradores'])) {
+                $destinatarios_colaboradores_array = $_POST['destinatarios_colaboradores'];
+            }
+        }
+    }
+    
+    $destinatarios_usuarios = !empty($destinatarios_usuarios_array) ? json_encode($destinatarios_usuarios_array) : null;
+    $destinatarios_colaboradores = !empty($destinatarios_colaboradores_array) ? json_encode($destinatarios_colaboradores_array) : null;
     
     // Validações
     if (empty($titulo)) {
@@ -100,24 +164,50 @@ try {
     $pdo->beginTransaction();
     
     try {
-        // Insere anotação
-        $stmt = $pdo->prepare("
-            INSERT INTO anotacoes_sistema (
-                usuario_id, titulo, conteudo, tipo, cor, prioridade, categoria, tags,
-                data_vencimento, fixada, notificar_email, notificar_push, data_notificacao,
-                publico_alvo, empresa_id, setor_id, cargo_id,
-                destinatarios_usuarios, destinatarios_colaboradores
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
-        ");
+        // Verifica se campos de múltiplos IDs existem na tabela
+        $stmt_check = $pdo->query("SHOW COLUMNS FROM anotacoes_sistema LIKE 'empresas_ids'");
+        $tem_multiplos = $stmt_check->rowCount() > 0;
         
-        $stmt->execute([
-            $usuario['id'], $titulo, $conteudo, $tipo, $cor, $prioridade, $categoria, $tags,
-            $data_vencimento, $fixada, $notificar_email, $notificar_push, $data_notificacao,
-            $publico_alvo, $empresa_id, $setor_id, $cargo_id,
-            $destinatarios_usuarios, $destinatarios_colaboradores
-        ]);
+        // Insere anotação
+        if ($tem_multiplos) {
+            $stmt = $pdo->prepare("
+                INSERT INTO anotacoes_sistema (
+                    usuario_id, titulo, conteudo, tipo, cor, prioridade, categoria, tags,
+                    data_vencimento, fixada, notificar_email, notificar_push, data_notificacao,
+                    publico_alvo, empresa_id, setor_id, cargo_id,
+                    empresas_ids, setores_ids, cargos_ids,
+                    destinatarios_usuarios, destinatarios_colaboradores
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+            ");
+            
+            $stmt->execute([
+                $usuario['id'], $titulo, $conteudo, $tipo, $cor, $prioridade, $categoria, $tags,
+                $data_vencimento, $fixada, $notificar_email, $notificar_push, $data_notificacao,
+                $publico_alvo, $empresa_id, $setor_id, $cargo_id,
+                $empresas_ids_json, $setores_ids_json, $cargos_ids_json,
+                $destinatarios_usuarios, $destinatarios_colaboradores
+            ]);
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO anotacoes_sistema (
+                    usuario_id, titulo, conteudo, tipo, cor, prioridade, categoria, tags,
+                    data_vencimento, fixada, notificar_email, notificar_push, data_notificacao,
+                    publico_alvo, empresa_id, setor_id, cargo_id,
+                    destinatarios_usuarios, destinatarios_colaboradores
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+            ");
+            
+            $stmt->execute([
+                $usuario['id'], $titulo, $conteudo, $tipo, $cor, $prioridade, $categoria, $tags,
+                $data_vencimento, $fixada, $notificar_email, $notificar_push, $data_notificacao,
+                $publico_alvo, $empresa_id, $setor_id, $cargo_id,
+                $destinatarios_usuarios, $destinatarios_colaboradores
+            ]);
+        }
         
         $anotacao_id = $pdo->lastInsertId();
         

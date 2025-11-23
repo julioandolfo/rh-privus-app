@@ -92,6 +92,25 @@ try {
         $anotacao['destinatarios_colaboradores'] = [];
     }
     
+    // Processa múltiplos IDs se existirem
+    if (isset($anotacao['empresas_ids']) && !empty($anotacao['empresas_ids'])) {
+        $anotacao['empresas_ids'] = json_decode($anotacao['empresas_ids'], true) ?: [];
+    } else {
+        $anotacao['empresas_ids'] = [];
+    }
+    
+    if (isset($anotacao['setores_ids']) && !empty($anotacao['setores_ids'])) {
+        $anotacao['setores_ids'] = json_decode($anotacao['setores_ids'], true) ?: [];
+    } else {
+        $anotacao['setores_ids'] = [];
+    }
+    
+    if (isset($anotacao['cargos_ids']) && !empty($anotacao['cargos_ids'])) {
+        $anotacao['cargos_ids'] = json_decode($anotacao['cargos_ids'], true) ?: [];
+    } else {
+        $anotacao['cargos_ids'] = [];
+    }
+    
     echo json_encode([
         'success' => true,
         'anotacao' => $anotacao

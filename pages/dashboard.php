@@ -163,6 +163,17 @@ if (is_colaborador() && !empty($colaborador_id)) {
     }
 } else {
     // Dashboard Admin/RH/GESTOR - Estatísticas gerais
+    // Inicializa variáveis
+    $setor_id = null;
+    
+    // Busca setor do gestor se necessário
+    if ($usuario['role'] === 'GESTOR') {
+        $stmt_setor = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
+        $stmt_setor->execute([$usuario['id']]);
+        $user_data = $stmt_setor->fetch();
+        $setor_id = $user_data['setor_id'] ?? 0;
+    }
+    
     try {
         // Total de colaboradores
         if ($usuario['role'] === 'ADMIN') {
@@ -171,12 +182,6 @@ if (is_colaborador() && !empty($colaborador_id)) {
             $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE empresa_id = ?");
             $stmt->execute([$usuario['empresa_id']]);
         } elseif ($usuario['role'] === 'GESTOR') {
-            // Busca setor do gestor
-            $stmt = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
-            $stmt->execute([$usuario['id']]);
-            $user_data = $stmt->fetch();
-            $setor_id = $user_data['setor_id'] ?? 0;
-            
             $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE setor_id = ?");
             $stmt->execute([$setor_id]);
         }
@@ -462,6 +467,42 @@ if (is_colaborador() && !empty($colaborador_id)) {
 <!--begin::Toolbar-->
 <div class="toolbar d-flex flex-stack mb-3 mb-lg-5" id="kt_toolbar">
     <div id="kt_toolbar_container" class="container-fluid d-flex flex-stack flex-wrap">
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-light-primary" id="btn_personalizar_dashboard">
+                <i class="ki-duotone ki-setting-3 fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                    <span class="path4"></span>
+                    <span class="path5"></span>
+                </i>
+                Personalizar Dashboard
+            </button>
+            <button type="button" class="btn btn-sm btn-success d-none" id="btn_salvar_dashboard">
+                <i class="ki-duotone ki-check fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Salvar Layout
+            </button>
+            <button type="button" class="btn btn-sm btn-info d-none" id="btn_adicionar_cards">
+                <i class="ki-duotone ki-plus fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Adicionar Cards
+            </button>
+            <button type="button" class="btn btn-sm btn-warning d-none" id="btn_limpar_layout">
+                <i class="ki-duotone ki-trash fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Limpar Layout
+            </button>
+            <button type="button" class="btn btn-sm btn-light d-none" id="btn_cancelar_dashboard">
+                Cancelar
+            </button>
+        </div>
         <div class="page-title d-flex flex-column me-5 py-2">
             <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0">Dashboard</h1>
             <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 pt-1">
@@ -1058,72 +1099,72 @@ if (is_colaborador() && !empty($colaborador_id)) {
         
         <?php if (has_role(['ADMIN', 'RH', 'GESTOR'])): ?>
         <!--begin::Row-->
-        <div class="row g-5 g-xl-8 mb-5">
+        <div class="row g-5 g-xl-8 mb-5" id="row_stats_cards">
             <!--begin::Col-->
-            <div class="col-xl-3">
-                <!--begin::Statistics Widget 5-->
-                <a href="colaboradores.php" class="card bg-primary hoverable card-xl-stretch mb-xl-8">
-                    <div class="card-body">
-                        <i class="ki-duotone ki-profile-circle text-white fs-2tx ms-n1 mb-5">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        <div class="text-white fw-bold fs-2 mb-2 mt-5"><?= $total_colaboradores ?></div>
-                        <div class="fw-semibold text-white opacity-75">Total de Colaboradores</div>
-                    </div>
-                </a>
-                <!--end::Statistics Widget 5-->
+            <div class="col-xl-3" data-card-id="card_total_colaboradores">
+                    <!--begin::Statistics Widget 5-->
+                    <a href="colaboradores.php" class="card bg-primary hoverable card-xl-stretch mb-xl-8">
+                        <div class="card-body">
+                            <i class="ki-duotone ki-profile-circle text-white fs-2tx ms-n1 mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="text-white fw-bold fs-2 mb-2 mt-5"><?= $total_colaboradores ?></div>
+                            <div class="fw-semibold text-white opacity-75">Total de Colaboradores</div>
+                        </div>
+                    </a>
+                    <!--end::Statistics Widget 5-->
             </div>
             <!--end::Col-->
             
             <!--begin::Col-->
-            <div class="col-xl-3">
-                <!--begin::Statistics Widget 5-->
-                <a href="colaboradores.php?status=ativo" class="card bg-success hoverable card-xl-stretch mb-xl-8">
-                    <div class="card-body">
-                        <i class="ki-duotone ki-check-circle text-white fs-2tx ms-n1 mb-5">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        <div class="text-white fw-bold fs-2 mb-2 mt-5"><?= $total_ativos ?></div>
-                        <div class="fw-semibold text-white opacity-75">Colaboradores Ativos</div>
-                    </div>
-                </a>
-                <!--end::Statistics Widget 5-->
+            <div class="col-xl-3" data-card-id="card_colaboradores_ativos">
+                    <!--begin::Statistics Widget 5-->
+                    <a href="colaboradores.php?status=ativo" class="card bg-success hoverable card-xl-stretch mb-xl-8">
+                        <div class="card-body">
+                            <i class="ki-duotone ki-check-circle text-white fs-2tx ms-n1 mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="text-white fw-bold fs-2 mb-2 mt-5"><?= $total_ativos ?></div>
+                            <div class="fw-semibold text-white opacity-75">Colaboradores Ativos</div>
+                        </div>
+                    </a>
+                    <!--end::Statistics Widget 5-->
             </div>
             <!--end::Col-->
             
             <!--begin::Col-->
-            <div class="col-xl-3">
-                <!--begin::Statistics Widget 5-->
-                <a href="ocorrencias_list.php" class="card bg-warning hoverable card-xl-stretch mb-xl-8">
-                    <div class="card-body">
-                        <i class="ki-duotone ki-notepad text-white fs-2tx ms-n1 mb-5">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        <div class="text-white fw-bold fs-2 mb-2 mt-5"><?= $ocorrencias_mes ?></div>
-                        <div class="fw-semibold text-white opacity-75">Ocorrências no Mês</div>
-                    </div>
-                </a>
-                <!--end::Statistics Widget 5-->
+            <div class="col-xl-3" data-card-id="card_ocorrencias_mes">
+                    <!--begin::Statistics Widget 5-->
+                    <a href="ocorrencias_list.php" class="card bg-warning hoverable card-xl-stretch mb-xl-8">
+                        <div class="card-body">
+                            <i class="ki-duotone ki-notepad text-white fs-2tx ms-n1 mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="text-white fw-bold fs-2 mb-2 mt-5"><?= $ocorrencias_mes ?></div>
+                            <div class="fw-semibold text-white opacity-75">Ocorrências no Mês</div>
+                        </div>
+                    </a>
+                    <!--end::Statistics Widget 5-->
             </div>
             <!--end::Col-->
             
             <!--begin::Col-->
-            <div class="col-xl-3">
-                <!--begin::Statistics Widget 5-->
-                <a href="colaboradores.php?status=inativo" class="card bg-danger hoverable card-xl-stretch mb-xl-8">
-                    <div class="card-body">
-                        <i class="ki-duotone ki-cross-circle text-white fs-2tx ms-n1 mb-5">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        <div class="text-white fw-bold fs-2 mb-2 mt-5"><?= $total_colaboradores - $total_ativos ?></div>
-                        <div class="fw-semibold text-white opacity-75">Inativos</div>
-                    </div>
-                </a>
-                <!--end::Statistics Widget 5-->
+            <div class="col-xl-3" data-card-id="card_colaboradores_inativos">
+                    <!--begin::Statistics Widget 5-->
+                    <a href="colaboradores.php?status=inativo" class="card bg-danger hoverable card-xl-stretch mb-xl-8">
+                        <div class="card-body">
+                            <i class="ki-duotone ki-cross-circle text-white fs-2tx ms-n1 mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="text-white fw-bold fs-2 mb-2 mt-5"><?= $total_colaboradores - $total_ativos ?></div>
+                            <div class="fw-semibold text-white opacity-75">Inativos</div>
+                        </div>
+                    </a>
+                    <!--end::Statistics Widget 5-->
             </div>
             <!--end::Col-->
         </div>
@@ -1584,7 +1625,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         <!--begin::Row-->
         <div class="row g-5 g-xl-8 mb-5">
             <!--begin::Col-->
-            <div class="col-xl-8">
+            <div class="col-xl-8" data-card-id="card_grafico_ocorrencias_mes">
                 <!--begin::Charts Widget 1-->
                 <div class="card card-xl-stretch mb-xl-8">
                     <!--begin::Header-->
@@ -1606,7 +1647,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
             <!--end::Col-->
             
             <!--begin::Col-->
-            <div class="col-xl-4">
+            <div class="col-xl-4" data-card-id="card_grafico_colaboradores_status">
                 <!--begin::Charts Widget 2-->
                 <div class="card card-xl-stretch mb-xl-8">
                     <!--begin::Header-->
@@ -1631,7 +1672,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         <!--begin::Row-->
         <div class="row g-5 g-xl-8 mb-5">
             <!--begin::Col-->
-            <div class="col-xl-12">
+            <div class="col-xl-12" data-card-id="card_grafico_ocorrencias_tipo">
                 <!--begin::Charts Widget 3-->
                 <div class="card card-xl-stretch mb-xl-8">
                     <!--begin::Header-->
@@ -1658,7 +1699,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         <div class="row g-5 g-xl-8 mb-5">
             <!--begin::Col - Ranking de Ocorrências -->
             <?php if (!empty($ranking)): ?>
-            <div class="col-xl-6">
+            <div class="col-xl-6" data-card-id="card_ranking_ocorrencias">
                 <!--begin::Tables Widget 9-->
                 <div class="card card-xl-stretch mb-5 mb-xl-8">
                     <!--begin::Header-->
@@ -1741,7 +1782,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
             
             <!--begin::Col - Próximos Aniversários -->
             <?php if (!empty($proximos_aniversarios)): ?>
-            <div class="col-xl-6">
+            <div class="col-xl-6" data-card-id="card_proximos_aniversarios">
                 <!--begin::Tables Widget 10-->
                 <div class="card card-xl-stretch mb-5 mb-xl-8">
                     <!--begin::Header-->
@@ -1832,7 +1873,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         <?php if (has_role(['ADMIN', 'RH', 'GESTOR'])): ?>
         <div class="row g-5 g-xl-8 mb-5">
             <!--begin::Col - Anotações -->
-            <div class="col-xl-6">
+            <div class="col-xl-6" data-card-id="card_anotacoes">
                 <div class="card card-xl-stretch mb-5 mb-xl-8">
                     <div class="card-header border-0 pt-5">
                         <h3 class="card-title align-items-start flex-column">
@@ -1886,7 +1927,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
             <!--end::Col-->
             
             <!--begin::Col - Histórico de Cargos/Salários -->
-            <div class="col-xl-6">
+            <div class="col-xl-6" data-card-id="card_historico_promocoes">
                 <div class="card card-xl-stretch mb-5 mb-xl-8">
                     <div class="card-header border-0 pt-5">
                         <h3 class="card-title align-items-start flex-column">
@@ -2001,6 +2042,996 @@ if (is_colaborador() && !empty($colaborador_id)) {
     </div>
 </div>
 <!--end::Post-->
+
+<!--begin::Modal Adicionar Cards-->
+<div class="modal fade" id="modal_adicionar_cards" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Adicionar Cards ao Dashboard</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="mb-5">
+                    <input type="text" class="form-control form-control-solid" id="buscar_cards" placeholder="Buscar cards...">
+                </div>
+                <div class="row g-3" id="lista_cards_disponiveis">
+                    <!-- Será preenchido via JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal Adicionar Cards-->
+
+<!--begin::Dashboard Personalization Scripts-->
+<link href="https://cdn.jsdelivr.net/npm/gridstack@9.0.0/dist/gridstack.min.css" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/gridstack@9.0.0/dist/gridstack-all.js"></script>
+<style>
+.grid-stack {
+    min-height: 100vh;
+    padding: 10px 0;
+}
+.grid-stack-item {
+    cursor: move !important;
+    padding: 5px !important;
+}
+.grid-stack-item.ui-draggable-disabled {
+    cursor: default !important;
+}
+.grid-stack-item-content {
+    overflow: visible !important;
+    height: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+.dashboard-edit-mode .grid-stack-item {
+    border: 2px dashed #0d6efd !important;
+    border-radius: 8px !important;
+    background: rgba(13, 110, 253, 0.05) !important;
+}
+.dashboard-edit-mode .grid-stack-item:hover {
+    border-color: #0a58ca !important;
+    box-shadow: 0 0 15px rgba(13, 110, 253, 0.4) !important;
+    background: rgba(13, 110, 253, 0.1) !important;
+}
+.grid-stack-item.ui-resizable-resizing {
+    opacity: 0.9;
+    z-index: 1000 !important;
+}
+.grid-stack-item.ui-draggable-dragging {
+    opacity: 0.9;
+    z-index: 1000 !important;
+    transform: rotate(2deg);
+}
+/* Remove padding/margin que pode interferir */
+.grid-stack > .row {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+.grid-stack-item .col-xl-3,
+.grid-stack-item .col-xl-4,
+.grid-stack-item .col-xl-6,
+.grid-stack-item .col-xl-8,
+.grid-stack-item .col-xl-12 {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+/* Garante que os cards dentro do grid item ocupem 100% */
+.grid-stack-item-content > .card {
+    height: 100% !important;
+    margin-bottom: 0 !important;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let grid = null;
+    let editMode = false;
+    let originalConfig = null;
+    let cardsDisponiveis = [];
+    let cardsAdicionados = new Set();
+    
+    // Define cards disponíveis
+    function definirCardsDisponiveis() {
+        cardsDisponiveis = [
+            { id: 'card_total_colaboradores', nome: 'Total de Colaboradores', descricao: 'Mostra o total de colaboradores', icone: 'ki-profile-circle', w: 3, h: 3 },
+            { id: 'card_colaboradores_ativos', nome: 'Colaboradores Ativos', descricao: 'Mostra colaboradores ativos', icone: 'ki-check-circle', w: 3, h: 3 },
+            { id: 'card_ocorrencias_mes', nome: 'Ocorrências no Mês', descricao: 'Ocorrências registradas no mês', icone: 'ki-notepad', w: 3, h: 3 },
+            { id: 'card_colaboradores_inativos', nome: 'Colaboradores Inativos', descricao: 'Mostra colaboradores inativos', icone: 'ki-cross-circle', w: 3, h: 3 },
+            { id: 'card_proximos_aniversarios', nome: 'Próximos Aniversários', descricao: 'Aniversários dos próximos 30 dias', icone: 'ki-cake', w: 6, h: 5 },
+            { id: 'card_ranking_ocorrencias', nome: 'Ranking de Ocorrências', descricao: 'Ranking de colaboradores por ocorrências', icone: 'ki-chart-simple', w: 6, h: 5 },
+            { id: 'card_grafico_ocorrencias_mes', nome: 'Gráfico de Ocorrências', descricao: 'Gráfico de ocorrências por mês', icone: 'ki-chart', w: 8, h: 4 },
+            { id: 'card_grafico_colaboradores_status', nome: 'Colaboradores por Status', descricao: 'Gráfico de colaboradores por status', icone: 'ki-chart-pie', w: 4, h: 4 },
+            { id: 'card_grafico_ocorrencias_tipo', nome: 'Ocorrências por Tipo', descricao: 'Gráfico de ocorrências por tipo', icone: 'ki-chart-bar', w: 12, h: 4 },
+            { id: 'card_anotacoes', nome: 'Anotações', descricao: 'Anotações do sistema', icone: 'ki-note-edit', w: 6, h: 6 },
+            { id: 'card_historico_promocoes', nome: 'Histórico de Promoções', descricao: 'Últimas promoções registradas', icone: 'ki-upgrade', w: 6, h: 6 }
+        ];
+    }
+    
+    // Gera layout padrão baseado nos cards disponíveis
+    function gerarLayoutPadrao() {
+        const layout = [];
+        let currentX = 0;
+        let currentY = 0;
+        let maxHeightInRow = 0;
+        
+        // Primeira linha: cards de estatísticas (3x3 cada)
+        const cardsStats = [
+            { id: 'card_total_colaboradores', w: 3, h: 3 },
+            { id: 'card_colaboradores_ativos', w: 3, h: 3 },
+            { id: 'card_ocorrencias_mes', w: 3, h: 3 },
+            { id: 'card_colaboradores_inativos', w: 3, h: 3 }
+        ];
+        
+        cardsStats.forEach(card => {
+            layout.push({
+                id: card.id,
+                x: currentX,
+                y: currentY,
+                w: card.w,
+                h: card.h,
+                visible: true
+            });
+            currentX += card.w;
+            maxHeightInRow = Math.max(maxHeightInRow, card.h);
+        });
+        
+        // Segunda linha: gráficos
+        currentX = 0;
+        currentY += maxHeightInRow + 1;
+        maxHeightInRow = 0;
+        
+        const cardsGraficos = [
+            { id: 'card_grafico_ocorrencias_mes', w: 8, h: 4 },
+            { id: 'card_grafico_colaboradores_status', w: 4, h: 4 }
+        ];
+        
+        cardsGraficos.forEach(card => {
+            layout.push({
+                id: card.id,
+                x: currentX,
+                y: currentY,
+                w: card.w,
+                h: card.h,
+                visible: true
+            });
+            currentX += card.w;
+            maxHeightInRow = Math.max(maxHeightInRow, card.h);
+        });
+        
+        // Terceira linha: gráfico de tipos (largura total)
+        currentX = 0;
+        currentY += maxHeightInRow + 1;
+        maxHeightInRow = 0;
+        
+        layout.push({
+            id: 'card_grafico_ocorrencias_tipo',
+            x: currentX,
+            y: currentY,
+            w: 12,
+            h: 4,
+            visible: true
+        });
+        currentY += 4 + 1;
+        
+        // Quarta linha: ranking e aniversários lado a lado
+        currentX = 0;
+        maxHeightInRow = 0;
+        
+        const cardsInfo = [
+            { id: 'card_ranking_ocorrencias', w: 6, h: 5 },
+            { id: 'card_proximos_aniversarios', w: 6, h: 5 }
+        ];
+        
+        cardsInfo.forEach(card => {
+            layout.push({
+                id: card.id,
+                x: currentX,
+                y: currentY,
+                w: card.w,
+                h: card.h,
+                visible: true
+            });
+            currentX += card.w;
+            maxHeightInRow = Math.max(maxHeightInRow, card.h);
+        });
+        
+        // Quinta linha: anotações e histórico
+        currentX = 0;
+        currentY += maxHeightInRow + 1;
+        
+        const cardsFinais = [
+            { id: 'card_anotacoes', w: 6, h: 6 },
+            { id: 'card_historico_promocoes', w: 6, h: 6 }
+        ];
+        
+        cardsFinais.forEach(card => {
+            layout.push({
+                id: card.id,
+                x: currentX,
+                y: currentY,
+                w: card.w,
+                h: card.h,
+                visible: true
+            });
+            currentX += card.w;
+        });
+        
+        return layout;
+    }
+    
+    // Carrega configuração salva
+    function carregarConfiguracao() {
+        return fetch('../api/dashboard/carregar_config.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.cards && data.cards.length > 0) {
+                    // Atualiza cards adicionados
+                    data.cards.forEach(card => {
+                        if (card.visible !== false) {
+                            cardsAdicionados.add(card.id);
+                        }
+                    });
+                    // Retorna no formato esperado pelo GridStack
+                    return data.cards.map(card => ({
+                        id: card.id,
+                        x: card.x || 0,
+                        y: card.y || 0,
+                        w: card.w || 3,
+                        h: card.h || 3,
+                        content: '', // GridStack precisa disso
+                        noResize: false,
+                        noMove: false
+                    }));
+                }
+                return null;
+            })
+            .catch(error => {
+                console.error('Erro ao carregar configuração:', error);
+                return null;
+            });
+    }
+    
+    // Salva configuração
+    function salvarConfiguracao() {
+        if (!grid) {
+            return Promise.reject(new Error('Grid não inicializado'));
+        }
+        
+        try {
+            const items = grid.save();
+            
+            // Filtra apenas items válidos que existem no DOM
+            const cards = items
+                .filter(item => {
+                    // Verifica se o elemento ainda existe no DOM
+                    const el = document.querySelector(`[data-gs-id="${item.id}"]`);
+                    return el !== null && item.id;
+                })
+                .map((item, index) => ({
+                    id: item.id,
+                    x: parseInt(item.x) || 0,
+                    y: parseInt(item.y) || 0,
+                    w: parseInt(item.w) || 3,
+                    h: parseInt(item.h) || 3,
+                    visible: true
+                }));
+            
+            if (cards.length === 0) {
+                throw new Error('Nenhum card válido para salvar');
+            }
+            
+            return fetch('../api/dashboard/salvar_config.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ cards: cards })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'Erro ao salvar configuração');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        text: 'Layout salvo com sucesso!',
+                        icon: 'success',
+                        buttonsStyling: false,
+                        confirmButtonText: 'Ok',
+                        customClass: {
+                            confirmButton: 'btn btn-primary'
+                        }
+                    });
+                    // Atualiza cards adicionados
+                    cardsAdicionados.clear();
+                    cards.forEach(card => cardsAdicionados.add(card.id));
+                    return true;
+                } else {
+                    throw new Error(data.message || 'Erro ao salvar');
+                }
+            });
+        } catch (error) {
+            console.error('Erro ao salvar configuração:', error);
+            return Promise.reject(error);
+        }
+    }
+    
+    // Limpa o layout (remove todos os cards)
+    function limparLayout() {
+        Swal.fire({
+            text: 'Tem certeza que deseja limpar todo o layout? Todos os cards serão removidos.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sim, limpar',
+            cancelButtonText: 'Cancelar',
+            buttonsStyling: false,
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-light'
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (grid) {
+                    // Remove todos os items do grid
+                    const items = grid.save();
+                    items.forEach(item => {
+                        try {
+                            grid.removeWidget(item.el, true); // true = remove do DOM
+                        } catch (e) {
+                            console.warn('Erro ao remover widget:', e);
+                            // Força remoção do DOM se grid.removeWidget falhar
+                            if (item.el && item.el.parentNode) {
+                                item.el.remove();
+                            }
+                        }
+                    });
+                    
+                    // Remove também qualquer card que possa ter ficado no container
+                    const container = document.getElementById('kt_content_container');
+                    if (container) {
+                        const remainingItems = container.querySelectorAll('.grid-stack-item');
+                        remainingItems.forEach(item => {
+                            item.remove();
+                        });
+                    }
+                    
+                    cardsAdicionados.clear();
+                    
+                    // Limpa configuração no servidor também
+                    fetch('../api/dashboard/salvar_config.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ cards: [] })
+                    }).catch(err => console.error('Erro ao limpar configuração no servidor:', err));
+                    
+                    Swal.fire({
+                        text: 'Layout limpo! Adicione cards usando o botão "Adicionar Cards".',
+                        icon: 'success',
+                        buttonsStyling: false,
+                        confirmButtonText: 'Ok',
+                        customClass: {
+                            confirmButton: 'btn btn-primary'
+                        }
+                    });
+                } else {
+                    Swal.fire({
+                        text: 'Grid não inicializado',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'Ok',
+                        customClass: {
+                            confirmButton: 'btn btn-primary'
+                        }
+                    });
+                }
+            }
+        });
+    }
+    
+    // Adiciona um card ao dashboard
+    function adicionarCardAoDashboard(cardInfo) {
+        if (!grid) {
+            console.error('Grid não inicializado');
+            return;
+        }
+        
+        // Verifica se o card já existe
+        const existingItems = grid.save();
+        const jaExiste = existingItems.some(item => item.id === cardInfo.id);
+        
+        if (jaExiste) {
+            Swal.fire({
+                text: 'Este card já está no dashboard!',
+                icon: 'info',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok',
+                customClass: {
+                    confirmButton: 'btn btn-primary'
+                }
+            });
+            return;
+        }
+        
+        // Encontra o card original no DOM para clonar
+        // Primeiro tenta encontrar por data-card-id (no HTML original)
+        let cardOriginal = document.querySelector(`[data-card-id="${cardInfo.id}"]`);
+        
+        // Se não encontrou, tenta encontrar por data-gs-id (já convertido)
+        if (!cardOriginal) {
+            cardOriginal = document.querySelector(`[data-gs-id="${cardInfo.id}"]`);
+        }
+        
+        let novoCard;
+        if (cardOriginal) {
+            // Clona o card original
+            novoCard = cardOriginal.cloneNode(true);
+            
+            // Remove atributos do GridStack se existirem
+            novoCard.removeAttribute('data-gs-x');
+            novoCard.removeAttribute('data-gs-y');
+            novoCard.removeAttribute('data-gs-w');
+            novoCard.removeAttribute('data-gs-h');
+            
+            // Remove classes que podem interferir
+            novoCard.classList.remove('grid-stack-item');
+            novoCard.classList.remove('col-xl-3', 'col-xl-4', 'col-xl-6', 'col-xl-8', 'col-xl-12');
+            
+            // Garante que tem o wrapper grid-stack-item-content
+            if (!novoCard.querySelector('.grid-stack-item-content')) {
+                const content = document.createElement('div');
+                content.className = 'grid-stack-item-content';
+                content.style.width = '100%';
+                content.style.height = '100%';
+                while (novoCard.firstChild) {
+                    content.appendChild(novoCard.firstChild);
+                }
+                novoCard.appendChild(content);
+            }
+        } else {
+            // Cria um card placeholder se não encontrar o original
+            novoCard = document.createElement('div');
+            novoCard.className = 'grid-stack-item';
+            novoCard.innerHTML = `
+                <div class="grid-stack-item-content">
+                    <div class="card card-xl-stretch">
+                        <div class="card-body text-center py-10">
+                            <i class="ki-duotone ${cardInfo.icone} fs-2tx text-primary mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <h5 class="fw-bold">${cardInfo.nome}</h5>
+                            <p class="text-muted">${cardInfo.descricao}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        novoCard.classList.add('grid-stack-item');
+        novoCard.setAttribute('data-gs-id', cardInfo.id);
+        novoCard.style.padding = '0';
+        novoCard.style.margin = '0';
+        
+        // Encontra posição vazia
+        const items = grid.save();
+        let posX = 0;
+        let posY = 0;
+        let encontrouPosicao = false;
+        
+        // Tenta encontrar uma posição vazia
+        for (let y = 0; y < 20 && !encontrouPosicao; y++) {
+            for (let x = 0; x <= 12 - cardInfo.w && !encontrouPosicao; x++) {
+                const ocupado = items.some(item => {
+                    const itemX = item.x || 0;
+                    const itemY = item.y || 0;
+                    const itemW = item.w || 3;
+                    const itemH = item.h || 3;
+                    
+                    return !(x + cardInfo.w <= itemX || x >= itemX + itemW || 
+                            y + cardInfo.h <= itemY || y >= itemY + itemH);
+                });
+                
+                if (!ocupado) {
+                    posX = x;
+                    posY = y;
+                    encontrouPosicao = true;
+                }
+            }
+        }
+        
+        // Adiciona o card ao grid
+        grid.addWidget(novoCard, {
+            x: posX,
+            y: posY,
+            w: cardInfo.w,
+            h: cardInfo.h
+        });
+        
+        cardsAdicionados.add(cardInfo.id);
+        
+        // Fecha o modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modal_adicionar_cards'));
+        if (modal) modal.hide();
+        
+        // Atualiza lista de cards disponíveis
+        setTimeout(() => {
+            carregarListaCardsDisponiveis();
+        }, 300);
+    }
+    
+    // Carrega lista de cards disponíveis no modal
+    function carregarListaCardsDisponiveis() {
+        const container = document.getElementById('lista_cards_disponiveis');
+        if (!container) return;
+        
+        const filtro = document.getElementById('buscar_cards')?.value.toLowerCase() || '';
+        const cardsFiltrados = cardsDisponiveis.filter(card => 
+            card.nome.toLowerCase().includes(filtro) || 
+            card.descricao.toLowerCase().includes(filtro)
+        );
+        
+        container.innerHTML = '';
+        
+        if (cardsFiltrados.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-5">Nenhum card encontrado</div>';
+            return;
+        }
+        
+        cardsFiltrados.forEach(card => {
+            const jaAdicionado = cardsAdicionados.has(card.id);
+            const cardHtml = `
+                <div class="col-md-6 col-lg-4">
+                    <div class="card card-hoverable ${jaAdicionado ? 'border-success' : ''}" style="cursor: pointer;" data-card-info='${JSON.stringify(card)}'>
+                        <div class="card-body text-center p-5">
+                            <i class="ki-duotone ${card.icone} fs-2tx text-primary mb-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <h5 class="fw-bold mb-2">${card.nome}</h5>
+                            <p class="text-muted small mb-3">${card.descricao}</p>
+                            ${jaAdicionado ? '<span class="badge badge-success">Já adicionado</span>' : '<span class="badge badge-primary">Clique para adicionar</span>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', cardHtml);
+        });
+        
+        // Adiciona event listeners
+        container.querySelectorAll('[data-card-info]').forEach(element => {
+            element.addEventListener('click', function() {
+                const cardInfo = JSON.parse(this.getAttribute('data-card-info'));
+                if (!cardsAdicionados.has(cardInfo.id)) {
+                    adicionarCardAoDashboard(cardInfo);
+                }
+            });
+        });
+    }
+    
+    // Converte cards existentes para GridStack items
+    function converterCardsParaGrid(configuracao = null) {
+        const container = document.getElementById('kt_content_container');
+        if (!container) return [];
+        
+        // Adiciona classe grid-stack ao container se não tiver
+        if (!container.classList.contains('grid-stack')) {
+            container.classList.add('grid-stack');
+        }
+        
+        // Se não há configuração, usa layout padrão
+        let layoutParaUsar = configuracao;
+        if (!layoutParaUsar || layoutParaUsar.length === 0) {
+            layoutParaUsar = gerarLayoutPadrao();
+        }
+        
+        // Cria mapa de configuração
+        const configMap = {};
+        if (layoutParaUsar && Array.isArray(layoutParaUsar)) {
+            layoutParaUsar.forEach(cfg => {
+                if (cfg.id) {
+                    configMap[cfg.id] = cfg;
+                }
+            });
+        }
+        
+        // Encontra todos os cards principais (col-xl-* dentro de rows)
+        const rows = container.querySelectorAll('.row');
+        let globalIndex = 0;
+        const cardsProcessados = [];
+        
+        rows.forEach(row => {
+            const cards = row.querySelectorAll(':scope > .col-xl-3, :scope > .col-xl-4, :scope > .col-xl-6, :scope > .col-xl-8, :scope > .col-xl-12');
+            
+            cards.forEach((card, index) => {
+                // Verifica se já é um grid item
+                if (card.classList.contains('grid-stack-item')) return;
+                
+                // Salva classes originais antes de remover
+                const originalClasses = card.className;
+                
+                // Remove classes Bootstrap que podem interferir
+                card.classList.remove('col-xl-3', 'col-xl-4', 'col-xl-6', 'col-xl-8', 'col-xl-12', 'col-md-3', 'col-md-4', 'col-md-6', 'col-md-8', 'col-md-12');
+                
+                // Remove padding/margin do Bootstrap
+                card.style.padding = '0';
+                card.style.margin = '0';
+                
+                // Cria ID único se não tiver
+                let cardId = card.getAttribute('data-gs-id') || card.getAttribute('data-card-id');
+                if (!cardId) {
+                    // Tenta encontrar um link ou título para identificar
+                    const link = card.querySelector('a[href]');
+                    const title = card.querySelector('.card-label, h3, h4, h5');
+                    if (link) {
+                        const href = link.getAttribute('href');
+                        cardId = 'card_' + href.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                    } else if (title) {
+                        cardId = 'card_' + title.textContent.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 50);
+                    } else {
+                        cardId = 'card_' + globalIndex;
+                    }
+                }
+                
+                // Verifica se há configuração para este card
+                const configCard = configMap[cardId];
+                
+                // Se há configuração e o card não está visível, oculta
+                if (configCard && configCard.visible === false) {
+                    card.style.display = 'none';
+                    return; // Não processa cards invisíveis
+                }
+                
+                // Calcula tamanho e posição baseado na configuração ou layout padrão
+                let width = 3;
+                let height = 5;
+                let posX = 0;
+                let posY = 0;
+                
+                if (configCard) {
+                    // Usa configuração (salva ou padrão)
+                    width = parseInt(configCard.w) || 3;
+                    height = parseInt(configCard.h) || 5;
+                    posX = parseInt(configCard.x) || 0;
+                    posY = parseInt(configCard.y) || 0;
+                } else {
+                    // Fallback: calcula baseado na classe original
+                    if (originalClasses.includes('col-xl-12')) width = 12;
+                    else if (originalClasses.includes('col-xl-8')) width = 8;
+                    else if (originalClasses.includes('col-xl-6')) width = 6;
+                    else if (originalClasses.includes('col-xl-4')) width = 4;
+                    else if (originalClasses.includes('col-xl-3')) width = 3;
+                    
+                    // Calcula altura baseada no conteúdo
+                    const cardElement = card.querySelector('.card');
+                    if (cardElement) {
+                        const tempHeight = cardElement.offsetHeight || cardElement.scrollHeight || 350;
+                        height = Math.max(5, Math.ceil(tempHeight / 70));
+                    }
+                }
+                
+                // Adiciona classes e atributos do GridStack
+                card.classList.add('grid-stack-item');
+                card.setAttribute('data-gs-id', cardId);
+                card.setAttribute('data-gs-x', posX);
+                card.setAttribute('data-gs-y', posY);
+                card.setAttribute('data-gs-w', width);
+                card.setAttribute('data-gs-h', height);
+                
+                // Envolve o conteúdo se necessário
+                if (!card.querySelector('.grid-stack-item-content')) {
+                    const content = document.createElement('div');
+                    content.className = 'grid-stack-item-content';
+                    content.style.width = '100%';
+                    content.style.height = '100%';
+                    while (card.firstChild) {
+                        content.appendChild(card.firstChild);
+                    }
+                    card.appendChild(content);
+                }
+                
+                // Move o card para fora da row e diretamente no container
+                container.appendChild(card);
+                cardsProcessados.push({ id: cardId, element: card });
+                
+                globalIndex++;
+            });
+            
+            // Remove row vazia após processar todos os cards
+            setTimeout(() => {
+                if (row.querySelectorAll(':scope > .col-xl-3, :scope > .col-xl-4, :scope > .col-xl-6, :scope > .col-xl-8, :scope > .col-xl-12').length === 0) {
+                    row.remove();
+                }
+            }, 100);
+        });
+        
+        console.log('Conversão concluída:', cardsProcessados.length, 'cards convertidos');
+        return cardsProcessados;
+    }
+    
+    // Inicializa GridStack
+    function inicializarGrid(configuracao) {
+        const container = document.getElementById('kt_content_container');
+        if (!container) {
+            console.error('Container kt_content_container não encontrado');
+            return;
+        }
+        
+        // Converte cards para grid items primeiro (passa configuração para aplicar posições)
+        const cardsProcessados = converterCardsParaGrid(configuracao);
+        
+        // Aguarda um pouco para garantir que a conversão foi feita
+        setTimeout(() => {
+            // Remove grid anterior se existir
+            if (grid) {
+                try {
+                    grid.destroy(false);
+                } catch (e) {
+                    console.warn('Erro ao destruir grid anterior:', e);
+                }
+                grid = null;
+            }
+            
+            // Verifica se há grid items
+            const gridItems = container.querySelectorAll('.grid-stack-item');
+            if (gridItems.length === 0) {
+                console.warn('Nenhum grid item encontrado');
+                return;
+            }
+            
+            console.log('Inicializando GridStack com', gridItems.length, 'itens');
+            
+            // Adiciona classe grid-stack ao container
+            container.classList.add('grid-stack');
+            
+            // Inicializa GridStack
+            grid = GridStack.init({
+                column: 12,
+                cellHeight: 70,
+                margin: 15,
+                disableResize: !editMode,
+                disableDrag: !editMode,
+                animate: true,
+                float: false,
+                resizable: {
+                    handles: 'e, se, s, sw, w'
+                },
+                draggable: {
+                    handle: '.grid-stack-item',
+                    appendTo: 'body',
+                    scroll: false
+                },
+                minRow: 1
+            }, container);
+            
+            // Aplica configuração se existir, senão usa layout padrão
+            setTimeout(() => {
+                if (configuracao && configuracao.length > 0) {
+                    console.log('Carregando configuração salva:', configuracao);
+                    try {
+                        // GridStack precisa que os elementos já tenham os atributos data-gs-*
+                        // A conversão já fez isso, então apenas força atualização
+                        grid.load(configuracao, false); // false = não remove items não na lista
+                    } catch (e) {
+                        console.error('Erro ao carregar configuração:', e);
+                        // Se falhar, tenta usar layout padrão
+                        setTimeout(() => aplicarLayoutPadrao(), 200);
+                    }
+                } else {
+                    // Se não tem configuração, aplica layout padrão
+                    console.log('Aplicando layout padrão');
+                    aplicarLayoutPadrao();
+                }
+            }, 300);
+            
+            // Força habilitação se estiver em modo de edição
+            if (editMode && grid) {
+                setTimeout(() => {
+                    try {
+                        grid.enable();
+                        console.log('GridStack habilitado para edição');
+                    } catch (e) {
+                        console.error('Erro ao habilitar grid:', e);
+                    }
+                }, 300);
+            }
+        }, 200);
+    }
+    
+    // Aplica layout padrão aos cards existentes
+    function aplicarLayoutPadrao() {
+        if (!grid) {
+            console.warn('Grid não inicializado, não é possível aplicar layout padrão');
+            return;
+        }
+        
+        const layoutPadrao = gerarLayoutPadrao();
+        const items = grid.save();
+        const itemsMap = {};
+        
+        // Cria mapa dos items existentes
+        items.forEach(item => {
+            if (item.id && item.el) {
+                itemsMap[item.id] = item;
+            }
+        });
+        
+        // Aplica layout padrão apenas aos cards que existem
+        const layoutAplicar = layoutPadrao.filter(card => itemsMap[card.id]);
+        
+        if (layoutAplicar.length > 0) {
+            console.log('Aplicando layout padrão a', layoutAplicar.length, 'cards');
+            
+            // Usa grid.load para aplicar todas as posições de uma vez
+            try {
+                grid.load(layoutAplicar.map(card => ({
+                    id: card.id,
+                    x: card.x,
+                    y: card.y,
+                    w: card.w,
+                    h: card.h
+                })), false);
+            } catch (e) {
+                console.error('Erro ao aplicar layout padrão via grid.load:', e);
+                // Fallback: atualiza um por um
+                layoutAplicar.forEach(card => {
+                    const item = itemsMap[card.id];
+                    if (item && item.el) {
+                        try {
+                            grid.update(item.el, {
+                                x: card.x,
+                                y: card.y,
+                                w: card.w,
+                                h: card.h
+                            });
+                        } catch (err) {
+                            console.warn('Erro ao aplicar layout padrão ao card', card.id, err);
+                        }
+                    }
+                });
+            }
+        } else {
+            console.warn('Nenhum card encontrado para aplicar layout padrão');
+        }
+    }
+    
+    // Entra no modo de edição
+    function entrarModoEdicao() {
+        editMode = true;
+        document.body.classList.add('dashboard-edit-mode');
+        document.getElementById('btn_personalizar_dashboard').classList.add('d-none');
+        document.getElementById('btn_salvar_dashboard').classList.remove('d-none');
+        document.getElementById('btn_adicionar_cards').classList.remove('d-none');
+        document.getElementById('btn_limpar_layout').classList.remove('d-none');
+        document.getElementById('btn_cancelar_dashboard').classList.remove('d-none');
+        
+        // Aguarda um pouco para garantir que o DOM está pronto
+        setTimeout(() => {
+            if (grid) {
+                console.log('Habilitando grid existente');
+                grid.enable();
+            } else {
+                console.log('Inicializando novo grid');
+                carregarConfiguracao().then(config => {
+                    // Se não há configuração, usa layout padrão
+                    if (!config || config.length === 0) {
+                        inicializarGrid(null); // null força uso do layout padrão
+                    } else {
+                        inicializarGrid(config);
+                    }
+                });
+            }
+        }, 200);
+    }
+    
+    // Sai do modo de edição
+    function sairModoEdicao(salvar = false) {
+        if (salvar && grid) {
+            salvarConfiguracao().then(() => {
+                editMode = false;
+                document.body.classList.remove('dashboard-edit-mode');
+                document.getElementById('btn_personalizar_dashboard').classList.remove('d-none');
+                document.getElementById('btn_salvar_dashboard').classList.add('d-none');
+                document.getElementById('btn_adicionar_cards').classList.add('d-none');
+                document.getElementById('btn_limpar_layout').classList.add('d-none');
+                document.getElementById('btn_cancelar_dashboard').classList.add('d-none');
+                
+                if (grid) {
+                    grid.disable();
+                }
+            }).catch(() => {
+                Swal.fire({
+                    text: 'Erro ao salvar configuração',
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+            });
+        } else {
+        editMode = false;
+        document.body.classList.remove('dashboard-edit-mode');
+        document.getElementById('btn_personalizar_dashboard').classList.remove('d-none');
+        document.getElementById('btn_salvar_dashboard').classList.add('d-none');
+        document.getElementById('btn_adicionar_cards').classList.add('d-none');
+        document.getElementById('btn_limpar_layout').classList.add('d-none');
+        document.getElementById('btn_cancelar_dashboard').classList.add('d-none');
+            
+            if (grid) {
+                grid.disable();
+                // Restaura configuração original se cancelou
+                if (originalConfig) {
+                    grid.load(originalConfig);
+                }
+            }
+        }
+    }
+    
+    // Event listeners
+    document.getElementById('btn_personalizar_dashboard')?.addEventListener('click', function() {
+        definirCardsDisponiveis();
+        carregarConfiguracao().then(config => {
+            originalConfig = config;
+            entrarModoEdicao();
+        });
+    });
+    
+    document.getElementById('btn_salvar_dashboard')?.addEventListener('click', function() {
+        sairModoEdicao(true);
+    });
+    
+    document.getElementById('btn_cancelar_dashboard')?.addEventListener('click', function() {
+        sairModoEdicao(false);
+    });
+    
+    document.getElementById('btn_limpar_layout')?.addEventListener('click', function() {
+        limparLayout();
+    });
+    
+    document.getElementById('btn_adicionar_cards')?.addEventListener('click', function() {
+        definirCardsDisponiveis();
+        carregarListaCardsDisponiveis();
+        const modal = new bootstrap.Modal(document.getElementById('modal_adicionar_cards'));
+        modal.show();
+    });
+    
+    // Busca de cards no modal
+    document.getElementById('buscar_cards')?.addEventListener('input', function() {
+        carregarListaCardsDisponiveis();
+    });
+    
+    // Atualiza lista quando modal é aberto
+    document.getElementById('modal_adicionar_cards')?.addEventListener('shown.bs.modal', function() {
+        definirCardsDisponiveis();
+        carregarListaCardsDisponiveis();
+    });
+    
+    // Inicializa cards disponíveis
+    definirCardsDisponiveis();
+    
+    // Carrega configuração ao iniciar (sem modo de edição)
+    // Não inicializa grid automaticamente - só quando entrar em modo de edição
+    // Isso mantém o layout Bootstrap normal quando não está editando
+});
+</script>
+<!--end::Dashboard Personalization Scripts-->
 
 <!--begin::Chart Scripts-->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -2390,6 +3421,7 @@ input[type="radio"]:checked + .emocao-option {
                     <div class="mb-5">
                         <label class="form-label">Público Alvo</label>
                         <select name="publico_alvo" id="publico_alvo_anotacao" class="form-select form-select-solid">
+                            <option value="atribuir_mim" selected>Atribuir a Mim</option>
                             <option value="especifico">Específico</option>
                             <option value="todos">Todos</option>
                             <option value="empresa">Empresa</option>
@@ -2398,16 +3430,131 @@ input[type="radio"]:checked + .emocao-option {
                         </select>
                     </div>
                     
-                    <div id="destinatarios_especificos" class="mb-5">
+                    <div id="destinatarios_especificos" class="mb-5" style="display: none;">
                         <label class="form-label">Destinatários</label>
-                        <div class="form-text mb-2">Selecione usuários ou colaboradores específicos</div>
-                        <div class="d-flex gap-2">
-                            <select id="select_destinatarios_usuarios" class="form-select form-select-solid" multiple style="min-height: 100px;">
-                                <!-- Será preenchido via JavaScript -->
-                            </select>
-                            <select id="select_destinatarios_colaboradores" class="form-select form-select-solid" multiple style="min-height: 100px;">
-                                <!-- Será preenchido via JavaScript -->
-                            </select>
+                        <div class="form-text mb-3">Selecione usuários ou colaboradores específicos</div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Usuários</label>
+                                <div class="form-control form-control-solid" style="min-height: 200px; max-height: 300px; overflow-y: auto; padding: 10px;">
+                                    <div id="checkboxes_usuarios">
+                                        <div class="text-center text-muted py-3">
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            Carregando...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Colaboradores</label>
+                                <div class="form-control form-control-solid" style="min-height: 200px; max-height: 300px; overflow-y: auto; padding: 10px;">
+                                    <div id="checkboxes_colaboradores">
+                                        <div class="text-center text-muted py-3">
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            Carregando...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="campo_empresa_anotacao" class="mb-5" style="display: none;">
+                        <label class="form-label required">Empresas</label>
+                        <div class="form-text mb-2">Selecione uma ou mais empresas</div>
+                        <div class="form-control form-control-solid" style="min-height: 200px; max-height: 300px; overflow-y: auto; padding: 10px;">
+                            <div id="checkboxes_empresas">
+                                <?php
+                                // Busca empresas disponíveis
+                                if ($usuario['role'] === 'ADMIN') {
+                                    $stmt_emp = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
+                                    $empresas_anotacao = $stmt_emp->fetchAll();
+                                } elseif ($usuario['role'] === 'RH') {
+                                    $stmt_emp = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo' ORDER BY nome_fantasia");
+                                    $stmt_emp->execute([$usuario['empresa_id']]);
+                                    $empresas_anotacao = $stmt_emp->fetchAll();
+                                } else {
+                                    $empresas_anotacao = [];
+                                }
+                                if (empty($empresas_anotacao)): ?>
+                                    <div class="text-muted small">Nenhuma empresa disponível</div>
+                                <?php else:
+                                    foreach ($empresas_anotacao as $emp): ?>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" name="empresas[]" value="<?= $emp['id'] ?>" id="empresa_<?= $emp['id'] ?>">
+                                            <label class="form-check-label" for="empresa_<?= $emp['id'] ?>">
+                                                <?= htmlspecialchars($emp['nome_fantasia']) ?>
+                                            </label>
+                                        </div>
+                                    <?php endforeach;
+                                endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="campo_setor_anotacao" class="mb-5" style="display: none;">
+                        <label class="form-label required">Setores</label>
+                        <div class="form-text mb-2">Selecione um ou mais setores</div>
+                        <div class="form-control form-control-solid" style="min-height: 200px; max-height: 300px; overflow-y: auto; padding: 10px;">
+                            <div id="checkboxes_setores">
+                                <?php
+                                // Busca setores disponíveis
+                                if ($usuario['role'] === 'ADMIN') {
+                                    $stmt_set = $pdo->query("SELECT id, nome_setor FROM setores WHERE status = 'ativo' ORDER BY nome_setor");
+                                    $setores_anotacao = $stmt_set->fetchAll();
+                                } elseif ($usuario['role'] === 'RH') {
+                                    $stmt_set = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
+                                    $stmt_set->execute([$usuario['empresa_id']]);
+                                    $setores_anotacao = $stmt_set->fetchAll();
+                                } elseif ($usuario['role'] === 'GESTOR') {
+                                    $stmt_set = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE id = ? AND status = 'ativo' ORDER BY nome_setor");
+                                    $stmt_set->execute([$setor_id]);
+                                    $setores_anotacao = $stmt_set->fetchAll();
+                                } else {
+                                    $setores_anotacao = [];
+                                }
+                                if (empty($setores_anotacao)): ?>
+                                    <div class="text-muted small">Nenhum setor disponível</div>
+                                <?php else:
+                                    foreach ($setores_anotacao as $setor): ?>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" name="setores[]" value="<?= $setor['id'] ?>" id="setor_<?= $setor['id'] ?>">
+                                            <label class="form-check-label" for="setor_<?= $setor['id'] ?>">
+                                                <?= htmlspecialchars($setor['nome_setor']) ?>
+                                            </label>
+                                        </div>
+                                    <?php endforeach;
+                                endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="campo_cargo_anotacao" class="mb-5" style="display: none;">
+                        <label class="form-label required">Cargos</label>
+                        <div class="form-text mb-2">Selecione um ou mais cargos</div>
+                        <div class="form-control form-control-solid" style="min-height: 200px; max-height: 300px; overflow-y: auto; padding: 10px;">
+                            <div id="checkboxes_cargos">
+                                <?php
+                                // Busca cargos disponíveis
+                                if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
+                                    $stmt_car = $pdo->query("SELECT id, nome_cargo FROM cargos WHERE status = 'ativo' ORDER BY nome_cargo");
+                                    $cargos_anotacao = $stmt_car->fetchAll();
+                                } else {
+                                    $cargos_anotacao = [];
+                                }
+                                if (empty($cargos_anotacao)): ?>
+                                    <div class="text-muted small">Nenhum cargo disponível</div>
+                                <?php else:
+                                    foreach ($cargos_anotacao as $cargo): ?>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" name="cargos[]" value="<?= $cargo['id'] ?>" id="cargo_<?= $cargo['id'] ?>">
+                                            <label class="form-check-label" for="cargo_<?= $cargo['id'] ?>">
+                                                <?= htmlspecialchars($cargo['nome_cargo']) ?>
+                                            </label>
+                                        </div>
+                                    <?php endforeach;
+                                endif; ?>
+                            </div>
                         </div>
                     </div>
                     
@@ -2466,6 +3613,142 @@ document.addEventListener('DOMContentLoaded', function() {
     // Carrega anotações ao abrir a página
     carregarAnotacoes();
     
+    // Variáveis globais para destinatários
+    let usuariosDisponiveis = [];
+    let colaboradoresDisponiveis = [];
+    
+    // Carrega destinatários disponíveis
+    function carregarDestinatarios() {
+        return fetch('../api/anotacoes/get_destinatarios.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    usuariosDisponiveis = data.usuarios || [];
+                    colaboradoresDisponiveis = data.colaboradores || [];
+                    popularSelectsDestinatarios();
+                }
+                return data;
+            })
+            .catch(error => {
+                console.error('Erro ao carregar destinatários:', error);
+                return { success: false };
+            });
+    }
+    
+    // Popula os checkboxes de destinatários
+    function popularSelectsDestinatarios() {
+        const usuariosContainer = document.getElementById('checkboxes_usuarios');
+        const colabsContainer = document.getElementById('checkboxes_colaboradores');
+        
+        if (usuariosContainer) {
+            if (usuariosDisponiveis.length === 0) {
+                usuariosContainer.innerHTML = '<div class="text-muted small">Nenhum usuário disponível</div>';
+            } else {
+                let html = '';
+                usuariosDisponiveis.forEach(usuario => {
+                    const fotoUrl = usuario.foto ? '../' + usuario.foto : null;
+                    const inicial = usuario.display_name ? usuario.display_name.charAt(0).toUpperCase() : '?';
+                    html += `
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="destinatarios_usuarios[]" value="${usuario.id}" id="usuario_${usuario.id}">
+                            <label class="form-check-label d-flex align-items-center" for="usuario_${usuario.id}">
+                                ${fotoUrl ? `<img src="${fotoUrl}" class="rounded-circle me-2" width="24" height="24" style="object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />` : ''}
+                                <span class="symbol symbol-circle symbol-24px me-2" ${fotoUrl ? 'style="display:none;"' : ''}>
+                                    <span class="symbol-label fs-7 fw-semibold bg-primary text-white">${inicial}</span>
+                                </span>
+                                <span>${usuario.display_name || usuario.nome} <small class="text-muted">(${usuario.role})</small></span>
+                            </label>
+                        </div>
+                    `;
+                });
+                usuariosContainer.innerHTML = html;
+            }
+        }
+        
+        if (colabsContainer) {
+            if (colaboradoresDisponiveis.length === 0) {
+                colabsContainer.innerHTML = '<div class="text-muted small">Nenhum colaborador disponível</div>';
+            } else {
+                let html = '';
+                colaboradoresDisponiveis.forEach(colab => {
+                    const fotoUrl = colab.foto ? '../' + colab.foto : null;
+                    const inicial = colab.nome_completo ? colab.nome_completo.charAt(0).toUpperCase() : '?';
+                    html += `
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="destinatarios_colaboradores[]" value="${colab.id}" id="colab_${colab.id}">
+                            <label class="form-check-label d-flex align-items-center" for="colab_${colab.id}">
+                                ${fotoUrl ? `<img src="${fotoUrl}" class="rounded-circle me-2" width="24" height="24" style="object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />` : ''}
+                                <span class="symbol symbol-circle symbol-24px me-2" ${fotoUrl ? 'style="display:none;"' : ''}>
+                                    <span class="symbol-label fs-7 fw-semibold bg-success text-white">${inicial}</span>
+                                </span>
+                                <span>${colab.nome_completo}</span>
+                            </label>
+                        </div>
+                    `;
+                });
+                colabsContainer.innerHTML = html;
+            }
+        }
+    }
+    
+    // Controla visibilidade do campo de destinatários específicos
+    const publicoAlvoSelect = document.getElementById('publico_alvo_anotacao');
+    const destinatariosEspecificos = document.getElementById('destinatarios_especificos');
+    
+    function atualizarVisibilidadeDestinatarios() {
+        if (!publicoAlvoSelect) return;
+        
+        const valor = publicoAlvoSelect.value;
+        const campoEmpresa = document.getElementById('campo_empresa_anotacao');
+        const campoSetor = document.getElementById('campo_setor_anotacao');
+        const campoCargo = document.getElementById('campo_cargo_anotacao');
+        
+        // Mostra/oculta campos baseado no público alvo
+        if (valor === 'atribuir_mim') {
+            // Atribuir a mim: oculta todos os campos de seleção
+            if (destinatariosEspecificos) destinatariosEspecificos.style.display = 'none';
+            if (campoEmpresa) campoEmpresa.style.display = 'none';
+            if (campoSetor) campoSetor.style.display = 'none';
+            if (campoCargo) campoCargo.style.display = 'none';
+        } else if (valor === 'especifico') {
+            if (destinatariosEspecificos) destinatariosEspecificos.style.display = 'block';
+            if (campoEmpresa) campoEmpresa.style.display = 'none';
+            if (campoSetor) campoSetor.style.display = 'none';
+            if (campoCargo) campoCargo.style.display = 'none';
+        } else if (valor === 'empresa') {
+            if (destinatariosEspecificos) destinatariosEspecificos.style.display = 'none';
+            if (campoEmpresa) campoEmpresa.style.display = 'block';
+            if (campoSetor) campoSetor.style.display = 'none';
+            if (campoCargo) campoCargo.style.display = 'none';
+        } else if (valor === 'setor') {
+            if (destinatariosEspecificos) destinatariosEspecificos.style.display = 'none';
+            if (campoEmpresa) campoEmpresa.style.display = 'none';
+            if (campoSetor) campoSetor.style.display = 'block';
+            if (campoCargo) campoCargo.style.display = 'none';
+        } else if (valor === 'cargo') {
+            if (destinatariosEspecificos) destinatariosEspecificos.style.display = 'none';
+            if (campoEmpresa) campoEmpresa.style.display = 'none';
+            if (campoSetor) campoSetor.style.display = 'none';
+            if (campoCargo) campoCargo.style.display = 'block';
+        } else { // todos
+            if (destinatariosEspecificos) destinatariosEspecificos.style.display = 'none';
+            if (campoEmpresa) campoEmpresa.style.display = 'none';
+            if (campoSetor) campoSetor.style.display = 'none';
+            if (campoCargo) campoCargo.style.display = 'none';
+        }
+    }
+    
+    publicoAlvoSelect?.addEventListener('change', atualizarVisibilidadeDestinatarios);
+    
+    // Carrega destinatários quando o modal é aberto
+    const modalAnotacao = document.getElementById('modal_nova_anotacao');
+    if (modalAnotacao) {
+        modalAnotacao.addEventListener('shown.bs.modal', function() {
+            carregarDestinatarios();
+            atualizarVisibilidadeDestinatarios();
+        });
+    }
+    
     // Filtros
     document.getElementById('filtro_status_anotacoes')?.addEventListener('change', carregarAnotacoes);
     document.getElementById('filtro_prioridade_anotacoes')?.addEventListener('change', carregarAnotacoes);
@@ -2510,17 +3793,52 @@ document.addEventListener('DOMContentLoaded', function() {
                 formData.append('tags', JSON.stringify(tags));
             }
             
-            // Processa destinatários
-            const usuariosSelect = document.getElementById('select_destinatarios_usuarios');
-            const colabsSelect = document.getElementById('select_destinatarios_colaboradores');
-            const usuariosIds = Array.from(usuariosSelect?.selectedOptions || []).map(o => parseInt(o.value));
-            const colabsIds = Array.from(colabsSelect?.selectedOptions || []).map(o => parseInt(o.value));
+            // Processa público alvo
+            const publicoAlvo = formData.get('publico_alvo');
             
-            if (usuariosIds.length > 0) {
-                formData.append('destinatarios_usuarios', JSON.stringify(usuariosIds));
-            }
-            if (colabsIds.length > 0) {
-                formData.append('destinatarios_colaboradores', JSON.stringify(colabsIds));
+            // Processa destinatários (checkboxes) apenas se não for "atribuir_mim"
+            if (publicoAlvo !== 'atribuir_mim') {
+                // Usuários e colaboradores específicos
+                if (publicoAlvo === 'especifico') {
+                    const usuariosCheckboxes = document.querySelectorAll('input[name="destinatarios_usuarios[]"]:checked');
+                    const colabsCheckboxes = document.querySelectorAll('input[name="destinatarios_colaboradores[]"]:checked');
+                    const usuariosIds = Array.from(usuariosCheckboxes).map(cb => parseInt(cb.value));
+                    const colabsIds = Array.from(colabsCheckboxes).map(cb => parseInt(cb.value));
+                    
+                    if (usuariosIds.length > 0) {
+                        formData.append('destinatarios_usuarios', JSON.stringify(usuariosIds));
+                    }
+                    if (colabsIds.length > 0) {
+                        formData.append('destinatarios_colaboradores', JSON.stringify(colabsIds));
+                    }
+                }
+                
+                // Empresas (múltiplas)
+                if (publicoAlvo === 'empresa') {
+                    const empresasCheckboxes = document.querySelectorAll('input[name="empresas[]"]:checked');
+                    const empresasIds = Array.from(empresasCheckboxes).map(cb => parseInt(cb.value));
+                    if (empresasIds.length > 0) {
+                        formData.append('empresas_ids', JSON.stringify(empresasIds));
+                    }
+                }
+                
+                // Setores (múltiplos)
+                if (publicoAlvo === 'setor') {
+                    const setoresCheckboxes = document.querySelectorAll('input[name="setores[]"]:checked');
+                    const setoresIds = Array.from(setoresCheckboxes).map(cb => parseInt(cb.value));
+                    if (setoresIds.length > 0) {
+                        formData.append('setores_ids', JSON.stringify(setoresIds));
+                    }
+                }
+                
+                // Cargos (múltiplos)
+                if (publicoAlvo === 'cargo') {
+                    const cargosCheckboxes = document.querySelectorAll('input[name="cargos[]"]:checked');
+                    const cargosIds = Array.from(cargosCheckboxes).map(cb => parseInt(cb.value));
+                    if (cargosIds.length > 0) {
+                        formData.append('cargos_ids', JSON.stringify(cargosIds));
+                    }
+                }
             }
             
             btn.setAttribute('data-kt-indicator', 'on');
@@ -2709,6 +4027,70 @@ document.addEventListener('DOMContentLoaded', function() {
                         atualizarCampoDataNotif();
                     }
                     
+                    // Atualiza visibilidade dos campos
+                    atualizarVisibilidadeDestinatarios();
+                    
+                    // Aguarda um pouco para garantir que os campos foram renderizados
+                    setTimeout(() => {
+                        // Seleciona empresas, setores ou cargos se aplicável (múltiplos)
+                        if (anotacao.empresas_ids && Array.isArray(anotacao.empresas_ids) && anotacao.empresas_ids.length > 0) {
+                            anotacao.empresas_ids.forEach(eid => {
+                                const checkbox = document.getElementById('empresa_' + eid);
+                                if (checkbox) checkbox.checked = true;
+                            });
+                        } else if (anotacao.empresa_id) {
+                            const checkbox = document.getElementById('empresa_' + anotacao.empresa_id);
+                            if (checkbox) checkbox.checked = true;
+                        }
+                        
+                        if (anotacao.setores_ids && Array.isArray(anotacao.setores_ids) && anotacao.setores_ids.length > 0) {
+                            anotacao.setores_ids.forEach(sid => {
+                                const checkbox = document.getElementById('setor_' + sid);
+                                if (checkbox) checkbox.checked = true;
+                            });
+                        } else if (anotacao.setor_id) {
+                            const checkbox = document.getElementById('setor_' + anotacao.setor_id);
+                            if (checkbox) checkbox.checked = true;
+                        }
+                        
+                        if (anotacao.cargos_ids && Array.isArray(anotacao.cargos_ids) && anotacao.cargos_ids.length > 0) {
+                            anotacao.cargos_ids.forEach(cid => {
+                                const checkbox = document.getElementById('cargo_' + cid);
+                                if (checkbox) checkbox.checked = true;
+                            });
+                        } else if (anotacao.cargo_id) {
+                            const checkbox = document.getElementById('cargo_' + anotacao.cargo_id);
+                            if (checkbox) checkbox.checked = true;
+                        }
+                    }, 300);
+                    
+                    // Carrega destinatários e depois seleciona os corretos
+                    carregarDestinatarios().then(() => {
+                        // Seleciona destinatários (checkboxes)
+                        if (anotacao.destinatarios_usuarios && anotacao.destinatarios_usuarios.length > 0) {
+                            anotacao.destinatarios_usuarios.forEach(uid => {
+                                const checkbox = document.getElementById('usuario_' + uid);
+                                if (checkbox) checkbox.checked = true;
+                            });
+                        }
+                        
+                        if (anotacao.destinatarios_colaboradores && anotacao.destinatarios_colaboradores.length > 0) {
+                            anotacao.destinatarios_colaboradores.forEach(cid => {
+                                const checkbox = document.getElementById('colab_' + cid);
+                                if (checkbox) checkbox.checked = true;
+                            });
+                        }
+                        
+                        // Verifica se é "atribuir a mim" (apenas o usuário atual como destinatário)
+                        if (anotacao.publico_alvo === 'especifico' && 
+                            anotacao.destinatarios_usuarios && 
+                            anotacao.destinatarios_usuarios.length === 1 &&
+                            anotacao.destinatarios_usuarios[0] == <?= $usuario['id'] ?>) {
+                            document.querySelector('[name="publico_alvo"]').value = 'atribuir_mim';
+                            atualizarVisibilidadeDestinatarios();
+                        }
+                    });
+                    
                     document.getElementById('modal_anotacao_titulo').textContent = 'Editar Anotação';
                     const modal = new bootstrap.Modal(document.getElementById('modal_nova_anotacao'));
                     modal.show();
@@ -2809,7 +4191,19 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('anotacao_id').value = '';
         document.getElementById('modal_anotacao_titulo').textContent = 'Nova Anotação';
         document.getElementById('campo_data_notificacao').style.display = 'none';
+        document.getElementById('publico_alvo_anotacao').value = 'atribuir_mim';
+        atualizarVisibilidadeDestinatarios();
+        
+        // Limpa checkboxes
+        document.querySelectorAll('input[name="destinatarios_usuarios[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="destinatarios_colaboradores[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="empresas[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="setores[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="cargos[]"]').forEach(cb => cb.checked = false);
     });
+    
+    // Inicializa visibilidade ao carregar
+    atualizarVisibilidadeDestinatarios();
 });
 </script>
 <!--end::Script Anotações-->
