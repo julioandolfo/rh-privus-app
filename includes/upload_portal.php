@@ -54,10 +54,13 @@ function upload_imagem_portal($file, $tipo = 'logo') {
     // Move arquivo
     if (move_uploaded_file($file['tmp_name'], $filepath)) {
         $relative_path = 'uploads/portal/' . $filename;
+        $base_url = get_base_url();
+        // Garante que há uma barra entre a URL base e o caminho relativo
+        $full_url = rtrim($base_url, '/') . '/' . ltrim($relative_path, '/');
         return [
             'success' => true,
             'path' => $relative_path,
-            'url' => get_base_url() . $relative_path,
+            'url' => $full_url,
             'filename' => $file['name'],
             'mime_type' => $mime_type,
             'size' => $file['size']

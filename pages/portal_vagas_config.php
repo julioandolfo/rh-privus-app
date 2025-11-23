@@ -11,6 +11,7 @@ require_once __DIR__ . '/../includes/permissions.php';
 require_page_permission('vagas.php'); // Usa mesma permissão de vagas
 
 require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/upload_portal.php';
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
@@ -65,14 +66,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $descricao_pagina = $_POST['descricao_pagina'] ?? '';
     $cor_primaria = $_POST['cor_primaria'] ?? '#009ef7';
     $cor_secundaria = $_POST['cor_secundaria'] ?? '#50cd89';
-    $logo_url = $_POST['logo_url'] ?? null;
-    $imagem_hero_url = $_POST['imagem_hero_url'] ?? null;
     $texto_hero = $_POST['texto_hero'] ?? '';
     $texto_cta = $_POST['texto_cta'] ?? '';
     $mostrar_filtros = isset($_POST['mostrar_filtros']) ? 1 : 0;
     $itens_por_pagina = (int)($_POST['itens_por_pagina'] ?? 12);
     $ordem_exibicao = $_POST['ordem_exibicao'] ?? 'data_criacao';
     $ativo = isset($_POST['ativo']) ? 1 : 0;
+    
+    // Processa uploads de imagens
+    $logo_url = $config['logo_url'] ?? null;
+    $imagem_hero_url = $config['imagem_hero_url'] ?? null;
+    
+    // Upload do logo
+    if (isset($_FILES['logo_upload']) && $_FILES['logo_upload']['error'] === UPLOAD_ERR_OK) {
+        $upload_result = upload_imagem_portal($_FILES['logo_upload'], 'logo');
+        if ($upload_result['success']) {
+            $logo_url = $upload_result['url'];
+        } else {
+            $mensagem = 'Erro no upload do logo: ' . $upload_result['error'];
+            $tipo_mensagem = 'error';
+        }
+    } elseif (!empty($_POST['logo_url'])) {
+        // Se não fez upload mas tem URL, usa URL informada
+        $logo_url = $_POST['logo_url'];
+    }
+    
+    // Upload da imagem hero
+    if (isset($_FILES['hero_upload']) && $_FILES['hero_upload']['error'] === UPLOAD_ERR_OK) {
+        $upload_result = upload_imagem_portal($_FILES['hero_upload'], 'hero');
+        if ($upload_result['success']) {
+            $imagem_hero_url = $upload_result['url'];
+        } else {
+            if (empty($mensagem)) {
+                $mensagem = 'Erro no upload da imagem hero: ' . $upload_result['error'];
+                $tipo_mensagem = 'error';
+            }
+        }
+    } elseif (!empty($_POST['imagem_hero_url'])) {
+        // Se não fez upload mas tem URL, usa URL informada
+        $imagem_hero_url = $_POST['imagem_hero_url'];
+    }
     
     try {
         if ($config) {
@@ -160,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     
                     <div class="card-body pt-0">
-                        <form method="POST" id="formConfig">
+                        <form method="POST" id="formConfig" enctype="multipart/form-data">
                             <div class="row">
                                 <!-- Informações Básicas -->
                                 <div class="col-md-12 mb-5">
@@ -202,19 +235,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <h3 class="mb-4">Imagens</h3>
                                     
                                     <div class="mb-5">
-                                        <label class="form-label">URL do Logo</label>
-                                        <input type="url" name="logo_url" class="form-control" 
-                                               value="<?= htmlspecialchars($config['logo_url'] ?? '') ?>" 
-                                               placeholder="https://exemplo.com/logo.png">
-                                        <div class="form-text">URL completa da imagem do logo</div>
+                                        <label class="form-label">Logo</label>
+                                        <div class="d-flex gap-3 align-items-end">
+                                            <div class="flex-grow-1">
+                                                <input type="file" name="logo_upload" id="logo_upload" 
+                                                       class="form-control" accept="image/*">
+                                                <div class="form-text">Ou faça upload de uma imagem (JPG, PNG, GIF, WEBP, SVG - máx. 5MB)</div>
+                                            </div>
+                                            <div class="flex-shrink-0" style="width: 300px;">
+                                                <input type="url" name="logo_url" class="form-control" 
+                                                       value="<?= htmlspecialchars($config['logo_url'] ?? '') ?>" 
+                                                       placeholder="Ou cole URL">
+                                                <div class="form-text">URL alternativa</div>
+                                            </div>
+                                        </div>
+                                        <?php if ($config['logo_url']): ?>
+                                        <div class="mt-3">
+                                            <label class="form-label">Preview:</label>
+                                            <div>
+                                                <img src="<?= htmlspecialchars($config['logo_url']) ?>" 
+                                                     alt="Logo" style="max-height: 80px; max-width: 200px;" 
+                                                     class="border rounded p-2 bg-light"
+                                                     onerror="this.style.display='none'">
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
                                     
                                     <div class="mb-5">
-                                        <label class="form-label">URL da Imagem Hero (Banner Principal)</label>
-                                        <input type="url" name="imagem_hero_url" class="form-control" 
-                                               value="<?= htmlspecialchars($config['imagem_hero_url'] ?? '') ?>" 
-                                               placeholder="https://exemplo.com/banner.jpg">
-                                        <div class="form-text">URL completa da imagem de destaque</div>
+                                        <label class="form-label">Imagem Hero (Banner Principal)</label>
+                                        <div class="d-flex gap-3 align-items-end">
+                                            <div class="flex-grow-1">
+                                                <input type="file" name="hero_upload" id="hero_upload" 
+                                                       class="form-control" accept="image/*">
+                                                <div class="form-text">Ou faça upload de uma imagem (JPG, PNG, GIF, WEBP - máx. 5MB)</div>
+                                            </div>
+                                            <div class="flex-shrink-0" style="width: 300px;">
+                                                <input type="url" name="imagem_hero_url" class="form-control" 
+                                                       value="<?= htmlspecialchars($config['imagem_hero_url'] ?? '') ?>" 
+                                                       placeholder="Ou cole URL">
+                                                <div class="form-text">URL alternativa</div>
+                                            </div>
+                                        </div>
+                                        <?php if ($config['imagem_hero_url']): ?>
+                                        <div class="mt-3">
+                                            <label class="form-label">Preview:</label>
+                                            <div>
+                                                <img src="<?= htmlspecialchars($config['imagem_hero_url']) ?>" 
+                                                     alt="Hero" style="max-height: 200px; max-width: 100%; border-radius: 8px;" 
+                                                     class="border rounded p-2 bg-light"
+                                                     onerror="this.style.display='none'">
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 

@@ -56,7 +56,7 @@ try {
         // Atualiza dados do candidato
         $stmt = $pdo->prepare("
             UPDATE candidatos 
-            SET nome_completo = ?, telefone = ?, linkedin = ?, portfolio = ?
+            SET nome_completo = ?, telefone = ?, linkedin = ?, portfolio = ?, instagram = ?
             WHERE id = ?
         ");
         $stmt->execute([
@@ -64,21 +64,23 @@ try {
             $_POST['telefone'] ?? null,
             $_POST['linkedin'] ?? null,
             $_POST['portfolio'] ?? null,
+            $_POST['instagram'] ?? null,
             $candidato_id
         ]);
     } else {
         // Cria novo candidato
         $stmt = $pdo->prepare("
             INSERT INTO candidatos 
-            (nome_completo, email, telefone, linkedin, portfolio, origem)
-            VALUES (?, ?, ?, ?, ?, 'portal')
+            (nome_completo, email, telefone, linkedin, portfolio, instagram, origem)
+            VALUES (?, ?, ?, ?, ?, ?, 'portal')
         ");
         $stmt->execute([
             $nome_completo,
             $email,
             $_POST['telefone'] ?? null,
             $_POST['linkedin'] ?? null,
-            $_POST['portfolio'] ?? null
+            $_POST['portfolio'] ?? null,
+            $_POST['instagram'] ?? null
         ]);
         $candidato_id = $pdo->lastInsertId();
     }

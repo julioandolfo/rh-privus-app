@@ -54,16 +54,16 @@ try {
             requisitos_obrigatorios, requisitos_desejaveis,
             competencias_tecnicas, competencias_comportamentais,
             tipo_contrato, modalidade, salario_min, salario_max,
-            beneficios, localizacao, quantidade_vagas,
-            publicar_portal, usar_landing_page_customizada,
+            beneficios, localizacao, horario_trabalho, dias_trabalho,
+            quantidade_vagas, publicar_portal, usar_landing_page_customizada,
             data_abertura, criado_por
         ) VALUES (
             ?, ?, ?, ?, ?,
             ?, ?,
             ?, ?,
             ?, ?, ?, ?,
+            ?, ?, ?, ?,
             ?, ?, ?,
-            ?, ?,
             CURDATE(), ?
         )
     ");
@@ -84,6 +84,8 @@ try {
         !empty($_POST['salario_max']) ? (float)$_POST['salario_max'] : null,
         json_encode($beneficios),
         $_POST['localizacao'] ?? null,
+        $_POST['horario_trabalho'] ?? null,
+        $_POST['dias_trabalho'] ?? null,
         (int)($_POST['quantidade_vagas'] ?? 1),
         isset($_POST['publicar_portal']) ? (int)$_POST['publicar_portal'] : 1,
         isset($_POST['usar_landing_page_customizada']) ? (int)$_POST['usar_landing_page_customizada'] : 0,

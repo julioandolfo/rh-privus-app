@@ -48,11 +48,10 @@ if ($vaga['empresa_id']) {
     $stmt->execute([$vaga['empresa_id']]);
     $setores = $stmt->fetchAll();
     
-    if ($vaga['setor_id']) {
-        $stmt = $pdo->prepare("SELECT * FROM cargos WHERE setor_id = ? ORDER BY nome_cargo");
-        $stmt->execute([$vaga['setor_id']]);
-        $cargos = $stmt->fetchAll();
-    }
+    // Cargos são por empresa, não por setor
+    $stmt = $pdo->prepare("SELECT * FROM cargos WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_cargo");
+    $stmt->execute([$vaga['empresa_id']]);
+    $cargos = $stmt->fetchAll();
 }
 
 // Busca etapas padrão e etapas da vaga
@@ -157,12 +156,12 @@ $beneficios_padrao = [
                             
                             <div class="col-md-4">
                                 <label class="form-label">Salário Mínimo (R$)</label>
-                                <input type="number" name="salario_min" class="form-control" step="0.01" value="<?= $vaga['salario_min'] ?>">
+                                <input type="text" name="salario_min" id="salario_min" class="form-control" placeholder="0,00" value="<?= $vaga['salario_min'] ? number_format($vaga['salario_min'], 2, ',', '.') : '' ?>">
                             </div>
                             
                             <div class="col-md-4">
                                 <label class="form-label">Salário Máximo (R$)</label>
-                                <input type="number" name="salario_max" class="form-control" step="0.01" value="<?= $vaga['salario_max'] ?>">
+                                <input type="text" name="salario_max" id="salario_max" class="form-control" placeholder="0,00" value="<?= $vaga['salario_max'] ? number_format($vaga['salario_max'], 2, ',', '.') : '' ?>">
                             </div>
                             
                             <div class="col-md-4">
@@ -240,6 +239,18 @@ $beneficios_padrao = [
                             </div>
                             
                             <div class="col-md-4">
+                                <label class="form-label">Horário de Trabalho</label>
+                                <input type="text" name="horario_trabalho" class="form-control" placeholder="Ex: 08:00 às 18:00" value="<?= htmlspecialchars($vaga['horario_trabalho'] ?? '') ?>">
+                                <small class="form-text text-muted">Ex: 08:00 às 18:00</small>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Dias de Trabalho</label>
+                                <input type="text" name="dias_trabalho" class="form-control" placeholder="Ex: Segunda a Sexta" value="<?= htmlspecialchars($vaga['dias_trabalho'] ?? '') ?>">
+                                <small class="form-text text-muted">Ex: Segunda a Sexta</small>
+                            </div>
+                            
+                            <div class="col-md-4">
                                 <label class="form-label">Status</label>
                                 <select name="status" class="form-select">
                                     <option value="aberta" <?= $vaga['status'] === 'aberta' ? 'selected' : '' ?>>Aberta</option>
@@ -281,62 +292,144 @@ $beneficios_padrao = [
 document.getElementById('empresaSelect').addEventListener('change', async function() {
     const empresaId = this.value;
     const setorSelect = document.getElementById('setorSelect');
+    const cargoSelect = document.getElementById('cargoSelect');
+    
+    // Limpa setores e cargos
+    setorSelect.innerHTML = '<option value="">Carregando...</option>';
+    cargoSelect.innerHTML = '<option value="">Carregando...</option>';
     
     if (!empresaId) {
         setorSelect.innerHTML = '<option value="">Selecione...</option>';
+        cargoSelect.innerHTML = '<option value="">Selecione...</option>';
         return;
     }
     
     try {
-        const response = await fetch(`../api/get_setores.php?empresa_id=${empresaId}`);
-        const data = await response.json();
+        // Carrega setores
+        const responseSetores = await fetch(`../api/get_setores.php?empresa_id=${empresaId}`);
+        const dataSetores = await responseSetores.json();
         
         setorSelect.innerHTML = '<option value="">Selecione...</option>';
-        if (data.setores) {
-            data.setores.forEach(setor => {
+        if (dataSetores.success && dataSetores.setores && dataSetores.setores.length > 0) {
+            dataSetores.setores.forEach(setor => {
                 const option = document.createElement('option');
                 option.value = setor.id;
                 option.textContent = setor.nome_setor;
                 setorSelect.appendChild(option);
             });
+        } else {
+            setorSelect.innerHTML = '<option value="">Nenhum setor encontrado</option>';
+        }
+        
+        // Carrega cargos da empresa
+        const responseCargos = await fetch(`../api/get_cargos.php?empresa_id=${empresaId}`);
+        const dataCargos = await responseCargos.json();
+        
+        cargoSelect.innerHTML = '<option value="">Selecione...</option>';
+        if (dataCargos.success && dataCargos.cargos && dataCargos.cargos.length > 0) {
+            dataCargos.cargos.forEach(cargo => {
+                const option = document.createElement('option');
+                option.value = cargo.id;
+                option.textContent = cargo.nome_cargo;
+                cargoSelect.appendChild(option);
+            });
+        } else {
+            cargoSelect.innerHTML = '<option value="">Nenhum cargo encontrado</option>';
         }
     } catch (error) {
-        console.error('Erro ao carregar setores:', error);
+        console.error('Erro ao carregar dados:', error);
+        setorSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+        cargoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
     }
 });
 
-// Carrega cargos ao selecionar setor
+// Carrega cargos ao selecionar setor (opcional - cargos já são carregados quando empresa muda)
 document.getElementById('setorSelect').addEventListener('change', async function() {
-    const setorId = this.value;
+    const empresaId = document.getElementById('empresaSelect').value;
     const cargoSelect = document.getElementById('cargoSelect');
     
-    if (!setorId) {
+    if (!empresaId) {
         cargoSelect.innerHTML = '<option value="">Selecione...</option>';
         return;
     }
     
+    // Recarrega cargos da empresa (opcional, já foram carregados)
     try {
-        const response = await fetch(`../api/get_cargos.php?setor_id=${setorId}`);
+        cargoSelect.innerHTML = '<option value="">Carregando...</option>';
+        const response = await fetch(`../api/get_cargos.php?empresa_id=${empresaId}`);
         const data = await response.json();
         
         cargoSelect.innerHTML = '<option value="">Selecione...</option>';
-        if (data.cargos) {
+        if (data.success && data.cargos && data.cargos.length > 0) {
             data.cargos.forEach(cargo => {
                 const option = document.createElement('option');
                 option.value = cargo.id;
                 option.textContent = cargo.nome_cargo;
                 cargoSelect.appendChild(option);
             });
+        } else {
+            cargoSelect.innerHTML = '<option value="">Nenhum cargo encontrado</option>';
         }
     } catch (error) {
         console.error('Erro ao carregar cargos:', error);
+        cargoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
     }
 });
+
+// Carrega setores e cargos ao carregar a página (se já tiver empresa selecionada)
+document.addEventListener('DOMContentLoaded', function() {
+    const empresaSelect = document.getElementById('empresaSelect');
+    const setorSelect = document.getElementById('setorSelect');
+    const cargoSelect = document.getElementById('cargoSelect');
+    
+    // Se já tem empresa selecionada e não tem setores carregados, carrega
+    if (empresaSelect.value && setorSelect.options.length <= 1) {
+        empresaSelect.dispatchEvent(new Event('change'));
+    }
+    
+    // Se já tem setor selecionado e não tem cargos carregados, carrega
+    if (setorSelect.value && cargoSelect.options.length <= 1) {
+        setorSelect.dispatchEvent(new Event('change'));
+    }
+});
+
+// Aplica máscaras de moeda
+(function waitForDependencies() {
+    if (typeof jQuery === 'undefined' || typeof $ === 'undefined') {
+        setTimeout(waitForDependencies, 50);
+        return;
+    }
+    
+    $(document).ready(function() {
+        // Aguarda jQuery Mask estar disponível
+        if (typeof $.fn.mask !== 'undefined') {
+            // Máscara para salário mínimo e máximo (moeda brasileira)
+            $('#salario_min').mask('#.##0,00', {reverse: true});
+            $('#salario_max').mask('#.##0,00', {reverse: true});
+        } else {
+            setTimeout(waitForDependencies, 100);
+        }
+    });
+})();
 
 // Submete formulário
 document.getElementById('formVaga').addEventListener('submit', async function(e) {
     e.preventDefault();
     const formData = new FormData(this);
+    
+    // Converte valores de moeda para formato numérico antes de enviar
+    const salarioMin = document.getElementById('salario_min').value;
+    const salarioMax = document.getElementById('salario_max').value;
+    
+    if (salarioMin) {
+        const valorMin = salarioMin.replace(/\./g, '').replace(',', '.');
+        formData.set('salario_min', valorMin);
+    }
+    
+    if (salarioMax) {
+        const valorMax = salarioMax.replace(/\./g, '').replace(',', '.');
+        formData.set('salario_max', valorMax);
+    }
     
     try {
         const response = await fetch('../api/recrutamento/vagas/editar.php', {
