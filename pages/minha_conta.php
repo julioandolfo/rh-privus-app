@@ -1165,16 +1165,74 @@ document.getElementById('foto_perfil')?.addEventListener('change', function(e) {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ativando...';
             
+            // Solicita permissão
             const sucesso = await OneSignalInit.subscribe();
             
+            // Aguarda um pouco para garantir que o OneSignal processou
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Verifica novamente o status antes de mostrar resultado
+            let statusFinal = sucesso;
             if (sucesso) {
+                // Verifica se realmente está ativo
+                try {
+                    if (typeof OneSignal !== 'undefined') {
+                        await new Promise((resolve) => {
+                            OneSignal.push(function() {
+                                OneSignal.isPushNotificationsEnabled(function(isEnabled) {
+                                    statusFinal = isEnabled;
+                                    resolve();
+                                });
+                            });
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Erro ao verificar status final:', e);
+                    // Se der erro, confia no resultado inicial
+                }
+            } else {
+                // Se retornou false, verifica se a permissão nativa foi concedida
+                const permission = Notification.permission;
+                if (permission === 'granted') {
+                    // Permissão foi concedida, mas OneSignal pode não ter processado ainda
+                    // Aguarda mais um pouco e tenta registrar
+                    console.log('Permissão concedida, aguardando OneSignal processar...');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Tenta registrar novamente
+                    try {
+                        await OneSignalInit.registerPlayer();
+                        statusFinal = true;
+                    } catch (e) {
+                        console.warn('Erro ao registrar após permissão:', e);
+                    }
+                }
+            }
+            
+            if (statusFinal) {
                 Swal.fire('Sucesso!', 'Notificações ativadas com sucesso!', 'success');
                 setTimeout(() => {
                     verificarStatusNotificacoes();
                     carregarDispositivos();
                 }, 1000);
             } else {
-                Swal.fire('Atenção', 'Não foi possível ativar as notificações. Verifique as configurações do navegador.', 'warning');
+                // Verifica uma última vez antes de mostrar erro
+                const permission = Notification.permission;
+                if (permission === 'granted') {
+                    // Permissão foi concedida, mas pode estar processando
+                    Swal.fire({
+                        title: 'Processando...',
+                        text: 'Permissão concedida. Aguarde alguns segundos e verifique o status novamente.',
+                        icon: 'info',
+                        timer: 3000
+                    });
+                    setTimeout(() => {
+                        verificarStatusNotificacoes();
+                        carregarDispositivos();
+                    }, 2000);
+                } else {
+                    Swal.fire('Atenção', 'Não foi possível ativar as notificações. Verifique as configurações do navegador.', 'warning');
+                }
             }
             
             btn.disabled = false;

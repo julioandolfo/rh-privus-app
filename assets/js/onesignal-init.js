@@ -303,38 +303,127 @@ const OneSignalInit = {
         }
         
         return new Promise((resolve) => {
+            let resolved = false;
+            let permissionCheckInterval = null;
+            
+            // Timeout de segurança (10 segundos)
+            const timeout = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    if (permissionCheckInterval) {
+                        clearInterval(permissionCheckInterval);
+                    }
+                    console.warn('⚠️ Timeout ao aguardar permissão');
+                    // Verifica uma última vez
+                    const finalPermission = Notification.permission;
+                    if (finalPermission === 'granted') {
+                        console.log('✅ Permissão concedida (verificação final)');
+                        setTimeout(() => {
+                            OneSignalInit.registerPlayer();
+                        }, 1000);
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
+                }
+            }, 10000);
+            
             OneSignal.push(function() {
                 // Verifica permissão atual
                 OneSignal.getNotificationPermission(function(permission) {
                     console.log('📱 Permissão atual:', permission);
                     
                     if (permission === 'granted') {
-                        console.log('✅ Permissão já concedida, registrando player...');
-                        setTimeout(() => {
-                            OneSignalInit.registerPlayer();
-                        }, 500);
-                        resolve(true);
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timeout);
+                            console.log('✅ Permissão já concedida, registrando player...');
+                            setTimeout(() => {
+                                OneSignalInit.registerPlayer();
+                            }, 500);
+                            resolve(true);
+                        }
                     } else if (permission === 'default') {
                         console.log('📱 Solicitando permissão...');
                         
-                        // Escuta mudança de permissão
-                        OneSignal.on('notificationPermissionChange', function(newPermission) {
+                        // Escuta mudança de permissão via evento
+                        const permissionChangeHandler = function(newPermission) {
                             console.log('📱 Permissão mudou para:', newPermission);
-                            if (newPermission === 'granted') {
+                            if (newPermission === 'granted' && !resolved) {
+                                resolved = true;
+                                clearTimeout(timeout);
+                                if (permissionCheckInterval) {
+                                    clearInterval(permissionCheckInterval);
+                                }
+                                OneSignal.off('notificationPermissionChange', permissionChangeHandler);
+                                console.log('✅ Permissão concedida via evento');
                                 setTimeout(() => {
                                     OneSignalInit.registerPlayer();
                                 }, 1000);
                                 resolve(true);
-                            } else {
+                            } else if (newPermission === 'denied' && !resolved) {
+                                resolved = true;
+                                clearTimeout(timeout);
+                                if (permissionCheckInterval) {
+                                    clearInterval(permissionCheckInterval);
+                                }
+                                OneSignal.off('notificationPermissionChange', permissionChangeHandler);
                                 resolve(false);
                             }
-                        });
+                        };
+                        
+                        OneSignal.on('notificationPermissionChange', permissionChangeHandler);
+                        
+                        // Verificação periódica como fallback (para casos onde o evento não dispara)
+                        permissionCheckInterval = setInterval(() => {
+                            if (resolved) {
+                                clearInterval(permissionCheckInterval);
+                                return;
+                            }
+                            
+                            OneSignal.getNotificationPermission(function(currentPermission) {
+                                if (currentPermission === 'granted' && !resolved) {
+                                    resolved = true;
+                                    clearTimeout(timeout);
+                                    clearInterval(permissionCheckInterval);
+                                    OneSignal.off('notificationPermissionChange', permissionChangeHandler);
+                                    console.log('✅ Permissão concedida (verificação periódica)');
+                                    setTimeout(() => {
+                                        OneSignalInit.registerPlayer();
+                                    }, 1000);
+                                    resolve(true);
+                                } else if (currentPermission === 'denied' && !resolved) {
+                                    resolved = true;
+                                    clearTimeout(timeout);
+                                    clearInterval(permissionCheckInterval);
+                                    OneSignal.off('notificationPermissionChange', permissionChangeHandler);
+                                    resolve(false);
+                                }
+                            });
+                        }, 500); // Verifica a cada 500ms
                         
                         // Mostra prompt nativo
-                        OneSignal.showNativePrompt();
+                        try {
+                            OneSignal.showNativePrompt();
+                        } catch (error) {
+                            console.error('❌ Erro ao mostrar prompt:', error);
+                            if (!resolved) {
+                                resolved = true;
+                                clearTimeout(timeout);
+                                if (permissionCheckInterval) {
+                                    clearInterval(permissionCheckInterval);
+                                }
+                                resolve(false);
+                            }
+                        }
                     } else {
-                        console.log('❌ Permissão negada pelo usuário');
-                        resolve(false);
+                        // Permissão negada
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timeout);
+                            console.log('❌ Permissão negada pelo usuário');
+                            resolve(false);
+                        }
                     }
                 });
             });

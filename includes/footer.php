@@ -43,6 +43,11 @@
     <script src="../assets/js/onesignal-init.js"></script>
     <!--end::OneSignal SDK-->
     
+    <!--begin::Push Notification Prompt-->
+    <link href="../assets/css/push-notification-prompt.css" rel="stylesheet" type="text/css" />
+    <script src="../assets/js/push-notification-prompt.js"></script>
+    <!--end::Push Notification Prompt-->
+    
     <!--begin::PWA Service Worker-->
     <script src="../assets/js/pwa-service-worker.js"></script>
     <!--end::PWA Service Worker-->

@@ -1,0 +1,114 @@
+/**
+ * Botão Flutuante de Solicitação de Notificações Push
+ */
+
+.push-notification-prompt {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 9998; /* Abaixo do chat widget (9999) mas acima de outros elementos */
+    display: none;
+    animation: slideInLeft 0.3s ease-out;
+}
+
+.push-notification-prompt.show {
+    display: block;
+}
+
+.push-notification-prompt-btn {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    padding: 0;
+}
+
+.push-notification-prompt-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.push-notification-prompt-btn:active {
+    transform: scale(0.95);
+}
+
+.push-notification-prompt-btn i {
+    color: white;
+    font-size: 24px;
+}
+
+.push-notification-prompt-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #f1416c;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(241, 65, 108, 0.4);
+    animation: pulse 2s infinite;
+}
+
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .push-notification-prompt {
+        bottom: 20px;
+        left: 20px;
+    }
+    
+    /* Se houver chat widget, ajusta posição */
+    body.is-colaborador .push-notification-prompt {
+        bottom: 90px; /* Acima do botão de chat */
+    }
+    
+    .push-notification-prompt-btn {
+        width: 56px;
+        height: 56px;
+    }
+    
+    .push-notification-prompt-btn i {
+        font-size: 22px;
+    }
+    
+    .push-notification-prompt-badge {
+        width: 22px;
+        height: 22px;
+        font-size: 11px;
+    }
+}
+
