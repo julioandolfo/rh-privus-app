@@ -179,7 +179,7 @@ $tipos_automacao = [
                     
                     <!-- Seção de Condições (Visual) -->
                     <div class="card mb-3" id="secaoCondicoes">
-                        <div class="card-header">
+                        <div class="card-header d-flex align-items-center" style="min-height: 50px;">
                             <h6 class="mb-0">Quando executar esta automação?</h6>
                         </div>
                         <div class="card-body">
@@ -221,7 +221,7 @@ $tipos_automacao = [
                     
                     <!-- Seção de Configuração (Dinâmica baseada no tipo) -->
                     <div class="card mb-3" id="secaoConfiguracao">
-                        <div class="card-header">
+                        <div class="card-header d-flex align-items-center" style="min-height: 50px;">
                             <h6 class="mb-0" id="tituloConfiguracao">Configurações da Automação</h6>
                         </div>
                         <div class="card-body" id="configuracaoCampos">

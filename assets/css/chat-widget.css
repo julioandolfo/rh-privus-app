@@ -1,0 +1,430 @@
+/* ============================================
+   Widget Flutuante de Chat
+   ============================================ */
+
+/* Botão Flutuante */
+.chat-widget-button {
+    position: fixed;
+    bottom: 90px; /* Ajustado para ficar acima do scroll to top (que fica em bottom: 40px) */
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #009ef7 0%, #0066cc 100%);
+    color: white !important;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 158, 247, 0.4);
+    cursor: pointer;
+    z-index: 106 !important; /* Acima do scroll to top (z-index: 105) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    font-size: 24px;
+}
+
+/* Ícone dentro do botão - cor branca */
+.chat-widget-button i {
+    color: white !important;
+}
+
+.chat-widget-button i .path1,
+.chat-widget-button i .path2,
+.chat-widget-button i .path3,
+.chat-widget-button i .path4 {
+    fill: white !important;
+    stroke: white !important;
+}
+
+.chat-widget-button svg {
+    color: white !important;
+    fill: white !important;
+}
+
+.chat-widget-button svg path {
+    fill: white !important;
+    stroke: white !important;
+}
+
+.chat-widget-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 158, 247, 0.6);
+}
+
+.chat-widget-button:active {
+    transform: scale(0.95);
+}
+
+/* Badge de notificações */
+.chat-widget-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #f1416c;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    border: 2px solid white;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+.chat-widget-badge.hidden {
+    display: none;
+}
+
+/* Painel do Chat */
+.chat-widget-panel {
+    position: fixed;
+    bottom: 90px; /* Acima do botão e do scroll to top */
+    right: 20px;
+    width: 400px;
+    max-height: 600px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    display: none;
+    flex-direction: column;
+    z-index: 10001; /* Acima do botão do chat */
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+[data-bs-theme="dark"] .chat-widget-panel {
+    background: #1e1e2d;
+    color: #e4e6ef;
+}
+
+.chat-widget-panel.active {
+    display: flex;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header do Painel */
+.chat-widget-header {
+    padding: 16px;
+    background: linear-gradient(135deg, #009ef7 0%, #0066cc 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 12px 12px 0 0;
+}
+
+.chat-widget-header h5 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.chat-widget-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.chat-widget-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Lista de Conversas */
+.chat-widget-conversas {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.chat-widget-conversa-item {
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: 1px solid #e4e6ef;
+}
+
+.chat-widget-conversa-item .chat-avatar-inicial {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+    border: 2px solid #e4e6ef;
+    background: linear-gradient(135deg, #009ef7 0%, #0066cc 100%);
+    color: white;
+    font-weight: bold;
+}
+
+[data-bs-theme="dark"] .chat-widget-conversa-item {
+    border-color: #2d2d43;
+}
+
+.chat-widget-conversa-item:hover {
+    background: #f5f8fa;
+}
+
+[data-bs-theme="dark"] .chat-widget-conversa-item:hover {
+    background: #2d2d43;
+}
+
+.chat-widget-conversa-item.nao-lida {
+    background: #fff4e6;
+    border-color: #ffc700;
+}
+
+[data-bs-theme="dark"] .chat-widget-conversa-item.nao-lida {
+    background: #3d2e1a;
+    border-color: #ffc700;
+}
+
+.chat-widget-conversa-titulo {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #181c32;
+}
+
+[data-bs-theme="dark"] .chat-widget-conversa-titulo {
+    color: #e4e6ef;
+}
+
+.chat-widget-conversa-preview {
+    font-size: 13px;
+    color: #7e8299;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-widget-conversa-badge {
+    display: inline-block;
+    background: #f1416c;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+/* Footer do Painel */
+.chat-widget-footer {
+    padding: 12px;
+    border-top: 1px solid #e4e6ef;
+}
+
+[data-bs-theme="dark"] .chat-widget-footer {
+    border-top-color: #2d2d43;
+}
+
+.chat-widget-btn-nova {
+    width: 100%;
+    padding: 10px;
+    background: #009ef7;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.chat-widget-btn-nova:hover {
+    background: #0066cc;
+}
+
+/* Modal Nova Conversa */
+.chat-widget-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-widget-modal.active {
+    display: flex;
+}
+
+.chat-widget-modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+[data-bs-theme="dark"] .chat-widget-modal-content {
+    background: #1e1e2d;
+    color: #e4e6ef;
+}
+
+.chat-widget-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.chat-widget-modal-header h4 {
+    margin: 0;
+}
+
+.chat-widget-form-group {
+    margin-bottom: 16px;
+}
+
+.chat-widget-form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #181c32;
+}
+
+[data-bs-theme="dark"] .chat-widget-form-group label {
+    color: #e4e6ef;
+}
+
+.chat-widget-form-group input,
+.chat-widget-form-group select,
+.chat-widget-form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #e4e6ef;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+[data-bs-theme="dark"] .chat-widget-form-group input,
+[data-bs-theme="dark"] .chat-widget-form-group select,
+[data-bs-theme="dark"] .chat-widget-form-group textarea {
+    background: #2d2d43;
+    border-color: #3d3d5c;
+    color: #e4e6ef;
+}
+
+.chat-widget-form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.chat-widget-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+
+.chat-widget-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.chat-widget-btn-primary {
+    background: #009ef7;
+    color: white;
+}
+
+.chat-widget-btn-primary:hover {
+    background: #0066cc;
+}
+
+.chat-widget-btn-secondary {
+    background: #e4e6ef;
+    color: #181c32;
+}
+
+[data-bs-theme="dark"] .chat-widget-btn-secondary {
+    background: #2d2d43;
+    color: #e4e6ef;
+}
+
+.chat-widget-btn-secondary:hover {
+    background: #d1d3e0;
+}
+
+[data-bs-theme="dark"] .chat-widget-btn-secondary:hover {
+    background: #3d3d5c;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .chat-widget-panel {
+        width: calc(100% - 40px);
+        max-height: calc(100vh - 100px);
+        bottom: 90px;
+        right: 20px;
+        left: 20px;
+    }
+    
+    .chat-widget-button {
+        bottom: 15px;
+        right: 15px;
+        width: 56px;
+        height: 56px;
+    }
+}
+
+/* Loading */
+.chat-widget-loading {
+    text-align: center;
+    padding: 20px;
+    color: #7e8299;
+}
+
+/* Vazio */
+.chat-widget-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #7e8299;
+}
+
+.chat-widget-empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+

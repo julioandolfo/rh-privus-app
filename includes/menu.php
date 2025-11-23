@@ -293,6 +293,24 @@ function getIcon($name) {
                     </div>
                     <!--end:Menu item-->
                     
+                    <!--begin:Menu item - Chat-->
+                    <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
+                    <div class="menu-item">
+                        <a class="menu-link <?= isActive('chat_gestao.php') ?>" href="chat_gestao.php">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-message-text-2 fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Chat</span>
+                        </a>
+                    </div>
+                    <!--end:Menu item-->
+                    <?php endif; ?>
+                    
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('empresas.php') || isActive('setores.php') || isActive('cargos.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -720,7 +738,7 @@ function getIcon($name) {
                     <!--end:Menu item-->
                     
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -762,6 +780,16 @@ function getIcon($name) {
                                         <span class="bullet bullet-dot"></span>
                                     </span>
                                     <span class="menu-title">Configuração OneSignal</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('chat_configuracoes.php') ?>" href="chat_configuracoes.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Chat</span>
                                 </a>
                             </div>
                             <!--end:Menu item-->

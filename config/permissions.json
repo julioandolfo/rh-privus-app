@@ -135,5 +135,13 @@
         "ADMIN",
         "RH",
         "GESTOR"
+    ],
+    "chat_gestao.php": [
+        "ADMIN",
+        "RH"
+    ],
+    "chat_configuracoes.php": [
+        "ADMIN",
+        "RH"
     ]
 }

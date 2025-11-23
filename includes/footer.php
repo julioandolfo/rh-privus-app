@@ -63,6 +63,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
     <!--end::jQuery Mask Plugin-->
     
+    <!--begin::Chat Widget (para colaboradores)-->
+    <?php 
+    if (isset($_SESSION['usuario']) && $_SESSION['usuario']['role'] === 'COLABORADOR'): 
+    ?>
+    <link href="../assets/css/chat-widget.css" rel="stylesheet" type="text/css" />
+    <script>
+        window.userRole = 'COLABORADOR';
+        document.body.classList.add('is-colaborador');
+    </script>
+    <script src="../assets/js/chat-widget.js"></script>
+    <?php endif; ?>
+    <!--end::Chat Widget-->
+    
     <!--begin::Custom Javascript-->
     <script>
         // Sistema de Troca de Tema
