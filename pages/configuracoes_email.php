@@ -553,6 +553,35 @@ require_once __DIR__ . '/../includes/header.php';
                                             <li><code>{cargo_nome}</code> - Nome do cargo</li>
                                         </ul>
                                     </div>
+                                    <div class="col-md-6 mt-4">
+                                        <h5 class="mb-3">Recrutamento - Confirmação/Aprovação/Rejeição</h5>
+                                        <ul class="list-unstyled">
+                                            <li><code>{nome_completo}</code> ou <code>{nome}</code> - Nome do candidato</li>
+                                            <li><code>{email}</code> - Email do candidato</li>
+                                            <li><code>{telefone}</code> - Telefone do candidato</li>
+                                            <li><code>{vaga_titulo}</code> ou <code>{vaga}</code> - Título da vaga</li>
+                                            <li><code>{empresa_nome}</code> - Nome da empresa</li>
+                                            <li><code>{data_candidatura}</code> - Data da candidatura</li>
+                                            <li><code>{data_aprovacao}</code> - Data da aprovação</li>
+                                            <li><code>{data_rejeicao}</code> - Data da rejeição</li>
+                                            <li><code>{motivo_rejeicao}</code> - Motivo da rejeição (HTML)</li>
+                                            <li><code>{link_acompanhamento}</code> - Link para acompanhar candidatura</li>
+                                            <li><code>{status}</code> - Status da candidatura</li>
+                                            <li><code>{nota_geral}</code> - Nota geral do candidato</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6 mt-4">
+                                        <h5 class="mb-3">Recrutamento - Nova Candidatura (Recrutador)</h5>
+                                        <ul class="list-unstyled">
+                                            <li><code>{nome_completo}</code> ou <code>{nome}</code> - Nome do candidato</li>
+                                            <li><code>{email}</code> - Email do candidato</li>
+                                            <li><code>{telefone}</code> - Telefone do candidato</li>
+                                            <li><code>{vaga_titulo}</code> ou <code>{vaga}</code> - Título da vaga</li>
+                                            <li><code>{empresa_nome}</code> - Nome da empresa</li>
+                                            <li><code>{data_candidatura}</code> - Data da candidatura</li>
+                                            <li><code>{link_candidatura}</code> - Link para ver candidatura no sistema</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>

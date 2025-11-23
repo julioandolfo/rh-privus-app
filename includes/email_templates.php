@@ -39,8 +39,14 @@ function enviar_email_template($codigo_template, $email_destinatario, $variaveis
         ];
     }
     
-    // Substitui variáveis no assunto e corpo
-    $assunto = substituir_variaveis($template['assunto'], $variaveis);
+    // Usa assunto customizado se fornecido nas opções, senão usa do template
+    if (!empty($opcoes['assunto_customizado'])) {
+        $assunto = $opcoes['assunto_customizado'];
+    } else {
+        $assunto = substituir_variaveis($template['assunto'], $variaveis);
+    }
+    
+    // Substitui variáveis no corpo
     $corpo_html = substituir_variaveis($template['corpo_html'], $variaveis);
     $corpo_texto = $template['corpo_texto'] ? substituir_variaveis($template['corpo_texto'], $variaveis) : null;
     
@@ -49,6 +55,9 @@ function enviar_email_template($codigo_template, $email_destinatario, $variaveis
         'nome_destinatario' => $variaveis['nome_completo'] ?? '',
         'texto_alternativo' => $corpo_texto
     ], $opcoes);
+    
+    // Remove assunto_customizado das opções antes de passar para enviar_email
+    unset($opcoes_email['assunto_customizado']);
     
     return enviar_email($email_destinatario, $assunto, $corpo_html, $opcoes_email);
 }

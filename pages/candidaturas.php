@@ -46,7 +46,11 @@ $sql = "
            cand.email,
            v.titulo as vaga_titulo,
            e.nome_fantasia as empresa_nome,
-           u.nome as recrutador_nome
+           u.nome as recrutador_nome,
+           (SELECT COUNT(*) FROM entrevistas WHERE candidatura_id = c.id) as total_entrevistas,
+           (SELECT COUNT(*) FROM candidaturas_etapas WHERE candidatura_id = c.id) as total_etapas,
+           (SELECT COUNT(*) FROM candidaturas_anexos WHERE candidatura_id = c.id) as total_anexos,
+           (SELECT COUNT(*) FROM onboarding WHERE candidatura_id = c.id) as tem_onboarding
     FROM candidaturas c
     INNER JOIN candidatos cand ON c.candidato_id = cand.id
     INNER JOIN vagas v ON c.vaga_id = v.id
@@ -162,9 +166,29 @@ $vagas = $stmt->fetchAll();
                                         <td><?= htmlspecialchars($candidatura['recrutador_nome'] ?? '-') ?></td>
                                         <td><?= date('d/m/Y', strtotime($candidatura['data_candidatura'])) ?></td>
                                         <td>
-                                            <a href="candidatura_view.php?id=<?= $candidatura['id'] ?>" class="btn btn-sm btn-light-primary">
-                                                Ver Detalhes
-                                            </a>
+                                            <div class="d-flex gap-2">
+                                                <a href="candidatura_view.php?id=<?= $candidatura['id'] ?>" class="btn btn-sm btn-light-primary">
+                                                    Ver Detalhes
+                                                </a>
+                                                <button class="btn btn-sm btn-light-danger btn-excluir-candidatura" 
+                                                        data-candidatura-id="<?= $candidatura['id'] ?>"
+                                                        data-candidato-nome="<?= htmlspecialchars($candidatura['nome_completo']) ?>"
+                                                        data-vaga-titulo="<?= htmlspecialchars($candidatura['vaga_titulo']) ?>"
+                                                        data-status="<?= htmlspecialchars($candidatura['status']) ?>"
+                                                        data-total-entrevistas="<?= $candidatura['total_entrevistas'] ?? 0 ?>"
+                                                        data-total-etapas="<?= $candidatura['total_etapas'] ?? 0 ?>"
+                                                        data-total-anexos="<?= $candidatura['total_anexos'] ?? 0 ?>"
+                                                        data-tem-onboarding="<?= ($candidatura['tem_onboarding'] ?? 0) > 0 ? '1' : '0' ?>"
+                                                        title="Excluir Candidatura">
+                                                    <i class="ki-duotone ki-trash fs-6">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                        <span class="path3"></span>
+                                                        <span class="path4"></span>
+                                                        <span class="path5"></span>
+                                                    </i>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -178,6 +202,104 @@ $vagas = $stmt->fetchAll();
         </div>
     </div>
 </div>
+
+<script>
+// Excluir candidatura
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.btn-excluir-candidatura').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const candidaturaId = this.dataset.candidaturaId;
+            const candidatoNome = this.dataset.candidatoNome;
+            const vagaTitulo = this.dataset.vagaTitulo;
+            const status = this.dataset.status;
+            const totalEntrevistas = parseInt(this.dataset.totalEntrevistas || 0);
+            const totalEtapas = parseInt(this.dataset.totalEtapas || 0);
+            const totalAnexos = parseInt(this.dataset.totalAnexos || 0);
+            const temOnboarding = this.dataset.temOnboarding === '1';
+            
+            let mensagemConfirmacao = `Deseja realmente excluir a candidatura?\n\n`;
+            mensagemConfirmacao += `Candidato: ${candidatoNome}\n`;
+            mensagemConfirmacao += `Vaga: ${vagaTitulo}\n`;
+            mensagemConfirmacao += `Status: ${status}\n\n`;
+            
+            mensagemConfirmacao += `⚠️ ATENÇÃO: Esta ação excluirá permanentemente:\n`;
+            mensagemConfirmacao += `- A candidatura\n`;
+            
+            if (totalEtapas > 0) {
+                mensagemConfirmacao += `- ${totalEtapas} etapa(s) do processo\n`;
+            }
+            if (totalEntrevistas > 0) {
+                mensagemConfirmacao += `- ${totalEntrevistas} entrevista(s)\n`;
+            }
+            if (totalAnexos > 0) {
+                mensagemConfirmacao += `- ${totalAnexos} anexo(s) (currículos, etc.)\n`;
+            }
+            mensagemConfirmacao += `- Histórico e comentários\n`;
+            mensagemConfirmacao += `- Respostas de formulários de cultura\n`;
+            
+            if (temOnboarding) {
+                mensagemConfirmacao += `\n⚠️ Há um processo de onboarding vinculado (será mantido, mas ficará órfão)\n`;
+            }
+            
+            if (status === 'aprovada') {
+                mensagemConfirmacao += `\n🚨 CRÍTICO: Esta candidatura está APROVADA!\n\n`;
+            }
+            
+            mensagemConfirmacao += `\nEsta ação não pode ser desfeita!`;
+            
+            if (!confirm(mensagemConfirmacao)) {
+                return;
+            }
+            
+            // Confirmação adicional se estiver aprovada
+            if (status === 'aprovada') {
+                if (!confirm(`ATENÇÃO: Você está prestes a excluir uma candidatura APROVADA!\n\nTem certeza absoluta que deseja continuar?`)) {
+                    return;
+                }
+            }
+            
+            const btnOriginal = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            try {
+                const response = await fetch(`../api/recrutamento/candidaturas/excluir.php?id=${candidaturaId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    let mensagemSucesso = 'Candidatura excluída com sucesso!';
+                    if (data.dados_excluidos) {
+                        const info = [];
+                        if (data.dados_excluidos.entrevistas > 0) {
+                            info.push(`${data.dados_excluidos.entrevistas} entrevista(s)`);
+                        }
+                        if (data.dados_excluidos.etapas > 0) {
+                            info.push(`${data.dados_excluidos.etapas} etapa(s)`);
+                        }
+                        if (!empty(info)) {
+                            mensagemSucesso += `\n\nTambém foram excluídos: ${info.join(', ')}.`;
+                        }
+                    }
+                    alert(mensagemSucesso);
+                    location.reload();
+                } else {
+                    alert('Erro: ' + data.message);
+                    this.disabled = false;
+                    this.innerHTML = btnOriginal;
+                }
+            } catch (error) {
+                console.error('Erro ao excluir candidatura:', error);
+                alert('Erro ao excluir candidatura. Verifique o console para mais detalhes.');
+                this.disabled = false;
+                this.innerHTML = btnOriginal;
+            }
+        });
+    });
+});
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

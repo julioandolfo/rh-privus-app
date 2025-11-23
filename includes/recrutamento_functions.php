@@ -127,11 +127,13 @@ function executar_automatizacoes_kanban($candidatura_id, $coluna_codigo) {
     // Busca dados da candidatura
     $stmt = $pdo->prepare("
         SELECT c.*, 
-               cand.nome_completo, cand.email,
-               v.titulo as vaga_titulo
+               cand.nome_completo, cand.email, cand.telefone,
+               v.titulo as vaga_titulo, v.empresa_id,
+               e.nome_fantasia as empresa_nome
         FROM candidaturas c
         INNER JOIN candidatos cand ON c.candidato_id = cand.id
         INNER JOIN vagas v ON c.vaga_id = v.id
+        LEFT JOIN empresas e ON v.empresa_id = e.id
         WHERE c.id = ?
     ");
     $stmt->execute([$candidatura_id]);
@@ -216,15 +218,35 @@ function verificar_condicoes_automacao($condicoes, $candidatura) {
  * Envia email ao candidato
  */
 function enviar_email_candidato($candidatura, $config) {
-    require_once __DIR__ . '/email.php';
+    require_once __DIR__ . '/email_templates.php';
     
-    $template = $config['template'] ?? 'confirmacao_candidatura';
-    $assunto = $config['assunto'] ?? 'Atualização da sua candidatura';
+    $template_codigo = $config['template'] ?? 'confirmacao_candidatura';
     
-    // Busca template de email
-    $corpo = obter_template_email_recrutamento($template, $candidatura);
+    // Prepara variáveis para o template
+    $variaveis = preparar_variaveis_email_candidatura($candidatura);
     
-    enviar_email($candidatura['email'], $assunto, $corpo);
+    // Usa assunto customizado se fornecido, senão usa do template
+    $opcoes = [];
+    if (!empty($config['assunto'])) {
+        // Se tiver assunto customizado, substitui variáveis manualmente
+        $assunto = str_replace(['{nome_completo}', '{vaga_titulo}', '{empresa_nome}'], 
+            [$variaveis['nome_completo'], $variaveis['vaga_titulo'], $variaveis['empresa_nome']], 
+            $config['assunto']);
+        $opcoes['assunto_customizado'] = $assunto;
+    }
+    
+    // Envia usando o sistema de templates
+    $resultado = enviar_email_template($template_codigo, $candidatura['email'], $variaveis, $opcoes);
+    
+    // Se o template não existir, usa fallback
+    if (!$resultado['success']) {
+        require_once __DIR__ . '/email.php';
+        $assunto = $config['assunto'] ?? 'Atualização da sua candidatura';
+        $corpo = obter_template_email_recrutamento($template_codigo, $candidatura);
+        enviar_email($candidatura['email'], $assunto, $corpo);
+    }
+    
+    return $resultado;
 }
 
 /**
@@ -235,7 +257,7 @@ function enviar_email_recrutador($candidatura, $config) {
         return false;
     }
     
-    require_once __DIR__ . '/email.php';
+    require_once __DIR__ . '/email_templates.php';
     
     $pdo = getDB();
     $stmt = $pdo->prepare("SELECT email FROM usuarios WHERE id = ?");
@@ -246,14 +268,38 @@ function enviar_email_recrutador($candidatura, $config) {
         return false;
     }
     
-    $assunto = $config['assunto'] ?? 'Nova candidatura recebida';
-    $corpo = "Nova candidatura recebida para a vaga: {$candidatura['vaga_titulo']}\n\n";
-    $corpo .= "Candidato: {$candidatura['nome_completo']}\n";
-    $corpo .= "Email: {$candidatura['email']}\n";
+    // Prepara variáveis para o template
+    $variaveis = preparar_variaveis_email_candidatura($candidatura);
+    $variaveis['link_candidatura'] = get_base_url() . "/pages/candidatura_view.php?id={$candidatura['id']}";
     
-    enviar_email($usuario['email'], $assunto, $corpo);
+    // Usa template padrão ou customizado
+    $template_codigo = $config['template'] ?? 'nova_candidatura_recrutador';
     
-    return true;
+    // Usa assunto customizado se fornecido
+    $opcoes = [];
+    if (!empty($config['assunto'])) {
+        $assunto = str_replace(['{nome_completo}', '{vaga_titulo}', '{empresa_nome}'], 
+            [$variaveis['nome_completo'], $variaveis['vaga_titulo'], $variaveis['empresa_nome']], 
+            $config['assunto']);
+        $opcoes['assunto_customizado'] = $assunto;
+    }
+    
+    // Envia usando o sistema de templates
+    $resultado = enviar_email_template($template_codigo, $usuario['email'], $variaveis, $opcoes);
+    
+    // Se o template não existir, usa fallback
+    if (!$resultado['success']) {
+        require_once __DIR__ . '/email.php';
+        $assunto = $config['assunto'] ?? 'Nova candidatura recebida';
+        $corpo = "Nova candidatura recebida para a vaga: {$candidatura['vaga_titulo']}\n\n";
+        $corpo .= "Candidato: {$candidatura['nome_completo']}\n";
+        $corpo .= "Email: {$candidatura['email']}\n";
+        $corpo .= "\nVer candidatura: " . get_base_url() . "/pages/candidatura_view.php?id={$candidatura['id']}";
+        enviar_email($usuario['email'], $assunto, $corpo);
+        return ['success' => true];
+    }
+    
+    return $resultado;
 }
 
 /**
@@ -318,69 +364,144 @@ function criar_tarefa_onboarding($candidatura, $config) {
  * Envia email de aprovação
  */
 function enviar_email_aprovacao($candidatura, $config) {
-    require_once __DIR__ . '/email.php';
+    require_once __DIR__ . '/email_templates.php';
     
-    $template = $config['template'] ?? 'aprovacao';
-    $assunto = $config['assunto'] ?? 'Parabéns! Você foi aprovado!';
+    $template_codigo = $config['template'] ?? 'aprovacao';
     
-    $corpo = obter_template_email_recrutamento($template, $candidatura);
+    // Prepara variáveis para o template
+    $variaveis = preparar_variaveis_email_candidatura($candidatura);
+    $variaveis['data_aprovacao'] = !empty($candidatura['data_aprovacao']) 
+        ? date('d/m/Y', strtotime($candidatura['data_aprovacao'])) 
+        : date('d/m/Y');
     
-    enviar_email($candidatura['email'], $assunto, $corpo);
+    // Usa assunto customizado se fornecido
+    $opcoes = [];
+    if (!empty($config['assunto'])) {
+        $assunto = str_replace(['{nome_completo}', '{vaga_titulo}', '{empresa_nome}'], 
+            [$variaveis['nome_completo'], $variaveis['vaga_titulo'], $variaveis['empresa_nome']], 
+            $config['assunto']);
+        $opcoes['assunto_customizado'] = $assunto;
+    }
+    
+    // Envia usando o sistema de templates
+    $resultado = enviar_email_template($template_codigo, $candidatura['email'], $variaveis, $opcoes);
+    
+    // Se o template não existir, usa fallback
+    if (!$resultado['success']) {
+        require_once __DIR__ . '/email.php';
+        $assunto = $config['assunto'] ?? 'Parabéns! Você foi aprovado!';
+        $corpo = obter_template_email_recrutamento($template_codigo, $candidatura);
+        enviar_email($candidatura['email'], $assunto, $corpo);
+        return ['success' => true];
+    }
+    
+    return $resultado;
 }
 
 /**
  * Envia email de rejeição
  */
 function enviar_email_rejeicao($candidatura, $config) {
-    require_once __DIR__ . '/email.php';
+    require_once __DIR__ . '/email_templates.php';
     
-    $template = $config['template'] ?? 'rejeicao';
-    $assunto = $config['assunto'] ?? 'Atualização sobre sua candidatura';
+    $template_codigo = $config['template'] ?? 'rejeicao';
     
-    $corpo = obter_template_email_recrutamento($template, $candidatura);
+    // Prepara variáveis para o template
+    $variaveis = preparar_variaveis_email_candidatura($candidatura);
+    $variaveis['data_rejeicao'] = !empty($candidatura['data_reprovacao']) 
+        ? date('d/m/Y', strtotime($candidatura['data_reprovacao'])) 
+        : date('d/m/Y');
     
-    enviar_email($candidatura['email'], $assunto, $corpo);
+    // Adiciona motivo da rejeição se existir
+    $variaveis['motivo_rejeicao'] = '';
+    if (!empty($candidatura['motivo_reprovacao'])) {
+        $variaveis['motivo_rejeicao'] = '<p><strong>Motivo:</strong> ' . nl2br(htmlspecialchars($candidatura['motivo_reprovacao'])) . '</p>';
+    }
+    
+    // Usa assunto customizado se fornecido
+    $opcoes = [];
+    if (!empty($config['assunto'])) {
+        $assunto = str_replace(['{nome_completo}', '{vaga_titulo}', '{empresa_nome}'], 
+            [$variaveis['nome_completo'], $variaveis['vaga_titulo'], $variaveis['empresa_nome']], 
+            $config['assunto']);
+        $opcoes['assunto_customizado'] = $assunto;
+    }
+    
+    // Envia usando o sistema de templates
+    $resultado = enviar_email_template($template_codigo, $candidatura['email'], $variaveis, $opcoes);
+    
+    // Se o template não existir, usa fallback
+    if (!$resultado['success']) {
+        require_once __DIR__ . '/email.php';
+        $assunto = $config['assunto'] ?? 'Atualização sobre sua candidatura';
+        $corpo = obter_template_email_recrutamento($template_codigo, $candidatura);
+        enviar_email($candidatura['email'], $assunto, $corpo);
+        return ['success' => true];
+    }
+    
+    return $resultado;
 }
 
 /**
- * Obtém template de email de recrutamento
+ * Prepara variáveis para templates de email de candidatura
  */
-function obter_template_email_recrutamento($template, $candidatura) {
+function preparar_variaveis_email_candidatura($candidatura) {
     $pdo = getDB();
     
-    try {
-        $stmt = $pdo->prepare("
-            SELECT corpo_html, corpo_texto FROM email_templates 
-            WHERE codigo = ? AND ativo = 1
-        ");
-        $stmt->execute([$template]);
-        $template_data = $stmt->fetch();
-        
-        if ($template_data) {
-            // Usa corpo_html se disponível, senão corpo_texto
-            $corpo = !empty($template_data['corpo_html']) 
-                ? $template_data['corpo_html'] 
-                : ($template_data['corpo_texto'] ?? '');
-        } else {
-            // Template padrão
-            $corpo = "Olá {$candidatura['nome_completo']},\n\n";
-            $corpo .= "Sua candidatura para a vaga '{$candidatura['vaga_titulo']}' foi atualizada.\n\n";
-            $corpo .= "Acompanhe seu processo: " . get_base_url() . "/acompanhar?token={$candidatura['token_acompanhamento']}\n";
-        }
-    } catch (Exception $e) {
-        // Se a tabela não existir ou houver erro, usa template padrão
-        error_log('Erro ao buscar template de email: ' . $e->getMessage());
-        $corpo = "Olá {$candidatura['nome_completo']},\n\n";
-        $corpo .= "Sua candidatura para a vaga '{$candidatura['vaga_titulo']}' foi atualizada.\n\n";
-        $corpo .= "Acompanhe seu processo: " . get_base_url() . "/acompanhar?token={$candidatura['token_acompanhamento']}\n";
+    // Busca dados adicionais se necessário
+    $empresa_nome = '';
+    if (!empty($candidatura['empresa_id'])) {
+        $stmt = $pdo->prepare("SELECT nome_fantasia FROM empresas WHERE id = ?");
+        $stmt->execute([$candidatura['empresa_id']]);
+        $empresa = $stmt->fetch();
+        $empresa_nome = $empresa['nome_fantasia'] ?? '';
     }
     
-    // Substitui variáveis
-    $corpo = str_replace('{nome}', $candidatura['nome_completo'] ?? '', $corpo);
-    $corpo = str_replace('{nome_completo}', $candidatura['nome_completo'] ?? '', $corpo);
-    $corpo = str_replace('{vaga}', $candidatura['vaga_titulo'] ?? '', $corpo);
-    $corpo = str_replace('{vaga_titulo}', $candidatura['vaga_titulo'] ?? '', $corpo);
-    $corpo = str_replace('{link_acompanhamento}', get_base_url() . "/acompanhar?token=" . ($candidatura['token_acompanhamento'] ?? ''), $corpo);
+    // Formata data de candidatura
+    $data_candidatura = '';
+    if (!empty($candidatura['data_candidatura'])) {
+        $data_candidatura = date('d/m/Y', strtotime($candidatura['data_candidatura']));
+    } elseif (!empty($candidatura['created_at'])) {
+        $data_candidatura = date('d/m/Y', strtotime($candidatura['created_at']));
+    }
+    
+    return [
+        'nome_completo' => $candidatura['nome_completo'] ?? '',
+        'nome' => $candidatura['nome_completo'] ?? '',
+        'email' => $candidatura['email'] ?? '',
+        'telefone' => $candidatura['telefone'] ?? '',
+        'vaga_titulo' => $candidatura['vaga_titulo'] ?? '',
+        'vaga' => $candidatura['vaga_titulo'] ?? '',
+        'empresa_nome' => $empresa_nome ?: ($candidatura['empresa_nome'] ?? ''),
+        'data_candidatura' => $data_candidatura,
+        'link_acompanhamento' => get_base_url() . "/acompanhar?token=" . ($candidatura['token_acompanhamento'] ?? ''),
+        'status' => $candidatura['status'] ?? '',
+        'nota_geral' => $candidatura['nota_geral'] ?? ''
+    ];
+}
+
+/**
+ * Obtém template de email de recrutamento (fallback)
+ * Mantida para compatibilidade com código antigo
+ */
+function obter_template_email_recrutamento($template, $candidatura) {
+    require_once __DIR__ . '/email_templates.php';
+    
+    $variaveis = preparar_variaveis_email_candidatura($candidatura);
+    
+    // Tenta buscar template
+    $template_data = buscar_template_email($template);
+    
+    if ($template_data) {
+        require_once __DIR__ . '/email_templates.php';
+        $corpo = substituir_variaveis($template_data['corpo_html'] ?: $template_data['corpo_texto'], $variaveis);
+        return $corpo;
+    }
+    
+    // Template padrão fallback
+    $corpo = "Olá {$variaveis['nome_completo']},\n\n";
+    $corpo .= "Sua candidatura para a vaga '{$variaveis['vaga_titulo']}' foi atualizada.\n\n";
+    $corpo .= "Acompanhe seu processo: {$variaveis['link_acompanhamento']}\n";
     
     return $corpo;
 }
