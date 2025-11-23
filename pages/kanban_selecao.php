@@ -117,8 +117,7 @@ $vagas = $stmt->fetchAll();
                                         });
                                         ?>
                                         
-                                        <?php if (empty($candidaturas_coluna)): ?>
-                                        <div class="text-center py-10">
+                                        <div class="text-center py-10 empty-message" style="display: <?= empty($candidaturas_coluna) ? 'block' : 'none' ?>;">
                                             <i class="ki-duotone ki-information-5 fs-3x text-gray-400 mb-3">
                                                 <span class="path1"></span>
                                                 <span class="path2"></span>
@@ -126,7 +125,6 @@ $vagas = $stmt->fetchAll();
                                             </i>
                                             <p class="text-gray-500 fs-6 mb-0">Nenhum candidato nesta etapa</p>
                                         </div>
-                                        <?php endif; ?>
                                         
                                         <?php foreach ($candidaturas_coluna as $candidatura): ?>
                                         <div class="card shadow-sm mb-3 kanban-card cursor-move" 
@@ -199,7 +197,7 @@ $vagas = $stmt->fetchAll();
 </div>
 
 <script>
-// Atualiza contadores
+// Atualiza contadores e mensagens de vazio
 function atualizarContadores() {
     <?php foreach ($colunas as $coluna): ?>
     const count<?= $coluna['codigo'] ?> = document.querySelectorAll('[data-coluna-atual="<?= $coluna['codigo'] ?>"]').length;
@@ -207,6 +205,21 @@ function atualizarContadores() {
     const countTextEl<?= $coluna['codigo'] ?> = document.getElementById('count-text-<?= $coluna['codigo'] ?>');
     if (countTextEl<?= $coluna['codigo'] ?>) {
         countTextEl<?= $coluna['codigo'] ?>.textContent = count<?= $coluna['codigo'] ?> === 1 ? 'candidato' : 'candidato(s)';
+    }
+    
+    // Atualiza mensagem de vazio
+    const colunaElement = document.querySelector(`[data-coluna="<?= $coluna['codigo'] ?>"] .kanban-column`);
+    if (colunaElement) {
+        const emptyMessage = colunaElement.querySelector('.empty-message');
+        // Conta apenas cards visíveis (não ocultos pelo filtro de busca)
+        const visibleCards = Array.from(colunaElement.querySelectorAll('.kanban-card')).filter(card => {
+            return card.style.display !== 'none' && window.getComputedStyle(card).display !== 'none';
+        });
+        const hasCards = visibleCards.length > 0;
+        
+        if (emptyMessage) {
+            emptyMessage.style.display = hasCards ? 'none' : 'block';
+        }
     }
     <?php endforeach; ?>
 }
@@ -375,6 +388,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     card.style.display = 'none';
                 }
             });
+            // Atualiza mensagens de vazio após filtrar
+            atualizarContadores();
         });
     }
 });

@@ -202,27 +202,117 @@ $tipos_automacao = [
 </div>
 
 <script>
-document.getElementById('formAutomacao').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
+document.addEventListener('DOMContentLoaded', function() {
+    const formAutomacao = document.getElementById('formAutomacao');
+    const modalNovaAutomacao = new bootstrap.Modal(document.getElementById('modalNovaAutomacao'));
+    const modalTitle = document.querySelector('#modalNovaAutomacao .modal-title');
     
-    try {
-        const response = await fetch('../api/recrutamento/automatizacoes/salvar.php', {
-            method: 'POST',
-            body: formData
+    // Limpa formulário ao fechar modal
+    document.getElementById('modalNovaAutomacao').addEventListener('hidden.bs.modal', function() {
+        formAutomacao.reset();
+        document.getElementById('automacao_id').value = '';
+        modalTitle.textContent = 'Nova Automação';
+        document.getElementById('ativo').checked = true;
+    });
+    
+    // Botões de editar
+    document.querySelectorAll('.btn-editar-automacao').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const automacaoId = this.dataset.automacaoId;
+            
+            try {
+                const response = await fetch(`../api/recrutamento/automatizacoes/detalhes.php?id=${automacaoId}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    alert('Erro: ' + data.message);
+                    return;
+                }
+                
+                const automacao = data.automacao;
+                
+                // Preenche formulário
+                document.getElementById('automacao_id').value = automacao.id;
+                document.querySelector('input[name="nome"]').value = automacao.nome || '';
+                document.querySelector('select[name="tipo"]').value = automacao.tipo || '';
+                document.querySelector('select[name="coluna_id"]').value = automacao.coluna_id || '';
+                document.querySelector('select[name="etapa_id"]').value = automacao.etapa_id || '';
+                
+                // Preenche JSONs
+                if (automacao.condicoes) {
+                    document.querySelector('textarea[name="condicoes"]').value = JSON.stringify(automacao.condicoes, null, 2);
+                } else {
+                    document.querySelector('textarea[name="condicoes"]').value = '';
+                }
+                
+                if (automacao.configuracao) {
+                    document.querySelector('textarea[name="configuracao"]').value = JSON.stringify(automacao.configuracao, null, 2);
+                } else {
+                    document.querySelector('textarea[name="configuracao"]').value = '';
+                }
+                
+                // Checkbox ativo
+                document.getElementById('ativo').checked = automacao.ativo == 1;
+                
+                // Altera título do modal
+                modalTitle.textContent = 'Editar Automação';
+                
+                // Abre modal
+                modalNovaAutomacao.show();
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao carregar automação');
+            }
         });
+    });
+    
+    // Submit do formulário
+    formAutomacao.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
         
-        const data = await response.json();
-        
-        if (data.success) {
-            alert('Automação salva com sucesso!');
-            location.reload();
-        } else {
-            alert('Erro: ' + data.message);
+        // Valida JSONs antes de enviar
+        const condicoesText = formData.get('condicoes');
+        if (condicoesText) {
+            try {
+                JSON.parse(condicoesText);
+            } catch (e) {
+                alert('Erro: JSON de Condições inválido');
+                return;
+            }
         }
-    } catch (error) {
-        alert('Erro ao salvar automação');
-    }
+        
+        const configuracaoText = formData.get('configuracao');
+        if (configuracaoText) {
+            try {
+                JSON.parse(configuracaoText);
+            } catch (e) {
+                alert('Erro: JSON de Configuração inválido');
+                return;
+            }
+        }
+        
+        try {
+            const response = await fetch('../api/recrutamento/automatizacoes/salvar.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Automação salva com sucesso!');
+                modalNovaAutomacao.hide();
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('Erro ao salvar automação');
+        }
+    });
 });
 </script>
 
