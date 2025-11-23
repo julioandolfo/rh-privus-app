@@ -664,7 +664,8 @@ function carregarSetores(empresaId, setorSelecionado = '') {
             .then(r => r.json())
             .then(data => {
                 setorSelect.innerHTML = '<option value="">Selecione...</option>';
-                data.forEach(setor => {
+                const setores = Array.isArray(data) ? data : (data.setores || []);
+                setores.forEach(setor => {
                     const selected = setor.id == setorSelecionado ? 'selected' : '';
                     setorSelect.innerHTML += `<option value="${setor.id}" ${selected}>${setor.nome_setor}</option>`;
                 });
