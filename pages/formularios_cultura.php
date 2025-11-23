@@ -88,9 +88,16 @@ $etapas = $stmt->fetchAll();
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <a href="formulario_cultura_editar.php?id=<?= $formulario['id'] ?>" class="btn btn-sm btn-light-primary">
-                                                Editar
-                                            </a>
+                                            <div class="d-flex gap-2">
+                                                <a href="formulario_cultura_editar.php?id=<?= $formulario['id'] ?>" class="btn btn-sm btn-light-primary">
+                                                    Editar
+                                                </a>
+                                                <button class="btn btn-sm btn-light-danger btn-excluir-formulario" 
+                                                        data-formulario-id="<?= $formulario['id'] ?>"
+                                                        data-formulario-nome="<?= htmlspecialchars($formulario['nome']) ?>">
+                                                    Excluir
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -165,6 +172,36 @@ document.getElementById('formFormulario').addEventListener('submit', async funct
     } catch (error) {
         alert('Erro ao criar formulário');
     }
+});
+
+// Excluir formulário
+document.querySelectorAll('.btn-excluir-formulario').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const formularioId = this.dataset.formularioId;
+        const formularioNome = this.dataset.formularioNome;
+        
+        if (!confirm(`Deseja realmente excluir o formulário "${formularioNome}"?\n\nEsta ação não pode ser desfeita e excluirá todos os campos do formulário.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`../api/recrutamento/formularios_cultura/excluir.php?id=${formularioId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Formulário excluído com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        } catch (error) {
+            alert('Erro ao excluir formulário');
+            console.error(error);
+        }
+    });
 });
 </script>
 

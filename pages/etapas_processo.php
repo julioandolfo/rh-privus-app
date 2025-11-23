@@ -15,13 +15,24 @@ require_once __DIR__ . '/../includes/header.php';
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
-// Busca etapas padrão
+// Busca etapas padrão (com proteção contra duplicatas)
 $stmt = $pdo->query("
     SELECT * FROM processo_seletivo_etapas
     WHERE vaga_id IS NULL
-    ORDER BY ordem ASC
+    ORDER BY ordem ASC, id ASC
 ");
 $etapas_padrao = $stmt->fetchAll();
+
+// Remove duplicatas por ID (segurança adicional caso haja duplicatas no banco)
+$etapas_unicas = [];
+$ids_vistos = [];
+foreach ($etapas_padrao as $etapa) {
+    if (!in_array($etapa['id'], $ids_vistos)) {
+        $etapas_unicas[] = $etapa;
+        $ids_vistos[] = $etapa['id'];
+    }
+}
+$etapas_padrao = $etapas_unicas;
 
 $tipos_etapas = [
     'triagem' => 'Triagem',
@@ -71,6 +82,13 @@ $tipos_etapas = [
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <?php if (empty($etapas_padrao)): ?>
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted py-10">
+                                            Nenhuma etapa cadastrada ainda. Clique em "Nova Etapa" para começar.
+                                        </td>
+                                    </tr>
+                                    <?php else: ?>
                                     <?php foreach ($etapas_padrao as $etapa): ?>
                                     <tr>
                                         <td><?= $etapa['ordem'] ?></td>
@@ -104,13 +122,21 @@ $tipos_etapas = [
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-light-warning btn-editar-etapa" 
-                                                    data-etapa-id="<?= $etapa['id'] ?>">
-                                                Editar
-                                            </button>
+                                            <div class="d-flex gap-2">
+                                                <button class="btn btn-sm btn-light-warning btn-editar-etapa" 
+                                                        data-etapa-id="<?= $etapa['id'] ?>">
+                                                    Editar
+                                                </button>
+                                                <button class="btn btn-sm btn-light-danger btn-excluir-etapa" 
+                                                        data-etapa-id="<?= $etapa['id'] ?>"
+                                                        data-etapa-nome="<?= htmlspecialchars($etapa['nome']) ?>">
+                                                    Excluir
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -245,6 +271,7 @@ document.querySelectorAll('.btn-editar-etapa').forEach(btn => {
                 document.getElementById('obrigatoria').checked = etapa.obrigatoria == 1;
                 document.getElementById('permite_pular').checked = etapa.permite_pular == 1;
                 
+                document.querySelector('#modalNovaEtapa .modal-title').textContent = 'Editar Etapa';
                 const modal = new bootstrap.Modal(document.getElementById('modalNovaEtapa'));
                 modal.show();
             }
@@ -252,6 +279,43 @@ document.querySelectorAll('.btn-editar-etapa').forEach(btn => {
             alert('Erro ao carregar etapa');
         }
     });
+});
+
+// Excluir etapa
+document.querySelectorAll('.btn-excluir-etapa').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const etapaId = this.dataset.etapaId;
+        const etapaNome = this.dataset.etapaNome;
+        
+        if (!confirm(`Deseja realmente excluir a etapa "${etapaNome}"?\n\nEsta ação não pode ser desfeita.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`../api/recrutamento/etapas/excluir.php?id=${etapaId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Etapa excluída com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        } catch (error) {
+            alert('Erro ao excluir etapa');
+            console.error(error);
+        }
+    });
+});
+
+// Reset modal ao fechar
+document.getElementById('modalNovaEtapa').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('formEtapa').reset();
+    document.getElementById('etapa_id').value = '';
+    document.querySelector('#modalNovaEtapa .modal-title').textContent = 'Nova Etapa';
 });
 </script>
 

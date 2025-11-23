@@ -278,6 +278,16 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('analytics_recrutamento.php') ?>" href="analytics_recrutamento.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Analytics</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
                         </div>
                         <!--end:Menu sub-->
                     </div>

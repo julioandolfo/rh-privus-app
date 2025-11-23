@@ -139,6 +139,7 @@ function get_page_permissions() {
         'entrevistas.php' => ['ADMIN', 'RH', 'GESTOR'],
         'onboarding.php' => ['ADMIN', 'RH'],
         'kanban_onboarding.php' => ['ADMIN', 'RH'],
+        'analytics_recrutamento.php' => ['ADMIN', 'RH'],
     ];
     
     // Carrega permissões customizadas (se existir)
