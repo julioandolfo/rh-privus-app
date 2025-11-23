@@ -27,13 +27,27 @@ try {
     $pdo = getDB();
     $usuario = $_SESSION['usuario'];
     
-    // Validações
+    // Log para debug (remover em produção)
+    error_log('Dados recebidos: ' . json_encode($_POST));
+    
+    // Validações detalhadas
     $empresa_id = (int)($_POST['empresa_id'] ?? 0);
     $titulo = trim($_POST['titulo'] ?? '');
     $descricao = trim($_POST['descricao'] ?? '');
     
-    if (empty($empresa_id) || empty($titulo) || empty($descricao)) {
-        throw new Exception('Empresa, título e descrição são obrigatórios');
+    $erros_validacao = [];
+    if (empty($empresa_id)) {
+        $erros_validacao[] = 'Empresa é obrigatória';
+    }
+    if (empty($titulo)) {
+        $erros_validacao[] = 'Título é obrigatório';
+    }
+    if (empty($descricao)) {
+        $erros_validacao[] = 'Descrição é obrigatória';
+    }
+    
+    if (!empty($erros_validacao)) {
+        throw new Exception('Campos obrigatórios: ' . implode(', ', $erros_validacao));
     }
     
     // Verifica permissão de empresa
@@ -133,8 +147,21 @@ try {
         'vaga_id' => $vaga_id
     ]);
     
+} catch (PDOException $e) {
+    http_response_code(400);
+    error_log('Erro PDO ao criar vaga: ' . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'message' => 'Erro ao salvar no banco de dados: ' . $e->getMessage(),
+        'debug' => (defined('DEBUG') && DEBUG) ? [
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString()
+        ] : null
+    ]);
 } catch (Exception $e) {
     http_response_code(400);
+    error_log('Erro ao criar vaga: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage()

@@ -436,25 +436,35 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             console.log('Enviando formulário...');
+            console.log('Dados do formulário:', Object.fromEntries(formData));
+            
             const response = await fetch('../api/recrutamento/vagas/criar.php', {
                 method: 'POST',
                 body: formData
             });
             
-            console.log('Resposta recebida:', response.status);
+            console.log('Resposta recebida:', response.status, response.statusText);
             
-            if (!response.ok) {
-                throw new Error('Erro HTTP: ' + response.status);
+            let data;
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                console.error('Resposta não é JSON:', text);
+                throw new Error('Resposta inválida do servidor: ' + text.substring(0, 200));
             }
             
-            const data = await response.json();
             console.log('Dados recebidos:', data);
             
             if (data.success) {
                 alert('Vaga criada com sucesso!');
                 window.location.href = 'vagas.php';
             } else {
-                alert('Erro: ' + (data.message || 'Erro desconhecido'));
+                const mensagemErro = data.message || 'Erro desconhecido ao criar vaga';
+                console.error('Erro retornado pela API:', mensagemErro);
+                alert('Erro: ' + mensagemErro);
                 isSubmitting = false;
                 if (btnSubmit) {
                     btnSubmit.disabled = false;
@@ -463,7 +473,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Erro ao criar vaga:', error);
-            alert('Erro ao criar vaga. Verifique o console para mais detalhes.');
+            console.error('Stack trace:', error.stack);
+            alert('Erro ao criar vaga: ' + error.message + '\n\nVerifique o console (F12) para mais detalhes.');
             isSubmitting = false;
             if (btnSubmit) {
                 btnSubmit.disabled = false;
