@@ -25,6 +25,16 @@ if (!has_role(['ADMIN', 'RH'])) {
 
 try {
     $pdo = getDB();
+    
+    // Configura timeout para evitar locks muito longos
+    $pdo->setAttribute(PDO::ATTR_TIMEOUT, 10);
+    
+    // Verifica se há transação aberta e fecha se necessário
+    if ($pdo->inTransaction()) {
+        error_log('Aviso: Transação já estava aberta, fazendo rollback');
+        $pdo->rollBack();
+    }
+    
     $usuario = $_SESSION['usuario'];
     
     // Log para debug (remover em produção)
@@ -61,7 +71,11 @@ try {
         $beneficios = $_POST['beneficios'];
     }
     
-    // Insere vaga
+    // Inicia transação
+    $pdo->beginTransaction();
+    
+    try {
+        // Insere vaga
     $stmt = $pdo->prepare("
         INSERT INTO vagas (
             empresa_id, setor_id, cargo_id, titulo, descricao,
@@ -106,60 +120,99 @@ try {
         $usuario['id']
     ]);
     
-    $vaga_id = $pdo->lastInsertId();
-    
-    // Se usar landing page customizada, cria estrutura básica
-    if (!empty($_POST['usar_landing_page_customizada'])) {
-        $stmt = $pdo->prepare("
-            INSERT INTO vagas_landing_pages (vaga_id, ativo)
-            VALUES (?, 1)
-        ");
-        $stmt->execute([$vaga_id]);
-    }
-    
-    // Configura etapas da vaga (se informadas)
-    if (!empty($_POST['etapas']) && is_array($_POST['etapas'])) {
-        $ordem = 1;
-        foreach ($_POST['etapas'] as $etapa_id) {
+        $vaga_id = $pdo->lastInsertId();
+        
+        // Se usar landing page customizada, cria estrutura básica
+        if (!empty($_POST['usar_landing_page_customizada'])) {
             $stmt = $pdo->prepare("
-                INSERT INTO vagas_etapas (vaga_id, etapa_id, ordem, obrigatoria)
-                VALUES (?, ?, ?, 1)
+                INSERT INTO vagas_landing_pages (vaga_id, ativo)
+                VALUES (?, 1)
             ");
-            $stmt->execute([$vaga_id, (int)$etapa_id, $ordem++]);
+            $stmt->execute([$vaga_id]);
         }
-    } else {
-        // Usa etapas padrão
-        $stmt = $pdo->query("SELECT id FROM processo_seletivo_etapas WHERE vaga_id IS NULL AND ativo = 1 ORDER BY ordem ASC");
-        $etapas_padrao = $stmt->fetchAll();
-        $ordem = 1;
-        foreach ($etapas_padrao as $etapa) {
-            $stmt = $pdo->prepare("
-                INSERT INTO vagas_etapas (vaga_id, etapa_id, ordem, obrigatoria)
-                VALUES (?, ?, ?, 1)
-            ");
-            $stmt->execute([$vaga_id, $etapa['id'], $ordem++]);
+        
+        // Configura etapas da vaga (se informadas)
+        if (!empty($_POST['etapas']) && is_array($_POST['etapas'])) {
+            $ordem = 1;
+            foreach ($_POST['etapas'] as $etapa_id) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO vagas_etapas (vaga_id, etapa_id, ordem, obrigatoria)
+                    VALUES (?, ?, ?, 1)
+                ");
+                $stmt->execute([$vaga_id, (int)$etapa_id, $ordem++]);
+            }
+        } else {
+            // Usa etapas padrão
+            $stmt = $pdo->query("SELECT id FROM processo_seletivo_etapas WHERE vaga_id IS NULL AND ativo = 1 ORDER BY ordem ASC");
+            $etapas_padrao = $stmt->fetchAll();
+            $ordem = 1;
+            foreach ($etapas_padrao as $etapa) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO vagas_etapas (vaga_id, etapa_id, ordem, obrigatoria)
+                    VALUES (?, ?, ?, 1)
+                ");
+                $stmt->execute([$vaga_id, $etapa['id'], $ordem++]);
+            }
         }
+        
+        // Confirma transação
+        $pdo->commit();
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Vaga criada com sucesso',
+            'vaga_id' => $vaga_id
+        ]);
+        
+    } catch (Exception $e) {
+        // Reverte transação em caso de erro
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
-    
-    echo json_encode([
-        'success' => true,
-        'message' => 'Vaga criada com sucesso',
-        'vaga_id' => $vaga_id
-    ]);
     
 } catch (PDOException $e) {
+    // Garante que não há transação aberta
+    try {
+        $pdo = getDB();
+        if ($pdo && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    } catch (Exception $rollbackEx) {
+        error_log('Erro ao fazer rollback: ' . $rollbackEx->getMessage());
+    }
+    
     http_response_code(400);
     error_log('Erro PDO ao criar vaga: ' . $e->getMessage());
+    
+    // Mensagem específica para lock timeout
+    $mensagem = $e->getMessage();
+    if (strpos($mensagem, 'Lock wait timeout') !== false || strpos($mensagem, '1205') !== false) {
+        $mensagem = 'O banco de dados está ocupado. Por favor, aguarde alguns segundos e tente novamente.';
+    }
+    
     echo json_encode([
         'success' => false,
-        'message' => 'Erro ao salvar no banco de dados: ' . $e->getMessage(),
+        'message' => 'Erro ao salvar no banco de dados: ' . $mensagem,
         'debug' => (defined('DEBUG') && DEBUG) ? [
             'file' => $e->getFile(),
             'line' => $e->getLine(),
+            'code' => $e->getCode(),
             'trace' => $e->getTraceAsString()
         ] : null
     ]);
 } catch (Exception $e) {
+    // Garante que não há transação aberta
+    try {
+        $pdo = getDB();
+        if ($pdo && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    } catch (Exception $rollbackEx) {
+        error_log('Erro ao fazer rollback: ' . $rollbackEx->getMessage());
+    }
+    
     http_response_code(400);
     error_log('Erro ao criar vaga: ' . $e->getMessage());
     echo json_encode([
