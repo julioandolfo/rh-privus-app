@@ -58,8 +58,8 @@ try {
             $filtros['limit']
         );
     } else {
-        // RH: busca com filtros
-        $conversas = buscar_conversas_rh($filtros);
+        // RH/ADMIN: busca com filtros (passa informações do usuário para filtro automático)
+        $conversas = buscar_conversas_rh($filtros, $usuario);
     }
     
     // Formata resposta

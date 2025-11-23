@@ -905,46 +905,164 @@ document.getElementById('foto_perfil')?.addEventListener('change', function(e) {
     // Verifica status das notificações
     async function verificarStatusNotificacoes() {
         try {
-            if (typeof OneSignal === 'undefined') {
+            // Verifica se navegador suporta notificações
+            if (!('Notification' in window)) {
                 atualizarStatus('nao_suportado', 'Push notifications não são suportadas neste navegador');
                 return;
             }
             
-            return new Promise((resolve) => {
-                OneSignal.push(function() {
-                    OneSignal.isPushNotificationsEnabled(function(isEnabled) {
-                        if (isEnabled) {
-                            OneSignal.getNotificationPermission(function(permission) {
-                                if (permission === 'granted') {
-                                    atualizarStatus('ativo', 'Notificações ativas');
-                                    mostrarBotoes(['desativar', 'resetar']);
-                                } else {
-                                    atualizarStatus('erro', 'Erro ao verificar permissão');
-                                    mostrarBotoes(['ativar', 'resetar']);
-                                }
-                                resolve();
-                            });
+            // Verifica se OneSignal está disponível
+            if (typeof OneSignal === 'undefined') {
+                // Fallback: usa API nativa do navegador
+                const permission = Notification.permission;
+                if (permission === 'granted') {
+                    atualizarStatus('ativo', 'Notificações ativas');
+                    mostrarBotoes(['desativar', 'resetar']);
+                } else if (permission === 'denied') {
+                    atualizarStatus('negado', 'Permissão negada. Use o botão "Resetar Permissão" para tentar novamente.');
+                    mostrarBotoes(['resetar']);
+                } else {
+                    atualizarStatus('inativo', 'Notificações não ativadas');
+                    mostrarBotoes(['ativar']);
+                }
+                return;
+            }
+            
+            // Verifica se OneSignal está inicializado (verifica se tem método init)
+            if (typeof OneSignal.push !== 'function') {
+                console.warn('OneSignal não está inicializado ainda, aguardando...');
+                // Aguarda até 5 segundos para OneSignal inicializar
+                let tentativas = 0;
+                const maxTentativas = 10; // 5 segundos (10 x 500ms)
+                const checkInterval = setInterval(() => {
+                    tentativas++;
+                    if (typeof OneSignal.push === 'function') {
+                        clearInterval(checkInterval);
+                        verificarStatusNotificacoes(); // Tenta novamente
+                    } else if (tentativas >= maxTentativas) {
+                        clearInterval(checkInterval);
+                        // Fallback para API nativa
+                        const permission = Notification.permission;
+                        if (permission === 'granted') {
+                            atualizarStatus('ativo', 'Notificações ativas');
+                            mostrarBotoes(['desativar', 'resetar']);
+                        } else if (permission === 'denied') {
+                            atualizarStatus('negado', 'Permissão negada. Use o botão "Resetar Permissão" para tentar novamente.');
+                            mostrarBotoes(['resetar']);
                         } else {
-                            OneSignal.getNotificationPermission(function(permission) {
-                                if (permission === 'denied') {
-                                    atualizarStatus('negado', 'Permissão negada. Use o botão "Resetar Permissão" para tentar novamente.');
-                                    mostrarBotoes(['resetar']);
-                                } else if (permission === 'default') {
-                                    atualizarStatus('inativo', 'Notificações não ativadas');
-                                    mostrarBotoes(['ativar']);
-                                } else {
-                                    atualizarStatus('inativo', 'Notificações não ativadas');
-                                    mostrarBotoes(['ativar']);
-                                }
-                                resolve();
-                            });
+                            atualizarStatus('inativo', 'Notificações não ativadas');
+                            mostrarBotoes(['ativar']);
                         }
+                    }
+                }, 500);
+                return;
+            }
+            
+            // Usa OneSignal com timeout para evitar travamento
+            return new Promise((resolve, reject) => {
+                let resolved = false;
+                
+                // Timeout de 5 segundos para evitar travamento
+                const timeout = setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        console.warn('Timeout ao verificar status do OneSignal, usando API nativa');
+                        // Fallback para API nativa
+                        const permission = Notification.permission;
+                        if (permission === 'granted') {
+                            atualizarStatus('ativo', 'Notificações ativas');
+                            mostrarBotoes(['desativar', 'resetar']);
+                        } else if (permission === 'denied') {
+                            atualizarStatus('negado', 'Permissão negada. Use o botão "Resetar Permissão" para tentar novamente.');
+                            mostrarBotoes(['resetar']);
+                        } else {
+                            atualizarStatus('inativo', 'Notificações não ativadas');
+                            mostrarBotoes(['ativar']);
+                        }
+                        resolve();
+                    }
+                }, 5000);
+                
+                try {
+                    OneSignal.push(function() {
+                        if (resolved) return; // Já foi resolvido pelo timeout
+                        
+                        OneSignal.isPushNotificationsEnabled(function(isEnabled) {
+                            if (resolved) return;
+                            
+                            if (isEnabled) {
+                                OneSignal.getNotificationPermission(function(permission) {
+                                    if (resolved) return;
+                                    
+                                    clearTimeout(timeout);
+                                    resolved = true;
+                                    
+                                    if (permission === 'granted') {
+                                        atualizarStatus('ativo', 'Notificações ativas');
+                                        mostrarBotoes(['desativar', 'resetar']);
+                                    } else {
+                                        atualizarStatus('erro', 'Erro ao verificar permissão');
+                                        mostrarBotoes(['ativar', 'resetar']);
+                                    }
+                                    resolve();
+                                });
+                            } else {
+                                OneSignal.getNotificationPermission(function(permission) {
+                                    if (resolved) return;
+                                    
+                                    clearTimeout(timeout);
+                                    resolved = true;
+                                    
+                                    if (permission === 'denied') {
+                                        atualizarStatus('negado', 'Permissão negada. Use o botão "Resetar Permissão" para tentar novamente.');
+                                        mostrarBotoes(['resetar']);
+                                    } else if (permission === 'default') {
+                                        atualizarStatus('inativo', 'Notificações não ativadas');
+                                        mostrarBotoes(['ativar']);
+                                    } else {
+                                        atualizarStatus('inativo', 'Notificações não ativadas');
+                                        mostrarBotoes(['ativar']);
+                                    }
+                                    resolve();
+                                });
+                            }
+                        });
                     });
-                });
+                } catch (error) {
+                    if (!resolved) {
+                        clearTimeout(timeout);
+                        resolved = true;
+                        console.error('Erro ao verificar status do OneSignal:', error);
+                        // Fallback para API nativa
+                        const permission = Notification.permission;
+                        if (permission === 'granted') {
+                            atualizarStatus('ativo', 'Notificações ativas');
+                            mostrarBotoes(['desativar', 'resetar']);
+                        } else if (permission === 'denied') {
+                            atualizarStatus('negado', 'Permissão negada. Use o botão "Resetar Permissão" para tentar novamente.');
+                            mostrarBotoes(['resetar']);
+                        } else {
+                            atualizarStatus('inativo', 'Notificações não ativadas');
+                            mostrarBotoes(['ativar']);
+                        }
+                        resolve();
+                    }
+                }
             });
         } catch (error) {
             console.error('Erro ao verificar status:', error);
-            atualizarStatus('erro', 'Erro ao verificar status: ' + error.message);
+            // Fallback para API nativa em caso de erro
+            const permission = Notification.permission;
+            if (permission === 'granted') {
+                atualizarStatus('ativo', 'Notificações ativas');
+                mostrarBotoes(['desativar', 'resetar']);
+            } else if (permission === 'denied') {
+                atualizarStatus('negado', 'Permissão negada. Use o botão "Resetar Permissão" para tentar novamente.');
+                mostrarBotoes(['resetar']);
+            } else {
+                atualizarStatus('inativo', 'Notificações não ativadas');
+                mostrarBotoes(['ativar']);
+            }
         }
     }
     

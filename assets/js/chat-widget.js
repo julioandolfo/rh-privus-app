@@ -11,6 +11,7 @@
         button: null,
         conversas: [],
         pollingInterval: null,
+        badgePollingInterval: null,
         ultimaMensagemId: 0,
         conversaAtual: null,
         
@@ -31,8 +32,11 @@
             // Carrega conversas
             this.carregarConversas();
             
-            // Inicia polling
+            // Inicia polling (inclui atualização contínua do badge)
             this.iniciarPolling();
+            
+            // Inicia polling específico para badge (sempre ativo)
+            this.iniciarPollingBadge();
         },
         
         isColaborador: function() {
@@ -342,13 +346,71 @@
             }
         },
         
+        atualizarBadgeApenas: function() {
+            // Atualiza apenas o badge sem recarregar toda a lista
+            fetch('../api/chat/conversas/listar.php?limit=100')
+                .then(r => {
+                    const contentType = r.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        return null;
+                    }
+                    return r.json();
+                })
+                .then(data => {
+                    if (data && data.success && data.data) {
+                        const total = data.data.reduce((sum, conv) => sum + (conv.total_mensagens_nao_lidas || 0), 0);
+                        const badge = document.getElementById('chat-widget-badge');
+                        
+                        if (badge) {
+                            if (total > 0) {
+                                badge.textContent = total > 99 ? '99+' : total;
+                                badge.classList.remove('hidden');
+                            } else {
+                                badge.classList.add('hidden');
+                            }
+                        }
+                    }
+                })
+                .catch(err => {
+                    // Ignora erros silenciosamente para não poluir o console
+                });
+        },
+        
+        iniciarPollingBadge: function() {
+            // Polling específico para badge - sempre ativo, mesmo com painel fechado
+            // Atualiza a cada 10 segundos
+            this.badgePollingInterval = setInterval(() => {
+                // Só atualiza se o painel não estiver aberto (para evitar conflito)
+                if (!this.panel.classList.contains('active')) {
+                    this.atualizarBadgeApenas();
+                }
+            }, 10000);
+            
+            // Atualiza badge imediatamente após carregar
+            setTimeout(() => {
+                this.atualizarBadgeApenas();
+            }, 2000);
+        },
+        
         iniciarPolling: function() {
-            // Polling a cada 5 segundos
+            // Polling a cada 5 segundos para atualizar lista quando painel está aberto
             this.pollingInterval = setInterval(() => {
-                if (this.panel.classList.contains('active')) {
+                // Verifica se está na página de conversa - se sim, atualiza badge também
+                const isOnConversaPage = window.location.pathname.includes('chat_conversa.php');
+                const isOnChatColaboradorPage = window.location.pathname.includes('chat_colaborador.php');
+                
+                if (this.panel.classList.contains('active') || isOnConversaPage || isOnChatColaboradorPage) {
+                    // Se o painel está aberto ou está em página de chat, recarrega tudo
                     this.carregarConversas();
                 }
             }, 5000);
+            
+            // Atualiza imediatamente quando a página de conversa é carregada
+            if (window.location.pathname.includes('chat_conversa.php') || window.location.pathname.includes('chat_colaborador.php')) {
+                setTimeout(() => {
+                    this.carregarConversas();
+                }, 1000);
+            }
         },
         
         formatarData: function(data) {

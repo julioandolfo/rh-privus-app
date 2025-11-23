@@ -58,6 +58,10 @@ $stmt = $pdo->prepare("
 $stmt->execute([$conversa_id]);
 $mensagens = $stmt->fetchAll();
 
+// Marca mensagens como lidas quando a conversa é aberta
+require_once __DIR__ . '/../includes/chat_functions.php';
+marcar_mensagens_lidas($conversa_id, null, $usuario['colaborador_id']);
+
 // Busca categorias
 $stmt = $pdo->query("SELECT id, nome FROM chat_categorias WHERE ativo = TRUE ORDER BY ordem, nome");
 $categorias = $stmt->fetchAll();
@@ -243,6 +247,16 @@ $categorias = $stmt->fetchAll();
 <script>
     // Define ID do colaborador logado para o JavaScript
     window.CHAT_COLABORADOR_ID = <?= $usuario['colaborador_id'] ?? 'null' ?>;
+    
+    // Atualiza badge do widget quando a conversa é visualizada
+    // Aguarda o widget ser carregado
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(() => {
+            if (typeof ChatWidget !== 'undefined' && ChatWidget.carregarConversas) {
+                ChatWidget.carregarConversas();
+            }
+        }, 1000);
+    });
 </script>
 <script src="../assets/js/chat-conversa.js"></script>
 <script src="../assets/js/chat-audio.js"></script>

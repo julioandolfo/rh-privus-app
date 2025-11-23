@@ -136,6 +136,9 @@
         "RH",
         "GESTOR"
     ],
+    "chat_colaborador.php": [
+        "COLABORADOR"
+    ],
     "chat_gestao.php": [
         "ADMIN",
         "RH"

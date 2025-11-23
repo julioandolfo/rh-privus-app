@@ -1,80 +1,40 @@
 <?php
 /**
- * Gestão de Chat - RH
+ * Chat - Colaborador
+ * Tela completa de chat para colaboradores verem suas conversas
  */
 
-$page_title = 'Gestão de Conversas';
+$page_title = 'Meu Chat';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/chat_functions.php';
 
-require_page_permission('chat_gestao.php');
+// Apenas colaboradores podem acessar
+if (!is_colaborador() || empty($_SESSION['usuario']['colaborador_id'])) {
+    header('Location: dashboard.php');
+    exit;
+}
 
 require_once __DIR__ . '/../includes/header.php';
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
+$colaborador_id = $usuario['colaborador_id'];
 
 // Filtros
 $filtros = [];
-// Por padrão, mostra apenas conversas abertas (não fechadas)
 $status_filtro = $_GET['status'] ?? 'aberta';
-$filtros['status'] = $status_filtro; // 'aberta' será tratado como não-fechadas na função
-$filtros['atribuido_para'] = $_GET['atribuido_para'] ?? '';
-$filtros['prioridade'] = $_GET['prioridade'] ?? '';
-$filtros['categoria_id'] = $_GET['categoria_id'] ?? (int)($_GET['categoria_id'] ?? 0);
+$filtros['status'] = $status_filtro;
 $filtros['busca'] = $_GET['busca'] ?? '';
 $filtros['limit'] = 50;
 
-// Filtro automático aplicado na função buscar_conversas_rh():
-// - ADMIN: vê todas as conversas
-// - RH: vê apenas conversas atribuídas a ele + não atribuídas
-
-// Debug: Verifica conversas no banco antes do filtro
-$stmt_debug = $pdo->query("SELECT COUNT(*) as total FROM chat_conversas");
-$total_geral = $stmt_debug->fetch()['total'];
-
-$stmt_debug2 = $pdo->query("SELECT id, titulo, status FROM chat_conversas LIMIT 5");
-$conversas_debug = $stmt_debug2->fetchAll();
-
-// Carrega função de log do chat
-require_once __DIR__ . '/../includes/chat_functions.php';
-
-chat_log("Chat Gestao - Total de conversas no banco: " . $total_geral);
-chat_log("Chat Gestao - Primeiras 5 conversas", $conversas_debug);
-chat_log("Chat Gestao - Filtros aplicados", $filtros);
-chat_log("Chat Gestao - Usuario role: " . ($usuario['role'] ?? 'N/A'));
-chat_log("Chat Gestao - Usuario ID: " . ($usuario['id'] ?? 'N/A'));
-
-// Busca conversas (passa informações do usuário para filtro automático)
-$conversas = buscar_conversas_rh($filtros, $usuario);
-
-// Debug: Log para verificar conversas encontradas
-chat_log("Chat Gestao - Total de conversas encontradas após filtro: " . count($conversas));
-if (!empty($conversas)) {
-    chat_log("Chat Gestao - Primeira conversa", $conversas[0]);
-} else {
-    // Testa query direta sem filtros
-    $stmt_teste = $pdo->query("SELECT c.*, col.nome_completo as colaborador_nome FROM chat_conversas c INNER JOIN colaboradores col ON c.colaborador_id = col.id WHERE c.status NOT IN ('fechada', 'arquivada', 'resolvida') LIMIT 5");
-    $teste = $stmt_teste->fetchAll();
-    chat_log("Chat Gestao - Teste direto SQL: " . count($teste) . " conversas encontradas");
-    if (!empty($teste)) {
-        chat_log("Chat Gestao - Primeira conversa do teste", $teste[0]);
-    }
-}
+// Busca conversas do colaborador
+$conversas = buscar_conversas_colaborador($colaborador_id, $filtros['status'] === 'aberta' ? 'aberta' : ($filtros['status'] ?: null), $filtros['limit']);
 
 // Busca categorias
 $stmt = $pdo->query("SELECT id, nome, cor FROM chat_categorias WHERE ativo = TRUE ORDER BY ordem, nome");
 $categorias = $stmt->fetchAll();
-
-// Busca usuários RH para atribuição
-$stmt = $pdo->query("SELECT id, nome FROM usuarios WHERE role IN ('ADMIN', 'RH') AND status = 'ativo' ORDER BY nome");
-$usuarios_rh = $stmt->fetchAll();
-
-// Estatísticas
-$stmt = $pdo->query("SELECT * FROM vw_chat_metricas_gerais");
-$metricas = $stmt->fetch();
 
 // Conversa selecionada
 $conversa_selecionada = null;
@@ -83,22 +43,32 @@ if ($conversa_id > 0) {
     $stmt = $pdo->prepare("
         SELECT c.*, col.nome_completo as colaborador_nome, col.foto as colaborador_foto,
                col.email_pessoal as colaborador_email, col.telefone as colaborador_telefone,
-               u.nome as atribuido_para_nome, cat.nome as categoria_nome
+               u.nome as atribuido_para_nome, cat.nome as categoria_nome, cat.cor as categoria_cor
         FROM chat_conversas c
         INNER JOIN colaboradores col ON c.colaborador_id = col.id
         LEFT JOIN usuarios u ON c.atribuido_para_usuario_id = u.id
         LEFT JOIN chat_categorias cat ON c.categoria_id = cat.id
-        WHERE c.id = ?
+        WHERE c.id = ? AND c.colaborador_id = ?
     ");
-    $stmt->execute([$conversa_id]);
+    $stmt->execute([$conversa_id, $colaborador_id]);
     $conversa_selecionada = $stmt->fetch();
+    
+    if (!$conversa_selecionada) {
+        header('Location: chat_colaborador.php');
+        exit;
+    }
     
     if ($conversa_selecionada) {
         // Busca mensagens
         $mensagens = buscar_mensagens_conversa($conversa_id, 1, 100);
         
         // Marca mensagens como lidas quando a conversa é aberta
-        marcar_mensagens_lidas($conversa_id, $usuario['id'], null);
+        marcar_mensagens_lidas($conversa_id, null, $colaborador_id);
+        
+        // Busca resumos IA se existirem
+        $stmt_resumos = $pdo->prepare("SELECT * FROM chat_resumos_ia WHERE conversa_id = ? ORDER BY created_at DESC");
+        $stmt_resumos->execute([$conversa_id]);
+        $resumos_ia = $stmt_resumos->fetchAll();
     }
 }
 ?>
@@ -110,77 +80,19 @@ if ($conversa_id > 0) {
         <div class="post d-flex flex-column-fluid" id="kt_post">
             <div id="kt_content_container" class="container-fluid">
                 
-                <!-- Header com Estatísticas -->
-                <div class="row g-5 g-xl-8 mb-5">
-                    <div class="col-xl-3">
-                        <div class="card card-flush h-xl-100">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <span class="text-gray-500 fw-semibold fs-6">Conversas Abertas</span>
-                                    <h2 class="fw-bold mt-2"><?= $metricas['conversas_abertas'] ?? 0 ?></h2>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3">
-                        <div class="card card-flush h-xl-100">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <span class="text-gray-500 fw-semibold fs-6">Não Lidas</span>
-                                    <h2 class="fw-bold mt-2 text-warning"><?= $metricas['conversas_nao_lidas_rh'] ?? 0 ?></h2>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3">
-                        <div class="card card-flush h-xl-100">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <span class="text-gray-500 fw-semibold fs-6">Tempo Médio Resposta</span>
-                                    <h2 class="fw-bold mt-2">
-                                        <?php
-                                        $tempo = $metricas['tempo_medio_resposta_segundos'] ?? 0;
-                                        if ($tempo > 0) {
-                                            $minutos = floor($tempo / 60);
-                                            echo $minutos . ' min';
-                                        } else {
-                                            echo '-';
-                                        }
-                                        ?>
-                                    </h2>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3">
-                        <div class="card card-flush h-xl-100">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <span class="text-gray-500 fw-semibold fs-6">SLA Cumprido</span>
-                                    <h2 class="fw-bold mt-2 text-success">
-                                        <?php
-                                        $total = ($metricas['sla_primeira_resposta_cumprido'] ?? 0) + ($metricas['sla_primeira_resposta_nao_cumprido'] ?? 0);
-                                        if ($total > 0) {
-                                            $percent = round((($metricas['sla_primeira_resposta_cumprido'] ?? 0) / $total) * 100);
-                                            echo $percent . '%';
-                                        } else {
-                                            echo '-';
-                                        }
-                                        ?>
-                                    </h2>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
                 <div class="row">
                     <!-- Sidebar Esquerda: Lista de Conversas -->
                     <div class="col-xl-4">
                         <div class="card">
                             <div class="card-header border-0 pt-6">
                                 <div class="card-title">
-                                    <h3>Conversas</h3>
+                                    <h3>Minhas Conversas</h3>
+                                </div>
+                                <div class="card-toolbar">
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="abrirModalNovaConversa()">
+                                        <i class="ki-duotone ki-plus fs-2"><span class="path1"></span><span class="path2"></span></i>
+                                        Nova Conversa
+                                    </button>
                                 </div>
                             </div>
                             <div class="card-body pt-0">
@@ -190,40 +102,16 @@ if ($conversa_id > 0) {
                                         <div class="row g-3">
                                             <div class="col-12">
                                                 <input type="text" name="busca" class="form-control" 
-                                                       placeholder="Buscar..." value="<?= htmlspecialchars($filtros['busca']) ?>">
+                                                       placeholder="Buscar conversas..." value="<?= htmlspecialchars($filtros['busca']) ?>">
                                             </div>
-                                            <div class="col-6">
+                                            <div class="col-12">
                                                 <select name="status" class="form-select">
                                                     <option value="aberta" <?= ($filtros['status'] ?? '') === 'aberta' ? 'selected' : '' ?>>Abertas</option>
-                                                    <option value="">Todos Status</option>
-                                                    <option value="nova" <?= ($filtros['status'] ?? '') === 'nova' ? 'selected' : '' ?>>Nova</option>
-                                                    <option value="em_atendimento" <?= ($filtros['status'] ?? '') === 'em_atendimento' ? 'selected' : '' ?>>Em Atendimento</option>
-                                                    <option value="aguardando_colaborador" <?= ($filtros['status'] ?? '') === 'aguardando_colaborador' ? 'selected' : '' ?>>Aguardando Colaborador</option>
-                                                    <option value="fechada" <?= ($filtros['status'] ?? '') === 'fechada' ? 'selected' : '' ?>>Fechada</option>
+                                                    <option value="">Todas</option>
+                                                    <option value="fechada" <?= ($filtros['status'] ?? '') === 'fechada' ? 'selected' : '' ?>>Fechadas</option>
+                                                    <option value="resolvida" <?= ($filtros['status'] ?? '') === 'resolvida' ? 'selected' : '' ?>>Resolvidas</option>
                                                 </select>
                                             </div>
-                                            <div class="col-6">
-                                                <select name="prioridade" class="form-select">
-                                                    <option value="">Todas Prioridades</option>
-                                                    <option value="urgente" <?= $filtros['prioridade'] === 'urgente' ? 'selected' : '' ?>>Urgente</option>
-                                                    <option value="alta" <?= $filtros['prioridade'] === 'alta' ? 'selected' : '' ?>>Alta</option>
-                                                    <option value="normal" <?= $filtros['prioridade'] === 'normal' ? 'selected' : '' ?>>Normal</option>
-                                                    <option value="baixa" <?= $filtros['prioridade'] === 'baixa' ? 'selected' : '' ?>>Baixa</option>
-                                                </select>
-                                            </div>
-                                            <?php if ($usuario['role'] === 'ADMIN'): ?>
-                                            <div class="col-12">
-                                                <select name="atribuido_para" class="form-select">
-                                                    <option value="">Todos RHs</option>
-                                                    <option value="nao_atribuido">Não Atribuído</option>
-                                                    <?php foreach ($usuarios_rh as $rh): ?>
-                                                    <option value="<?= $rh['id'] ?>" <?= $filtros['atribuido_para'] == $rh['id'] ? 'selected' : '' ?>>
-                                                        <?= htmlspecialchars($rh['nome']) ?>
-                                                    </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                            <?php endif; ?>
                                             <div class="col-12">
                                                 <button type="submit" class="btn btn-primary w-100">Filtrar</button>
                                             </div>
@@ -236,28 +124,17 @@ if ($conversa_id > 0) {
                                     <?php if (empty($conversas)): ?>
                                         <div class="text-center text-muted py-10">
                                             <p>Nenhuma conversa encontrada</p>
-                                            <p class="small">Filtros aplicados: <?= htmlspecialchars(json_encode($filtros)) ?></p>
-                                            <?php if (isset($total_geral)): ?>
-                                            <p class="small">Total no banco: <?= $total_geral ?></p>
-                                            <?php endif; ?>
-                                            <?php if (!empty($conversas_debug)): ?>
-                                            <div class="mt-3 p-3 bg-light rounded">
-                                                <p class="small fw-bold">Status das primeiras conversas:</p>
-                                                <ul class="small text-start">
-                                                    <?php foreach ($conversas_debug as $c): ?>
-                                                    <li>ID: <?= $c['id'] ?> - Status: <strong><?= $c['status'] ?></strong> - Título: <?= htmlspecialchars($c['titulo']) ?></li>
-                                                    <?php endforeach; ?>
-                                                </ul>
-                                            </div>
+                                            <?php if (isset($_GET['nova'])): ?>
+                                            <a href="../api/chat/conversas/criar.php" class="btn btn-primary mt-3">Criar Nova Conversa</a>
                                             <?php endif; ?>
                                         </div>
                                     <?php else: ?>
                                         <?php foreach ($conversas as $conv): 
-                                            $avatar_colab = $conv['colaborador_foto'] ?? null;
-                                            $nome_colab = $conv['colaborador_nome'] ?? 'Colaborador';
-                                            $inicial_colab = mb_substr(mb_strtoupper($nome_colab), 0, 1);
+                                            $avatar_rh = null; // Colaborador não tem avatar do RH na listagem
+                                            $nome_rh = $conv['atribuido_para_nome'] ?? 'RH';
+                                            $inicial_rh = mb_substr(mb_strtoupper($nome_rh), 0, 1);
                                             $is_active = $conv['id'] == $conversa_id;
-                                            $nao_lidas = ($conv['total_mensagens_nao_lidas_rh'] ?? 0);
+                                            $nao_lidas = ($conv['total_mensagens_nao_lidas_colaborador'] ?? 0);
                                             
                                             // Preview da mensagem (limita a 60 caracteres)
                                             $preview = '';
@@ -310,30 +187,23 @@ if ($conversa_id > 0) {
                                             <?php endif; ?>
                                             
                                             <div class="chat-conversa-content">
-                                                <!-- Ícone de canal (sempre interno) -->
+                                                <!-- Ícone de canal -->
                                                 <div class="chat-conversa-channel-icon">
                                                     <i class="ki-duotone ki-message-text-2 fs-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
                                                 </div>
                                                 
-                                                <!-- Avatar -->
+                                                <!-- Avatar (do RH atribuído ou inicial) -->
                                                 <div class="chat-conversa-avatar-wrapper">
-                                                    <?php if ($avatar_colab): ?>
-                                                    <img src="../<?= htmlspecialchars($avatar_colab) ?>" 
-                                                         alt="<?= htmlspecialchars($nome_colab) ?>" 
-                                                         class="chat-conversa-avatar"
-                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                                    <?php endif; ?>
                                                     <div class="chat-conversa-avatar chat-avatar-inicial d-flex align-items-center justify-content-center fw-bold text-white" 
-                                                         data-inicial="<?= htmlspecialchars($inicial_colab) ?>"
-                                                         style="<?= $avatar_colab ? 'display: none;' : '' ?>">
-                                                        <?= htmlspecialchars($inicial_colab) ?>
+                                                         data-inicial="<?= htmlspecialchars($inicial_rh) ?>">
+                                                        <?= htmlspecialchars($inicial_rh) ?>
                                                     </div>
                                                 </div>
                                                 
                                                 <!-- Conteúdo -->
                                                 <div class="chat-conversa-info flex-grow-1">
                                                     <div class="chat-conversa-header">
-                                                        <span class="chat-conversa-nome fw-bold"><?= htmlspecialchars($nome_colab) ?></span>
+                                                        <span class="chat-conversa-nome fw-bold"><?= htmlspecialchars($conv['titulo'] ?? 'Sem título') ?></span>
                                                         <?php if ($prioridade_icon): ?>
                                                         <span class="chat-prioridade-wrapper"><?= $prioridade_icon ?></span>
                                                         <?php endif; ?>
@@ -347,10 +217,18 @@ if ($conversa_id > 0) {
                                                     </div>
                                                     
                                                     <div class="chat-conversa-footer">
-                                                        <?php if ($conv['categoria_nome']): ?>
-                                                        <span class="chat-conversa-tag" style="background-color: <?= htmlspecialchars($conv['categoria_cor'] ?? '#6c757d') ?>20; color: <?= htmlspecialchars($conv['categoria_cor'] ?? '#6c757d') ?>;">
-                                                            <?= htmlspecialchars($conv['categoria_nome']) ?>
+                                                        <?php if ($conv['categoria_id']): ?>
+                                                        <?php 
+                                                        $categoria = array_filter($categorias, function($cat) use ($conv) {
+                                                            return $cat['id'] == $conv['categoria_id'];
+                                                        });
+                                                        $cat = !empty($categoria) ? reset($categoria) : null;
+                                                        ?>
+                                                        <?php if ($cat): ?>
+                                                        <span class="chat-conversa-tag" style="background-color: <?= htmlspecialchars($cat['cor'] ?? '#6c757d') ?>20; color: <?= htmlspecialchars($cat['cor'] ?? '#6c757d') ?>;">
+                                                            <?= htmlspecialchars($cat['nome']) ?>
                                                         </span>
+                                                        <?php endif; ?>
                                                         <?php endif; ?>
                                                         <?php if ($nao_lidas > 0): ?>
                                                         <span class="chat-conversa-badge"><?= $nao_lidas > 99 ? '99+' : $nao_lidas ?></span>
@@ -374,42 +252,55 @@ if ($conversa_id > 0) {
                                 <div class="card-header border-0">
                                     <div class="card-title d-flex flex-column">
                                         <h3 class="mb-2"><?= htmlspecialchars($conversa_selecionada['titulo']) ?></h3>
+                                        <?php if ($conversa_selecionada['atribuido_para_nome']): ?>
                                         <div class="d-flex align-items-center gap-2 text-muted mb-1">
                                             <i class="ki-duotone ki-user fs-6"><span class="path1"></span><span class="path2"></span></i>
-                                            <span class="fw-semibold"><?= htmlspecialchars($conversa_selecionada['colaborador_nome']) ?></span>
+                                            <span class="fw-semibold">Atendido por: <?= htmlspecialchars($conversa_selecionada['atribuido_para_nome']) ?></span>
                                         </div>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="card-toolbar">
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-light" data-bs-toggle="dropdown">
-                                                <i class="ki-duotone ki-setting-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                                            </button>
-                                            <ul class="dropdown-menu">
-                                                <li><a class="dropdown-item" href="#" onclick="atribuirConversa(<?= $conversa_id ?>)">Atribuir</a></li>
-                                                <li><a class="dropdown-item" href="#" onclick="gerarResumoIA(<?= $conversa_id ?>)">Gerar Resumo IA</a></li>
-                                                <li><a class="dropdown-item" href="#" onclick="fecharConversa(<?= $conversa_id ?>)">Fechar Conversa</a></li>
-                                            </ul>
-                                        </div>
+                                        <span class="badge badge-<?= $conversa_selecionada['status'] === 'fechada' ? 'secondary' : 'success' ?>">
+                                            <?= ucfirst(str_replace('_', ' ', $conversa_selecionada['status'])) ?>
+                                        </span>
                                     </div>
                                 </div>
                                 <div class="card-body">
+                                    <!-- Resumos IA se existirem -->
+                                    <?php if (!empty($resumos_ia)): ?>
+                                    <div class="mb-5">
+                                        <h5 class="mb-3">Resumos IA</h5>
+                                        <?php foreach ($resumos_ia as $resumo): ?>
+                                        <div class="alert alert-info">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <strong>Resumo gerado em <?= date('d/m/Y H:i', strtotime($resumo['created_at'])) ?></strong>
+                                                <small class="text-muted">Modelo: <?= htmlspecialchars($resumo['modelo_usado'] ?? 'N/A') ?></small>
+                                            </div>
+                                            <div class="mb-2"><?= nl2br(htmlspecialchars($resumo['resumo'])) ?></div>
+                                            <?php if ($resumo['tokens_usados']): ?>
+                                            <small class="text-muted">Tokens: <?= $resumo['tokens_usados'] ?> | Custo estimado: R$ <?= number_format($resumo['custo_estimado'] ?? 0, 4, ',', '.') ?></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <?php endif; ?>
+                                    
                                     <!-- Mensagens -->
                                     <div class="chat-mensagens-container" id="chat-mensagens">
                                         <?php 
                                         $ultimo_remetente = null;
                                         $ultima_data = null;
-                                        $usuario_logado_id = $usuario['id'] ?? null;
+                                        $colaborador_logado_id = $colaborador_id;
                                         
                                         foreach ($mensagens as $index => $msg): 
                                             $eh_rh = !empty($msg['enviado_por_usuario_id']);
                                             $remetente_atual = $eh_rh ? 'rh' : 'colaborador';
                                             $data_atual = date('d/m/Y', strtotime($msg['created_at']));
-                                            $consecutiva = ($ultimo_remetente === $remetente_atual && $ultima_data === $data_atual);
                                             
-                                            // Verifica se a mensagem foi enviada pelo usuário RH logado (minha mensagem = direita)
+                                            // Verifica se a mensagem foi enviada pelo colaborador logado (minha mensagem = direita)
                                             $eh_minha_mensagem = false;
-                                            if ($eh_rh && !empty($msg['enviado_por_usuario_id']) && !empty($usuario_logado_id)) {
-                                                $eh_minha_mensagem = ((int)$msg['enviado_por_usuario_id'] === (int)$usuario_logado_id);
+                                            if (!$eh_rh && !empty($msg['enviado_por_colaborador_id']) && !empty($colaborador_logado_id)) {
+                                                $eh_minha_mensagem = ((int)$msg['enviado_por_colaborador_id'] === (int)$colaborador_logado_id);
                                             }
                                             
                                             // Avatar e nome do remetente
@@ -482,9 +373,6 @@ if ($conversa_id > 0) {
                                                 <!-- Timestamp -->
                                                 <div class="chat-mensagem-timestamp">
                                                     <span><?= date('d/m/Y H:i', strtotime($msg['created_at'])) ?></span>
-                                                    <?php if ($eh_rh && $msg['lida_por_colaborador']): ?>
-                                                    <i class="ki-duotone ki-check fs-8 text-primary"><span class="path1"></span><span class="path2"></span></i>
-                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </div>
@@ -496,7 +384,8 @@ if ($conversa_id > 0) {
                                         ?>
                                     </div>
                                     
-                                    <!-- Formulário de Resposta - Estilo WhatsApp -->
+                                    <!-- Formulário de Resposta -->
+                                    <?php if ($conversa_selecionada['status'] !== 'fechada'): ?>
                                     <div class="chat-resposta-container">
                                         <form id="chat-form-resposta" enctype="multipart/form-data">
                                             <input type="hidden" name="conversa_id" value="<?= $conversa_id ?>">
@@ -512,7 +401,7 @@ if ($conversa_id > 0) {
                                                               onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); document.getElementById('chat-form-resposta').dispatchEvent(new Event('submit')); }"
                                                               required></textarea>
                                                 </div>
-                                                <button type="button" class="btn btn-sm btn-light rounded-circle d-flex align-items-center justify-content-center" onclick="iniciarGravacaoVoz(<?= $conversa_selecionada['id'] ?>)" title="Mensagem de voz" style="width: 40px; height: 40px;">
+                                                <button type="button" class="btn btn-sm btn-light rounded-circle d-flex align-items-center justify-content-center" onclick="iniciarGravacaoVoz(<?= $conversa_id ?>)" title="Mensagem de voz" style="width: 40px; height: 40px;">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                                                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -526,6 +415,12 @@ if ($conversa_id > 0) {
                                             </div>
                                         </form>
                                     </div>
+                                    <?php else: ?>
+                                    <div class="alert alert-info mt-5">
+                                        <i class="ki-duotone ki-information-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                        Esta conversa foi fechada. Você pode criar uma nova conversa se necessário.
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         <?php else: ?>
@@ -537,6 +432,10 @@ if ($conversa_id > 0) {
                                     </i>
                                     <h3 class="text-muted">Selecione uma conversa</h3>
                                     <p class="text-muted">Escolha uma conversa da lista ao lado para visualizar as mensagens</p>
+                                    <button type="button" class="btn btn-primary mt-3" onclick="abrirModalNovaConversa()">
+                                        <i class="ki-duotone ki-plus"><span class="path1"></span><span class="path2"></span></i>
+                                        Criar Nova Conversa
+                                    </button>
                                 </div>
                             </div>
                         <?php endif; ?>
@@ -548,11 +447,142 @@ if ($conversa_id > 0) {
     </div>
 </div>
 
+<!-- Modal Nova Conversa -->
+<div class="modal fade" id="modalNovaConversa" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Nova Conversa</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="formNovaConversa">
+                <div class="modal-body">
+                    <div class="mb-5">
+                        <label class="form-label required">Título</label>
+                        <input type="text" name="titulo" class="form-control" required placeholder="Ex: Dúvida sobre férias">
+                    </div>
+                    <div class="mb-5">
+                        <label class="form-label">Categoria</label>
+                        <select name="categoria_id" id="selectCategoria" class="form-select">
+                            <option value="">Selecione...</option>
+                            <?php foreach ($categorias as $cat): ?>
+                            <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-5">
+                        <label class="form-label">Prioridade</label>
+                        <select name="prioridade" class="form-select">
+                            <option value="normal">Normal</option>
+                            <option value="alta">Alta</option>
+                            <option value="urgente">Urgente</option>
+                            <option value="baixa">Baixa</option>
+                        </select>
+                    </div>
+                    <div class="mb-5">
+                        <label class="form-label required">Mensagem</label>
+                        <textarea name="mensagem" class="form-control" rows="4" required placeholder="Descreva sua solicitação..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="ki-duotone ki-send"><span class="path1"></span><span class="path2"></span></i>
+                        Enviar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
-    // Define ID do usuário logado para o JavaScript
-    window.CHAT_USUARIO_ID = <?= $usuario['id'] ?? 'null' ?>;
+    // Define ID do colaborador logado para o JavaScript
+    window.CHAT_COLABORADOR_ID = <?= $colaborador_id ?? 'null' ?>;
+    
+    // Função para abrir modal de nova conversa
+    function abrirModalNovaConversa() {
+        const modal = new bootstrap.Modal(document.getElementById('modalNovaConversa'));
+        modal.show();
+    }
+    
+    // Abre modal automaticamente se ?nova=1 estiver na URL
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('nova') === '1') {
+            abrirModalNovaConversa();
+            // Remove o parâmetro da URL sem recarregar
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+        
+        // Atualiza badge do widget quando a conversa é visualizada
+        setTimeout(() => {
+            if (typeof ChatWidget !== 'undefined' && ChatWidget.carregarConversas) {
+                ChatWidget.carregarConversas();
+            }
+        }, 1000);
+    });
+    
+    // Submit do formulário de nova conversa
+    document.getElementById('formNovaConversa').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+        
+        fetch('../api/chat/conversas/criar.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(async response => {
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error('Resposta inválida do servidor');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: 'Conversa criada com sucesso!',
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    // Fecha modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalNovaConversa'));
+                    if (modal) modal.hide();
+                    
+                    // Redireciona para a nova conversa
+                    if (data.conversa_id) {
+                        window.location.href = 'chat_colaborador.php?conversa=' + data.conversa_id;
+                    } else {
+                        window.location.reload();
+                    }
+                });
+            } else {
+                throw new Error(data.message || 'Erro ao criar conversa');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao criar conversa:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: error.message || 'Erro ao criar conversa. Tente novamente.'
+            });
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        });
+    });
 </script>
-<script src="../assets/js/chat-gestao.js"></script>
+<script src="../assets/js/chat-conversa.js"></script>
 <script src="../assets/js/chat-audio.js"></script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

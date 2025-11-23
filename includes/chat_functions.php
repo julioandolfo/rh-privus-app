@@ -37,7 +37,8 @@ function buscar_conversas_colaborador($colaborador_id, $status = null, $limit = 
         SELECT c.*,
                COUNT(DISTINCT m.id) as total_mensagens_real,
                MAX(m.created_at) as ultima_mensagem_real_at,
-               COUNT(DISTINCT CASE WHEN m.deletada = FALSE AND m.enviado_por_usuario_id IS NOT NULL AND m.lida_por_colaborador = FALSE THEN m.id END) as total_mensagens_nao_lidas_colaborador
+               COUNT(DISTINCT CASE WHEN m.deletada = FALSE AND m.enviado_por_usuario_id IS NOT NULL AND m.lida_por_colaborador = FALSE THEN m.id END) as total_mensagens_nao_lidas_colaborador,
+               (SELECT SUBSTRING(m2.mensagem, 1, 100) FROM chat_mensagens m2 WHERE m2.conversa_id = c.id AND m2.deletada = FALSE AND m2.mensagem IS NOT NULL AND m2.mensagem != '' ORDER BY m2.created_at DESC LIMIT 1) as ultima_mensagem_preview
         FROM chat_conversas c
         LEFT JOIN chat_mensagens m ON c.id = m.conversa_id AND m.deletada = FALSE
         WHERE c.colaborador_id = ?
@@ -69,9 +70,21 @@ function buscar_conversas_colaborador($colaborador_id, $status = null, $limit = 
 
 /**
  * Busca conversas para RH
+ * 
+ * @param array $filtros Filtros de busca
+ * @param array|null $usuario Informações do usuário logado (role e id). Se não fornecido, busca da sessão.
+ * @return array Lista de conversas
  */
-function buscar_conversas_rh($filtros = []) {
+function buscar_conversas_rh($filtros = [], $usuario = null) {
     $pdo = getDB();
+    
+    // Se não forneceu usuário, busca da sessão
+    if ($usuario === null && isset($_SESSION['usuario'])) {
+        $usuario = $_SESSION['usuario'];
+    }
+    
+    $usuario_role = $usuario['role'] ?? null;
+    $usuario_id = $usuario['id'] ?? null;
     
     $sql = "
         SELECT c.*,
@@ -81,7 +94,8 @@ function buscar_conversas_rh($filtros = []) {
                u.nome as atribuido_para_nome,
                cat.nome as categoria_nome,
                cat.cor as categoria_cor,
-               COALESCE(COUNT(DISTINCT CASE WHEN m.deletada = FALSE AND m.enviado_por_colaborador_id IS NOT NULL AND m.lida_por_rh = FALSE THEN m.id END), 0) as total_mensagens_nao_lidas_rh
+               COALESCE(COUNT(DISTINCT CASE WHEN m.deletada = FALSE AND m.enviado_por_colaborador_id IS NOT NULL AND m.lida_por_rh = FALSE THEN m.id END), 0) as total_mensagens_nao_lidas_rh,
+               (SELECT SUBSTRING(m2.mensagem, 1, 100) FROM chat_mensagens m2 WHERE m2.conversa_id = c.id AND m2.deletada = FALSE AND m2.mensagem IS NOT NULL AND m2.mensagem != '' ORDER BY m2.created_at DESC LIMIT 1) as ultima_mensagem_preview
         FROM chat_conversas c
         INNER JOIN colaboradores col ON c.colaborador_id = col.id
         LEFT JOIN usuarios u ON c.atribuido_para_usuario_id = u.id
@@ -91,6 +105,23 @@ function buscar_conversas_rh($filtros = []) {
     ";
     
     $params = [];
+    
+    // FILTRO AUTOMÁTICO POR ATRIBUIÇÃO
+    // ADMIN vê tudo, RH vê apenas conversas atribuídas a ele + não atribuídas
+    $aplicar_filtro_automatico = true;
+    if ($usuario_role === 'RH' && !empty($usuario_id)) {
+        // RH: apenas conversas atribuídas a ele OU não atribuídas
+        // Mas verifica se há filtro manual que pode sobrescrever
+        if (isset($filtros['atribuido_para']) && $filtros['atribuido_para'] !== '') {
+            // Se há filtro manual, não aplica o automático (será aplicado abaixo)
+            $aplicar_filtro_automatico = false;
+        } else {
+            // Aplica filtro automático
+            $sql .= " AND (c.atribuido_para_usuario_id = ? OR c.atribuido_para_usuario_id IS NULL)";
+            $params[] = (int)$usuario_id;
+        }
+    }
+    // ADMIN não tem filtro automático (vê tudo)
     
     // Filtro por status
     if (!empty($filtros['status'])) {
@@ -109,16 +140,14 @@ function buscar_conversas_rh($filtros = []) {
         // Não adiciona filtro
     }
     
-    // Filtro por atribuído
+    // Filtro manual por atribuído (pode sobrescrever o filtro automático)
     if (isset($filtros['atribuido_para']) && $filtros['atribuido_para'] !== '') {
         if ($filtros['atribuido_para'] === 'nao_atribuido') {
             $sql .= " AND c.atribuido_para_usuario_id IS NULL";
         } elseif (is_numeric($filtros['atribuido_para'])) {
-            // Só aplica filtro se for um ID numérico válido
             $sql .= " AND c.atribuido_para_usuario_id = ?";
             $params[] = (int)$filtros['atribuido_para'];
         }
-        // Se for string vazia ou inválida, não aplica filtro (mostra todas)
     }
     
     // Filtro por prioridade

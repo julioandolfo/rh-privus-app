@@ -8,9 +8,63 @@ if (!isset($_SESSION['usuario'])) {
 }
 
 require_once __DIR__ . '/permissions.php';
+require_once __DIR__ . '/chat_functions.php';
 
 $usuario = $_SESSION['usuario'];
 $current_page = get_current_page();
+
+// Busca total de mensagens não lidas para o badge do menu
+$total_nao_lidas_chat = 0;
+try {
+    $pdo = getDB();
+    if (is_colaborador() && !empty($usuario['colaborador_id'])) {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(DISTINCT m.id) as total
+            FROM chat_mensagens m
+            INNER JOIN chat_conversas c ON m.conversa_id = c.id
+            WHERE c.colaborador_id = ?
+            AND m.enviado_por_usuario_id IS NOT NULL
+            AND m.lida_por_colaborador = FALSE
+            AND m.deletada = FALSE
+        ");
+        $stmt->execute([$usuario['colaborador_id']]);
+        $result = $stmt->fetch();
+        $total_nao_lidas_chat = (int)($result['total'] ?? 0);
+    } elseif (can_show_menu(['ADMIN', 'RH'])) {
+        // ADMIN: conta todas as mensagens não lidas
+        // RH: conta apenas mensagens de conversas atribuídas a ele + não atribuídas
+        if ($usuario['role'] === 'ADMIN') {
+            $stmt = $pdo->query("
+                SELECT COUNT(DISTINCT m.id) as total
+                FROM chat_mensagens m
+                INNER JOIN chat_conversas c ON m.conversa_id = c.id
+                WHERE m.enviado_por_colaborador_id IS NOT NULL
+                AND m.lida_por_rh = FALSE
+                AND m.deletada = FALSE
+                AND c.status NOT IN ('fechada', 'arquivada', 'resolvida')
+            ");
+        } else {
+            // RH: apenas conversas atribuídas a ele + não atribuídas
+            $usuario_id = (int)($usuario['id'] ?? 0);
+            $stmt = $pdo->prepare("
+                SELECT COUNT(DISTINCT m.id) as total
+                FROM chat_mensagens m
+                INNER JOIN chat_conversas c ON m.conversa_id = c.id
+                WHERE m.enviado_por_colaborador_id IS NOT NULL
+                AND m.lida_por_rh = FALSE
+                AND m.deletada = FALSE
+                AND c.status NOT IN ('fechada', 'arquivada', 'resolvida')
+                AND (c.atribuido_para_usuario_id = ? OR c.atribuido_para_usuario_id IS NULL)
+            ");
+            $stmt->execute([$usuario_id]);
+        }
+        $result = $stmt->fetch();
+        $total_nao_lidas_chat = (int)($result['total'] ?? 0);
+    }
+} catch (Exception $e) {
+    // Ignora erros para não quebrar o menu
+    $total_nao_lidas_chat = 0;
+}
 
 function isActive($page) {
     global $current_page;
@@ -64,6 +118,27 @@ function getIcon($name) {
                     <!--end:Menu link-->
                 </div>
                 <!--end:Menu item-->
+                
+                <!--begin:Menu item - Chat-->
+                <?php if (can_show_menu(['ADMIN', 'RH']) || is_colaborador()): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('chat_gestao.php') || isActive('chat_colaborador.php') ?>" href="<?= is_colaborador() ? 'chat_colaborador.php' : 'chat_gestao.php' ?>">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-message-text-2 fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Chat</span>
+                        <?php if ($total_nao_lidas_chat > 0): ?>
+                        <span class="badge badge-circle badge-danger ms-auto"><?= $total_nao_lidas_chat > 99 ? '99+' : $total_nao_lidas_chat ?></span>
+                        <?php endif; ?>
+                    </a>
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
                 
                 <!--begin:Menu item-->
                 <div class="menu-item">
@@ -293,23 +368,6 @@ function getIcon($name) {
                     </div>
                     <!--end:Menu item-->
                     
-                    <!--begin:Menu item - Chat-->
-                    <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
-                    <div class="menu-item">
-                        <a class="menu-link <?= isActive('chat_gestao.php') ?>" href="chat_gestao.php">
-                            <span class="menu-icon">
-                                <i class="ki-duotone ki-message-text-2 fs-2">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                    <span class="path3"></span>
-                                    <span class="path4"></span>
-                                </i>
-                            </span>
-                            <span class="menu-title">Chat</span>
-                        </a>
-                    </div>
-                    <!--end:Menu item-->
-                    <?php endif; ?>
                     
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('empresas.php') || isActive('setores.php') || isActive('cargos.php')) ? 'here show' : '' ?>">
@@ -630,7 +688,9 @@ function getIcon($name) {
                         </div>
                     </div>
                     <!--end:Menu separator-->
-                    
+                <?php endif; ?>
+                
+                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('gestao_engajamento.php') || isActive('reunioes_1on1.php') || isActive('celebracoes.php') || isActive('pesquisas_satisfacao.php') || isActive('pesquisas_rapidas.php') || isActive('pdis.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -649,6 +709,7 @@ function getIcon($name) {
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
                             <!--begin:Menu item-->
+                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('gestao_engajamento.php') ?>" href="gestao_engajamento.php">
                                     <span class="menu-bullet">
@@ -658,7 +719,9 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                             <!--begin:Menu item-->
+                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('reunioes_1on1.php') ?>" href="reunioes_1on1.php">
                                     <span class="menu-bullet">
@@ -668,7 +731,9 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                             <!--begin:Menu item-->
+                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('celebracoes.php') ?>" href="celebracoes.php">
                                     <span class="menu-bullet">
@@ -678,7 +743,9 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                             <!--begin:Menu item-->
+                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('pesquisas_satisfacao.php') ?>" href="pesquisas_satisfacao.php">
                                     <span class="menu-bullet">
@@ -688,7 +755,9 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                             <!--begin:Menu item-->
+                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('pesquisas_rapidas.php') ?>" href="pesquisas_rapidas.php">
                                     <span class="menu-bullet">
@@ -698,16 +767,19 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                             <!--begin:Menu item-->
+                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('pdis.php') ?>" href="pdis.php">
                                     <span class="menu-bullet">
                                         <span class="bullet bullet-dot"></span>
                                     </span>
-                                    <span class="menu-title">PDIs</span>
+                                    <span class="menu-title"><?= is_colaborador() ? 'Meus PDIs' : 'PDIs' ?></span>
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                         </div>
                         <!--end:Menu sub-->
                     </div>

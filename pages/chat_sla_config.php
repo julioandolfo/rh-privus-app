@@ -10,8 +10,6 @@ require_once __DIR__ . '/../includes/permissions.php';
 
 require_page_permission('chat_configuracoes.php');
 
-require_once __DIR__ . '/../includes/header.php';
-
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
@@ -20,8 +18,23 @@ $sla = null;
 $mensagem = '';
 $erro = '';
 
+// Processa exclusão ANTES de incluir o header (para evitar erro de headers already sent)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    $delete_id = (int)($_POST['id'] ?? 0);
+    if ($delete_id > 0) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM chat_sla_config WHERE id = ?");
+            $stmt->execute([$delete_id]);
+            header('Location: chat_configuracoes.php?msg=Configuração de SLA excluída com sucesso!');
+            exit;
+        } catch (Exception $e) {
+            $erro = 'Erro ao excluir: ' . $e->getMessage();
+        }
+    }
+}
+
 // Busca empresas para o select
-$stmt = $pdo->query("SELECT id, nome FROM empresas WHERE ativo = TRUE ORDER BY nome");
+$stmt = $pdo->query("SELECT id, nome_fantasia as nome FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
 $empresas = $stmt->fetchAll();
 
 // Se tem ID, busca SLA existente
@@ -36,8 +49,10 @@ if ($sla_id > 0) {
     }
 }
 
+require_once __DIR__ . '/../includes/header.php';
+
 // Processa salvamento
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (!isset($_POST['action']) || $_POST['action'] !== 'delete')) {
     try {
         $empresa_id = !empty($_POST['empresa_id']) ? (int)$_POST['empresa_id'] : null;
         $nome = trim($_POST['nome'] ?? '');
@@ -143,6 +158,12 @@ if ($sla && $sla['dias_semana']) {
                             <h2><?= $sla_id > 0 ? 'Editar' : 'Nova' ?> Configuração de SLA</h2>
                         </div>
                         <div class="card-toolbar">
+                            <?php if ($sla_id > 0): ?>
+                            <button type="button" class="btn btn-danger me-2" onclick="confirmarExclusao()">
+                                <i class="ki-duotone ki-trash"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                Excluir
+                            </button>
+                            <?php endif; ?>
                             <a href="chat_configuracoes.php" class="btn btn-light">
                                 <i class="ki-duotone ki-arrow-left"><span class="path1"></span><span class="path2"></span></i>
                                 Voltar
@@ -328,6 +349,31 @@ if ($sla && $sla['dias_semana']) {
         </div>
     </div>
 </div>
+
+<!-- Formulário oculto para exclusão -->
+<form id="form-delete" method="POST" style="display: none;">
+    <input type="hidden" name="action" value="delete">
+    <input type="hidden" name="id" value="<?= $sla_id ?>">
+</form>
+
+<script>
+function confirmarExclusao() {
+    Swal.fire({
+        title: 'Tem certeza?',
+        text: 'Esta ação não pode ser desfeita!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir!',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('form-delete').submit();
+        }
+    });
+}
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

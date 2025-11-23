@@ -254,9 +254,20 @@ $sla_configs = $stmt->fetchAll();
                                             <td><?= $sla['tempo_resolucao_horas'] ?> horas</td>
                                             <td><?= $sla['horario_inicio'] ?> - <?= $sla['horario_fim'] ?></td>
                                             <td>
-                                                <a href="chat_sla_config.php?id=<?= $sla['id'] ?>" class="btn btn-sm btn-light">
-                                                    Editar
-                                                </a>
+                                                <div class="d-flex gap-2">
+                                                    <a href="chat_sla_config.php?id=<?= $sla['id'] ?>" class="btn btn-sm btn-light">
+                                                        <i class="ki-duotone ki-notepad-edit"><span class="path1"></span><span class="path2"></span></i>
+                                                        Editar
+                                                    </a>
+                                                    <form method="POST" action="chat_sla_config.php?id=<?= $sla['id'] ?>" style="display: inline;" onsubmit="return confirmarExclusao(this);">
+                                                        <input type="hidden" name="action" value="delete">
+                                                        <input type="hidden" name="id" value="<?= $sla['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-danger">
+                                                            <i class="ki-duotone ki-trash"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                                            Excluir
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -271,6 +282,27 @@ $sla_configs = $stmt->fetchAll();
         </div>
     </div>
 </div>
+
+<script>
+function confirmarExclusao(form) {
+    event.preventDefault();
+    Swal.fire({
+        title: 'Tem certeza?',
+        text: 'Esta ação não pode ser desfeita!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir!',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            form.submit();
+        }
+    });
+    return false;
+}
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

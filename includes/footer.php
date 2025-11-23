@@ -1029,5 +1029,57 @@
         }
     </style>
     <!--end::Responsive CSS-->
+    
+    <!--begin::Atualização Badge Chat Menu-->
+    <script>
+    (function() {
+        function atualizarBadgeChatMenu() {
+            fetch('../api/chat/conversas/listar.php?limit=1')
+                .then(response => {
+                    if (!response.ok) return null;
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) return null;
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.success && data.data) {
+                        const total = data.data.reduce((sum, conv) => sum + (conv.total_mensagens_nao_lidas || 0), 0);
+                        const badge = document.querySelector('a[href*="chat"].menu-link .badge');
+                        
+                        if (total > 0) {
+                            if (badge) {
+                                badge.textContent = total > 99 ? '99+' : total;
+                                badge.style.display = '';
+                            } else {
+                                // Cria badge se não existir
+                                const menuLink = document.querySelector('a[href*="chat"].menu-link');
+                                if (menuLink) {
+                                    const newBadge = document.createElement('span');
+                                    newBadge.className = 'badge badge-circle badge-danger ms-auto';
+                                    newBadge.textContent = total > 99 ? '99+' : total;
+                                    menuLink.appendChild(newBadge);
+                                }
+                            }
+                        } else {
+                            if (badge) {
+                                badge.style.display = 'none';
+                            }
+                        }
+                    }
+                })
+                .catch(() => {
+                    // Ignora erros silenciosamente
+                });
+        }
+        
+        // Atualiza a cada 10 segundos
+        setInterval(atualizarBadgeChatMenu, 10000);
+        
+        // Atualiza imediatamente após carregar
+        setTimeout(atualizarBadgeChatMenu, 2000);
+    })();
+    </script>
+    <!--end::Atualização Badge Chat Menu-->
+    
 </body>
 </html>
