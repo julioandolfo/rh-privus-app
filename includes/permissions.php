@@ -267,6 +267,214 @@ function can_show_menu($roles) {
 }
 
 /**
+ * Verifica se o usuário tem acesso a pelo menos uma página de um grupo de páginas
+ * 
+ * @param array $pages Array com nomes das páginas a verificar
+ * @return bool True se tem acesso a pelo menos uma página
+ */
+function can_access_any_page($pages) {
+    if (!isset($_SESSION['usuario'])) {
+        return false;
+    }
+    
+    $user_role = $_SESSION['usuario']['role'] ?? null;
+    
+    if (!$user_role) {
+        return false;
+    }
+    
+    // ADMIN sempre tem acesso
+    if ($user_role === 'ADMIN') {
+        return true;
+    }
+    
+    $permissions = get_page_permissions();
+    
+    // Verifica se tem acesso a pelo menos uma página
+    foreach ($pages as $page) {
+        if (isset($permissions[$page]) && in_array($user_role, $permissions[$page])) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de configuração
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de configuração
+ */
+function can_access_configuracoes() {
+    $config_pages = [
+        'permissoes.php',
+        'configuracoes_email.php',
+        'configuracoes_onesignal.php',
+        'configuracoes_pontos.php',
+        'templates_email.php',
+        'chat_configuracoes.php'
+    ];
+    
+    return can_access_any_page($config_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de recrutamento
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de recrutamento
+ */
+function can_access_recrutamento() {
+    $recrutamento_pages = [
+        'vagas.php',
+        'kanban_selecao.php',
+        'candidaturas.php',
+        'entrevistas.php',
+        'etapas_processo.php',
+        'formularios_cultura.php',
+        'automatizacoes_kanban.php',
+        'onboarding.php',
+        'kanban_onboarding.php',
+        'analytics_recrutamento.php',
+        'portal_vagas_config.php'
+    ];
+    
+    return can_access_any_page($recrutamento_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de estrutura
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de estrutura
+ */
+function can_access_estrutura() {
+    $estrutura_pages = [
+        'empresas.php',
+        'setores.php',
+        'cargos.php',
+        'hierarquia.php',
+        'niveis_hierarquicos.php'
+    ];
+    
+    return can_access_any_page($estrutura_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de colaboradores
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de colaboradores
+ */
+function can_access_colaboradores_menu() {
+    $colaboradores_pages = [
+        'colaboradores.php',
+        'colaborador_add.php',
+        'colaborador_view.php',
+        'colaborador_edit.php',
+        'emocoes_analise.php',
+        'promocoes.php',
+        'horas_extras.php',
+        'fechamento_pagamentos.php',
+        'tipos_bonus.php'
+    ];
+    
+    return can_access_any_page($colaboradores_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de ocorrências
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de ocorrências
+ */
+function can_access_ocorrencias_menu() {
+    $ocorrencias_pages = [
+        'ocorrencias_list.php',
+        'ocorrencias_add.php',
+        'ocorrencias_rapida.php',
+        'tipos_ocorrencias.php',
+        'categorias_ocorrencias.php',
+        'relatorio_ocorrencias_avancado.php',
+        'relatorio_ocorrencias.php'
+    ];
+    
+    return can_access_any_page($ocorrencias_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de engajamento
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de engajamento
+ */
+function can_access_engajamento_menu() {
+    $engajamento_pages = [
+        'gestao_engajamento.php',
+        'reunioes_1on1.php',
+        'celebracoes.php',
+        'pesquisas_satisfacao.php',
+        'pesquisas_rapidas.php',
+        'pdis.php'
+    ];
+    
+    return can_access_any_page($engajamento_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de notificações push
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de notificações push
+ */
+function can_access_notificacoes_push_menu() {
+    $notificacoes_pages = [
+        'enviar_notificacao_push.php',
+        'notificacoes_enviadas.php'
+    ];
+    
+    return can_access_any_page($notificacoes_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de feedbacks
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de feedbacks
+ */
+function can_access_feedbacks_menu() {
+    $feedbacks_pages = [
+        'feedback_enviar.php',
+        'feedback_meus.php',
+        'ver_feedback.php'
+    ];
+    
+    return can_access_any_page($feedbacks_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de endomarketing
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de endomarketing
+ */
+function can_access_endomarketing_menu() {
+    $endomarketing_pages = [
+        'endomarketing_datas_comemorativas.php',
+        'endomarketing_acoes.php',
+        'endomarketing_acao_view.php'
+    ];
+    
+    return can_access_any_page($endomarketing_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso a pelo menos uma página de feed
+ * 
+ * @return bool True se tem acesso a pelo menos uma página de feed
+ */
+function can_access_feed_menu() {
+    $feed_pages = [
+        'feed.php',
+        'emocoes.php'
+    ];
+    
+    return can_access_any_page($feed_pages);
+}
+
+/**
  * Obtém o nome do arquivo atual
  * 
  * @return string Nome do arquivo (ex: 'dashboard.php')

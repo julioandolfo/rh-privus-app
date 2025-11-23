@@ -141,6 +141,7 @@ function getIcon($name) {
                 <?php endif; ?>
                 
                 <!--begin:Menu item-->
+                <?php if (can_access_feed_menu()): ?>
                 <div class="menu-item">
                     <!--begin:Menu link-->
                     <a class="menu-link <?= isActive('feed.php') ?>" href="feed.php">
@@ -157,9 +158,10 @@ function getIcon($name) {
                     <!--end:Menu link-->
                 </div>
                 <!--end:Menu item-->
+                <?php endif; ?>
                 
                 <!--begin:Menu item-->
-                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
+                <?php if (can_access_feedbacks_menu()): ?>
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('feedback_enviar.php') || isActive('feedback_meus.php')) ? 'here show' : '' ?>">
                     <!--begin:Menu link-->
                     <span class="menu-link">
@@ -176,6 +178,7 @@ function getIcon($name) {
                     <!--end:Menu link-->
                     <!--begin:Menu sub-->
                     <div class="menu-sub menu-sub-accordion">
+                        <?php if (can_access_page('feedback_enviar.php')): ?>
                         <!--begin:Menu item-->
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('feedback_enviar.php') ?>" href="feedback_enviar.php">
@@ -186,6 +189,8 @@ function getIcon($name) {
                             </a>
                         </div>
                         <!--end:Menu item-->
+                        <?php endif; ?>
+                        <?php if (can_access_page('feedback_meus.php')): ?>
                         <!--begin:Menu item-->
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('feedback_meus.php') ?>" href="feedback_meus.php">
@@ -196,6 +201,7 @@ function getIcon($name) {
                             </a>
                         </div>
                         <!--end:Menu item-->
+                        <?php endif; ?>
                     </div>
                     <!--end:Menu sub-->
                 </div>
@@ -203,7 +209,7 @@ function getIcon($name) {
                 <?php endif; ?>
                 
                 <!--begin:Menu item-->
-                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
+                <?php if (can_access_endomarketing_menu()): ?>
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('endomarketing_datas_comemorativas.php') || isActive('endomarketing_acoes.php')) ? 'here show' : '' ?>">
                     <!--begin:Menu link-->
                     <span class="menu-link">
@@ -220,6 +226,7 @@ function getIcon($name) {
                     <!--end:Menu link-->
                     <!--begin:Menu sub-->
                     <div class="menu-sub menu-sub-accordion">
+                        <?php if (can_access_page('endomarketing_datas_comemorativas.php')): ?>
                         <!--begin:Menu item-->
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('endomarketing_datas_comemorativas.php') ?>" href="endomarketing_datas_comemorativas.php">
@@ -230,6 +237,8 @@ function getIcon($name) {
                             </a>
                         </div>
                         <!--end:Menu item-->
+                        <?php endif; ?>
+                        <?php if (can_access_page('endomarketing_acoes.php')): ?>
                         <!--begin:Menu item-->
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('endomarketing_acoes.php') ?>" href="endomarketing_acoes.php">
@@ -240,13 +249,14 @@ function getIcon($name) {
                             </a>
                         </div>
                         <!--end:Menu item-->
+                        <?php endif; ?>
                     </div>
                     <!--end:Menu sub-->
                 </div>
                 <!--end:Menu item-->
                 <?php endif; ?>
                 
-                <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
+                <?php if (can_access_recrutamento()): ?>
                     <!--begin:Menu item - Recrutamento e Seleção-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('vagas.php') || isActive('kanban_selecao.php') || isActive('candidaturas.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -263,6 +273,7 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('vagas.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('vagas.php') ?>" href="vagas.php">
@@ -273,6 +284,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('portal_vagas_config.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('portal_vagas_config.php') ?>" href="portal_vagas_config.php">
@@ -283,6 +296,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('kanban_selecao.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('kanban_selecao.php') ?>" href="kanban_selecao.php">
@@ -293,6 +308,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('candidaturas.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('candidaturas.php') ?>" href="candidaturas.php">
@@ -303,6 +320,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('entrevistas.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('entrevistas.php') ?>" href="entrevistas.php">
@@ -313,6 +332,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('etapas_processo.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('etapas_processo.php') ?>" href="etapas_processo.php">
@@ -323,6 +344,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('formularios_cultura.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('formularios_cultura.php') ?>" href="formularios_cultura.php">
@@ -333,6 +356,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('automatizacoes_kanban.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('automatizacoes_kanban.php') ?>" href="automatizacoes_kanban.php">
@@ -343,6 +368,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('onboarding.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('onboarding.php') ?>" href="onboarding.php">
@@ -353,6 +380,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('analytics_recrutamento.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('analytics_recrutamento.php') ?>" href="analytics_recrutamento.php">
@@ -363,12 +392,14 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                         </div>
                         <!--end:Menu sub-->
                     </div>
                     <!--end:Menu item-->
+                    <?php endif; ?>
                     
-                    
+                    <?php if (can_access_estrutura()): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('empresas.php') || isActive('setores.php') || isActive('cargos.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -386,6 +417,7 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('empresas.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('empresas.php') ?>" href="empresas.php">
@@ -396,6 +428,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('setores.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('setores.php') ?>" href="setores.php">
@@ -406,6 +440,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('cargos.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('cargos.php') ?>" href="cargos.php">
@@ -416,11 +452,13 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                         </div>
                         <!--end:Menu sub-->
                     </div>
                     <!--end:Menu item-->
                     
+                    <?php if (can_access_page('hierarquia.php') || can_access_page('niveis_hierarquicos.php')): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('hierarquia.php') || isActive('niveis_hierarquicos.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -437,6 +475,7 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('hierarquia.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('hierarquia.php') ?>" href="hierarquia.php">
@@ -447,6 +486,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('niveis_hierarquicos.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('niveis_hierarquicos.php') ?>" href="niveis_hierarquicos.php">
@@ -457,13 +498,15 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                         </div>
                         <!--end:Menu sub-->
                     </div>
                     <!--end:Menu item-->
-                <?php endif; ?>
+                    <?php endif; ?>
+                    <?php endif; ?>
                 
-                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
+                <?php if (can_access_colaboradores_menu()): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('colaboradores.php') || isActive('emocoes_analise.php') || isActive('promocoes.php') || isActive('horas_extras.php') || isActive('fechamento_pagamentos.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -480,6 +523,7 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('colaboradores.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('colaboradores.php') ?>" href="colaboradores.php">
@@ -490,6 +534,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('emocoes_analise.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('emocoes_analise.php') ?>" href="emocoes_analise.php">
@@ -500,7 +546,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
-                            <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
+                            <?php endif; ?>
+                            <?php if (can_access_page('promocoes.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('promocoes.php') ?>" href="promocoes.php">
@@ -511,6 +558,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('horas_extras.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('horas_extras.php') ?>" href="horas_extras.php">
@@ -521,6 +570,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('fechamento_pagamentos.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('fechamento_pagamentos.php') ?>" href="fechamento_pagamentos.php">
@@ -531,6 +582,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('tipos_bonus.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('tipos_bonus.php') ?>" href="tipos_bonus.php">
@@ -547,6 +600,7 @@ function getIcon($name) {
                     </div>
                     <!--end:Menu item-->
                     
+                    <?php if (can_access_ocorrencias_menu()): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('ocorrencias_list.php') || isActive('ocorrencias_add.php') || isActive('ocorrencias_rapida.php') || isActive('tipos_ocorrencias.php') || isActive('categorias_ocorrencias.php') || isActive('relatorio_ocorrencias_avancado.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -563,6 +617,7 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('ocorrencias_list.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('ocorrencias_list.php') ?>" href="ocorrencias_list.php">
@@ -573,6 +628,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('ocorrencias_rapida.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('ocorrencias_rapida.php') ?>" href="ocorrencias_rapida.php">
@@ -586,6 +643,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('relatorio_ocorrencias_avancado.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('relatorio_ocorrencias_avancado.php') ?>" href="relatorio_ocorrencias_avancado.php">
@@ -596,7 +655,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
-                            <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
+                            <?php endif; ?>
+                            <?php if (can_access_page('tipos_ocorrencias.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('tipos_ocorrencias.php') ?>" href="tipos_ocorrencias.php">
@@ -607,6 +667,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('categorias_ocorrencias.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('categorias_ocorrencias.php') ?>" href="categorias_ocorrencias.php">
@@ -622,7 +684,9 @@ function getIcon($name) {
                         <!--end:Menu sub-->
                     </div>
                     <!--end:Menu item-->
+                    <?php endif; ?>
                     
+                    <?php if (can_access_page('relatorio_ocorrencias.php')): ?>
                     <!--begin:Menu item-->
                     <div class="menu-item">
                         <a class="menu-link <?= isActive('relatorio_ocorrencias.php') ?>" href="relatorio_ocorrencias.php">
@@ -636,7 +700,9 @@ function getIcon($name) {
                         </a>
                     </div>
                     <!--end:Menu item-->
+                    <?php endif; ?>
                     
+                    <?php if (can_access_notificacoes_push_menu()): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('enviar_notificacao_push.php') || isActive('notificacoes_enviadas.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -654,6 +720,7 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('enviar_notificacao_push.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('enviar_notificacao_push.php') ?>" href="enviar_notificacao_push.php">
@@ -664,6 +731,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('notificacoes_enviadas.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('notificacoes_enviadas.php') ?>" href="notificacoes_enviadas.php">
@@ -674,13 +743,15 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                         </div>
                         <!--end:Menu sub-->
                     </div>
                     <!--end:Menu item-->
+                    <?php endif; ?>
                 <?php endif; ?>
                 
-                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
+                <?php if (can_access_engajamento_menu() || can_access_colaboradores_menu() || can_access_ocorrencias_menu() || can_access_notificacoes_push_menu()): ?>
                     <!--begin:Menu separator-->
                     <div class="menu-item pt-5">
                         <div class="menu-content">
@@ -690,7 +761,7 @@ function getIcon($name) {
                     <!--end:Menu separator-->
                 <?php endif; ?>
                 
-                <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
+                <?php if (can_access_engajamento_menu()): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('gestao_engajamento.php') || isActive('reunioes_1on1.php') || isActive('celebracoes.php') || isActive('pesquisas_satisfacao.php') || isActive('pesquisas_rapidas.php') || isActive('pdis.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -708,8 +779,8 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('gestao_engajamento.php')): ?>
                             <!--begin:Menu item-->
-                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('gestao_engajamento.php') ?>" href="gestao_engajamento.php">
                                     <span class="menu-bullet">
@@ -720,8 +791,8 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('reunioes_1on1.php')): ?>
                             <!--begin:Menu item-->
-                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('reunioes_1on1.php') ?>" href="reunioes_1on1.php">
                                     <span class="menu-bullet">
@@ -732,8 +803,8 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('celebracoes.php')): ?>
                             <!--begin:Menu item-->
-                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('celebracoes.php') ?>" href="celebracoes.php">
                                     <span class="menu-bullet">
@@ -744,8 +815,8 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('pesquisas_satisfacao.php')): ?>
                             <!--begin:Menu item-->
-                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('pesquisas_satisfacao.php') ?>" href="pesquisas_satisfacao.php">
                                     <span class="menu-bullet">
@@ -756,8 +827,8 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('pesquisas_rapidas.php')): ?>
                             <!--begin:Menu item-->
-                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('pesquisas_rapidas.php') ?>" href="pesquisas_rapidas.php">
                                     <span class="menu-bullet">
@@ -768,8 +839,8 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('pdis.php')): ?>
                             <!--begin:Menu item-->
-                            <?php if (can_show_menu(['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'])): ?>
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('pdis.php') ?>" href="pdis.php">
                                     <span class="menu-bullet">
@@ -786,7 +857,7 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
-                <?php if (can_show_menu('ADMIN')): ?>
+                <?php if (can_show_menu('ADMIN') || can_access_configuracoes()): ?>
                     <!--begin:Menu separator-->
                     <div class="menu-item pt-5">
                         <div class="menu-content">
@@ -795,6 +866,7 @@ function getIcon($name) {
                     </div>
                     <!--end:Menu separator-->
                     
+                    <?php if (can_show_menu('ADMIN')): ?>
                     <!--begin:Menu item-->
                     <div class="menu-item">
                         <a class="menu-link <?= isActive('usuarios.php') ?>" href="usuarios.php">
@@ -808,9 +880,10 @@ function getIcon($name) {
                         </a>
                     </div>
                     <!--end:Menu item-->
+                    <?php endif; ?>
                     
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php') || isActive('configuracoes_pontos.php') || isActive('templates_email.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -825,6 +898,7 @@ function getIcon($name) {
                         <!--end:Menu link-->
                         <!--begin:Menu sub-->
                         <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('permissoes.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('permissoes.php') ?>" href="permissoes.php">
@@ -835,6 +909,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('configuracoes_email.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('configuracoes_email.php') ?>" href="configuracoes_email.php">
@@ -845,6 +921,20 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('templates_email.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('templates_email.php') ?>" href="templates_email.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Templates de Email</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('configuracoes_onesignal.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('configuracoes_onesignal.php') ?>" href="configuracoes_onesignal.php">
@@ -855,6 +945,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('chat_configuracoes.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('chat_configuracoes.php') ?>" href="chat_configuracoes.php">
@@ -865,6 +957,8 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('configuracoes_pontos.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
                                 <a class="menu-link <?= isActive('configuracoes_pontos.php') ?>" href="configuracoes_pontos.php">
@@ -875,6 +969,7 @@ function getIcon($name) {
                                 </a>
                             </div>
                             <!--end:Menu item-->
+                            <?php endif; ?>
                         </div>
                         <!--end:Menu sub-->
                     </div>
