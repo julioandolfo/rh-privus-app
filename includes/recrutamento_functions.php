@@ -348,26 +348,39 @@ function enviar_email_rejeicao($candidatura, $config) {
 function obter_template_email_recrutamento($template, $candidatura) {
     $pdo = getDB();
     
-    $stmt = $pdo->prepare("
-        SELECT conteudo FROM email_templates 
-        WHERE codigo = ? AND tipo = 'recrutamento'
-    ");
-    $stmt->execute([$template]);
-    $template_data = $stmt->fetch();
-    
-    if ($template_data) {
-        $corpo = $template_data['conteudo'];
-    } else {
-        // Template padrão
+    try {
+        $stmt = $pdo->prepare("
+            SELECT corpo_html, corpo_texto FROM email_templates 
+            WHERE codigo = ? AND ativo = 1
+        ");
+        $stmt->execute([$template]);
+        $template_data = $stmt->fetch();
+        
+        if ($template_data) {
+            // Usa corpo_html se disponível, senão corpo_texto
+            $corpo = !empty($template_data['corpo_html']) 
+                ? $template_data['corpo_html'] 
+                : ($template_data['corpo_texto'] ?? '');
+        } else {
+            // Template padrão
+            $corpo = "Olá {$candidatura['nome_completo']},\n\n";
+            $corpo .= "Sua candidatura para a vaga '{$candidatura['vaga_titulo']}' foi atualizada.\n\n";
+            $corpo .= "Acompanhe seu processo: " . get_base_url() . "/acompanhar?token={$candidatura['token_acompanhamento']}\n";
+        }
+    } catch (Exception $e) {
+        // Se a tabela não existir ou houver erro, usa template padrão
+        error_log('Erro ao buscar template de email: ' . $e->getMessage());
         $corpo = "Olá {$candidatura['nome_completo']},\n\n";
         $corpo .= "Sua candidatura para a vaga '{$candidatura['vaga_titulo']}' foi atualizada.\n\n";
         $corpo .= "Acompanhe seu processo: " . get_base_url() . "/acompanhar?token={$candidatura['token_acompanhamento']}\n";
     }
     
     // Substitui variáveis
-    $corpo = str_replace('{nome}', $candidatura['nome_completo'], $corpo);
-    $corpo = str_replace('{vaga}', $candidatura['vaga_titulo'], $corpo);
-    $corpo = str_replace('{link_acompanhamento}', get_base_url() . "/acompanhar?token={$candidatura['token_acompanhamento']}", $corpo);
+    $corpo = str_replace('{nome}', $candidatura['nome_completo'] ?? '', $corpo);
+    $corpo = str_replace('{nome_completo}', $candidatura['nome_completo'] ?? '', $corpo);
+    $corpo = str_replace('{vaga}', $candidatura['vaga_titulo'] ?? '', $corpo);
+    $corpo = str_replace('{vaga_titulo}', $candidatura['vaga_titulo'] ?? '', $corpo);
+    $corpo = str_replace('{link_acompanhamento}', get_base_url() . "/acompanhar?token=" . ($candidatura['token_acompanhamento'] ?? ''), $corpo);
     
     return $corpo;
 }
