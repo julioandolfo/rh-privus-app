@@ -125,13 +125,25 @@ const OneSignalInit = {
                     notifyButton: {
                         enable: false, // Desabilita botão padrão, vamos usar nosso próprio
                     },
-                    // CRÍTICO: Desabilita popup próprio do OneSignal
-                    // Isso força usar APENAS a permissão nativa do navegador
+                    // CRÍTICO: Desabilita TODOS os prompts automáticos do OneSignal
+                    // Isso força usar APENAS a permissão nativa do navegador quando solicitado manualmente
                     promptOptions: {
                         autoPrompt: false, // NÃO mostra popup automático do OneSignal
                         slidedown: {
                             enabled: false, // Desabilita slidedown do OneSignal
+                            actionMessage: '',
+                            acceptButtonText: '',
+                            cancelButtonText: '',
+                            categories: {
+                                enabled: false
+                            }
                         },
+                        native: {
+                            enabled: false // Desabilita prompt nativo automático também
+                        }
+                    },
+                    welcomeNotification: {
+                        disable: true // Desabilita notificação de boas-vindas
                     },
                     allowLocalhostAsSecureOrigin: true, // Para testes em localhost
                     autoResubscribe: true,
@@ -142,9 +154,51 @@ const OneSignalInit = {
                 };
                 
                 console.log('🔧 Inicializando OneSignal com App ID:', self.appId);
-                console.log('🔧 Popup do OneSignal DESABILITADO - usando apenas permissão nativa');
+                console.log('🔧 TODOS os prompts automáticos DESABILITADOS - usando apenas permissão nativa manual');
                 
                 OneSignal.init(initConfig);
+                
+                // CRÍTICO: Previne que o OneSignal mostre prompts automaticamente
+                // Bloqueia métodos que podem mostrar prompts automaticamente
+                setTimeout(() => {
+                    // Sobrescreve métodos após inicialização para prevenir prompts automáticos
+                    if (typeof OneSignal.showSlidedownPrompt === 'function') {
+                        const originalShowSlidedownPrompt = OneSignal.showSlidedownPrompt;
+                        OneSignal.showSlidedownPrompt = function() {
+                            console.log('🚫 Bloqueado: showSlidedownPrompt() - prompts automáticos desabilitados');
+                            return Promise.resolve(false);
+                        };
+                    }
+                    
+                    if (typeof OneSignal.showHttpPrompt === 'function') {
+                        const originalShowHttpPrompt = OneSignal.showHttpPrompt;
+                        OneSignal.showHttpPrompt = function() {
+                            console.log('🚫 Bloqueado: showHttpPrompt() - prompts automáticos desabilitados');
+                            return Promise.resolve(false);
+                        };
+                    }
+                    
+                    // registerForPushNotifications pode ser chamado automaticamente
+                    if (typeof OneSignal.registerForPushNotifications === 'function') {
+                        const originalRegister = OneSignal.registerForPushNotifications;
+                        OneSignal.registerForPushNotifications = function() {
+                            console.log('🚫 Bloqueado: registerForPushNotifications() automático');
+                            console.log('💡 Use OneSignalInit.subscribe() para solicitar permissão manualmente');
+                            return Promise.resolve(false);
+                        };
+                    }
+                }, 100);
+                
+                // Escuta mudanças de permissão (apenas para log)
+                OneSignal.on('notificationPermissionChange', function(permission) {
+                    console.log('📱 Permissão mudou (evento):', permission);
+                });
+                
+                // Previne que o OneSignal registre automaticamente
+                // Só registra quando explicitamente solicitado via OneSignalInit.subscribe()
+                OneSignal.setNotificationOpened(function(jsonData) {
+                    console.log('📱 Notificação aberta:', jsonData);
+                });
                 
                 // Registra quando usuário se inscreve
                 OneSignal.on('subscriptionChange', function(isSubscribed) {
@@ -189,6 +243,47 @@ const OneSignalInit = {
                         }
                     });
                 }, 3000);
+                
+                // Verificação adicional após 5 segundos para garantir que prompts estão bloqueados
+                setTimeout(() => {
+                    console.log('🔒 Verificando bloqueio de prompts automáticos...');
+                    
+                    // Verifica e bloqueia novamente (caso o SDK tenha sobrescrito)
+                    if (typeof OneSignal.showSlidedownPrompt === 'function') {
+                        const testCall = OneSignal.showSlidedownPrompt.toString();
+                        if (!testCall.includes('Bloqueado')) {
+                            const original = OneSignal.showSlidedownPrompt;
+                            OneSignal.showSlidedownPrompt = function() {
+                                console.log('🚫 Bloqueado (verificação tardia): showSlidedownPrompt()');
+                                return Promise.resolve(false);
+                            };
+                        }
+                    }
+                    
+                    if (typeof OneSignal.showHttpPrompt === 'function') {
+                        const testCall = OneSignal.showHttpPrompt.toString();
+                        if (!testCall.includes('Bloqueado')) {
+                            const original = OneSignal.showHttpPrompt;
+                            OneSignal.showHttpPrompt = function() {
+                                console.log('🚫 Bloqueado (verificação tardia): showHttpPrompt()');
+                                return Promise.resolve(false);
+                            };
+                        }
+                    }
+                    
+                    if (typeof OneSignal.registerForPushNotifications === 'function') {
+                        const testCall = OneSignal.registerForPushNotifications.toString();
+                        if (!testCall.includes('Bloqueado')) {
+                            const original = OneSignal.registerForPushNotifications;
+                            OneSignal.registerForPushNotifications = function() {
+                                console.log('🚫 Bloqueado (verificação tardia): registerForPushNotifications()');
+                                return Promise.resolve(false);
+                            };
+                        }
+                    }
+                    
+                    console.log('✅ Bloqueio de prompts verificado e ativo');
+                }, 5000);
             });
             
             this.initialized = true;
@@ -442,6 +537,59 @@ const OneSignalInit = {
 
 // Exportar globalmente
 window.OneSignalInit = OneSignalInit;
+
+// CRÍTICO: Bloqueia prompts automáticos ANTES do OneSignal SDK carregar
+// Isso previne que o SDK mostre prompts automaticamente ao carregar
+(function() {
+    // Intercepta OneSignal antes de ser inicializado
+    window.OneSignal = window.OneSignal || [];
+    
+    // Guarda referência original do push
+    const originalPush = window.OneSignal.push;
+    
+    // Intercepta chamadas push para bloquear inicializações automáticas
+    window.OneSignal.push = function(callback) {
+        if (typeof callback === 'function') {
+            // Executa callback mas garante que prompts estão desabilitados
+            originalPush.call(window.OneSignal, function() {
+                // Bloqueia métodos de prompt antes de executar callback
+                if (typeof OneSignal !== 'undefined') {
+                    // Bloqueia showSlidedownPrompt
+                    if (typeof OneSignal.showSlidedownPrompt === 'function') {
+                        const original = OneSignal.showSlidedownPrompt;
+                        OneSignal.showSlidedownPrompt = function() {
+                            console.log('🚫 Bloqueado: showSlidedownPrompt() automático');
+                            return Promise.resolve(false);
+                        };
+                    }
+                    
+                    // Bloqueia showHttpPrompt
+                    if (typeof OneSignal.showHttpPrompt === 'function') {
+                        const original = OneSignal.showHttpPrompt;
+                        OneSignal.showHttpPrompt = function() {
+                            console.log('🚫 Bloqueado: showHttpPrompt() automático');
+                            return Promise.resolve(false);
+                        };
+                    }
+                    
+                    // Bloqueia registerForPushNotifications automático
+                    if (typeof OneSignal.registerForPushNotifications === 'function') {
+                        const original = OneSignal.registerForPushNotifications;
+                        OneSignal.registerForPushNotifications = function() {
+                            console.log('🚫 Bloqueado: registerForPushNotifications() automático');
+                            return Promise.resolve(false);
+                        };
+                    }
+                }
+                
+                // Executa callback original
+                callback();
+            });
+        } else {
+            originalPush.apply(window.OneSignal, arguments);
+        }
+    };
+})();
 
 // Auto-inicializa quando o DOM estiver pronto
 if (document.readyState === 'loading') {

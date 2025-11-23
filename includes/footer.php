@@ -39,6 +39,48 @@
     <!--end::Global Javascript Bundle-->
     
     <!--begin::OneSignal SDK-->
+    <!-- CRÍTICO: Bloqueia prompts automáticos ANTES do SDK carregar -->
+    <script>
+    // Intercepta OneSignal antes do SDK carregar para prevenir prompts automáticos
+    window.OneSignal = window.OneSignal || [];
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    
+    // Bloqueia qualquer tentativa de mostrar prompts automaticamente
+    const blockAutoPrompts = function() {
+        if (typeof OneSignal !== 'undefined') {
+            // Bloqueia showSlidedownPrompt
+            if (typeof OneSignal.showSlidedownPrompt === 'function') {
+                const original = OneSignal.showSlidedownPrompt;
+                OneSignal.showSlidedownPrompt = function() {
+                    console.log('🚫 Bloqueado: showSlidedownPrompt() automático');
+                    return Promise.resolve(false);
+                };
+            }
+            
+            // Bloqueia showHttpPrompt
+            if (typeof OneSignal.showHttpPrompt === 'function') {
+                const original = OneSignal.showHttpPrompt;
+                OneSignal.showHttpPrompt = function() {
+                    console.log('🚫 Bloqueado: showHttpPrompt() automático');
+                    return Promise.resolve(false);
+                };
+            }
+            
+            // Bloqueia registerForPushNotifications automático
+            if (typeof OneSignal.registerForPushNotifications === 'function') {
+                const original = OneSignal.registerForPushNotifications;
+                OneSignal.registerForPushNotifications = function() {
+                    console.log('🚫 Bloqueado: registerForPushNotifications() automático');
+                    return Promise.resolve(false);
+                };
+            }
+        }
+    };
+    
+    // Executa bloqueio imediatamente e periodicamente
+    blockAutoPrompts();
+    setInterval(blockAutoPrompts, 1000);
+    </script>
     <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
     <script src="../assets/js/onesignal-init.js"></script>
     <!--end::OneSignal SDK-->

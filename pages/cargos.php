@@ -44,29 +44,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'delete') {
         $id = $_POST['id'] ?? 0;
         try {
+            // Verifica se há colaboradores vinculados a este cargo
+            $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE cargo_id = ?");
+            $stmt->execute([$id]);
+            $resultado = $stmt->fetch();
+            $total_colaboradores = $resultado['total'] ?? 0;
+            
+            if ($total_colaboradores > 0) {
+                redirect('cargos.php', "Não é possível excluir este cargo pois existem {$total_colaboradores} colaborador(es) vinculado(s) a ele. Primeiro, altere o cargo desses colaboradores ou desative o cargo.", 'error');
+            }
+            
+            // Se não houver colaboradores vinculados, pode excluir
             $stmt = $pdo->prepare("DELETE FROM cargos WHERE id = ?");
             $stmt->execute([$id]);
             redirect('cargos.php', 'Cargo excluído com sucesso!');
         } catch (PDOException $e) {
-            redirect('cargos.php', 'Erro ao excluir: ' . $e->getMessage(), 'error');
+            // Trata especificamente o erro de foreign key
+            if (strpos($e->getMessage(), '1451') !== false || strpos($e->getMessage(), 'foreign key constraint') !== false) {
+                redirect('cargos.php', 'Não é possível excluir este cargo pois existem colaboradores vinculados a ele. Primeiro, altere o cargo desses colaboradores ou desative o cargo.', 'error');
+            } else {
+                redirect('cargos.php', 'Erro ao excluir: ' . $e->getMessage(), 'error');
+            }
         }
     }
 }
 
-// Busca cargos
+// Busca cargos com contagem de colaboradores vinculados
 if ($usuario['role'] === 'ADMIN') {
     $stmt = $pdo->query("
-        SELECT c.*, e.nome_fantasia as empresa_nome 
+        SELECT c.*, 
+               e.nome_fantasia as empresa_nome,
+               COUNT(col.id) as total_colaboradores
         FROM cargos c
         LEFT JOIN empresas e ON c.empresa_id = e.id
+        LEFT JOIN colaboradores col ON c.id = col.cargo_id
+        GROUP BY c.id
         ORDER BY e.nome_fantasia, c.nome_cargo
     ");
 } else {
     $stmt = $pdo->prepare("
-        SELECT c.*, e.nome_fantasia as empresa_nome 
+        SELECT c.*, 
+               e.nome_fantasia as empresa_nome,
+               COUNT(col.id) as total_colaboradores
         FROM cargos c
         LEFT JOIN empresas e ON c.empresa_id = e.id
+        LEFT JOIN colaboradores col ON c.id = col.cargo_id
         WHERE c.empresa_id = ?
+        GROUP BY c.id
         ORDER BY c.nome_cargo
     ");
     $stmt->execute([$usuario['empresa_id']]);
@@ -200,7 +224,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <!--end::Menu item-->
                                     <!--begin::Menu item-->
                                     <div class="menu-item px-3">
-                                        <a href="#" class="menu-link px-3" data-kt-cargo-table-filter="delete_row" data-cargo-id="<?= $cargo['id'] ?>" data-cargo-nome="<?= htmlspecialchars($cargo['nome_cargo']) ?>">Excluir</a>
+                                        <a href="#" class="menu-link px-3" data-kt-cargo-table-filter="delete_row" data-cargo-id="<?= $cargo['id'] ?>" data-cargo-nome="<?= htmlspecialchars($cargo['nome_cargo']) ?>" data-total-colaboradores="<?= $cargo['total_colaboradores'] ?? 0 ?>">Excluir</a>
                                     </div>
                                     <!--end::Menu item-->
                                 </div>
@@ -299,6 +323,26 @@ var KTCargosList = function() {
                 e.preventDefault();
                 const cargoId = this.getAttribute("data-cargo-id");
                 const cargoNome = this.getAttribute("data-cargo-nome");
+                const totalColaboradores = parseInt(this.getAttribute("data-total-colaboradores") || "0");
+                
+                // Verifica se há colaboradores vinculados
+                if (totalColaboradores > 0) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            title: "Não é possível excluir",
+                            html: "O cargo <strong>" + cargoNome + "</strong> possui <strong>" + totalColaboradores + "</strong> colaborador(es) vinculado(s).<br><br>Para excluir este cargo, primeiro altere o cargo desses colaboradores ou desative o cargo.",
+                            icon: "error",
+                            buttonsStyling: false,
+                            confirmButtonText: "Entendi",
+                            customClass: {
+                                confirmButton: "btn fw-bold btn-primary"
+                            }
+                        });
+                    } else {
+                        alert("Não é possível excluir o cargo " + cargoNome + " pois existem " + totalColaboradores + " colaborador(es) vinculado(s) a ele. Primeiro, altere o cargo desses colaboradores ou desative o cargo.");
+                    }
+                    return;
+                }
                 
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({

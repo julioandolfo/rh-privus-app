@@ -4,13 +4,7 @@
   "webDir": "public",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://privus.com.br/rh",
-    "cleartext": false,
-    "allowNavigation": [
-      "https://privus.com.br",
-      "https://onesignal.com",
-      "https://cdn.onesignal.com"
-    ]
+    "androidScheme": "https"
   },
   "plugins": {
     "SplashScreen": {
@@ -26,9 +20,6 @@
     "StatusBar": {
       "style": "light",
       "backgroundColor": "#009ef7"
-    },
-    "App": {
-      "launchUrl": "https://privus.com.br/rh/"
     }
   },
   "android": {
