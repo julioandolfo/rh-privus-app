@@ -761,14 +761,61 @@ function editarUsuario(usuario) {
     modal.show();
 }
 
-// Carrega setores quando uma empresa é selecionada (usa a primeira empresa selecionada)
+// Carrega setores de todas as empresas selecionadas
 function atualizarSetores() {
-    const empresasSelecionadas = Array.from(document.querySelectorAll('input[name="empresas[]"]:checked')).map(cb => cb.value);
-    if (empresasSelecionadas.length > 0) {
-        carregarSetores(empresasSelecionadas[0]);
-    } else {
-        document.getElementById('setor_id').innerHTML = '<option value="">Selecione uma empresa primeiro</option>';
+    const empresasSelecionadas = Array.from(document.querySelectorAll('input[name="empresas[]"]:checked')).map(cb => ({
+        id: cb.value,
+        nome: cb.nextElementSibling.textContent.trim()
+    }));
+    
+    const setorSelect = document.getElementById('setor_id');
+    
+    if (empresasSelecionadas.length === 0) {
+        setorSelect.innerHTML = '<option value="">Selecione uma empresa primeiro</option>';
+        return;
     }
+    
+    if (empresasSelecionadas.length === 1) {
+        // Se apenas uma empresa, carrega setores normalmente
+        carregarSetores(empresasSelecionadas[0].id);
+        return;
+    }
+    
+    // Se múltiplas empresas, carrega setores de todas com identificação
+    setorSelect.innerHTML = '<option value="">Carregando...</option>';
+    
+    const promises = empresasSelecionadas.map(empresa => 
+        fetch(`../api/get_setores.php?empresa_id=${empresa.id}`)
+            .then(r => r.json())
+            .then(data => {
+                const setores = Array.isArray(data) ? data : (data.setores || []);
+                return setores.map(setor => ({
+                    ...setor,
+                    empresa_nome: empresa.nome
+                }));
+            })
+            .catch(() => [])
+    );
+    
+    Promise.all(promises).then(results => {
+        const todosSetores = results.flat();
+        setorSelect.innerHTML = '<option value="">Selecione...</option>';
+        
+        if (todosSetores.length === 0) {
+            setorSelect.innerHTML = '<option value="">Nenhum setor encontrado</option>';
+            return;
+        }
+        
+        todosSetores.forEach(setor => {
+            // Mostra nome do setor com empresa entre parênteses se houver múltiplas empresas
+            const label = empresasSelecionadas.length > 1 
+                ? `${setor.nome_setor} (${setor.empresa_nome})`
+                : setor.nome_setor;
+            setorSelect.innerHTML += `<option value="${setor.id}">${label}</option>`;
+        });
+    }).catch(() => {
+        setorSelect.innerHTML = '<option value="">Erro ao carregar setores</option>';
+    });
 }
 
 // Adiciona listener para cada checkbox de empresa
