@@ -177,6 +177,20 @@ $empresas = get_empresas_disponiveis($pdo, $usuario);
                                                     Landing Page
                                                 </a>
                                                 <?php endif; ?>
+                                                <button class="btn btn-sm btn-light-danger btn-excluir-vaga" 
+                                                        data-vaga-id="<?= $vaga['id'] ?>"
+                                                        data-vaga-titulo="<?= htmlspecialchars($vaga['titulo']) ?>"
+                                                        data-total-candidaturas="<?= $vaga['total_candidaturas'] ?>"
+                                                        data-candidaturas-aprovadas="<?= $vaga['candidaturas_aprovadas'] ?>"
+                                                        title="Excluir Vaga">
+                                                    <i class="ki-duotone ki-trash fs-6">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                        <span class="path3"></span>
+                                                        <span class="path4"></span>
+                                                        <span class="path5"></span>
+                                                    </i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -191,6 +205,73 @@ $empresas = get_empresas_disponiveis($pdo, $usuario);
         </div>
     </div>
 </div>
+
+<script>
+// Excluir vaga
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.btn-excluir-vaga').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const vagaId = this.dataset.vagaId;
+            const vagaTitulo = this.dataset.vagaTitulo;
+            const totalCandidaturas = parseInt(this.dataset.totalCandidaturas) || 0;
+            const candidaturasAprovadas = parseInt(this.dataset.candidaturasAprovadas) || 0;
+            
+            let mensagemConfirmacao = `Deseja realmente excluir a vaga "${vagaTitulo}"?\n\n`;
+            
+            if (totalCandidaturas > 0) {
+                mensagemConfirmacao += `⚠️ ATENÇÃO: Esta vaga possui ${totalCandidaturas} candidatura(s).\n`;
+                if (candidaturasAprovadas > 0) {
+                    mensagemConfirmacao += `⚠️ CRÍTICO: ${candidaturasAprovadas} candidatura(s) aprovada(s) serão excluídas!\n\n`;
+                }
+                mensagemConfirmacao += `Todas as candidaturas, entrevistas e dados relacionados serão excluídos permanentemente.\n\n`;
+            }
+            
+            mensagemConfirmacao += `Esta ação não pode ser desfeita!`;
+            
+            if (!confirm(mensagemConfirmacao)) {
+                return;
+            }
+            
+            // Confirmação adicional se houver candidaturas aprovadas
+            if (candidaturasAprovadas > 0) {
+                if (!confirm(`ATENÇÃO: Você está prestes a excluir ${candidaturasAprovadas} candidatura(s) APROVADA(S)!\n\nTem certeza absoluta que deseja continuar?`)) {
+                    return;
+                }
+            }
+            
+            const btnOriginal = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            try {
+                const response = await fetch(`../api/recrutamento/vagas/excluir.php?id=${vagaId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    let mensagemSucesso = 'Vaga excluída com sucesso!';
+                    if (data.candidaturas_excluidas > 0) {
+                        mensagemSucesso += `\n${data.candidaturas_excluidas} candidatura(s) também foram excluída(s).`;
+                    }
+                    alert(mensagemSucesso);
+                    location.reload();
+                } else {
+                    alert('Erro: ' + data.message);
+                    this.disabled = false;
+                    this.innerHTML = btnOriginal;
+                }
+            } catch (error) {
+                console.error('Erro ao excluir vaga:', error);
+                alert('Erro ao excluir vaga. Verifique o console para mais detalhes.');
+                this.disabled = false;
+                this.innerHTML = btnOriginal;
+            }
+        });
+    });
+});
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
