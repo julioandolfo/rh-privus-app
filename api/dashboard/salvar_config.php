@@ -32,7 +32,7 @@ try {
         $stmt_delete = $pdo->prepare("DELETE FROM dashboard_config WHERE usuario_id = ?");
         $stmt_delete->execute([$usuario['id']]);
         
-        // Insere novas configurações
+        // Insere novas configurações de cards
         $stmt_insert = $pdo->prepare("
             INSERT INTO dashboard_config (usuario_id, card_id, posicao_x, posicao_y, largura, altura, visivel, ordem)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -52,6 +52,44 @@ try {
                 isset($card['visible']) ? (int)$card['visible'] : 1,
                 $ordem++
             ]);
+        }
+        
+        // Salva configurações do dashboard (margin, cellHeight, etc) se fornecidas
+        if (isset($configuracao['config']) && is_array($configuracao['config'])) {
+            $dashboard_settings = json_encode($configuracao['config']);
+            
+            // Remove preferência antiga se existir
+            $stmt_del_pref = $pdo->prepare("
+                DELETE FROM dashboard_preferences 
+                WHERE usuario_id = ? AND configuracao_chave = 'dashboard_settings'
+            ");
+            $stmt_del_pref->execute([$usuario['id']]);
+            
+            // Insere nova preferência
+            $stmt_ins_pref = $pdo->prepare("
+                INSERT INTO dashboard_preferences (usuario_id, configuracao_chave, configuracao_valor)
+                VALUES (?, 'dashboard_settings', ?)
+            ");
+            $stmt_ins_pref->execute([$usuario['id'], $dashboard_settings]);
+        }
+        
+        // Salva configurações dos carrosséis se fornecidas
+        if (isset($configuracao['carrosselConfigs']) && is_array($configuracao['carrosselConfigs'])) {
+            $carrossel_settings = json_encode($configuracao['carrosselConfigs']);
+            
+            // Remove preferência antiga se existir
+            $stmt_del_carousel = $pdo->prepare("
+                DELETE FROM dashboard_preferences 
+                WHERE usuario_id = ? AND configuracao_chave = 'carousel_settings'
+            ");
+            $stmt_del_carousel->execute([$usuario['id']]);
+            
+            // Insere nova preferência
+            $stmt_ins_carousel = $pdo->prepare("
+                INSERT INTO dashboard_preferences (usuario_id, configuracao_chave, configuracao_valor)
+                VALUES (?, 'carousel_settings', ?)
+            ");
+            $stmt_ins_carousel->execute([$usuario['id'], $carrossel_settings]);
         }
         
         $pdo->commit();

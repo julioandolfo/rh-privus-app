@@ -41,9 +41,41 @@ try {
         ];
     }
     
+    // Busca configurações do dashboard (margin, cellHeight, etc)
+    $stmt_config = $pdo->prepare("
+        SELECT configuracao_valor
+        FROM dashboard_preferences
+        WHERE usuario_id = ? AND configuracao_chave = 'dashboard_settings'
+        LIMIT 1
+    ");
+    $stmt_config->execute([$usuario['id']]);
+    $dashboard_settings = $stmt_config->fetchColumn();
+    
+    $config = null;
+    if ($dashboard_settings) {
+        $config = json_decode($dashboard_settings, true);
+    }
+    
+    // Busca configurações dos carrosséis
+    $stmt_carousel = $pdo->prepare("
+        SELECT configuracao_valor
+        FROM dashboard_preferences
+        WHERE usuario_id = ? AND configuracao_chave = 'carousel_settings'
+        LIMIT 1
+    ");
+    $stmt_carousel->execute([$usuario['id']]);
+    $carousel_settings = $stmt_carousel->fetchColumn();
+    
+    $carrosselConfigs = null;
+    if ($carousel_settings) {
+        $carrosselConfigs = json_decode($carousel_settings, true);
+    }
+    
     echo json_encode([
         'success' => true,
-        'cards' => $cards
+        'cards' => $cards,
+        'config' => $config,
+        'carrosselConfigs' => $carrosselConfigs
     ]);
     
 } catch (Exception $e) {
@@ -51,7 +83,8 @@ try {
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage(),
-        'cards' => []
+        'cards' => [],
+        'config' => null
     ]);
 }
 

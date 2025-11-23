@@ -192,10 +192,11 @@ function enviar_email_ocorrencia($ocorrencia_id) {
         SELECT o.*, 
                c.nome_completo, c.email_pessoal,
                e.nome_fantasia as empresa_nome,
-               s.nome_setor,
+               s.nome_setor, s.gestor_id,
                car.nome_cargo,
                u.nome as usuario_nome,
-               t.nome as tipo_ocorrencia_nome
+               t.nome as tipo_ocorrencia_nome,
+               t.notificar_colaborador_email, t.notificar_gestor_email, t.notificar_rh_email
         FROM ocorrencias o
         INNER JOIN colaboradores c ON o.colaborador_id = c.id
         LEFT JOIN empresas e ON c.empresa_id = e.id
@@ -208,13 +209,22 @@ function enviar_email_ocorrencia($ocorrencia_id) {
     $stmt->execute([$ocorrencia_id]);
     $ocorrencia = $stmt->fetch();
     
-    if (!$ocorrencia || empty($ocorrencia['email_pessoal'])) {
-        return ['success' => false, 'message' => 'Ocorrência não encontrada ou colaborador sem email.'];
+    if (!$ocorrencia) {
+        return ['success' => false, 'message' => 'Ocorrência não encontrada.'];
+    }
+    
+    // Verifica se email está habilitado para colaborador
+    if (empty($ocorrencia['email_pessoal']) || !$ocorrencia['notificar_colaborador_email']) {
+        return ['success' => false, 'message' => 'Email não habilitado ou colaborador sem email.'];
     }
     
     // Prepara variáveis HTML condicionais
     $hora_ocorrencia_html = '';
     $tempo_atraso_html = '';
+    $severidade_html = '';
+    $status_aprovacao_html = '';
+    $tags_html = '';
+    $valor_desconto_html = '';
     
     if (!empty($ocorrencia['hora_ocorrencia'])) {
         $hora_ocorrencia_html = '<li><strong>Hora:</strong> ' . substr($ocorrencia['hora_ocorrencia'], 0, 5) . '</li>';
@@ -226,12 +236,59 @@ function enviar_email_ocorrencia($ocorrencia_id) {
         $tempo_atraso_html = '<li><strong>Tempo de Atraso:</strong> ' . ($horas > 0 ? $horas . 'h ' : '') . $minutos . 'min</li>';
     }
     
+    if (!empty($ocorrencia['severidade'])) {
+        $severidade_labels = [
+            'leve' => 'Leve',
+            'moderada' => 'Moderada',
+            'grave' => 'Grave',
+            'critica' => 'Crítica'
+        ];
+        $severidade_html = '<li><strong>Severidade:</strong> ' . ($severidade_labels[$ocorrencia['severidade']] ?? ucfirst($ocorrencia['severidade'])) . '</li>';
+    }
+    
+    if (!empty($ocorrencia['status_aprovacao'])) {
+        $status_labels = [
+            'pendente' => 'Pendente de Aprovação',
+            'aprovada' => 'Aprovada',
+            'rejeitada' => 'Rejeitada'
+        ];
+        $status_aprovacao_html = '<li><strong>Status:</strong> ' . ($status_labels[$ocorrencia['status_aprovacao']] ?? ucfirst($ocorrencia['status_aprovacao'])) . '</li>';
+    }
+    
+    if (!empty($ocorrencia['tags'])) {
+        require_once __DIR__ . '/ocorrencias_functions.php';
+        $tags_array = json_decode($ocorrencia['tags'], true);
+        if ($tags_array) {
+            $tags_disponiveis = get_tags_ocorrencias();
+            $tags_nomes = [];
+            foreach ($tags_array as $tag_id) {
+                foreach ($tags_disponiveis as $tag) {
+                    if ($tag['id'] == $tag_id) {
+                        $tags_nomes[] = $tag['nome'];
+                        break;
+                    }
+                }
+            }
+            if (!empty($tags_nomes)) {
+                $tags_html = '<li><strong>Tags:</strong> ' . implode(', ', $tags_nomes) . '</li>';
+            }
+        }
+    }
+    
+    if (!empty($ocorrencia['valor_desconto']) && $ocorrencia['valor_desconto'] > 0) {
+        $valor_desconto_html = '<li><strong>Desconto Calculado:</strong> R$ ' . number_format($ocorrencia['valor_desconto'], 2, ',', '.') . '</li>';
+    }
+    
     $variaveis = [
         'nome_completo' => $ocorrencia['nome_completo'] ?? '',
         'tipo_ocorrencia' => $ocorrencia['tipo_ocorrencia_nome'] ?? $ocorrencia['tipo'] ?? '',
         'data_ocorrencia' => formatar_data($ocorrencia['data_ocorrencia'] ?? ''),
         'hora_ocorrencia' => $hora_ocorrencia_html,
         'tempo_atraso' => $tempo_atraso_html,
+        'severidade' => $severidade_html,
+        'status_aprovacao' => $status_aprovacao_html,
+        'tags' => $tags_html,
+        'valor_desconto' => $valor_desconto_html,
         'descricao' => !empty($ocorrencia['descricao']) ? nl2br(htmlspecialchars($ocorrencia['descricao'])) : '',
         'usuario_registro' => $ocorrencia['usuario_nome'] ?? '',
         'data_registro' => formatar_data($ocorrencia['created_at'] ?? '', 'd/m/Y H:i'),

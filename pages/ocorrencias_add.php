@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/select_colaborador.php';
+require_once __DIR__ . '/../includes/ocorrencias_functions.php';
 
 require_page_permission('ocorrencias_add.php');
 
@@ -24,6 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hora_ocorrencia = $_POST['hora_ocorrencia'] ?? null;
     $tempo_atraso_minutos = !empty($_POST['tempo_atraso_minutos']) ? (int)$_POST['tempo_atraso_minutos'] : null;
     $tipo_ponto = $_POST['tipo_ponto'] ?? null;
+    $severidade = $_POST['severidade'] ?? null;
+    $tags = !empty($_POST['tags']) ? json_encode($_POST['tags']) : null;
+    $campos_dinamicos_valores = !empty($_POST['campos_dinamicos']) ? json_encode($_POST['campos_dinamicos']) : null;
     
     if (empty($colaborador_id) || (empty($tipo_ocorrencia_id) && empty($tipo)) || empty($data_ocorrencia)) {
         redirect('ocorrencias_add.php', 'Preencha os campos obrigatórios!', 'error');
@@ -35,6 +39,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     try {
+        // Busca dados do tipo de ocorrência
+        $tipo_ocorrencia_data = null;
+        if ($tipo_ocorrencia_id) {
+            $stmt = $pdo->prepare("SELECT * FROM tipos_ocorrencias WHERE id = ?");
+            $stmt->execute([$tipo_ocorrencia_id]);
+            $tipo_ocorrencia_data = $stmt->fetch();
+        }
+        
         // Se não tiver tipo_ocorrencia_id, usa o tipo antigo para compatibilidade
         if (empty($tipo_ocorrencia_id) && !empty($tipo)) {
             $stmt = $pdo->prepare("SELECT id FROM tipos_ocorrencias WHERE codigo = ? LIMIT 1");
@@ -53,15 +65,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$codigo]);
                 $tipo_data = $stmt->fetch();
                 $tipo_ocorrencia_id = $tipo_data['id'] ?? null;
+                if ($tipo_ocorrencia_id) {
+                    $stmt = $pdo->prepare("SELECT * FROM tipos_ocorrencias WHERE id = ?");
+                    $stmt->execute([$tipo_ocorrencia_id]);
+                    $tipo_ocorrencia_data = $stmt->fetch();
+                }
             }
         }
+        
+        // Valida campos dinâmicos se existirem
+        if ($tipo_ocorrencia_data && $tipo_ocorrencia_id) {
+            $campos_dinamicos = get_campos_dinamicos_tipo($tipo_ocorrencia_id);
+            if (!empty($campos_dinamicos) && !empty($_POST['campos_dinamicos'])) {
+                $erros_validacao = validar_campos_dinamicos($campos_dinamicos, $_POST['campos_dinamicos']);
+                if (!empty($erros_validacao)) {
+                    redirect('ocorrencias_add.php', implode('<br>', $erros_validacao), 'error');
+                }
+            }
+        }
+        
+        // Determina severidade (usa do tipo se não informada)
+        if (!$severidade && $tipo_ocorrencia_data) {
+            $severidade = $tipo_ocorrencia_data['severidade'] ?? 'moderada';
+        }
+        
+        // Determina status de aprovação
+        $status_aprovacao = 'aprovada';
+        if ($tipo_ocorrencia_data && $tipo_ocorrencia_data['requer_aprovacao']) {
+            $status_aprovacao = 'pendente';
+        }
+        
+        // Calcula desconto se necessário
+        $valor_desconto = null;
+        if ($tipo_ocorrencia_data && $tipo_ocorrencia_data['calcula_desconto']) {
+            // Será calculado após inserir a ocorrência
+        }
+        
+        // Usa template de descrição se não houver descrição
+        if (empty($descricao) && $tipo_ocorrencia_data && !empty($tipo_ocorrencia_data['template_descricao'])) {
+            $descricao = $tipo_ocorrencia_data['template_descricao'];
+            // Substitui variáveis
+            $stmt_colab = $pdo->prepare("SELECT nome_completo FROM colaboradores WHERE id = ?");
+            $stmt_colab->execute([$colaborador_id]);
+            $colab = $stmt_colab->fetch();
+            $descricao = str_replace('{colaborador}', $colab['nome_completo'] ?? '', $descricao);
+            $descricao = str_replace('{data}', formatar_data($data_ocorrencia), $descricao);
+            $descricao = str_replace('{hora}', $hora_ocorrencia ?? '', $descricao);
+        }
+        
+        $pdo->beginTransaction();
         
         $stmt = $pdo->prepare("
             INSERT INTO ocorrencias (
                 colaborador_id, usuario_id, tipo, tipo_ocorrencia_id, 
                 descricao, data_ocorrencia, hora_ocorrencia, 
-                tempo_atraso_minutos, tipo_ponto
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tempo_atraso_minutos, tipo_ponto, severidade, status_aprovacao,
+                tags, campos_dinamicos
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $colaborador_id, 
@@ -72,17 +132,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data_ocorrencia,
             $hora_ocorrencia,
             $tempo_atraso_minutos,
-            $tipo_ponto
+            $tipo_ponto,
+            $severidade,
+            $status_aprovacao,
+            $tags,
+            $campos_dinamicos_valores
         ]);
         
         $ocorrencia_id = $pdo->lastInsertId();
+        
+        // Calcula e atualiza desconto se necessário
+        if ($tipo_ocorrencia_data && $tipo_ocorrencia_data['calcula_desconto']) {
+            $valor_desconto = calcular_desconto_ocorrencia($ocorrencia_id);
+            if ($valor_desconto > 0) {
+                $stmt = $pdo->prepare("UPDATE ocorrencias SET valor_desconto = ? WHERE id = ?");
+                $stmt->execute([$valor_desconto, $ocorrencia_id]);
+            }
+        }
+        
+        // Processa anexos
+        if (!empty($_FILES['anexos']['name'][0])) {
+            foreach ($_FILES['anexos']['name'] as $key => $name) {
+                if (!empty($name)) {
+                    $file = [
+                        'name' => $name,
+                        'type' => $_FILES['anexos']['type'][$key],
+                        'tmp_name' => $_FILES['anexos']['tmp_name'][$key],
+                        'error' => $_FILES['anexos']['error'][$key],
+                        'size' => $_FILES['anexos']['size'][$key]
+                    ];
+                    
+                    $upload_result = upload_anexo_ocorrencia($file, $ocorrencia_id);
+                    if ($upload_result['success']) {
+                        $stmt = $pdo->prepare("
+                            INSERT INTO ocorrencias_anexos 
+                            (ocorrencia_id, nome_arquivo, caminho_arquivo, tipo_mime, tamanho_bytes, uploaded_by)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ");
+                        $stmt->execute([
+                            $ocorrencia_id,
+                            $upload_result['filename'],
+                            $upload_result['path'],
+                            $upload_result['mime_type'],
+                            $upload_result['size'],
+                            $usuario['id']
+                        ]);
+                    }
+                }
+            }
+        }
+        
+        // Registra histórico
+        registrar_historico_ocorrencia($ocorrencia_id, 'criada', $usuario['id'], null, null, null, 'Ocorrência criada');
+        
+        // Verifica e aplica advertências progressivas
+        if ($tipo_ocorrencia_data && $tipo_ocorrencia_data['conta_advertencia']) {
+            verificar_advertencias_progressivas($colaborador_id, $tipo_ocorrencia_id);
+        }
+        
+        // Envia notificações
+        enviar_notificacoes_ocorrencia($ocorrencia_id);
         
         // Envia email de ocorrência se template estiver ativo
         require_once __DIR__ . '/../includes/email_templates.php';
         enviar_email_ocorrencia($ocorrencia_id);
         
-        redirect('colaborador_view.php?id=' . $colaborador_id, 'Ocorrência registrada com sucesso!');
+        $pdo->commit();
+        
+        $mensagem = $status_aprovacao === 'pendente' 
+            ? 'Ocorrência registrada com sucesso! Aguardando aprovação.' 
+            : 'Ocorrência registrada com sucesso!';
+        
+        redirect('colaborador_view.php?id=' . $colaborador_id, $mensagem);
     } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         redirect('ocorrencias_add.php', 'Erro ao registrar: ' . $e->getMessage(), 'error');
     }
 }
@@ -203,7 +328,10 @@ require_once __DIR__ . '/../includes/header.php';
                                 ?>
                                     <option value="<?= $tipo['id'] ?>" 
                                         data-permite-tempo="<?= $tipo['permite_tempo_atraso'] ?>"
-                                        data-permite-ponto="<?= $tipo['permite_tipo_ponto'] ?>">
+                                        data-permite-ponto="<?= $tipo['permite_tipo_ponto'] ?>"
+                                        data-severidade="<?= htmlspecialchars($tipo['severidade'] ?? 'moderada') ?>"
+                                        data-requer-aprovacao="<?= $tipo['requer_aprovacao'] ?? 0 ?>"
+                                        data-template="<?= htmlspecialchars($tipo['template_descricao'] ?? '') ?>">
                                         <?= htmlspecialchars($tipo['nome']) ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -217,6 +345,32 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="col-md-3">
                             <label class="fw-semibold fs-6 mb-2">Hora da Ocorrência</label>
                             <input type="time" name="hora_ocorrencia" id="hora_ocorrencia" class="form-control form-control-solid" />
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-6">
+                            <label class="fw-semibold fs-6 mb-2">Severidade</label>
+                            <select name="severidade" id="severidade" class="form-select form-select-solid">
+                                <option value="leve">Leve</option>
+                                <option value="moderada" selected>Moderada</option>
+                                <option value="grave">Grave</option>
+                                <option value="critica">Crítica</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-semibold fs-6 mb-2">Tags</label>
+                            <select name="tags[]" id="tags" class="form-select form-select-solid" multiple>
+                                <?php 
+                                $tags_disponiveis = get_tags_ocorrencias();
+                                foreach ($tags_disponiveis as $tag): 
+                                ?>
+                                    <option value="<?= $tag['id'] ?>" data-cor="<?= htmlspecialchars($tag['cor']) ?>">
+                                        <?= htmlspecialchars($tag['nome']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Mantenha Ctrl pressionado para selecionar múltiplas tags</small>
                         </div>
                     </div>
                     
@@ -242,10 +396,28 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     
+                    <!-- Campos dinâmicos serão inseridos aqui -->
+                    <div id="campos_dinamicos_container" class="mb-7"></div>
+                    
                     <div class="row mb-7">
                         <div class="col-md-12">
                             <label class="fw-semibold fs-6 mb-2">Descrição</label>
                             <textarea name="descricao" id="descricao" class="form-control form-control-solid" rows="5" placeholder="Descreva detalhadamente a ocorrência..."></textarea>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-light-primary" onclick="carregarTemplateDescricao()">
+                                    <i class="ki-duotone ki-file fs-2"></i>
+                                    Usar Template
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-12">
+                            <label class="fw-semibold fs-6 mb-2">Anexos</label>
+                            <input type="file" name="anexos[]" id="anexos" class="form-control form-control-solid" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" />
+                            <small class="text-muted">Você pode selecionar múltiplos arquivos (PDF, DOC, DOCX, XLS, XLSX ou imagens). Máximo 10MB por arquivo.</small>
+                            <div id="anexos_preview" class="mt-3"></div>
                         </div>
                     </div>
                     
@@ -298,6 +470,12 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     const option = this.options[this.selectedIndex];
     const permiteTempo = option.getAttribute('data-permite-tempo') === '1';
     const permitePonto = option.getAttribute('data-permite-ponto') === '1';
+    const severidade = option.getAttribute('data-severidade') || 'moderada';
+    const requerAprovacao = option.getAttribute('data-requer-aprovacao') === '1';
+    const template = option.getAttribute('data-template') || '';
+    
+    // Atualiza severidade
+    document.getElementById('severidade').value = severidade;
     
     // Mostra/esconde campo de tempo de atraso
     const campoTempo = document.getElementById('campo_tempo_atraso');
@@ -321,8 +499,167 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
         document.getElementById('tipo_ponto').required = false;
     }
     
+    // Carrega campos dinâmicos
+    if (tipoId) {
+        carregarCamposDinamicosFormulario(tipoId);
+    } else {
+        document.getElementById('campos_dinamicos_container').innerHTML = '';
+    }
+    
     // Atualiza campo oculto tipo para compatibilidade
     document.getElementById('tipo').value = option.text.trim();
+});
+
+// Carrega campos dinâmicos no formulário
+function carregarCamposDinamicosFormulario(tipoId) {
+    fetch(`../api/ocorrencias/get_campos_dinamicos.php?tipo_id=${tipoId}`)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('campos_dinamicos_container');
+            container.innerHTML = '';
+            
+            if (data.success && data.campos && data.campos.length > 0) {
+                data.campos.forEach(campo => {
+                    const campoHtml = criarHtmlCampoDinamico(campo);
+                    container.insertAdjacentHTML('beforeend', campoHtml);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar campos dinâmicos:', error);
+        });
+}
+
+// Cria HTML para campo dinâmico
+function criarHtmlCampoDinamico(campo) {
+    const codigo = campo.codigo;
+    const label = campo.label;
+    const tipo = campo.tipo_campo;
+    const obrigatorio = campo.obrigatorio == 1 ? 'required' : '';
+    const placeholder = campo.placeholder || '';
+    const valorPadrao = campo.valor_padrao || '';
+    
+    let inputHtml = '';
+    
+    switch(tipo) {
+        case 'textarea':
+            inputHtml = `<textarea name="campos_dinamicos[${codigo}]" id="campo_${codigo}" class="form-control form-control-solid" ${obrigatorio} placeholder="${placeholder}">${valorPadrao}</textarea>`;
+            break;
+        case 'number':
+            inputHtml = `<input type="number" name="campos_dinamicos[${codigo}]" id="campo_${codigo}" class="form-control form-control-solid" ${obrigatorio} placeholder="${placeholder}" value="${valorPadrao}" />`;
+            break;
+        case 'date':
+            inputHtml = `<input type="date" name="campos_dinamicos[${codigo}]" id="campo_${codigo}" class="form-control form-control-solid" ${obrigatorio} value="${valorPadrao}" />`;
+            break;
+        case 'time':
+            inputHtml = `<input type="time" name="campos_dinamicos[${codigo}]" id="campo_${codigo}" class="form-control form-control-solid" ${obrigatorio} value="${valorPadrao}" />`;
+            break;
+        case 'select':
+            const opcoes = campo.opcoes ? JSON.parse(campo.opcoes) : [];
+            let optionsHtml = '<option value="">Selecione...</option>';
+            opcoes.forEach(opcao => {
+                optionsHtml += `<option value="${opcao}" ${opcao === valorPadrao ? 'selected' : ''}>${opcao}</option>`;
+            });
+            inputHtml = `<select name="campos_dinamicos[${codigo}]" id="campo_${codigo}" class="form-select form-select-solid" ${obrigatorio}>${optionsHtml}</select>`;
+            break;
+        case 'checkbox':
+            inputHtml = `<div class="form-check form-check-custom form-check-solid">
+                <input class="form-check-input" type="checkbox" name="campos_dinamicos[${codigo}]" id="campo_${codigo}" value="1" ${valorPadrao === '1' ? 'checked' : ''} />
+                <label class="form-check-label" for="campo_${codigo}">${label}</label>
+            </div>`;
+            return `<div class="row mb-5">
+                <div class="col-md-12">
+                    ${inputHtml}
+                </div>
+            </div>`;
+        case 'radio':
+            const opcoesRadio = campo.opcoes ? JSON.parse(campo.opcoes) : [];
+            let radiosHtml = '';
+            opcoesRadio.forEach((opcao, index) => {
+                radiosHtml += `<div class="form-check form-check-custom form-check-solid">
+                    <input class="form-check-input" type="radio" name="campos_dinamicos[${codigo}]" id="campo_${codigo}_${index}" value="${opcao}" ${opcao === valorPadrao ? 'checked' : ''} />
+                    <label class="form-check-label" for="campo_${codigo}_${index}">${opcao}</label>
+                </div>`;
+            });
+            return `<div class="row mb-5">
+                <div class="col-md-12">
+                    <label class="fw-semibold fs-6 mb-2">${label} ${obrigatorio ? '<span class="text-danger">*</span>' : ''}</label>
+                    ${radiosHtml}
+                </div>
+            </div>`;
+        default:
+            inputHtml = `<input type="text" name="campos_dinamicos[${codigo}]" id="campo_${codigo}" class="form-control form-control-solid" ${obrigatorio} placeholder="${placeholder}" value="${valorPadrao}" />`;
+    }
+    
+    return `<div class="row mb-5">
+        <div class="col-md-12">
+            <label class="fw-semibold fs-6 mb-2">${label} ${obrigatorio ? '<span class="text-danger">*</span>' : ''}</label>
+            ${inputHtml}
+        </div>
+    </div>`;
+}
+
+// Carrega template de descrição
+function carregarTemplateDescricao() {
+    const tipoId = document.getElementById('tipo_ocorrencia_id').value;
+    if (!tipoId) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                text: 'Selecione um tipo de ocorrência primeiro!',
+                icon: 'warning',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok, entendi!',
+                customClass: {
+                    confirmButton: 'btn fw-bold btn-primary'
+                }
+            });
+        }
+        return;
+    }
+    
+    fetch(`../api/ocorrencias/get_templates_descricao.php?tipo_id=${tipoId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.templates && data.templates.length > 0) {
+                // Mostra modal para selecionar template
+                const opcoes = data.templates.map(t => t.nome).join('|');
+                const templateEscolhido = prompt('Escolha um template:\n' + data.templates.map((t, i) => `${i + 1}. ${t.nome}`).join('\n') + '\n\nDigite o número:');
+                
+                if (templateEscolhido && data.templates[parseInt(templateEscolhido) - 1]) {
+                    const template = data.templates[parseInt(templateEscolhido) - 1];
+                    document.getElementById('descricao').value = template.template;
+                }
+            } else {
+                // Usa template padrão do tipo
+                const option = document.getElementById('tipo_ocorrencia_id').options[document.getElementById('tipo_ocorrencia_id').selectedIndex];
+                const template = option.getAttribute('data-template') || '';
+                if (template) {
+                    document.getElementById('descricao').value = template;
+                } else {
+                    alert('Nenhum template disponível para este tipo.');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar templates:', error);
+        });
+}
+
+// Preview de anexos
+document.getElementById('anexos').addEventListener('change', function(e) {
+    const preview = document.getElementById('anexos_preview');
+    preview.innerHTML = '';
+    
+    Array.from(e.target.files).forEach((file, index) => {
+        const div = document.createElement('div');
+        div.className = 'd-flex align-items-center mb-2';
+        div.innerHTML = `
+            <i class="ki-duotone ki-file fs-2 me-2"></i>
+            <span class="text-gray-800">${file.name}</span>
+            <span class="text-muted ms-2">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+        `;
+        preview.appendChild(div);
+    });
 });
 
 // Validação do formulário

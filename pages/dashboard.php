@@ -478,6 +478,13 @@ if (is_colaborador() && !empty($colaborador_id)) {
                 </i>
                 Personalizar Dashboard
             </button>
+            <button type="button" class="btn btn-sm btn-light-info d-none" id="btn_configuracoes_dashboard">
+                <i class="ki-duotone ki-gear fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Configurações
+            </button>
             <button type="button" class="btn btn-sm btn-success d-none" id="btn_salvar_dashboard">
                 <i class="ki-duotone ki-check fs-2">
                     <span class="path1"></span>
@@ -498,6 +505,13 @@ if (is_colaborador() && !empty($colaborador_id)) {
                     <span class="path2"></span>
                 </i>
                 Limpar Layout
+            </button>
+            <button type="button" class="btn btn-sm btn-light-primary d-none" id="btn_restaurar_layout">
+                <i class="ki-duotone ki-arrow-circle-left fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Restaurar Layout
             </button>
             <button type="button" class="btn btn-sm btn-light d-none" id="btn_cancelar_dashboard">
                 Cancelar
@@ -537,7 +551,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                 </div>
             </div>
         <?php endif; ?>
-        <div id="dashboard_grid_area">
+        <div id="dashboard_grid_area" style="opacity: 0; transition: opacity 0.3s;">
         <?php if (is_colaborador() && !empty($colaborador_id)): ?>
         <!-- Dashboard do Colaborador -->
         
@@ -730,7 +744,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         ?>
         <div class="row g-5 g-xl-8 mb-5">
             <!--begin::Col - Análise de Emoções -->
-            <div class="col-xl-8">
+            <div class="col-xl-8" data-card-id="card_emocao_diaria" data-card-title="Como você está se sentindo?" data-card-w="8" data-card-h="6">
                 <div class="card card-flush">
                     <div class="card-header pt-7">
                         <h3 class="card-title align-items-start flex-column">
@@ -845,7 +859,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
             <!--end::Col-->
             
             <!--begin::Col - Ranking de Pontos -->
-            <div class="col-xl-4">
+            <div class="col-xl-4" data-card-id="card_ranking_pontos" data-card-title="Ranking de Pontos" data-card-w="4" data-card-h="5">
                 <div class="card card-flush">
                     <div class="card-header pt-7">
                         <h3 class="card-title align-items-start flex-column">
@@ -1228,7 +1242,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         ?>
         <div class="row g-5 g-xl-8 mb-5">
             <!--begin::Col - Análise de Emoções -->
-            <div class="col-xl-8">
+            <div class="col-xl-8" data-card-id="card_emocao_diaria" data-card-title="Como você está se sentindo?" data-card-w="8" data-card-h="6">
                 <div class="card card-flush">
                     <div class="card-header pt-7">
                         <h3 class="card-title align-items-start flex-column">
@@ -1343,7 +1357,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
             <!--end::Col-->
             
             <!--begin::Col - Histórico de Emoções -->
-            <div class="col-xl-4">
+            <div class="col-xl-4" data-card-id="card_historico_emocoes" data-card-title="Histórico de Emoções" data-card-w="4" data-card-h="5">
                 <div class="card card-flush">
                     <div class="card-header pt-7">
                         <h3 class="card-title align-items-start flex-column">
@@ -1453,7 +1467,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         <div class="row g-5 g-xl-8 mb-5">
             <?php if ($can_see_media_emocoes): ?>
             <!--begin::Col - Média de Emoções -->
-            <div class="col-xl-<?= $can_see_ultimas_emocoes ? '4' : '12' ?>">
+            <div class="col-xl-<?= $can_see_ultimas_emocoes ? '4' : '12' ?>" data-card-id="card_media_emocoes" data-card-title="Média das Emoções" data-card-w="<?= $can_see_ultimas_emocoes ? '4' : '12' ?>" data-card-h="4">
                 <div class="card card-flush">
                     <div class="card-header pt-7">
                         <h3 class="card-title align-items-start flex-column">
@@ -1497,7 +1511,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
             
             <?php if ($can_see_ultimas_emocoes): ?>
             <!--begin::Col - Últimas 10 Emoções -->
-            <div class="col-xl-<?= $can_see_media_emocoes ? '8' : '12' ?>">
+            <div class="col-xl-<?= $can_see_media_emocoes ? '8' : '12' ?>" data-card-id="card_ultimas_emocoes" data-card-title="Últimas Emoções Registradas" data-card-w="<?= $can_see_media_emocoes ? '8' : '12' ?>" data-card-h="5">
                 <div class="card card-flush">
                     <div class="card-header pt-7">
                         <div class="card-title align-items-start flex-column">
@@ -2073,27 +2087,515 @@ if (is_colaborador() && !empty($colaborador_id)) {
 </div>
 <!--end::Modal Adicionar Cards-->
 
+<!--begin::Modal Configurações do Dashboard-->
+<div class="modal fade" id="modal_configuracoes_dashboard" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Configurações do Dashboard</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <form id="form_configuracoes_dashboard">
+                    <!--begin::Margem entre Cards-->
+                    <div class="mb-8">
+                        <label class="form-label fw-bold fs-6 mb-2">Margem entre Cards</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <input type="range" class="form-range flex-grow-1" min="0" max="48" step="4" value="16" id="config_margin" name="margin">
+                            <span class="badge badge-light-primary fs-5 fw-bold" style="min-width: 60px;" id="config_margin_value">16px</span>
+                        </div>
+                        <div class="form-text">Espaçamento entre os cards do dashboard</div>
+                    </div>
+                    <!--end::Margem entre Cards-->
+                    
+                    <!--begin::Altura das Células-->
+                    <div class="mb-8">
+                        <label class="form-label fw-bold fs-6 mb-2">Altura das Células</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <input type="range" class="form-range flex-grow-1" min="50" max="120" step="10" value="70" id="config_cell_height" name="cell_height">
+                            <span class="badge badge-light-info fs-5 fw-bold" style="min-width: 60px;" id="config_cell_height_value">70px</span>
+                        </div>
+                        <div class="form-text">Define a altura base das células do grid</div>
+                    </div>
+                    <!--end::Altura das Células-->
+                    
+                    <!--begin::Densidade do Layout-->
+                    <div class="mb-8">
+                        <label class="form-label fw-bold fs-6 mb-2">Densidade do Layout</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="densidade" id="densidade_compacto" value="compacto">
+                            <label class="btn btn-outline btn-outline-primary" for="densidade_compacto">
+                                <i class="ki-duotone ki-grid fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Compacto
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="densidade" id="densidade_padrao" value="padrao" checked>
+                            <label class="btn btn-outline btn-outline-primary" for="densidade_padrao">
+                                <i class="ki-duotone ki-element-11 fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                Padrão
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="densidade" id="densidade_espacado" value="espacado">
+                            <label class="btn btn-outline btn-outline-primary" for="densidade_espacado">
+                                <i class="ki-duotone ki-maximize fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Espaçado
+                            </label>
+                        </div>
+                        <div class="form-text">Define o espaçamento geral do dashboard</div>
+                    </div>
+                    <!--end::Densidade do Layout-->
+                    
+                    <!--begin::Tema do Grid-->
+                    <div class="mb-8">
+                        <label class="form-label fw-bold fs-6 mb-2">Tema do Grid (Modo Edição)</label>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <input type="radio" class="btn-check" name="tema_grid" id="tema_azul" value="azul" checked>
+                                <label class="btn btn-outline btn-outline-dashed btn-outline-primary w-100 p-4" for="tema_azul">
+                                    <span class="d-block fw-bold mb-2">Azul</span>
+                                    <span class="d-block" style="height: 4px; background: #0d6efd;"></span>
+                                </label>
+                            </div>
+                            <div class="col-6">
+                                <input type="radio" class="btn-check" name="tema_grid" id="tema_verde" value="verde">
+                                <label class="btn btn-outline btn-outline-dashed btn-outline-success w-100 p-4" for="tema_verde">
+                                    <span class="d-block fw-bold mb-2">Verde</span>
+                                    <span class="d-block" style="height: 4px; background: #50cd89;"></span>
+                                </label>
+                            </div>
+                            <div class="col-6">
+                                <input type="radio" class="btn-check" name="tema_grid" id="tema_roxo" value="roxo">
+                                <label class="btn btn-outline btn-outline-dashed btn-outline-info w-100 p-4" for="tema_roxo">
+                                    <span class="d-block fw-bold mb-2">Roxo</span>
+                                    <span class="d-block" style="height: 4px; background: #7239ea;"></span>
+                                </label>
+                            </div>
+                            <div class="col-6">
+                                <input type="radio" class="btn-check" name="tema_grid" id="tema_laranja" value="laranja">
+                                <label class="btn btn-outline btn-outline-dashed btn-outline-warning w-100 p-4" for="tema_laranja">
+                                    <span class="d-block fw-bold mb-2">Laranja</span>
+                                    <span class="d-block" style="height: 4px; background: #ffc700;"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Tema do Grid-->
+                    
+                    <!--begin::Animações-->
+                    <div class="mb-8">
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" id="config_animate" name="animate" checked>
+                            <label class="form-check-label fw-bold" for="config_animate">
+                                Habilitar Animações
+                            </label>
+                        </div>
+                        <div class="form-text">Animações suaves ao reorganizar cards</div>
+                    </div>
+                    <!--end::Animações-->
+                    
+                    <!--begin::Restaurar Padrão-->
+                    <div class="separator separator-dashed my-8"></div>
+                    <div class="alert alert-dismissible bg-light-warning d-flex flex-column flex-sm-row p-5 mb-5">
+                        <i class="ki-duotone ki-information-5 fs-2hx text-warning me-4 mb-5 mb-sm-0">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column pe-0 pe-sm-10">
+                            <h5 class="mb-1">Restaurar Configurações</h5>
+                            <span>Clique abaixo para restaurar as configurações padrão</span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-light-warning ms-auto" id="btn_restaurar_config">
+                            <i class="ki-duotone ki-arrows-circle fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Restaurar Padrão
+                        </button>
+                    </div>
+                    <!--end::Restaurar Padrão-->
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn_aplicar_config">
+                    <span class="indicator-label">
+                        <i class="ki-duotone ki-check fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Aplicar Configurações
+                    </span>
+                    <span class="indicator-progress">Aplicando...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal Configurações do Dashboard-->
+
+<!--begin::Modal Configurar Carrossel-->
+<div class="modal fade" id="modal_configurar_carrossel" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-800px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Configurar Carrossel de Cards</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <input type="hidden" id="carousel_card_id">
+                
+                <!--begin::Configurações do Carrossel-->
+                <div class="mb-8">
+                    <h3 class="fw-bold mb-5">Configurações</h3>
+                    
+                    <div class="row g-5 mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Cards por Slide</label>
+                            <select class="form-select form-select-solid" id="carousel_slides_per_view">
+                                <option value="1">1 Card</option>
+                                <option value="2">2 Cards</option>
+                                <option value="3" selected>3 Cards</option>
+                                <option value="4">4 Cards</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Velocidade (ms)</label>
+                            <input type="number" class="form-control form-control-solid" id="carousel_speed" value="500" min="300" max="2000" step="100">
+                        </div>
+                    </div>
+                    
+                    <div class="row g-5 mb-5">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch form-check-custom form-check-solid">
+                                <input class="form-check-input" type="checkbox" id="carousel_autoplay" checked>
+                                <label class="form-check-label fw-bold" for="carousel_autoplay">
+                                    Auto-play
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="carousel_autoplay_delay_container">
+                            <label class="form-label fw-bold">Intervalo Auto-play (ms)</label>
+                            <input type="number" class="form-control form-control-solid" id="carousel_autoplay_delay" value="3000" min="1000" max="10000" step="500">
+                        </div>
+                    </div>
+                    
+                    <div class="row g-5">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch form-check-custom form-check-solid">
+                                <input class="form-check-input" type="checkbox" id="carousel_loop" checked>
+                                <label class="form-check-label fw-bold" for="carousel_loop">
+                                    Loop Contínuo
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch form-check-custom form-check-solid">
+                                <input class="form-check-input" type="checkbox" id="carousel_pagination" checked>
+                                <label class="form-check-label fw-bold" for="carousel_pagination">
+                                    Mostrar Navegação (dots)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Configurações do Carrossel-->
+                
+                <div class="separator separator-dashed my-8"></div>
+                
+                <!--begin::Cards do Carrossel-->
+                <div class="mb-8">
+                    <div class="d-flex justify-content-between align-items-center mb-5">
+                        <h3 class="fw-bold mb-0">Cards no Carrossel</h3>
+                        <button type="button" class="btn btn-sm btn-primary" id="btn_adicionar_card_carrossel">
+                            <i class="ki-duotone ki-plus fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Adicionar Card
+                        </button>
+                    </div>
+                    
+                    <div id="carousel_cards_list" class="min-h-200px">
+                        <div class="text-center text-muted py-10">
+                            <i class="ki-duotone ki-slider fs-3x text-gray-400 mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <p>Nenhum card adicionado ainda</p>
+                            <small>Clique em "Adicionar Card" para começar</small>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Cards do Carrossel-->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn_salvar_carrossel">
+                    <span class="indicator-label">
+                        <i class="ki-duotone ki-check fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Salvar Carrossel
+                    </span>
+                    <span class="indicator-progress">Salvando...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal Configurar Carrossel-->
+
+<!--begin::Modal Adicionar Card ao Carrossel-->
+<div class="modal fade" id="modal_adicionar_card_carrossel" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-800px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Adicionar Card ao Carrossel</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <!--begin::Tipo de Card-->
+                <div class="mb-8">
+                    <label class="form-label fw-bold fs-5 mb-5">Escolha o Tipo de Card</label>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <input type="radio" class="btn-check" name="tipo_card_carrossel" id="tipo_card_personalizado" value="personalizado" checked>
+                            <label class="btn btn-outline btn-outline-dashed btn-outline-primary w-100 p-5 text-start" for="tipo_card_personalizado">
+                                <i class="ki-duotone ki-colors-square fs-3x text-primary mb-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                <div class="fw-bold fs-4 mb-1">Card Personalizado</div>
+                                <div class="text-muted fs-7">Crie um mini-card customizado com título, valor e ícone</div>
+                            </label>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="radio" class="btn-check" name="tipo_card_carrossel" id="tipo_card_existente" value="existente">
+                            <label class="btn btn-outline btn-outline-dashed btn-outline-success w-100 p-5 text-start" for="tipo_card_existente">
+                                <i class="ki-duotone ki-element-11 fs-3x text-success mb-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                <div class="fw-bold fs-4 mb-1">Card Existente</div>
+                                <div class="text-muted fs-7">Adicione um card já criado do dashboard</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Tipo de Card-->
+                
+                <div class="separator separator-dashed my-8"></div>
+                
+                <!--begin::Formulário Card Personalizado-->
+                <form id="form_card_carrossel" style="display: block;">
+                    <div class="mb-5">
+                        <label class="form-label fw-bold required">Título do Card</label>
+                        <input type="text" name="titulo" class="form-control form-control-solid" placeholder="Ex: Total de Vendas" required>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-bold">Valor/Número</label>
+                        <input type="text" name="valor" class="form-control form-control-solid" placeholder="Ex: 1.234 ou R$ 15.000">
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-bold">Ícone</label>
+                        <select name="icone" class="form-select form-select-solid">
+                            <option value="">Sem ícone</option>
+                            <option value="ki-chart-simple">Gráfico</option>
+                            <option value="ki-dollar">Dinheiro</option>
+                            <option value="ki-profile-circle">Usuários</option>
+                            <option value="ki-notepad">Notas</option>
+                            <option value="ki-calendar">Calendário</option>
+                            <option value="ki-check-circle">Check</option>
+                            <option value="ki-cross-circle">Cruz</option>
+                            <option value="ki-time">Relógio</option>
+                            <option value="ki-chart-pie">Pizza</option>
+                            <option value="ki-wallet">Carteira</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-bold">Cor do Card</label>
+                        <div class="d-flex gap-3">
+                            <label class="btn btn-outline btn-outline-dashed btn-outline-primary w-100">
+                                <input type="radio" name="cor" value="primary" class="d-none" checked>
+                                <div class="text-center py-3">
+                                    <div class="mb-2" style="height: 20px; background: #009ef7; border-radius: 4px;"></div>
+                                    <span>Azul</span>
+                                </div>
+                            </label>
+                            <label class="btn btn-outline btn-outline-dashed btn-outline-success w-100">
+                                <input type="radio" name="cor" value="success" class="d-none">
+                                <div class="text-center py-3">
+                                    <div class="mb-2" style="height: 20px; background: #50cd89; border-radius: 4px;"></div>
+                                    <span>Verde</span>
+                                </div>
+                            </label>
+                            <label class="btn btn-outline btn-outline-dashed btn-outline-warning w-100">
+                                <input type="radio" name="cor" value="warning" class="d-none">
+                                <div class="text-center py-3">
+                                    <div class="mb-2" style="height: 20px; background: #ffc700; border-radius: 4px;"></div>
+                                    <span>Amarelo</span>
+                                </div>
+                            </label>
+                            <label class="btn btn-outline btn-outline-dashed btn-outline-danger w-100">
+                                <input type="radio" name="cor" value="danger" class="d-none">
+                                <div class="text-center py-3">
+                                    <div class="mb-2" style="height: 20px; background: #f1416c; border-radius: 4px;"></div>
+                                    <span>Vermelho</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-bold">Descrição/Subtítulo</label>
+                        <input type="text" name="descricao" class="form-control form-control-solid" placeholder="Ex: Últimos 30 dias">
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-bold">Link (opcional)</label>
+                        <input type="text" name="link" class="form-control form-control-solid" placeholder="Ex: relatorios.php">
+                    </div>
+                </form>
+                <!--end::Formulário Card Personalizado-->
+                
+                <!--begin::Seleção Card Existente-->
+                <div id="selecao_card_existente" style="display: none;">
+                    <div class="mb-5">
+                        <label class="form-label fw-bold fs-5 mb-3">Selecione um Card Existente</label>
+                        <input type="text" class="form-control form-control-solid mb-4" id="buscar_cards_existentes" placeholder="Buscar cards...">
+                    </div>
+                    <div class="row g-3" id="lista_cards_existentes" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Será preenchido via JavaScript -->
+                    </div>
+                </div>
+                <!--end::Seleção Card Existente-->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn_confirmar_card_carrossel">
+                    <span class="indicator-label">Adicionar Card</span>
+                    <span class="indicator-progress">Adicionando...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal Adicionar Card ao Carrossel-->
+
 <!--begin::Dashboard Personalization Scripts-->
 <link href="https://cdn.jsdelivr.net/npm/gridstack@9.0.0/dist/gridstack.min.css" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/gridstack@9.0.0/dist/gridstack-all.js"></script>
+<!-- Swiper CSS para carrossel -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<style id="dynamic_grid_styles"></style>
 <style>
 .grid-stack {
     min-height: 100vh;
-    padding: 10px 0;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 .grid-stack-item {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+.dashboard-edit-mode .grid-stack-item {
     cursor: move !important;
-    padding: 5px !important;
+    pointer-events: auto !important;
+}
+.dashboard-edit-mode .grid-stack-item:not(.ui-draggable-disabled):not(.ui-resizable-disabled) {
+    cursor: move !important;
 }
 .grid-stack-item.ui-draggable-disabled {
     cursor: default !important;
 }
+.dashboard-edit-mode .grid-stack-item .ui-resizable-handle {
+    background: rgba(13, 110, 253, 0.3) !important;
+    border: 1px solid rgba(13, 110, 253, 0.6) !important;
+    z-index: 1001 !important;
+}
+.dashboard-edit-mode .grid-stack-item .ui-resizable-handle:hover {
+    background: rgba(13, 110, 253, 0.6) !important;
+}
+.dashboard-edit-mode .grid-stack-item .ui-resizable-se {
+    width: 20px !important;
+    height: 20px !important;
+    right: 0 !important;
+    bottom: 0 !important;
+}
+.dashboard-edit-mode .grid-stack-item .ui-resizable-e {
+    width: 8px !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+}
+.dashboard-edit-mode .grid-stack-item .ui-resizable-s {
+    height: 8px !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+}
+.dashboard-edit-mode .grid-stack-item .ui-resizable-sw {
+    width: 20px !important;
+    height: 20px !important;
+    left: 0 !important;
+    bottom: 0 !important;
+}
+.dashboard-edit-mode .grid-stack-item .ui-resizable-w {
+    width: 8px !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+}
 .grid-stack-item-content {
-    overflow: visible !important;
-    height: 100% !important;
-    width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    overflow: hidden !important;
+    inset: 0 !important;
+    position: absolute !important;
+    /* Padding interno padrão - será sobrescrito dinamicamente */
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    transition: padding 0.2s ease;
 }
 .dashboard-edit-mode .grid-stack-item {
     border: 2px dashed #0d6efd !important;
@@ -2105,6 +2607,47 @@ if (is_colaborador() && !empty($colaborador_id)) {
     box-shadow: 0 0 15px rgba(13, 110, 253, 0.4) !important;
     background: rgba(13, 110, 253, 0.1) !important;
 }
+/* Botão de remover card no modo de edição */
+.dashboard-edit-mode .btn-remover-card {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1002;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #F1416C;
+    border: 1px solid rgba(241, 65, 108, 0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.25s ease;
+    pointer-events: auto;
+    margin: 0 !important;
+    backdrop-filter: blur(10px);
+}
+.dashboard-edit-mode .grid-stack-item:hover .btn-remover-card {
+    opacity: 1;
+}
+.dashboard-edit-mode .btn-remover-card:hover {
+    background: #F1416C;
+    color: white;
+    border-color: #F1416C;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(241, 65, 108, 0.4);
+}
+.dashboard-edit-mode .btn-remover-card:active {
+    transform: translateY(0);
+}
+.dashboard-edit-mode .btn-remover-card i {
+    font-size: 18px;
+    pointer-events: none;
+}
 .grid-stack-item.ui-resizable-resizing {
     opacity: 0.9;
     z-index: 1000 !important;
@@ -2115,7 +2658,8 @@ if (is_colaborador() && !empty($colaborador_id)) {
     transform: rotate(2deg);
 }
 /* Remove padding/margin que pode interferir */
-.grid-stack > .row {
+.grid-stack > .row,
+.grid-stack .row {
     margin: 0 !important;
     padding: 0 !important;
 }
@@ -2123,28 +2667,399 @@ if (is_colaborador() && !empty($colaborador_id)) {
 .grid-stack-item .col-xl-4,
 .grid-stack-item .col-xl-6,
 .grid-stack-item .col-xl-8,
-.grid-stack-item .col-xl-12 {
+.grid-stack-item .col-xl-12,
+.grid-stack-item [class*="col-"] {
     padding: 0 !important;
     margin: 0 !important;
 }
-/* Garante que os cards dentro do grid item ocupem 100% */
-.grid-stack-item-content > .card {
+/* Garante que os cards dentro do grid item ocupem 100% do espaço disponível */
+.grid-stack-item-content > .card,
+.grid-stack-item-content > a.card {
     height: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    border-radius: 8px !important;
+}
+/* Desabilita links dos cards no modo de edição para evitar redirecionamento ao arrastar */
+.dashboard-edit-mode .grid-stack-item a[href],
+.dashboard-edit-mode .grid-stack-item a.card {
+    pointer-events: none !important;
+    cursor: move !important;
+}
+.dashboard-edit-mode .grid-stack-item a[href]::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+}
+/* Remove TODAS as classes de margem e padding do Bootstrap dos elementos internos */
+.grid-stack-item [class*="mb-"],
+.grid-stack-item [class*="mt-"],
+.grid-stack-item [class*="ml-"],
+.grid-stack-item [class*="mr-"],
+.grid-stack-item [class*="mx-"],
+.grid-stack-item [class*="my-"],
+.grid-stack-item [class*="m-"] {
+    margin: 0 !important;
+}
+/* Mantém padding interno dos cards */
+.grid-stack-item .card-body {
+    padding: 1.5rem !important;
+}
+/* Remove padding de classes específicas do Bootstrap que interferem */
+.grid-stack-item.mb-5,
+.grid-stack-item.mb-xl-8,
+.grid-stack-item.mb-8 {
     margin-bottom: 0 !important;
+}
+
+/* ========== ESTILOS DO CARROSSEL DE CARDS ========== */
+.carousel-card-container {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+}
+.swiper-carousel-cards {
+    width: 100%;
+    height: 100%;
+    padding: 10px 0;
+}
+/* Desabilita interação do Swiper no modo de edição para não interferir com GridStack */
+.dashboard-edit-mode .swiper {
+    pointer-events: none !important;
+}
+.dashboard-edit-mode .swiper-wrapper {
+    pointer-events: none !important;
+}
+.dashboard-edit-mode .swiper-slide {
+    pointer-events: none !important;
+}
+.dashboard-edit-mode .swiper-button-next,
+.dashboard-edit-mode .swiper-button-prev {
+    pointer-events: none !important;
+    display: none !important;
+}
+.dashboard-edit-mode .swiper-pagination {
+    pointer-events: none !important;
+    display: none !important;
+}
+.swiper-carousel-cards .swiper-slide {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.swiper-carousel-cards .swiper-slide .mini-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 1.5rem;
+    width: 100%;
+    height: auto;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.swiper-carousel-cards .swiper-slide .mini-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+.swiper-carousel-cards .swiper-button-next,
+.swiper-carousel-cards .swiper-button-prev {
+    color: #009ef7;
+    width: 35px;
+    height: 35px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.swiper-carousel-cards .swiper-button-next:after,
+.swiper-carousel-cards .swiper-button-prev:after {
+    font-size: 16px;
+    font-weight: bold;
+}
+.swiper-carousel-cards .swiper-pagination-bullet {
+    background: #009ef7;
+    opacity: 0.4;
+}
+.swiper-carousel-cards .swiper-pagination-bullet-active {
+    opacity: 1;
+}
+.carousel-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 2rem;
+    text-align: center;
+}
+.carousel-empty-state i {
+    font-size: 4rem;
+    color: #e4e6ef;
+    margin-bottom: 1rem;
+}
+.carousel-config-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+}
+.carousel-card-wrapper {
+    width: 100%;
+    height: 100%;
+}
+.carousel-card-wrapper .card {
+    height: 100%;
+    margin: 0 !important;
+}
+/* Ajuste para cards existentes dentro do carrossel */
+.swiper-carousel-cards .swiper-slide .carousel-card-wrapper .card {
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.swiper-carousel-cards .swiper-slide .carousel-card-wrapper .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+/* Responsividade para cards no carrossel */
+@media (max-width: 768px) {
+    .swiper-carousel-cards {
+        padding: 10px 0;
+    }
+    .swiper-carousel-cards .swiper-button-next,
+    .swiper-carousel-cards .swiper-button-prev {
+        width: 30px;
+        height: 30px;
+    }
+}
+/* Estilos para seleção de cards */
+.card-hoverable {
+    transition: all 0.3s ease;
+}
+.card-hoverable:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.15) !important;
+}
+.border-primary {
+    border-color: #009ef7 !important;
+}
+.bg-light-primary {
+    background-color: #f1faff !important;
 }
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const GRID_CONTAINER_ID = 'dashboard_grid_area';
     let grid = null;
+    let gridEstatico = null; // Grid estático (somente leitura) usado fora do modo de edição
     let editMode = false;
     let originalConfig = null;
     let cardsDisponiveis = [];
     let cardsAdicionados = new Set();
+    const cardTemplates = new Map();
     
-    // Define cards disponíveis
-    function definirCardsDisponiveis() {
-        cardsDisponiveis = [
+    // Configurações do Dashboard (padrão)
+    let dashboardConfig = {
+        margin: 16,
+        cellHeight: 70,
+        densidade: 'padrao',
+        temaGrid: 'azul',
+        animate: true
+    };
+    
+    // Temas de cores
+    const temasCores = {
+        azul: { primary: '#0d6efd', bg: 'rgba(13, 110, 253, 0.05)', bgHover: 'rgba(13, 110, 253, 0.1)' },
+        verde: { primary: '#50cd89', bg: 'rgba(80, 205, 137, 0.05)', bgHover: 'rgba(80, 205, 137, 0.1)' },
+        roxo: { primary: '#7239ea', bg: 'rgba(114, 57, 234, 0.05)', bgHover: 'rgba(114, 57, 234, 0.1)' },
+        laranja: { primary: '#ffc700', bg: 'rgba(255, 199, 0, 0.05)', bgHover: 'rgba(255, 199, 0, 0.1)' }
+    };
+    
+    garantirCardIdsBase();
+    
+    function slugify(text) {
+        return text
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .substring(0, 60) || 'card';
+    }
+
+    function gerarIdParaCard(elemento, indiceFallback) {
+        if (!elemento) {
+            return `card_auto_${indiceFallback}`;
+        }
+
+        if (elemento.dataset.cardId) {
+            return elemento.dataset.cardId;
+        }
+
+        if (elemento.id) {
+            return `card_${slugify(elemento.id)}`;
+        }
+
+        const label = elemento.querySelector('[data-card-title], .card-title .card-label, .card-title span, h3, h4, h5');
+        if (label && label.textContent.trim().length > 0) {
+            return `card_${slugify(label.textContent.trim())}`;
+        }
+
+        return `card_auto_${indiceFallback}`;
+    }
+
+    function garantirCardIdsBase() {
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (!container) {
+            return;
+        }
+
+        const candidatos = container.querySelectorAll('.row > div[class*="col-"]:not([data-card-id])');
+        let autoIndex = 0;
+
+        candidatos.forEach(coluna => {
+            if (!coluna.querySelector('.card')) {
+                return;
+            }
+
+            let idGerado = gerarIdParaCard(coluna, autoIndex++);
+            let sufixo = 1;
+            while (document.querySelector(`[data-card-id="${idGerado}"]`)) {
+                idGerado = `${idGerado}_${sufixo++}`;
+            }
+
+            coluna.setAttribute('data-card-id', idGerado);
+        });
+    }
+
+    function limparEspacamentosCard(elemento) {
+        if (!elemento || !elemento.classList) {
+            return;
+        }
+        const classes = Array.from(elemento.classList);
+        classes.forEach(cls => {
+            // Remove todas as classes de margem e padding do Bootstrap
+            if (/^m[trblxy]?-/i.test(cls) || 
+                /^my-/i.test(cls) || 
+                /^mx-/i.test(cls) ||
+                /^p[trblxy]?-/i.test(cls) ||
+                /^py-/i.test(cls) ||
+                /^px-/i.test(cls)) {
+                elemento.classList.remove(cls);
+            }
+        });
+        elemento.style.margin = '0';
+        elemento.style.padding = '';
+        
+        // Também limpa do elemento pai se for grid-stack-item
+        const parent = elemento.closest('.grid-stack-item');
+        if (parent && parent !== elemento) {
+            const parentClasses = Array.from(parent.classList);
+            parentClasses.forEach(cls => {
+                if (/^m[trblxy]?-/i.test(cls) || 
+                    /^my-/i.test(cls) || 
+                    /^mx-/i.test(cls) ||
+                    /^p[trblxy]?-/i.test(cls) ||
+                    /^py-/i.test(cls) ||
+                    /^px-/i.test(cls)) {
+                    parent.classList.remove(cls);
+                }
+            });
+            parent.style.margin = '0';
+            parent.style.padding = '0';
+        }
+    }
+
+    function inferirLarguraGrid(elemento) {
+        if (!elemento) {
+            return 6;
+        }
+        if (elemento.dataset.cardW) {
+            const valor = parseInt(elemento.dataset.cardW, 10);
+            if (!isNaN(valor) && valor > 0) {
+                return Math.min(12, Math.max(1, valor));
+            }
+        }
+        const classe = Array.from(elemento.classList || []).find(cls => cls.startsWith('col-xl-'));
+        if (classe) {
+            const valor = parseInt(classe.replace('col-xl-', ''), 10);
+            if (!isNaN(valor)) {
+                return Math.min(12, Math.max(1, valor));
+            }
+        }
+        return 6;
+    }
+
+    function inferirAlturaGrid(elemento) {
+        if (!elemento) {
+            return 4;
+        }
+        const datasetValor = elemento.dataset.cardH || elemento.dataset.gridH;
+        if (datasetValor) {
+            const valor = parseInt(datasetValor, 10);
+            if (!isNaN(valor) && valor > 0) {
+                return Math.min(12, Math.max(2, valor));
+            }
+        }
+        const card = elemento.querySelector('.card');
+        if (card) {
+            const alturaPx = card.offsetHeight || card.scrollHeight || 280;
+            return Math.min(12, Math.max(3, Math.round(alturaPx / 90)));
+        }
+        return 4;
+    }
+
+    function extrairMetadadosCard(elemento) {
+        const id = elemento?.dataset?.cardId || `card_auto_${Date.now()}`;
+        const tituloAttr = elemento?.dataset?.cardTitle;
+        const tituloElemento = elemento?.querySelector('[data-card-title], .card-title .card-label, .card-title span, h3, h4, h5');
+        const nome = (tituloAttr || (tituloElemento ? tituloElemento.textContent.trim() : '') || id).trim();
+        const descricao = elemento?.dataset?.cardDesc || 'Card do dashboard';
+        const icone = elemento?.dataset?.cardIcon || 'ki-element';
+        const w = inferirLarguraGrid(elemento);
+        const h = inferirAlturaGrid(elemento);
+        return { id, nome, descricao, icone, w, h };
+    }
+
+    // Permissões dos cards (PHP -> JavaScript)
+    const cardPermissions = {
+        <?php
+        // Lista de cards para verificar permissões
+        $all_cards = [
+            'card_total_colaboradores',
+            'card_colaboradores_ativos',
+            'card_ocorrencias_mes',
+            'card_colaboradores_inativos',
+            'card_proximos_aniversarios',
+            'card_ranking_ocorrencias',
+            'card_grafico_ocorrencias_mes',
+            'card_grafico_colaboradores_status',
+            'card_grafico_ocorrencias_tipo',
+            'card_anotacoes',
+            'card_historico_promocoes',
+            'card_emocao_diaria',
+            'card_ranking_pontos',
+            'card_historico_emocoes',
+            'card_media_emocoes',
+            'card_ultimas_emocoes',
+            'card_carrossel'
+        ];
+        
+        $permissions_array = [];
+        foreach ($all_cards as $card_id) {
+            $can_see = can_see_dashboard_card($card_id);
+            $permissions_array[] = "'$card_id': " . ($can_see ? 'true' : 'false');
+        }
+        echo implode(",\n        ", $permissions_array);
+        ?>
+    };
+
+    const catalogoBaseCards = [
             { id: 'card_total_colaboradores', nome: 'Total de Colaboradores', descricao: 'Mostra o total de colaboradores', icone: 'ki-profile-circle', w: 3, h: 3 },
             { id: 'card_colaboradores_ativos', nome: 'Colaboradores Ativos', descricao: 'Mostra colaboradores ativos', icone: 'ki-check-circle', w: 3, h: 3 },
             { id: 'card_ocorrencias_mes', nome: 'Ocorrências no Mês', descricao: 'Ocorrências registradas no mês', icone: 'ki-notepad', w: 3, h: 3 },
@@ -2155,8 +3070,34 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'card_grafico_colaboradores_status', nome: 'Colaboradores por Status', descricao: 'Gráfico de colaboradores por status', icone: 'ki-chart-pie', w: 4, h: 4 },
             { id: 'card_grafico_ocorrencias_tipo', nome: 'Ocorrências por Tipo', descricao: 'Gráfico de ocorrências por tipo', icone: 'ki-chart-bar', w: 12, h: 4 },
             { id: 'card_anotacoes', nome: 'Anotações', descricao: 'Anotações do sistema', icone: 'ki-note-edit', w: 6, h: 6 },
-            { id: 'card_historico_promocoes', nome: 'Histórico de Promoções', descricao: 'Últimas promoções registradas', icone: 'ki-upgrade', w: 6, h: 6 }
+            { id: 'card_historico_promocoes', nome: 'Histórico de Promoções', descricao: 'Últimas promoções registradas', icone: 'ki-upgrade', w: 6, h: 6 },
+            { id: 'card_emocao_diaria', nome: 'Como você está se sentindo?', descricao: 'Formulário de emoção diária', icone: 'ki-heart', w: 8, h: 6 },
+            { id: 'card_ranking_pontos', nome: 'Ranking de Pontos', descricao: 'Ranking gamificado dos colaboradores', icone: 'ki-medal-star', w: 4, h: 5 },
+            { id: 'card_historico_emocoes', nome: 'Histórico de Emoções', descricao: 'Linha do tempo das emoções', icone: 'ki-calendar', w: 4, h: 5 },
+            { id: 'card_media_emocoes', nome: 'Média das Emoções', descricao: 'Indicador médio de humor', icone: 'ki-graph-up', w: 4, h: 4 },
+            { id: 'card_ultimas_emocoes', nome: 'Últimas Emoções Registradas', descricao: 'Tabela das últimas emoções registradas', icone: 'ki-tablet-text-up', w: 8, h: 5 },
+            { id: 'card_carrossel', nome: '🎠 Carrossel de Cards', descricao: 'Carrossel com múltiplos cards deslizantes', icone: 'ki-slider', w: 12, h: 5, tipo: 'carrossel' }
         ];
+
+    // Define cards disponíveis
+    function definirCardsDisponiveis() {
+        cardsDisponiveis = [...catalogoBaseCards];
+        const idsRegistrados = new Set(cardsDisponiveis.map(card => card.id));
+
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (!container) {
+            return;
+        }
+
+        container.querySelectorAll('[data-card-id]').forEach(elemento => {
+            const id = elemento.dataset.cardId;
+            if (!id || idsRegistrados.has(id)) {
+                return;
+            }
+            const info = extrairMetadadosCard(elemento);
+            cardsDisponiveis.push(info);
+            idsRegistrados.add(info.id);
+        });
     }
     
     // Gera layout padrão baseado nos cards disponíveis
@@ -2266,8 +3207,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 visible: true
             });
             currentX += card.w;
+            maxHeightInRow = Math.max(maxHeightInRow, card.h);
         });
-        
+
+        currentX = 0;
+        currentY += maxHeightInRow + 1;
+        maxHeightInRow = 0;
+
+        const cardsEmocaoLinha1 = [
+            { id: 'card_emocao_diaria', w: 8, h: 5 },
+            { id: 'card_ranking_pontos', w: 4, h: 5 }
+        ];
+
+        cardsEmocaoLinha1.forEach(card => {
+            layout.push({
+                id: card.id,
+                x: currentX,
+                y: currentY,
+                w: card.w,
+                h: card.h,
+                visible: true
+            });
+            currentX += card.w;
+            maxHeightInRow = Math.max(maxHeightInRow, card.h);
+        });
+
+        currentX = 0;
+        currentY += maxHeightInRow + 1;
+        maxHeightInRow = 0;
+
+        const cardsEmocaoLinha2 = [
+            { id: 'card_historico_emocoes', w: 4, h: 5 },
+            { id: 'card_media_emocoes', w: 4, h: 4 }
+        ];
+
+        cardsEmocaoLinha2.forEach(card => {
+            layout.push({
+                id: card.id,
+                x: currentX,
+                y: currentY,
+                w: card.w,
+                h: card.h,
+                visible: true
+            });
+            currentX += card.w;
+            maxHeightInRow = Math.max(maxHeightInRow, card.h);
+        });
+
+        currentX = 0;
+        currentY += maxHeightInRow + 1;
+        maxHeightInRow = 0;
+
+        layout.push({
+            id: 'card_ultimas_emocoes',
+            x: currentX,
+            y: currentY,
+            w: 12,
+            h: 5,
+            visible: true
+        });
+
         return layout;
     }
     
@@ -2283,6 +3282,25 @@ document.addEventListener('DOMContentLoaded', function() {
                             cardsAdicionados.add(card.id);
                         }
                     });
+                    
+                    // Carrega configurações do dashboard se existirem
+                    if (data.config) {
+                        dashboardConfig = {
+                            margin: parseInt(data.config.margin) || 16,
+                            cellHeight: parseInt(data.config.cellHeight) || 70,
+                            densidade: data.config.densidade || 'padrao',
+                            temaGrid: data.config.temaGrid || 'azul',
+                            animate: data.config.animate !== false
+                        };
+                        aplicarEstilosTema();
+                    }
+                    
+                    // Carrega configurações dos carrosséis se existirem
+                    if (data.carrosselConfigs) {
+                        Object.assign(carrosselConfigs, data.carrosselConfigs);
+                        console.log('Configurações de carrosséis carregadas:', Object.keys(carrosselConfigs));
+                    }
+                    
                     // Retorna no formato esperado pelo GridStack
                     return data.cards.map(card => ({
                         id: card.id,
@@ -2303,6 +3321,104 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
+    // Carrega apenas configurações do dashboard
+    function carregarConfiguracoesDashboard() {
+        return fetch('../api/dashboard/carregar_config.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.config) {
+                    dashboardConfig = {
+                        margin: parseInt(data.config.margin) || 16,
+                        cellHeight: parseInt(data.config.cellHeight) || 70,
+                        densidade: data.config.densidade || 'padrao',
+                        temaGrid: data.config.temaGrid || 'azul',
+                        animate: data.config.animate !== false
+                    };
+                    aplicarEstilosTema();
+                }
+                
+                // Carrega configurações dos carrosséis se existirem
+                if (data.carrosselConfigs) {
+                    Object.assign(carrosselConfigs, data.carrosselConfigs);
+                    console.log('Configurações de carrosséis carregadas:', Object.keys(carrosselConfigs));
+                }
+                
+                // Retorna TANTO as configurações quanto os cards salvos
+                return {
+                    config: dashboardConfig,
+                    cards: data.cards || []
+                };
+            })
+            .catch(error => {
+                console.error('Erro ao carregar configurações:', error);
+                return {
+                    config: dashboardConfig,
+                    cards: []
+                };
+            });
+    }
+    
+    // Aplica estilos do tema dinamicamente
+    function aplicarEstilosTema() {
+        const tema = temasCores[dashboardConfig.temaGrid] || temasCores.azul;
+        const styleElement = document.getElementById('dynamic_grid_styles');
+        
+        // Calcula padding interno (12px fixo para manter espaçamento visual consistente)
+        // Isso garante que os cards tenham margem visual semelhante ao modo normal
+        const paddingInterno = 12;
+        
+        if (styleElement) {
+            styleElement.innerHTML = `
+                .grid-stack-item-content {
+                    padding: ${paddingInterno}px !important;
+                }
+                .dashboard-edit-mode .grid-stack-item {
+                    border-color: ${tema.primary} !important;
+                    background: ${tema.bg} !important;
+                }
+                .dashboard-edit-mode .grid-stack-item:hover {
+                    border-color: ${tema.primary} !important;
+                    box-shadow: 0 0 15px ${tema.primary}40 !important;
+                    background: ${tema.bgHover} !important;
+                }
+            `;
+        }
+    }
+    
+    // Aplica densidade ao layout
+    function aplicarDensidade() {
+        const densidades = {
+            compacto: { margin: 8, cellHeight: 60 },
+            padrao: { margin: 16, cellHeight: 70 },
+            espacado: { margin: 24, cellHeight: 80 }
+        };
+        
+        const densidade = densidades[dashboardConfig.densidade] || densidades.padrao;
+        dashboardConfig.margin = densidade.margin;
+        dashboardConfig.cellHeight = densidade.cellHeight;
+    }
+    
+    // Salva configurações do dashboard
+    function salvarConfiguracoesDashboard() {
+        return fetch('../api/dashboard/salvar_config.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                config: dashboardConfig
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                return true;
+            } else {
+                throw new Error(data.message || 'Erro ao salvar configurações');
+            }
+            });
+    }
+    
     // Salva configuração
     function salvarConfiguracao() {
         if (!grid) {
@@ -2311,33 +3427,72 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const items = grid.save();
+            console.log('Items do grid.save():', items);
             
-            // Filtra apenas items válidos que existem no DOM
+            // Filtra e mapeia items válidos
             const cards = items
-                .filter(item => {
-                    // Verifica se o elemento ainda existe no DOM
-                    const el = document.querySelector(`[data-gs-id="${item.id}"]`);
-                    return el !== null && item.id;
-                })
-                .map((item, index) => ({
-                    id: item.id,
+                .map((item, index) => {
+                    // Tenta pegar o ID de várias formas
+                    let cardId = item.id || item['gs-id'];
+                    
+                    // Se não tem ID, tenta pegar do elemento DOM
+                    if (!cardId && item.el) {
+                        cardId = item.el.getAttribute('data-gs-id') || 
+                                 item.el.getAttribute('data-card-id') ||
+                                 item.el.getAttribute('gs-id');
+                    }
+                    
+                    // Gera ID temporário se ainda não tiver
+                    if (!cardId) {
+                        cardId = `card_temp_${index}_${Date.now()}`;
+                        console.warn('Card sem ID, gerando temporário:', cardId);
+                    }
+                    
+                    return {
+                        id: cardId,
                     x: parseInt(item.x) || 0,
                     y: parseInt(item.y) || 0,
                     w: parseInt(item.w) || 3,
                     h: parseInt(item.h) || 3,
                     visible: true
-                }));
+                    };
+                })
+                .filter(card => {
+                    // Verifica se o elemento existe no DOM
+                    const el = document.querySelector(`[data-gs-id="${card.id}"]`) || 
+                               document.querySelector(`[data-card-id="${card.id}"]`);
+                    if (!el) {
+                        console.warn('Card não encontrado no DOM:', card.id);
+                    }
+                    return el !== null;
+                });
+            
+            console.log('Cards válidos para salvar:', cards);
             
             if (cards.length === 0) {
-                throw new Error('Nenhum card válido para salvar');
+                throw new Error('Nenhum card válido para salvar. Verifique se os cards possuem data-gs-id ou data-card-id.');
             }
+            
+            // Salva também as configurações dos carrosséis
+            const carrosseisConfig = {};
+            cards.forEach(card => {
+                if (card.id && card.id.startsWith('card_carrossel_') && carrosselConfigs[card.id]) {
+                    carrosseisConfig[card.id] = carrosselConfigs[card.id];
+                }
+            });
+            
+            console.log('Configurações de carrosséis para salvar:', carrosseisConfig);
             
             return fetch('../api/dashboard/salvar_config.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ cards: cards })
+                body: JSON.stringify({ 
+                    cards: cards,
+                    config: dashboardConfig,
+                    carrosselConfigs: carrosseisConfig
+                })
             })
             .then(response => {
                 if (!response.ok) {
@@ -2375,10 +3530,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Limpa o layout (remove todos os cards)
     function limparLayout() {
         Swal.fire({
-            text: 'Tem certeza que deseja limpar todo o layout? Todos os cards serão removidos.',
+            text: 'Tem certeza que deseja remover todos os cards do dashboard?',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'Sim, limpar',
+            confirmButtonText: 'Sim, remover',
             cancelButtonText: 'Cancelar',
             buttonsStyling: false,
             customClass: {
@@ -2400,9 +3555,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                aplicarLayoutPadrao();
+                grid.batchUpdate();
+                const nodes = grid.engine && grid.engine.nodes ? [...grid.engine.nodes] : [];
+                nodes.forEach(node => {
+                    if (node?.el) {
+                        try {
+                            grid.removeWidget(node.el, true);
+                        } catch (err) {
+                            console.warn('Erro ao remover card', node.id, err);
+                        }
+                    }
+                });
+                grid.commit();
+                cardsAdicionados.clear();
                 
-                // Limpa configuração no servidor também
                 fetch('../api/dashboard/salvar_config.php', {
                     method: 'POST',
                     headers: {
@@ -2411,11 +3577,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({ cards: [] })
                 }).catch(err => console.error('Erro ao limpar configuração no servidor:', err));
                 
-                cardsAdicionados.clear();
-                
                 Swal.fire({
-                    text: 'Layout redefinido para o padrão!',
-                    icon: 'success',
+                    text: 'Todos os cards foram removidos. Adicione novos cards para montar o layout.',
+                    icon: 'info',
                     buttonsStyling: false,
                     confirmButtonText: 'Ok',
                     customClass: {
@@ -2424,6 +3588,148 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+    }
+    
+    // Restaura o layout padrão
+    function restaurarLayout() {
+        Swal.fire({
+            text: 'Deseja restaurar o layout padrão com todos os cards?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sim, restaurar',
+            cancelButtonText: 'Cancelar',
+            buttonsStyling: false,
+            customClass: {
+                confirmButton: 'btn btn-primary',
+                cancelButton: 'btn btn-light'
+            }
+        }).then(result => {
+            if (!result.isConfirmed) {
+                return;
+            }
+            
+            if (!grid) {
+                Swal.fire({
+                    text: 'Grid não inicializado',
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+                return;
+            }
+            
+            aplicarLayoutPadrao();
+            
+            Swal.fire({
+                text: 'Layout padrão aplicado. Salve para manter as alterações.',
+                icon: 'info',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok',
+                customClass: {
+                    confirmButton: 'btn btn-primary'
+                }
+            });
+        });
+    }
+    
+    function montarCardAPartirDoTemplate(cardId) {
+        // Se for um carrossel, cria dinamicamente
+        if (cardId && cardId.startsWith('card_carrossel_')) {
+            console.log('Criando card carrossel dinamicamente:', cardId);
+            const carrosselCard = document.createElement('div');
+            carrosselCard.className = 'grid-stack-item';
+            carrosselCard.setAttribute('data-gs-id', cardId);
+            carrosselCard.setAttribute('data-card-id', cardId);
+            carrosselCard.setAttribute('gs-id', cardId);
+            carrosselCard.innerHTML = `
+                <div class="grid-stack-item-content">
+                    ${criarCardCarrossel(cardId)}
+                </div>
+            `;
+            
+            // Salva o template do carrossel para uso futuro
+            if (!cardTemplates.has(cardId)) {
+                cardTemplates.set(cardId, carrosselCard.cloneNode(true));
+                console.log('Template do carrossel salvo:', cardId);
+            }
+            
+            // Inicializa o carrossel após um curto delay
+            setTimeout(() => {
+                inicializarCarrossel(cardId);
+            }, 500);
+            
+            console.log('Card carrossel criado:', cardId);
+            return carrosselCard;
+        }
+        
+        let cardFonte = null;
+        
+        if (cardTemplates.has(cardId)) {
+            cardFonte = cardTemplates.get(cardId).cloneNode(true);
+        }
+        
+        if (!cardFonte) {
+            const domOriginal = document.querySelector(`[data-card-id="${cardId}"]`) || document.querySelector(`[data-gs-id="${cardId}"]`);
+            if (domOriginal) {
+                cardFonte = domOriginal.cloneNode(true);
+            }
+        }
+        
+        if (!cardFonte) {
+            return null;
+        }
+        
+        // Remove atributos do GridStack
+        cardFonte.removeAttribute('data-gs-x');
+        cardFonte.removeAttribute('data-gs-y');
+        cardFonte.removeAttribute('data-gs-w');
+        cardFonte.removeAttribute('data-gs-h');
+        cardFonte.removeAttribute('gs-x');
+        cardFonte.removeAttribute('gs-y');
+        cardFonte.removeAttribute('gs-w');
+        cardFonte.removeAttribute('gs-h');
+        
+        // Remove classes Bootstrap de grid e margem
+        cardFonte.classList.remove('grid-stack-item');
+        cardFonte.classList.remove('col-xl-3', 'col-xl-4', 'col-xl-6', 'col-xl-8', 'col-xl-12', 'col-md-3', 'col-md-4', 'col-md-6', 'col-md-8', 'col-md-12');
+        
+        // Remove classes de margem do Bootstrap
+        const classesToRemove = Array.from(cardFonte.classList).filter(cls => 
+            /^m[trblxy]?-/.test(cls) || 
+            /^my-/.test(cls) || 
+            /^mx-/.test(cls) ||
+            /^p[trblxy]?-/.test(cls) ||
+            /^py-/.test(cls) ||
+            /^px-/.test(cls)
+        );
+        classesToRemove.forEach(cls => cardFonte.classList.remove(cls));
+        
+        if (!cardFonte.querySelector('.grid-stack-item-content')) {
+            const content = document.createElement('div');
+            content.className = 'grid-stack-item-content';
+            while (cardFonte.firstChild) {
+                content.appendChild(cardFonte.firstChild);
+            }
+            cardFonte.appendChild(content);
+        }
+        
+        cardFonte.classList.add('grid-stack-item');
+        cardFonte.setAttribute('data-gs-id', cardId);
+        cardFonte.setAttribute('data-card-id', cardId);
+        cardFonte.setAttribute('gs-id', cardId);
+        
+        // Limpa espaçamentos do card interno
+        const cardInterno = cardFonte.querySelector('.card, a.card');
+        if (cardInterno) {
+            limparEspacamentosCard(cardInterno);
+        }
+        
+        console.log('Card montado com ID:', cardId);
+        
+        return cardFonte;
     }
     
     // Adiciona um card ao dashboard
@@ -2450,42 +3756,45 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Encontra o card original no DOM para clonar
-        // Primeiro tenta encontrar por data-card-id (no HTML original)
-        let cardOriginal = document.querySelector(`[data-card-id="${cardInfo.id}"]`);
+        let novoCard = null;
         
-        // Se não encontrou, tenta encontrar por data-gs-id (já convertido)
-        if (!cardOriginal) {
-            cardOriginal = document.querySelector(`[data-gs-id="${cardInfo.id}"]`);
-        }
-        
-        let novoCard;
-        if (cardOriginal) {
-            // Clona o card original
-            novoCard = cardOriginal.cloneNode(true);
+        // Se for um carrossel, cria um card especial
+        if (cardInfo.tipo === 'carrossel') {
+            // Gera ID único para o carrossel
+            const carrosselId = cardInfo.id + '_' + Date.now();
             
-            // Remove atributos do GridStack se existirem
-            novoCard.removeAttribute('data-gs-x');
-            novoCard.removeAttribute('data-gs-y');
-            novoCard.removeAttribute('data-gs-w');
-            novoCard.removeAttribute('data-gs-h');
+            // Inicializa configuração padrão
+            carrosselConfigs[carrosselId] = {
+                slidesPerView: 3,
+                speed: 500,
+                autoplay: true,
+                autoplayDelay: 3000,
+                loop: true,
+                pagination: true,
+                cards: []
+            };
             
-            // Remove classes que podem interferir
-            novoCard.classList.remove('grid-stack-item');
-            novoCard.classList.remove('col-xl-3', 'col-xl-4', 'col-xl-6', 'col-xl-8', 'col-xl-12');
+            novoCard = document.createElement('div');
+            novoCard.className = 'grid-stack-item';
+            novoCard.setAttribute('data-gs-id', carrosselId);
+            novoCard.setAttribute('data-card-id', carrosselId);
+            novoCard.innerHTML = `
+                <div class="grid-stack-item-content">
+                    ${criarCardCarrossel(carrosselId)}
+                </div>
+            `;
             
-            // Garante que tem o wrapper grid-stack-item-content
-            if (!novoCard.querySelector('.grid-stack-item-content')) {
-                const content = document.createElement('div');
-                content.className = 'grid-stack-item-content';
-                content.style.width = '100%';
-                content.style.height = '100%';
-                while (novoCard.firstChild) {
-                    content.appendChild(novoCard.firstChild);
-                }
-                novoCard.appendChild(content);
+            // Salva o template do carrossel
+            if (!cardTemplates.has(carrosselId)) {
+                cardTemplates.set(carrosselId, novoCard.cloneNode(true));
+                console.log('Template do carrossel salvo ao adicionar:', carrosselId);
             }
+            
+            cardInfo.id = carrosselId; // Atualiza o ID
         } else {
+            novoCard = montarCardAPartirDoTemplate(cardInfo.id);
+        
+        if (!novoCard) {
             // Cria um card placeholder se não encontrar o original
             novoCard = document.createElement('div');
             novoCard.className = 'grid-stack-item';
@@ -2503,12 +3812,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
             `;
+            }
         }
         
         novoCard.classList.add('grid-stack-item');
         novoCard.setAttribute('data-gs-id', cardInfo.id);
-        novoCard.style.padding = '0';
-        novoCard.style.margin = '0';
+        novoCard.setAttribute('data-card-id', cardInfo.id);
+        limparEspacamentosCard(novoCard.querySelector('.card, a.card'));
         
         // Encontra posição vazia
         const items = grid.save();
@@ -2539,13 +3849,55 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Adiciona o card ao grid
         grid.addWidget(novoCard, {
+            id: cardInfo.id,
             x: posX,
             y: posY,
             w: cardInfo.w,
             h: cardInfo.h
         });
         
+        console.log('Card adicionado ao grid com ID:', cardInfo.id);
+        
         cardsAdicionados.add(cardInfo.id);
+        
+        // Aplica estilos após adicionar
+        aplicarEstilosTema();
+        
+                // Se estiver em modo de edição, desabilita links do novo card e adiciona botão de remover
+        if (editMode) {
+            setTimeout(() => {
+                const links = novoCard.querySelectorAll('a[href], a.card');
+                links.forEach(link => {
+                    link.addEventListener('click', prevenirCliqueLink, true);
+                    link.addEventListener('mousedown', prevenirCliqueLink, true);
+                    link.classList.add('link-desabilitado-edicao');
+                });
+                
+                // Adiciona botão de remover no novo card
+                if (!novoCard.querySelector('.btn-remover-card')) {
+                    const btnRemover = document.createElement('button');
+                    btnRemover.className = 'btn btn-remover-card';
+                    btnRemover.type = 'button';
+                    btnRemover.title = 'Remover card';
+                    btnRemover.innerHTML = '<i class="ki-duotone ki-trash fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>';
+                    
+                    btnRemover.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        removerCard(novoCard);
+                    });
+                    
+                    novoCard.appendChild(btnRemover);
+                }
+            }, 100);
+        }
+        
+        // Se for carrossel, inicializa após adicionar
+        if (cardInfo.tipo === 'carrossel') {
+            setTimeout(() => {
+                inicializarCarrossel(cardInfo.id);
+            }, 300);
+        }
         
         // Fecha o modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('modal_adicionar_cards'));
@@ -2563,10 +3915,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!container) return;
         
         const filtro = document.getElementById('buscar_cards')?.value.toLowerCase() || '';
-        const cardsFiltrados = cardsDisponiveis.filter(card => 
-            card.nome.toLowerCase().includes(filtro) || 
-            card.descricao.toLowerCase().includes(filtro)
-        );
+        const cardsFiltrados = cardsDisponiveis.filter(card => {
+            // Verifica permissão do card
+            if (card.id && cardPermissions[card.id] === false) {
+                return false;
+            }
+            // Aplica filtro de busca
+            return card.nome.toLowerCase().includes(filtro) || 
+                   card.descricao.toLowerCase().includes(filtro);
+        });
         
         container.innerHTML = '';
         
@@ -2614,144 +3971,156 @@ document.addEventListener('DOMContentLoaded', function() {
             return [];
         }
         
-        // Adiciona classe grid-stack ao container se não tiver
+        // NÃO limpa cardsAdicionados aqui se já temos uma configuração
+        // Isso preserva a informação de quais cards foram salvos
+        if (!configuracao || configuracao.length === 0) {
+        cardsAdicionados.clear();
+        }
+        
         if (!container.classList.contains('grid-stack')) {
             container.classList.add('grid-stack');
         }
         
-        // Se não há configuração, usa layout padrão
         let layoutParaUsar = configuracao;
         if (!layoutParaUsar || layoutParaUsar.length === 0) {
             console.log('Usando layout padrão');
             layoutParaUsar = gerarLayoutPadrao();
         }
         
-        // Cria mapa de configuração
         const configMap = {};
-        if (layoutParaUsar && Array.isArray(layoutParaUsar)) {
+        const idsNoLayout = new Set();
+        if (Array.isArray(layoutParaUsar)) {
             layoutParaUsar.forEach(cfg => {
                 if (cfg.id) {
                     configMap[cfg.id] = cfg;
+                    idsNoLayout.add(cfg.id);
                 }
             });
         }
         
-        console.log('Configuração a usar:', configMap);
+        const cards = Array.from(container.querySelectorAll('[data-card-id]'));
+        if (cards.length === 0) {
+            console.warn('Nenhum card com data-card-id encontrado');
+            return [];
+        }
         
-        // Encontra todos os cards principais (col-xl-* ou com data-card-id)
-        const rows = container.querySelectorAll('.row');
+        console.log('Cards no container:', cards.length);
+        console.log('Cards no layout salvo:', idsNoLayout.size, Array.from(idsNoLayout));
+        
         let globalIndex = 0;
         const cardsProcessados = [];
         
-        rows.forEach((row, rowIndex) => {
-            const cards = row.querySelectorAll(':scope > .col-xl-3, :scope > .col-xl-4, :scope > .col-xl-6, :scope > .col-xl-8, :scope > .col-xl-12, :scope > [data-card-id]');
+        cards.forEach(card => {
+            if (card.classList.contains('grid-stack-item')) {
+                return;
+            }
             
-            console.log(`Row ${rowIndex}: encontrados ${cards.length} cards`);
+            let cardId = card.getAttribute('data-card-id') || card.getAttribute('data-gs-id');
             
-            cards.forEach((card, index) => {
-                // Verifica se já é um grid item - SE SIM, IGNORA
-                if (card.classList.contains('grid-stack-item')) {
-                    console.warn('Card já é grid-stack-item, ignorando:', card);
-                    return;
-                }
-                
-                // Salva classes originais antes de remover
-                const originalClasses = card.className;
-                
-                // Remove classes Bootstrap que podem interferir
-                card.classList.remove('col-xl-3', 'col-xl-4', 'col-xl-6', 'col-xl-8', 'col-xl-12', 'col-md-3', 'col-md-4', 'col-md-6', 'col-md-8', 'col-md-12');
-                
-                // Remove padding/margin do Bootstrap
-                card.style.padding = '0';
-                card.style.margin = '0';
-                
-                // Cria ID único se não tiver
-                let cardId = card.getAttribute('data-gs-id') || card.getAttribute('data-card-id');
-                if (!cardId) {
-                    // Tenta encontrar um link ou título para identificar
-                    const link = card.querySelector('a[href]');
-                    const title = card.querySelector('.card-label, h3, h4, h5');
-                    if (link) {
-                        const href = link.getAttribute('href');
-                        cardId = 'card_' + href.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                    } else if (title) {
-                        cardId = 'card_' + title.textContent.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 50);
-                    } else {
-                        cardId = 'card_' + globalIndex;
-                    }
-                }
-                
-                // Verifica se há configuração para este card
-                const configCard = configMap[cardId];
-                
-                // Se há configuração e o card não está visível, oculta
-                if (configCard && configCard.visible === false) {
-                    card.style.display = 'none';
-                    return; // Não processa cards invisíveis
-                }
-                
-                // Calcula tamanho e posição baseado na configuração ou layout padrão
-                let width = 3;
-                let height = 5;
-                let posX = 0;
-                let posY = 0;
-                
-                if (configCard) {
-                    // Usa configuração (salva ou padrão)
-                    width = parseInt(configCard.w) || 3;
-                    height = parseInt(configCard.h) || 5;
-                    posX = parseInt(configCard.x) || 0;
-                    posY = parseInt(configCard.y) || 0;
+            if (!cardId) {
+                const link = card.querySelector('a[href]');
+                const title = card.querySelector('.card-label, h3, h4, h5');
+                if (link) {
+                    const href = link.getAttribute('href');
+                    cardId = 'card_' + href.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                } else if (title) {
+                    cardId = 'card_' + title.textContent.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 50);
                 } else {
-                    // Fallback: calcula baseado na classe original
-                    if (originalClasses.includes('col-xl-12')) width = 12;
-                    else if (originalClasses.includes('col-xl-8')) width = 8;
-                    else if (originalClasses.includes('col-xl-6')) width = 6;
-                    else if (originalClasses.includes('col-xl-4')) width = 4;
-                    else if (originalClasses.includes('col-xl-3')) width = 3;
-                    
-                    // Calcula altura baseada no conteúdo
-                    const cardElement = card.querySelector('.card');
-                    if (cardElement) {
-                        const tempHeight = cardElement.offsetHeight || cardElement.scrollHeight || 350;
-                        height = Math.max(5, Math.ceil(tempHeight / 70));
-                    }
+                    cardId = 'card_' + globalIndex;
                 }
-                
-                // Adiciona classes e atributos do GridStack
-                card.classList.add('grid-stack-item');
-                card.setAttribute('data-gs-id', cardId);
-                card.setAttribute('gs-id', cardId);
-                card.dataset.gsId = cardId;
-                card.setAttribute('data-gs-x', posX);
-                card.setAttribute('data-gs-y', posY);
-                card.setAttribute('data-gs-w', width);
-                card.setAttribute('data-gs-h', height);
-                
-                // Envolve o conteúdo se necessário
-                if (!card.querySelector('.grid-stack-item-content')) {
-                    const content = document.createElement('div');
-                    content.className = 'grid-stack-item-content';
-                    content.style.width = '100%';
-                    content.style.height = '100%';
-                    while (card.firstChild) {
-                        content.appendChild(card.firstChild);
-                    }
-                    card.appendChild(content);
-                }
-                
-                // Move o card para fora da row e diretamente no container
-                container.appendChild(card);
-                cardsProcessados.push({ id: cardId, element: card });
-                
-                globalIndex++;
-            });
+            }
             
-            // NÃO REMOVE rows vazias - pode causar problemas ao resetar
-            // As rows vazias são necessárias para restaurar o layout depois
+            // Se há configuração salva E o card NÃO está nela, remove este card
+            if (configuracao && configuracao.length > 0 && !idsNoLayout.has(cardId)) {
+                console.log('❌ Card não está no layout salvo, removendo:', cardId);
+                card.remove(); // Remove do DOM
+                return;
+            } else if (configuracao && configuracao.length > 0) {
+                console.log('✅ Card está no layout salvo, processando:', cardId);
+            }
+            
+            if (!cardTemplates.has(cardId)) {
+                const templateClone = card.cloneNode(true);
+                cardTemplates.set(cardId, templateClone);
+            }
+            
+            const originalClasses = card.className;
+            const configCard = configMap[cardId];
+            if (configCard && configCard.visible === false) {
+                card.style.display = 'none';
+                return;
+            }
+            
+            // Remove classes Bootstrap de grid
+            card.classList.remove('col-xl-3', 'col-xl-4', 'col-xl-6', 'col-xl-8', 'col-xl-12', 'col-md-3', 'col-md-4', 'col-md-6', 'col-md-8', 'col-md-12');
+            
+            // Remove classes de margem/padding do Bootstrap
+            const classesToRemove = Array.from(card.classList).filter(cls => 
+                /^m[trblxy]?-/.test(cls) || 
+                /^my-/.test(cls) || 
+                /^mx-/.test(cls) ||
+                /^p[trblxy]?-/.test(cls) ||
+                /^py-/.test(cls) ||
+                /^px-/.test(cls)
+            );
+            classesToRemove.forEach(cls => card.classList.remove(cls));
+            
+            // Limpa espaçamentos do card interno
+            limparEspacamentosCard(card.querySelector('.card, a.card'));
+            
+            let width = 3;
+            let height = 5;
+            let posX = 0;
+            let posY = 0;
+            
+            if (configCard) {
+                width = parseInt(configCard.w) || 3;
+                height = parseInt(configCard.h) || 5;
+                posX = parseInt(configCard.x) || 0;
+                posY = parseInt(configCard.y) || 0;
+            } else {
+                if (originalClasses.includes('col-xl-12')) width = 12;
+                else if (originalClasses.includes('col-xl-8')) width = 8;
+                else if (originalClasses.includes('col-xl-6')) width = 6;
+                else if (originalClasses.includes('col-xl-4')) width = 4;
+                else if (originalClasses.includes('col-xl-3')) width = 3;
+                
+                const cardElement = card.querySelector('.card');
+                if (cardElement) {
+                    const tempHeight = cardElement.offsetHeight || cardElement.scrollHeight || 350;
+                    height = Math.max(5, Math.ceil(tempHeight / 70));
+                }
+            }
+            
+            card.classList.add('grid-stack-item');
+            card.setAttribute('data-gs-id', cardId);
+            card.setAttribute('gs-id', cardId);
+            card.dataset.gsId = cardId;
+            card.setAttribute('data-gs-x', posX);
+            card.setAttribute('data-gs-y', posY);
+            card.setAttribute('data-gs-w', width);
+            card.setAttribute('data-gs-h', height);
+            
+            if (!card.querySelector('.grid-stack-item-content')) {
+                const content = document.createElement('div');
+                content.className = 'grid-stack-item-content';
+                content.style.width = '100%';
+                content.style.height = '100%';
+                while (card.firstChild) {
+                    content.appendChild(card.firstChild);
+                }
+                card.appendChild(content);
+            }
+            
+            container.appendChild(card);
+            cardsProcessados.push({ id: cardId, element: card });
+            cardsAdicionados.add(cardId);
+            
+            globalIndex++;
         });
         
         console.log('Conversão concluída:', cardsProcessados.length, 'cards convertidos');
+        console.log('Cards no grid:', Array.from(cardsAdicionados));
         return cardsProcessados;
     }
     
@@ -2796,33 +4165,93 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             console.log('Inicializando GridStack com', gridItems.length, 'itens');
+            console.log('editMode:', editMode);
+            console.log('Configurações do grid:', {
+                disableResize: !editMode,
+                disableDrag: !editMode
+            });
             
             // Adiciona classe grid-stack ao container
             container.classList.add('grid-stack');
             
-            // Inicializa GridStack
-            grid = GridStack.init({
+            // Inicializa GridStack com configurações personalizadas
+            // Em modo de edição, permite drag e resize
+            const gridOptions = {
                 column: 12,
-                cellHeight: 70,
-                margin: 15,
-                disableResize: !editMode,
-                disableDrag: !editMode,
-                animate: true,
+                cellHeight: dashboardConfig.cellHeight,
+                margin: dashboardConfig.margin,
+                animate: dashboardConfig.animate,
                 float: false,
-                resizable: {
+                minRow: 1,
+                acceptWidgets: true,
+                removable: false
+            };
+            
+            // Em modo de edição, habilita drag e resize
+            if (editMode) {
+                gridOptions.disableResize = false;
+                gridOptions.disableDrag = false;
+                gridOptions.resizable = {
                     handles: 'e, se, s, sw, w'
-                },
-                draggable: {
-                    handle: '.grid-stack-item',
+                };
+                gridOptions.draggable = {
                     appendTo: 'body',
-                    scroll: false
-                },
-                minRow: 1
-            }, container);
+                    scroll: true
+                };
+            } else {
+                gridOptions.disableResize = true;
+                gridOptions.disableDrag = true;
+                gridOptions.staticGrid = true;
+            }
+            
+            grid = GridStack.init(gridOptions, container);
             
             if (!grid) {
                 console.error('Falha ao inicializar GridStack');
                 return;
+            }
+            
+            console.log('✅ GridStack inicializado com sucesso');
+            console.log('Grid opts:', {
+                disableDrag: grid.opts.disableDrag,
+                disableResize: grid.opts.disableResize,
+                staticGrid: grid.opts.staticGrid
+            });
+            
+            // Garante que todos os elementos existentes sejam widgets do GridStack
+            // IMPORTANTE: O GridStack.init() automaticamente converte elementos .grid-stack-item
+            // que já existem no DOM em widgets, mas precisamos garantir que isso aconteceu
+            console.log('Elementos encontrados para converter em widgets:', gridItems.length);
+            
+            // Aguarda um pouco para o GridStack processar os elementos automaticamente
+            setTimeout(() => {
+                gridItems.forEach(item => {
+                    try {
+                        // Verifica se o elemento já é um widget
+                        const node = grid.engine.nodes.find(n => n.el === item);
+                        if (!node) {
+                            // Se não foi convertido automaticamente, converte manualmente
+                            console.log('Convertendo elemento em widget:', item.getAttribute('data-gs-id'));
+                            grid.makeWidget(item);
+                        } else {
+                            console.log('Widget já existe:', item.getAttribute('data-gs-id'));
+                        }
+                        // Remove classes que podem desabilitar drag/resize
+                        item.classList.remove('ui-draggable-disabled', 'ui-resizable-disabled');
+                    } catch (err) {
+                        console.warn('Erro ao criar widget:', err);
+                    }
+                });
+            }, 100);
+            
+            // Aplica estilos do tema
+            aplicarEstilosTema();
+            
+            // Se estiver em modo de edição, desabilita links dos cards
+            if (editMode) {
+                setTimeout(() => {
+                    desabilitarLinksCards();
+                }, 200);
             }
             
             // Aplica configuração se existir, senão usa layout padrão
@@ -2834,19 +4263,92 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('Aplicando layout padrão');
                     aplicarLayoutPadrao();
                 }
+                
+                // Garante que o grid está habilitado após aplicar a configuração
+                if (editMode && grid) {
+                    setTimeout(() => {
+                        try {
+                            // Habilita o grid para edição
+                            grid.enable();
+                            
+                            // Força a atualização das opções do grid
+                            if (grid.opts) {
+                                grid.opts.disableDrag = false;
+                                grid.opts.disableResize = false;
+                                grid.opts.staticGrid = false;
+                            }
+                            
+                            // Garante que todos os widgets estão habilitados
+                            const allItems = container.querySelectorAll('.grid-stack-item');
+                            allItems.forEach(item => {
+                                // Remove classes que desabilitam drag/resize
+                                item.classList.remove('ui-draggable-disabled', 'ui-resizable-disabled');
+                                
+                                // Garante que o widget está registrado
+                                const node = grid.engine.nodes.find(n => n.el === item);
+                                if (!node) {
+                                    try {
+                                        grid.makeWidget(item);
+                                    } catch (err) {
+                                        console.warn('Erro ao criar widget:', err);
+                                    }
+                                }
+                            });
+                            
+                            // Força a re-inicialização do drag e resize para todos os widgets
+                            if (grid.engine && grid.engine.nodes) {
+                                grid.engine.nodes.forEach(node => {
+                                    if (node.el) {
+                                        // Remove classes de desabilitado
+                                        node.el.classList.remove('ui-draggable-disabled', 'ui-resizable-disabled');
+                                    }
+                                });
+                            }
+                            
+                            console.log('✅ GridStack habilitado para edição');
+                            console.log('Widgets habilitados:', allItems.length);
+                            console.log('Grid opts após habilitação:', {
+                                disableDrag: grid.opts?.disableDrag,
+                                disableResize: grid.opts?.disableResize,
+                                staticGrid: grid.opts?.staticGrid
+                            });
+                            
+                            // Debug: verifica se os widgets têm os handlers corretos
+                            allItems.forEach(item => {
+                                const hasDraggable = item.classList.contains('ui-draggable') || item.classList.contains('ui-draggable-handle');
+                                const hasResizable = item.classList.contains('ui-resizable');
+                                console.log('Widget', item.getAttribute('data-gs-id'), {
+                                    hasDraggable,
+                                    hasResizable,
+                                    disabled: item.classList.contains('ui-draggable-disabled') || item.classList.contains('ui-resizable-disabled')
+                                });
+                            });
+                            
+                            // Força a re-inicialização do drag e resize usando a API do GridStack
+                            // Isso garante que os handlers sejam criados corretamente
+                            try {
+                                // Desabilita e reabilita o grid para forçar a recriação dos handlers
+                                grid.disable();
+                                setTimeout(() => {
+                                    grid.enable();
+                                    console.log('✅ GridStack reabilitado para garantir handlers');
+                                    
+                                    // Adiciona botões de remover após grid estar pronto
+                                    if (editMode) {
+                                        setTimeout(() => {
+                                            adicionarBotoesRemover();
+                                        }, 100);
+                                    }
+                                }, 100);
+                            } catch (e) {
+                                console.warn('Erro ao reabilitar grid:', e);
+                            }
+                        } catch (e) {
+                            console.error('Erro ao habilitar grid:', e);
+                        }
+                    }, 300);
+                }
             }, 300);
-            
-            // Força habilitação se estiver em modo de edição
-            if (editMode && grid) {
-                setTimeout(() => {
-                    try {
-                        grid.enable();
-                        console.log('GridStack habilitado para edição');
-                    } catch (e) {
-                        console.error('Erro ao habilitar grid:', e);
-                    }
-                }, 300);
-            }
         }, 200);
     }
     
@@ -2869,12 +4371,46 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        const idsPadrao = new Set(layoutPadrao.map(card => card.id));
         grid.batchUpdate();
+        
+        const nodesExistentes = grid.engine && grid.engine.nodes ? [...grid.engine.nodes] : [];
+        nodesExistentes.forEach(node => {
+            if (!node?.id || idsPadrao.has(node.id)) {
+                return;
+            }
+            try {
+                grid.removeWidget(node.el, true);
+            } catch (err) {
+                console.warn('Erro ao remover card fora do layout padrão', node.id, err);
+            }
+        });
+        
         layoutPadrao.forEach(card => {
             const node = getNodeById(card.id);
-            if (node && node.el) {
+            let element = node?.el || document.querySelector(`[data-gs-id="${card.id}"]`);
+            
+            if (!element) {
+                const novoCard = montarCardAPartirDoTemplate(card.id);
+                if (novoCard) {
+                    try {
+                        grid.addWidget(novoCard, {
+                            id: card.id,
+                            x: card.x,
+                            y: card.y,
+                            w: card.w,
+                            h: card.h
+                        });
+                        element = novoCard;
+                    } catch (err) {
+                        console.warn('Erro ao recriar card', card.id, err);
+                    }
+                } else {
+                    console.warn('Template não encontrado para card', card.id);
+                }
+            } else {
                 try {
-                    grid.update(node.el, {
+                    grid.update(element, {
                         x: card.x,
                         y: card.y,
                         w: card.w,
@@ -2883,23 +4419,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 } catch (err) {
                     console.warn('Erro ao aplicar layout padrão ao card', card.id, err);
                 }
-            } else {
-                const element = document.querySelector(`[data-gs-id="${card.id}"]`);
-                if (element) {
-                    try {
-                        grid.update(element, {
-                            x: card.x,
-                            y: card.y,
-                            w: card.w,
-                            h: card.h
-                        });
-                    } catch (err) {
-                        console.warn('Erro ao posicionar elemento', card.id, err);
-                    }
-                }
             }
         });
         grid.commit();
+        
+        cardsAdicionados.clear();
+        idsPadrao.forEach(id => cardsAdicionados.add(id));
     }
     
     // Aplica configuração salva
@@ -2922,12 +4447,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         w: parseInt(card.w) || 3,
                         h: parseInt(card.h) || 3
                     });
+                    // Garante que o widget não está desabilitado após atualização
+                    if (editMode) {
+                        element.classList.remove('ui-draggable-disabled', 'ui-resizable-disabled');
+                    }
                 } catch (err) {
                     console.warn('Erro ao aplicar configuração ao card', card.id, err);
                 }
             }
         });
         grid.commit();
+        
+        // Após aplicar configuração, garante que o grid está habilitado se estiver em modo de edição
+        if (editMode) {
+            try {
+                grid.enable();
+            } catch (e) {
+                console.warn('Erro ao reabilitar grid após aplicar configuração:', e);
+            }
+        }
     }
     
     // Limpa e reseta o container para estado inicial
@@ -2938,76 +4476,86 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        console.log('Resetando container...');
+        console.log('Resetando container para modo de edição...');
+        console.log('Templates salvos:', cardTemplates.size);
+        console.log('Cards adicionados (salvos):', cardsAdicionados.size, Array.from(cardsAdicionados));
         
-        // Remove classe grid-stack
-        container.classList.remove('grid-stack');
+        // Limpa o container
+        container.innerHTML = '';
         
-        // Remove todos os grid items e reseta para layout Bootstrap
-        const gridItems = container.querySelectorAll('.grid-stack-item');
-        console.log('Grid items encontrados para resetar:', gridItems.length);
-        
-        gridItems.forEach((item, index) => {
-            console.log(`Resetando item ${index}:`, item.getAttribute('data-gs-id'));
+        // Restaura APENAS os cards que estão no cardsAdicionados (layout salvo)
+        if (cardTemplates.size > 0 && cardsAdicionados.size > 0) {
+            console.log('Restaurando apenas cards do layout salvo...');
+            cardsAdicionados.forEach(cardId => {
+                const template = cardTemplates.get(cardId);
+                if (!template) {
+                    console.warn('Template não encontrado para:', cardId);
+                    return;
+                }
+                
+                const cardClone = template.cloneNode(true);
             
             // Remove atributos do GridStack
-            item.removeAttribute('data-gs-x');
-            item.removeAttribute('data-gs-y');
-            item.removeAttribute('data-gs-w');
-            item.removeAttribute('data-gs-h');
-            item.removeAttribute('data-gs-id');
-            item.removeAttribute('gs-x');
-            item.removeAttribute('gs-y');
-            item.removeAttribute('gs-w');
-            item.removeAttribute('gs-h');
-            item.removeAttribute('gs-id');
+                cardClone.removeAttribute('gs-x');
+                cardClone.removeAttribute('gs-y');
+                cardClone.removeAttribute('gs-w');
+                cardClone.removeAttribute('gs-h');
+                cardClone.removeAttribute('gs-id');
+                cardClone.removeAttribute('data-gs-x');
+                cardClone.removeAttribute('data-gs-y');
+                cardClone.removeAttribute('data-gs-w');
+                cardClone.removeAttribute('data-gs-h');
+                cardClone.removeAttribute('data-gs-id');
             
             // Remove classes do GridStack
-            item.classList.remove('grid-stack-item');
-            item.classList.remove('ui-draggable');
-            item.classList.remove('ui-resizable');
-            item.classList.remove('ui-draggable-handle');
-            item.style.padding = '';
-            item.style.margin = '';
-            item.style.position = '';
-            item.style.left = '';
-            item.style.top = '';
-            item.style.width = '';
-            item.style.height = '';
+                cardClone.classList.remove('grid-stack-item', 'ui-draggable', 'ui-resizable', 'ui-draggable-dragging', 'ui-resizable-resizing');
+                
+                // Limpa estilos inline do GridStack
+                cardClone.style.position = '';
+                cardClone.style.left = '';
+                cardClone.style.top = '';
+                cardClone.style.width = '';
+                cardClone.style.height = '';
             
             // Remove wrapper grid-stack-item-content se existir
-            const content = item.querySelector('.grid-stack-item-content');
+                // EXCETO para carrosséis, que precisam do wrapper
+                if (!cardId.startsWith('card_carrossel_')) {
+                    const content = cardClone.querySelector('.grid-stack-item-content');
             if (content) {
-                console.log('Removendo wrapper grid-stack-item-content');
-                // Move conteúdo para fora do wrapper
                 while (content.firstChild) {
-                    item.appendChild(content.firstChild);
+                            cardClone.appendChild(content.firstChild);
                 }
                 content.remove();
-            }
-            
-            // Re-adiciona classes Bootstrap originais se tiver data-card-id
-            const cardId = item.getAttribute('data-card-id');
-            if (cardId) {
-                // Determina tamanho baseado no card
-                if (cardId.includes('total_colaboradores') || 
-                    cardId.includes('colaboradores_ativos') || 
-                    cardId.includes('ocorrencias_mes') || 
-                    cardId.includes('colaboradores_inativos')) {
-                    item.classList.add('col-xl-3');
-                } else if (cardId.includes('grafico_ocorrencias_mes')) {
-                    item.classList.add('col-xl-8');
-                } else if (cardId.includes('grafico_colaboradores_status')) {
-                    item.classList.add('col-xl-4');
-                } else if (cardId.includes('grafico_ocorrencias_tipo')) {
-                    item.classList.add('col-xl-12');
-                } else {
-                    item.classList.add('col-xl-6');
+                    }
                 }
-            }
-        });
+                
+                // Adiciona ao container
+                container.appendChild(cardClone);
+                console.log('Card restaurado:', cardId);
+                
+                // Se for carrossel, inicializa após adicionar ao DOM
+                if (cardId.startsWith('card_carrossel_')) {
+                    setTimeout(() => {
+                        inicializarCarrossel(cardId);
+                    }, 500);
+                }
+            });
+        } else if (cardTemplates.size === 0) {
+            console.warn('Nenhum template disponível');
+        } else if (cardsAdicionados.size === 0) {
+            console.log('Nenhum card foi adicionado ainda (layout vazio)');
+        }
         
-        console.log('Container resetado para estado inicial');
+        // Remove todas as classes relacionadas ao GridStack
+        container.classList.remove('grid-stack', 'grid-stack-rtl', 'grid-stack-animate');
+        container.removeAttribute('gs-current-row');
+        
+        // Limpa qualquer estilo inline que possa ter sido adicionado
+        container.style.height = '';
+        
+        // NÃO limpa cardsAdicionados aqui! Precisamos dele para saber quais cards restaurar
+        
+        console.log('Container resetado com', cardsAdicionados.size, 'cards do layout salvo');
     }
     
     // Entra no modo de edição
@@ -3018,10 +4566,46 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('btn_salvar_dashboard').classList.remove('d-none');
         document.getElementById('btn_adicionar_cards').classList.remove('d-none');
         document.getElementById('btn_limpar_layout').classList.remove('d-none');
+        document.getElementById('btn_restaurar_layout').classList.remove('d-none');
+        document.getElementById('btn_configuracoes_dashboard').classList.remove('d-none');
         document.getElementById('btn_cancelar_dashboard').classList.remove('d-none');
+        
+        // Mostra botões que só aparecem em modo de edição
+        document.querySelectorAll('.edit-mode-only').forEach(btn => {
+            btn.style.display = 'inline-block';
+        });
+        
+        // Atualiza botões dos carrosséis
+        atualizarBotoesCarrossel();
+        
+        // Desabilita links dos cards no modo de edição
+        desabilitarLinksCards();
+        
+        // Garante que o container está visível
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (container) {
+            container.style.opacity = '1';
+        }
+        
+        // Adiciona botões de remover nos cards após entrar no modo de edição
+        setTimeout(() => {
+            adicionarBotoesRemover();
+        }, 500);
         
         // Aguarda um pouco para garantir que o DOM está pronto
         setTimeout(() => {
+            // Destrói grid estático se existir
+            if (gridEstatico) {
+                console.log('Destruindo grid estático para entrar em modo de edição');
+                try {
+                    gridEstatico.destroy(false);
+                } catch (e) {
+                    console.warn('Erro ao destruir grid estático:', e);
+                }
+                gridEstatico = null;
+            }
+            
+            // Destrói grid editável se existir
             if (grid) {
                 console.log('Destruindo grid existente para reiniciar');
                 try {
@@ -3037,12 +4621,20 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log('Inicializando novo grid');
             carregarConfiguracao().then(config => {
+                // Aplica estilos do tema antes de inicializar grid
+                aplicarEstilosTema();
+                
                 // Se não há configuração, usa layout padrão
                 if (!config || config.length === 0) {
                     inicializarGrid(null); // null força uso do layout padrão
                 } else {
                     inicializarGrid(config);
                 }
+                
+                // Atualiza botões dos carrosséis após inicializar o grid
+                setTimeout(() => {
+                    atualizarBotoesCarrossel();
+                }, 800);
             });
         }, 200);
     }
@@ -3051,7 +4643,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function sairModoEdicao(salvar = false) {
         if (salvar && grid) {
             salvarConfiguracao().then(() => {
-                finalizarModoEdicao();
+                Swal.fire({
+                    text: 'Configuração salva com sucesso!',
+                    icon: 'success',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                }).then(() => {
+                    // Recarrega a página para aplicar o layout salvo
+                    location.reload();
+                });
             }).catch(() => {
                 Swal.fire({
                     text: 'Erro ao salvar configuração',
@@ -3094,11 +4697,217 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('btn_salvar_dashboard').classList.add('d-none');
         document.getElementById('btn_adicionar_cards').classList.add('d-none');
         document.getElementById('btn_limpar_layout').classList.add('d-none');
+        document.getElementById('btn_restaurar_layout').classList.add('d-none');
+        document.getElementById('btn_configuracoes_dashboard').classList.add('d-none');
         document.getElementById('btn_cancelar_dashboard').classList.add('d-none');
+        
+        // Oculta botões que só aparecem em modo de edição
+        document.querySelectorAll('.edit-mode-only').forEach(btn => {
+            btn.style.display = 'none';
+        });
+        
+        // Atualiza botões dos carrosséis
+        atualizarBotoesCarrossel();
+        
+        // Reabilita links dos cards ao sair do modo de edição
+        habilitarLinksCards();
+        
+        // Remove botões de remover ao sair do modo de edição
+        removerBotoesRemover();
         
         if (grid) {
             grid.disable();
         }
+    }
+    
+    // Desabilita links dos cards no modo de edição
+    function desabilitarLinksCards() {
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (!container) return;
+        
+        // Encontra todos os links dentro dos grid items
+        const links = container.querySelectorAll('.grid-stack-item a[href], .grid-stack-item a.card');
+        
+        links.forEach(link => {
+            // Armazena o href original se ainda não foi armazenado
+            if (!link.dataset.originalHref) {
+                link.dataset.originalHref = link.getAttribute('href');
+            }
+            
+            // Previne o comportamento padrão do link
+            link.addEventListener('click', prevenirCliqueLink, true);
+            link.addEventListener('mousedown', prevenirCliqueLink, true);
+            
+            // Adiciona classe para indicar que está desabilitado
+            link.classList.add('link-desabilitado-edicao');
+        });
+    }
+    
+    // Reabilita links dos cards ao sair do modo de edição
+    function habilitarLinksCards() {
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (!container) return;
+        
+        // Encontra todos os links dentro dos grid items
+        const links = container.querySelectorAll('.grid-stack-item a[href], .grid-stack-item a.card');
+        
+        links.forEach(link => {
+            // Remove os event listeners
+            link.removeEventListener('click', prevenirCliqueLink, true);
+            link.removeEventListener('mousedown', prevenirCliqueLink, true);
+            
+            // Remove classe de desabilitado
+            link.classList.remove('link-desabilitado-edicao');
+        });
+    }
+    
+    // Função para prevenir clique no link durante arraste
+    let isDragging = false;
+    let dragStartTime = 0;
+    
+    function prevenirCliqueLink(e) {
+        // Se estamos arrastando (GridStack está ativo), previne o clique
+        if (isDragging || document.body.classList.contains('dashboard-edit-mode')) {
+            // Verifica se o elemento está sendo arrastado pelo GridStack
+            const gridItem = e.target.closest('.grid-stack-item');
+            if (gridItem && (gridItem.classList.contains('ui-draggable-dragging') || 
+                             gridItem.classList.contains('ui-resizable-resizing'))) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return false;
+            }
+            
+            // Se passou menos de 300ms desde o mousedown, provavelmente é um arraste
+            const timeSinceMouseDown = Date.now() - dragStartTime;
+            if (timeSinceMouseDown < 300) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return false;
+            }
+        }
+    }
+    
+    // Detecta quando o arraste começa
+    document.addEventListener('mousedown', function(e) {
+        if (editMode && e.target.closest('.grid-stack-item')) {
+            dragStartTime = Date.now();
+            isDragging = false;
+            
+            // Detecta movimento do mouse para determinar se é arraste
+            const onMouseMove = function() {
+                isDragging = true;
+            };
+            
+            const onMouseUp = function() {
+                setTimeout(() => {
+                    isDragging = false;
+                }, 100);
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+            
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+    }, true);
+    
+    // Adiciona botões de remover nos cards no modo de edição
+    function adicionarBotoesRemover() {
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (!container) return;
+        
+        const gridItems = container.querySelectorAll('.grid-stack-item');
+        
+        gridItems.forEach(item => {
+            // Verifica se já tem botão de remover
+            if (item.querySelector('.btn-remover-card')) {
+                return;
+            }
+            
+            // Cria o botão de remover
+            const btnRemover = document.createElement('button');
+            btnRemover.className = 'btn btn-remover-card';
+            btnRemover.type = 'button';
+            btnRemover.title = 'Remover card';
+            btnRemover.innerHTML = '<i class="ki-duotone ki-trash fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>';
+            
+            // Adiciona event listener para remover o card
+            btnRemover.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                removerCard(item);
+            });
+            
+            // Adiciona o botão ao card
+            item.appendChild(btnRemover);
+        });
+    }
+    
+    // Remove botões de remover dos cards
+    function removerBotoesRemover() {
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (!container) return;
+        
+        const botoesRemover = container.querySelectorAll('.btn-remover-card');
+        botoesRemover.forEach(btn => btn.remove());
+    }
+    
+    // Remove um card individual
+    function removerCard(cardElement) {
+        const cardId = cardElement.getAttribute('data-gs-id') || cardElement.getAttribute('data-card-id');
+        
+        if (!cardId) {
+            console.warn('Card sem ID, não é possível remover');
+            return;
+        }
+        
+        Swal.fire({
+            text: 'Deseja remover este card do dashboard?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sim, remover',
+            cancelButtonText: 'Cancelar',
+            buttonsStyling: false,
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-light'
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Remove do grid
+                if (grid) {
+                    try {
+                        grid.removeWidget(cardElement, true);
+                    } catch (e) {
+                        console.warn('Erro ao remover widget do grid:', e);
+                        cardElement.remove();
+                    }
+                } else {
+                    cardElement.remove();
+                }
+                
+                // Remove do conjunto de cards adicionados
+                cardsAdicionados.delete(cardId);
+                
+                // Remove configurações de carrossel se for um carrossel
+                if (cardId.startsWith('card_carrossel_')) {
+                    if (carrosselInstances[cardId]) {
+                        carrosselInstances[cardId].destroy(true, true);
+                        delete carrosselInstances[cardId];
+                    }
+                    delete carrosselConfigs[cardId];
+                }
+                
+                console.log('Card removido:', cardId);
+                
+                // Atualiza lista de cards disponíveis
+                setTimeout(() => {
+                    carregarListaCardsDisponiveis();
+                }, 300);
+            }
+        });
     }
     
     // Event listeners
@@ -3122,6 +4931,10 @@ document.addEventListener('DOMContentLoaded', function() {
         limparLayout();
     });
     
+    document.getElementById('btn_restaurar_layout')?.addEventListener('click', function() {
+        restaurarLayout();
+    });
+    
     document.getElementById('btn_adicionar_cards')?.addEventListener('click', function() {
         definirCardsDisponiveis();
         carregarListaCardsDisponiveis();
@@ -3140,12 +4953,872 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarListaCardsDisponiveis();
     });
     
+    // Event listeners para Configurações do Dashboard
+    document.getElementById('btn_configuracoes_dashboard')?.addEventListener('click', function() {
+        abrirModalConfiguracoes();
+    });
+    
+    // Abre modal de configurações
+    function abrirModalConfiguracoes() {
+        // Preenche valores atuais
+        document.getElementById('config_margin').value = dashboardConfig.margin;
+        document.getElementById('config_margin_value').textContent = dashboardConfig.margin + 'px';
+        document.getElementById('config_cell_height').value = dashboardConfig.cellHeight;
+        document.getElementById('config_cell_height_value').textContent = dashboardConfig.cellHeight + 'px';
+        document.getElementById('densidade_' + dashboardConfig.densidade).checked = true;
+        document.getElementById('tema_' + dashboardConfig.temaGrid).checked = true;
+        document.getElementById('config_animate').checked = dashboardConfig.animate;
+        
+        const modal = new bootstrap.Modal(document.getElementById('modal_configuracoes_dashboard'));
+        modal.show();
+    }
+    
+    // Atualiza valor ao mover slider de margem
+    document.getElementById('config_margin')?.addEventListener('input', function() {
+        document.getElementById('config_margin_value').textContent = this.value + 'px';
+    });
+    
+    // Atualiza valor ao mover slider de altura
+    document.getElementById('config_cell_height')?.addEventListener('input', function() {
+        document.getElementById('config_cell_height_value').textContent = this.value + 'px';
+    });
+    
+    // Quando seleciona densidade, atualiza sliders automaticamente
+    document.querySelectorAll('input[name="densidade"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const densidades = {
+                compacto: { margin: 8, cellHeight: 60 },
+                padrao: { margin: 16, cellHeight: 70 },
+                espacado: { margin: 24, cellHeight: 80 }
+            };
+            
+            const densidade = densidades[this.value];
+            if (densidade) {
+                document.getElementById('config_margin').value = densidade.margin;
+                document.getElementById('config_margin_value').textContent = densidade.margin + 'px';
+                document.getElementById('config_cell_height').value = densidade.cellHeight;
+                document.getElementById('config_cell_height_value').textContent = densidade.cellHeight + 'px';
+            }
+        });
+    });
+    
+    // Aplica configurações
+    document.getElementById('btn_aplicar_config')?.addEventListener('click', function() {
+        const btn = this;
+        const indicator = btn.querySelector('.indicator-label');
+        const progress = btn.querySelector('.indicator-progress');
+        
+        // Captura valores do formulário
+        dashboardConfig.margin = parseInt(document.getElementById('config_margin').value);
+        dashboardConfig.cellHeight = parseInt(document.getElementById('config_cell_height').value);
+        dashboardConfig.densidade = document.querySelector('input[name="densidade"]:checked').value;
+        dashboardConfig.temaGrid = document.querySelector('input[name="tema_grid"]:checked').value;
+        dashboardConfig.animate = document.getElementById('config_animate').checked;
+        
+        btn.setAttribute('data-kt-indicator', 'on');
+        indicator.style.display = 'none';
+        progress.style.display = 'inline-block';
+        
+        // Aplica estilos do tema e padding interno
+        aplicarEstilosTema();
+        
+        // Reinicia o grid com novas configurações
+        if (grid) {
+            grid.cellHeight(dashboardConfig.cellHeight);
+            grid.margin(dashboardConfig.margin);
+            grid.opts.animate = dashboardConfig.animate;
+            
+            // Força re-render do grid para aplicar mudanças
+            setTimeout(() => {
+                grid.batchUpdate();
+                grid.commit();
+            }, 100);
+        }
+        
+        // Salva configurações (junto com o layout)
+        salvarConfiguracao()
+            .then(() => {
+                btn.removeAttribute('data-kt-indicator');
+                indicator.style.display = 'inline-block';
+                progress.style.display = 'none';
+                
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modal_configuracoes_dashboard'));
+                modal.hide();
+                
+                Swal.fire({
+                    text: 'Configurações aplicadas com sucesso!',
+                    icon: 'success',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+            })
+            .catch(error => {
+                btn.removeAttribute('data-kt-indicator');
+                indicator.style.display = 'inline-block';
+                progress.style.display = 'none';
+                
+                Swal.fire({
+                    text: 'Erro ao salvar configurações: ' + error.message,
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+            });
+    });
+    
+    // Restaurar configurações padrão
+    document.getElementById('btn_restaurar_config')?.addEventListener('click', function() {
+        Swal.fire({
+            text: 'Deseja restaurar as configurações padrão do dashboard?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sim, restaurar',
+            cancelButtonText: 'Cancelar',
+            buttonsStyling: false,
+            customClass: {
+                confirmButton: 'btn btn-primary',
+                cancelButton: 'btn btn-light'
+            }
+        }).then(result => {
+            if (result.isConfirmed) {
+                // Restaura valores padrão
+                dashboardConfig = {
+                    margin: 16,
+                    cellHeight: 70,
+                    densidade: 'padrao',
+                    temaGrid: 'azul',
+                    animate: true
+                };
+                
+                // Atualiza formulário
+                document.getElementById('config_margin').value = 16;
+                document.getElementById('config_margin_value').textContent = '16px';
+                document.getElementById('config_cell_height').value = 70;
+                document.getElementById('config_cell_height_value').textContent = '70px';
+                document.getElementById('densidade_padrao').checked = true;
+                document.getElementById('tema_azul').checked = true;
+                document.getElementById('config_animate').checked = true;
+                
+                Swal.fire({
+                    text: 'Configurações restauradas! Clique em "Aplicar" para salvar.',
+                    icon: 'info',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+            }
+        });
+    });
+    
     // Inicializa cards disponíveis
     definirCardsDisponiveis();
     
-    // Carrega configuração ao iniciar (sem modo de edição)
-    // Não inicializa grid automaticamente - só quando entrar em modo de edição
-    // Isso mantém o layout Bootstrap normal quando não está editando
+    // Carrega configurações e aplica layout salvo ao iniciar
+    carregarConfiguracoesDashboard().then(resultado => {
+        if (resultado.cards && resultado.cards.length > 0) {
+            aplicarLayoutSalvo(resultado.cards);
+        } else {
+            // Se não há layout salvo, torna o dashboard visível (usa layout padrão)
+            const container = document.getElementById(GRID_CONTAINER_ID);
+            if (container) {
+                setTimeout(() => {
+                    container.style.opacity = '1';
+                }, 100);
+            }
+        }
+    });
+    
+    // Função para aplicar layout salvo ao carregar a página (fora do modo de edição)
+    function aplicarLayoutSalvo(layoutSalvo) {
+        console.log('Aplicando layout salvo:', layoutSalvo);
+        
+        // Verifica se há layout para aplicar
+        if (!layoutSalvo || layoutSalvo.length === 0) {
+            console.log('Nenhum layout salvo para aplicar');
+            return;
+        }
+        
+        // Aguarda um pouco para garantir que o DOM está completamente carregado
+        setTimeout(() => {
+            // Obtém a área de cards do dashboard usando o ID correto
+            const dashboardCards = document.getElementById(GRID_CONTAINER_ID);
+            if (!dashboardCards) {
+                console.error('Área de cards não encontrada:', GRID_CONTAINER_ID);
+                console.log('O dashboard personalizável pode não estar disponível para este usuário');
+                return;
+            }
+            
+            console.log('Container encontrado, aplicando layout...');
+            
+            // Salva os templates dos cards ANTES de limpar o container
+            dashboardCards.querySelectorAll('[data-card-id]').forEach(cardElement => {
+                const cardId = cardElement.getAttribute('data-card-id');
+                if (cardId && !cardTemplates.has(cardId)) {
+                    cardTemplates.set(cardId, cardElement.cloneNode(true));
+                    console.log('Template salvo:', cardId);
+                }
+            });
+            
+            // Limpa todos os cards existentes
+            dashboardCards.innerHTML = '';
+            
+            // Remove classes Bootstrap do container
+            dashboardCards.classList.remove('row', 'g-4');
+            
+            // Adiciona classe do GridStack
+            dashboardCards.classList.add('grid-stack');
+            
+            // Oculta todos os cards disponíveis
+            document.querySelectorAll('.card-disponivel').forEach(cardDisp => {
+                cardDisp.style.display = 'none';
+            });
+            
+            // Aplica os cards conforme o layout salvo
+            layoutSalvo.forEach(cardInfo => {
+                if (!cardInfo.visible) return; // Pula cards invisíveis
+                
+                console.log('Aplicando card:', cardInfo.id);
+                
+                // Cria o card a partir do ID (montarCardAPartirDoTemplate espera o ID, não o objeto)
+                const novoCard = montarCardAPartirDoTemplate(cardInfo.id);
+                if (!novoCard) {
+                    console.warn('Não foi possível montar card:', cardInfo.id);
+                    return;
+                }
+                
+                // Define posição e tamanho do GridStack
+                novoCard.setAttribute('gs-x', cardInfo.x);
+                novoCard.setAttribute('gs-y', cardInfo.y);
+                novoCard.setAttribute('gs-w', cardInfo.w);
+                novoCard.setAttribute('gs-h', cardInfo.h);
+                novoCard.setAttribute('gs-id', cardInfo.id);
+                
+                // Adiciona ao dashboard
+                dashboardCards.appendChild(novoCard);
+                console.log('Card adicionado:', cardInfo.id);
+            });
+        
+            // Inicializa GridStack em modo somente leitura (não editável)
+            if (window.GridStack) {
+                // Destrói grid estático anterior se existir
+                if (gridEstatico) {
+                    try {
+                        gridEstatico.destroy(false);
+                    } catch (e) {
+                        console.warn('Erro ao destruir grid estático anterior:', e);
+                    }
+                    gridEstatico = null;
+                }
+                
+                gridEstatico = GridStack.init({
+                    margin: dashboardConfig.margin,
+                    cellHeight: dashboardConfig.cellHeight,
+                    animate: false,
+                    float: false,
+                    disableDrag: true,   // Desabilita arrastar
+                    disableResize: true, // Desabilita redimensionar
+                    staticGrid: true     // Grid estático (não editável)
+                }, dashboardCards);
+                
+                console.log('Layout salvo aplicado com sucesso');
+                
+                // Torna o dashboard visível após aplicar o layout
+                dashboardCards.style.opacity = '1';
+            } else {
+                // Se não tem GridStack, torna visível mesmo assim
+                dashboardCards.style.opacity = '1';
+            }
+        }, 300); // Aguarda 300ms para garantir que o DOM está pronto
+    }
+    
+    // ========== FUNÇÕES DO CARROSSEL DE CARDS ==========
+    
+    let carrosselConfigs = {}; // Armazena configurações de cada carrossel
+    let carrosselInstances = {}; // Armazena instâncias do Swiper
+    
+    // Cria HTML do card de carrossel
+    function criarCardCarrossel(cardId) {
+        const config = carrosselConfigs[cardId] || {
+            slidesPerView: 3,
+            speed: 500,
+            autoplay: true,
+            autoplayDelay: 3000,
+            loop: true,
+            pagination: true,
+            cards: []
+        };
+        
+        const carrosselId = 'swiper_' + cardId.replace(/[^a-z0-9]/gi, '_');
+        
+        let html = `
+            <div class="card h-100">
+                <div class="card-header pt-5">
+                    <h3 class="card-title align-items-start flex-column">
+                        <span class="card-label fw-bold fs-3 mb-1">🎠 Carrossel de Cards</span>
+                        <span class="text-muted fw-semibold fs-7">${config.cards.length} card(s)</span>
+                    </h3>
+                    <div class="card-toolbar">
+                        <button type="button" class="btn btn-sm btn-icon btn-light-primary carousel-config-btn edit-mode-only" onclick="configurarCarrossel('${cardId}')" style="display: ${editMode ? 'inline-block' : 'none'};">
+                            <i class="ki-duotone ki-setting-3 fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body carousel-card-container">
+        `;
+        
+        if (config.cards.length === 0) {
+            html += `
+                <div class="carousel-empty-state">
+                    <i class="ki-duotone ki-slider fs-3x">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <p class="text-gray-600 fw-bold">Nenhum card adicionado</p>
+                    <small class="text-muted">Configure o carrossel para adicionar cards</small>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="swiper swiper-carousel-cards" id="${carrosselId}">
+                    <div class="swiper-wrapper">
+            `;
+            
+            config.cards.forEach(card => {
+                if (card.tipo === 'existente') {
+                    // Card existente do dashboard
+                    // Tenta buscar do cardTemplates primeiro, depois do DOM
+                    let cardOriginal = null;
+                    if (cardTemplates.has(card.cardId)) {
+                        cardOriginal = cardTemplates.get(card.cardId);
+                        console.log('Card encontrado no cardTemplates:', card.cardId);
+                    } else {
+                        cardOriginal = document.querySelector(`[data-card-id="${card.cardId}"]`);
+                        if (cardOriginal) {
+                            console.log('Card encontrado no DOM:', card.cardId);
+                        }
+                    }
+                    
+                    let cardHtml = '';
+                    
+                    if (cardOriginal) {
+                        // Clona o card original
+                        const clone = cardOriginal.cloneNode(true);
+                        // Remove atributos do grid
+                        clone.removeAttribute('data-gs-x');
+                        clone.removeAttribute('data-gs-y');
+                        clone.removeAttribute('data-gs-w');
+                        clone.removeAttribute('data-gs-h');
+                        clone.classList.remove('grid-stack-item');
+                        
+                        // Pega apenas o conteúdo do card
+                        const cardContent = clone.querySelector('.card, a.card');
+                        if (cardContent) {
+                            cardHtml = cardContent.outerHTML;
+                        } else {
+                            cardHtml = clone.innerHTML;
+                        }
+                    } else {
+                        // Fallback se card não for encontrado
+                        console.warn('Card não encontrado:', card.cardId);
+                        cardHtml = `
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="ki-duotone ${card.icone || 'ki-information'} fs-3x text-primary mb-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <h5 class="fw-bold">${card.nome || 'Card não encontrado'}</h5>
+                                    <p class="text-muted small">${card.descricao || 'Este card não está disponível'}</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    html += `
+                        <div class="swiper-slide">
+                            <div class="carousel-card-wrapper" style="height: 100%;">
+                                ${cardHtml}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Card personalizado (mini-card)
+                    const corClass = `bg-${card.cor || 'primary'}`;
+                    html += `
+                        <div class="swiper-slide">
+                            <div class="mini-card ${corClass} text-white">
+                                ${card.icone ? `
+                                    <i class="ki-duotone ${card.icone} fs-2tx mb-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                ` : ''}
+                                ${card.valor ? `<div class="fs-2x fw-bold mb-2">${card.valor}</div>` : ''}
+                                <div class="fw-bold fs-5 mb-1">${card.titulo}</div>
+                                ${card.descricao ? `<div class="opacity-75 fs-7">${card.descricao}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            html += `
+                    </div>
+                    <div class="swiper-button-next"></div>
+                    <div class="swiper-button-prev"></div>
+                    ${config.pagination ? '<div class="swiper-pagination"></div>' : ''}
+                </div>
+            `;
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        return html;
+    }
+    
+    // Atualiza visibilidade dos botões de configuração dos carrosséis
+    function atualizarBotoesCarrossel() {
+        document.querySelectorAll('.carousel-config-btn').forEach(btn => {
+            if (editMode) {
+                btn.style.display = 'inline-block';
+            } else {
+                btn.style.display = 'none';
+            }
+        });
+    }
+    
+    // Inicializa carrossel Swiper
+    function inicializarCarrossel(cardId) {
+        console.log('Inicializando carrossel:', cardId);
+        const config = carrosselConfigs[cardId];
+        if (!config) {
+            console.warn('Configuração do carrossel não encontrada:', cardId);
+            return;
+        }
+        if (config.cards.length === 0) {
+            console.warn('Carrossel sem cards:', cardId);
+            return;
+        }
+        
+        const carrosselId = 'swiper_' + cardId.replace(/[^a-z0-9]/gi, '_');
+        const elemento = document.getElementById(carrosselId);
+        
+        if (!elemento) {
+            console.warn('Elemento do carrossel não encontrado no DOM:', carrosselId);
+            return;
+        }
+        
+        console.log('Carrossel encontrado, criando Swiper...');
+        
+        // Destroi instância anterior se existir
+        if (carrosselInstances[cardId]) {
+            carrosselInstances[cardId].destroy(true, true);
+        }
+        
+        // Detecta se há cards existentes (que são maiores)
+        const temCardsExistentes = config.cards.some(card => card.tipo === 'existente');
+        const slidesPerViewPadrao = temCardsExistentes ? 
+            Math.min(2, parseInt(config.slidesPerView) || 2) : 
+            parseInt(config.slidesPerView) || 3;
+        
+        const swiperConfig = {
+            slidesPerView: slidesPerViewPadrao,
+            spaceBetween: 20,
+            speed: parseInt(config.speed) || 500,
+            loop: config.loop !== false && config.cards.length > slidesPerViewPadrao,
+            navigation: {
+                nextEl: '.swiper-button-next',
+                prevEl: '.swiper-button-prev',
+            },
+            // Desabilita drag/swipe no modo de edição para não interferir com GridStack
+            allowTouchMove: !editMode,
+            allowSlideNext: !editMode,
+            allowSlidePrev: !editMode,
+            breakpoints: {
+                320: { slidesPerView: 1, spaceBetween: 15 },
+                768: { 
+                    slidesPerView: temCardsExistentes ? 1 : 2,
+                    spaceBetween: 20
+                },
+                1024: { 
+                    slidesPerView: temCardsExistentes ? 
+                        Math.min(2, slidesPerViewPadrao) : 
+                        Math.min(parseInt(config.slidesPerView) || 3, 3),
+                    spaceBetween: 20
+                }
+            }
+        };
+        
+        if (config.pagination !== false) {
+            swiperConfig.pagination = {
+                el: '.swiper-pagination',
+                clickable: true
+            };
+        }
+        
+        if (config.autoplay) {
+            swiperConfig.autoplay = {
+                delay: parseInt(config.autoplayDelay) || 3000,
+                disableOnInteraction: false
+            };
+        }
+        
+        carrosselInstances[cardId] = new Swiper('#' + carrosselId, swiperConfig);
+        console.log('✅ Carrossel inicializado com sucesso:', cardId, `(${config.cards.length} cards)`);
+        
+        // Atualiza visibilidade do botão de configuração
+        atualizarBotoesCarrossel();
+    }
+    
+    // Abre modal para configurar carrossel
+    window.configurarCarrossel = function(cardId) {
+        document.getElementById('carousel_card_id').value = cardId;
+        
+        const config = carrosselConfigs[cardId] || {
+            slidesPerView: 3,
+            speed: 500,
+            autoplay: true,
+            autoplayDelay: 3000,
+            loop: true,
+            pagination: true,
+            cards: []
+        };
+        
+        // Preenche formulário
+        document.getElementById('carousel_slides_per_view').value = config.slidesPerView;
+        document.getElementById('carousel_speed').value = config.speed;
+        document.getElementById('carousel_autoplay').checked = config.autoplay;
+        document.getElementById('carousel_autoplay_delay').value = config.autoplayDelay;
+        document.getElementById('carousel_loop').checked = config.loop;
+        document.getElementById('carousel_pagination').checked = config.pagination;
+        
+        // Renderiza lista de cards
+        renderizarCardsCarrossel(config.cards);
+        
+        const modal = new bootstrap.Modal(document.getElementById('modal_configurar_carrossel'));
+        modal.show();
+    };
+    
+    // Renderiza lista de cards do carrossel
+    function renderizarCardsCarrossel(cards) {
+        const container = document.getElementById('carousel_cards_list');
+        
+        if (!cards || cards.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-10">
+                    <i class="ki-duotone ki-slider fs-3x text-gray-400 mb-5">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <p>Nenhum card adicionado ainda</p>
+                    <small>Clique em "Adicionar Card" para começar</small>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '<div class="d-flex flex-column gap-3">';
+        cards.forEach((card, index) => {
+            if (card.tipo === 'existente') {
+                // Card existente
+                html += `
+                    <div class="card card-dashed border-2 border-success">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center gap-3 mb-2">
+                                        <span class="badge badge-success">Card Existente</span>
+                                        ${card.icone ? `<i class="ki-duotone ${card.icone} fs-2x text-success"><span class="path1"></span><span class="path2"></span></i>` : ''}
+                                        <div>
+                                            <h5 class="mb-0">${card.nome}</h5>
+                                        </div>
+                                    </div>
+                                    ${card.descricao ? `<p class="text-muted small mb-0">${card.descricao}</p>` : ''}
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removerCardCarrossel(${index})">
+                                        <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Card personalizado
+                html += `
+                    <div class="card card-dashed border-2 border-primary">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center gap-3 mb-2">
+                                        <span class="badge badge-primary">Card Personalizado</span>
+                                        ${card.icone ? `<i class="ki-duotone ${card.icone} fs-2x text-${card.cor}"><span class="path1"></span><span class="path2"></span></i>` : ''}
+                                        <div>
+                                            <h5 class="mb-0">${card.titulo}</h5>
+                                            ${card.valor ? `<div class="text-${card.cor} fw-bold">${card.valor}</div>` : ''}
+                                        </div>
+                                    </div>
+                                    ${card.descricao ? `<p class="text-muted small mb-0">${card.descricao}</p>` : ''}
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removerCardCarrossel(${index})">
+                                        <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+    
+    // Adicionar card ao carrossel
+    document.getElementById('btn_adicionar_card_carrossel')?.addEventListener('click', function() {
+        // Reseta para modo personalizado
+        document.getElementById('tipo_card_personalizado').checked = true;
+        document.getElementById('form_card_carrossel').style.display = 'block';
+        document.getElementById('selecao_card_existente').style.display = 'none';
+        
+        // Carrega cards disponíveis
+        carregarCardsExistentesParaCarrossel();
+        
+        const modal = new bootstrap.Modal(document.getElementById('modal_adicionar_card_carrossel'));
+        modal.show();
+    });
+    
+    // Toggle entre card personalizado e existente
+    document.querySelectorAll('input[name="tipo_card_carrossel"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'personalizado') {
+                document.getElementById('form_card_carrossel').style.display = 'block';
+                document.getElementById('selecao_card_existente').style.display = 'none';
+            } else {
+                document.getElementById('form_card_carrossel').style.display = 'none';
+                document.getElementById('selecao_card_existente').style.display = 'block';
+            }
+        });
+    });
+    
+    // Carrega cards existentes para seleção
+    function carregarCardsExistentesParaCarrossel() {
+        const container = document.getElementById('lista_cards_existentes');
+        const filtro = document.getElementById('buscar_cards_existentes')?.value.toLowerCase() || '';
+        
+        // Filtra cards (exclui o próprio carrossel)
+        const cardsFiltrados = cardsDisponiveis.filter(card => {
+            // Não permite adicionar carrossel dentro de carrossel
+            if (card.id === 'card_carrossel' || card.tipo === 'carrossel') {
+                return false;
+            }
+            // Verifica permissão do card
+            if (card.id && cardPermissions[card.id] === false) {
+                return false;
+            }
+            // Aplica filtro de busca
+            return card.nome.toLowerCase().includes(filtro) || 
+                   card.descricao.toLowerCase().includes(filtro);
+        });
+        
+        container.innerHTML = '';
+        
+        if (cardsFiltrados.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-5">Nenhum card encontrado</div>';
+            return;
+        }
+        
+        cardsFiltrados.forEach(card => {
+            const cardHtml = `
+                <div class="col-md-6">
+                    <div class="card card-hoverable border-2 border-dashed border-gray-300 cursor-pointer h-100" 
+                         data-card-existente='${JSON.stringify(card)}'
+                         onclick="selecionarCardExistente(this)">
+                        <div class="card-body p-4 text-center">
+                            <i class="ki-duotone ${card.icone} fs-3x text-primary mb-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <h5 class="fw-bold mb-2">${card.nome}</h5>
+                            <p class="text-muted small mb-0">${card.descricao}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', cardHtml);
+        });
+    }
+    
+    // Busca de cards existentes
+    document.getElementById('buscar_cards_existentes')?.addEventListener('input', function() {
+        carregarCardsExistentesParaCarrossel();
+    });
+    
+    // Seleciona card existente
+    let cardExistenteSelecionado = null;
+    window.selecionarCardExistente = function(elemento) {
+        // Remove seleção anterior
+        document.querySelectorAll('[data-card-existente]').forEach(el => {
+            el.classList.remove('border-primary', 'bg-light-primary');
+            el.classList.add('border-gray-300');
+        });
+        
+        // Adiciona seleção atual
+        elemento.classList.remove('border-gray-300');
+        elemento.classList.add('border-primary', 'bg-light-primary');
+        
+        cardExistenteSelecionado = JSON.parse(elemento.getAttribute('data-card-existente'));
+    };
+    
+    // Confirmar adição de card
+    document.getElementById('btn_confirmar_card_carrossel')?.addEventListener('click', function() {
+        const tipoCard = document.querySelector('input[name="tipo_card_carrossel"]:checked').value;
+        const cardId = document.getElementById('carousel_card_id').value;
+        
+        if (!carrosselConfigs[cardId]) {
+            carrosselConfigs[cardId] = { cards: [] };
+        }
+        
+        let novoCard = null;
+        
+        if (tipoCard === 'personalizado') {
+            // Card personalizado
+            const form = document.getElementById('form_card_carrossel');
+            const formData = new FormData(form);
+            
+            if (!formData.get('titulo')) {
+                Swal.fire({
+                    text: 'Preencha o título do card!',
+                    icon: 'warning',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+                return;
+            }
+            
+            novoCard = {
+                tipo: 'personalizado',
+                titulo: formData.get('titulo'),
+                valor: formData.get('valor'),
+                icone: formData.get('icone'),
+                cor: formData.get('cor'),
+                descricao: formData.get('descricao'),
+                link: formData.get('link')
+            };
+            
+            form.reset();
+        } else {
+            // Card existente
+            if (!cardExistenteSelecionado) {
+                Swal.fire({
+                    text: 'Selecione um card!',
+                    icon: 'warning',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+                return;
+            }
+            
+            novoCard = {
+                tipo: 'existente',
+                cardId: cardExistenteSelecionado.id,
+                nome: cardExistenteSelecionado.nome,
+                descricao: cardExistenteSelecionado.descricao,
+                icone: cardExistenteSelecionado.icone,
+                w: cardExistenteSelecionado.w || 6,
+                h: cardExistenteSelecionado.h || 4
+            };
+            
+            cardExistenteSelecionado = null;
+        }
+        
+        carrosselConfigs[cardId].cards.push(novoCard);
+        renderizarCardsCarrossel(carrosselConfigs[cardId].cards);
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modal_adicionar_card_carrossel'));
+        modal.hide();
+    });
+    
+    // Remover card do carrossel
+    window.removerCardCarrossel = function(index) {
+        const cardId = document.getElementById('carousel_card_id').value;
+        if (carrosselConfigs[cardId] && carrosselConfigs[cardId].cards) {
+            carrosselConfigs[cardId].cards.splice(index, 1);
+            renderizarCardsCarrossel(carrosselConfigs[cardId].cards);
+        }
+    };
+    
+    // Salvar configurações do carrossel
+    document.getElementById('btn_salvar_carrossel')?.addEventListener('click', function() {
+        const cardId = document.getElementById('carousel_card_id').value;
+        
+        if (!carrosselConfigs[cardId]) {
+            carrosselConfigs[cardId] = {};
+        }
+        
+        carrosselConfigs[cardId].slidesPerView = document.getElementById('carousel_slides_per_view').value;
+        carrosselConfigs[cardId].speed = document.getElementById('carousel_speed').value;
+        carrosselConfigs[cardId].autoplay = document.getElementById('carousel_autoplay').checked;
+        carrosselConfigs[cardId].autoplayDelay = document.getElementById('carousel_autoplay_delay').value;
+        carrosselConfigs[cardId].loop = document.getElementById('carousel_loop').checked;
+        carrosselConfigs[cardId].pagination = document.getElementById('carousel_pagination').checked;
+        
+        // Atualiza o card no grid
+        const elemento = document.querySelector(`[data-gs-id="${cardId}"]`);
+        if (elemento) {
+            const content = elemento.querySelector('.grid-stack-item-content');
+            if (content) {
+                content.innerHTML = criarCardCarrossel(cardId);
+                inicializarCarrossel(cardId);
+            }
+        }
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modal_configurar_carrossel'));
+        modal.hide();
+        
+        Swal.fire({
+            text: 'Carrossel configurado com sucesso!',
+            icon: 'success',
+            buttonsStyling: false,
+            confirmButtonText: 'Ok',
+            customClass: {
+                confirmButton: 'btn btn-primary'
+            }
+        });
+    });
+    
+    // Toggle do campo de intervalo do autoplay
+    document.getElementById('carousel_autoplay')?.addEventListener('change', function() {
+        const container = document.getElementById('carousel_autoplay_delay_container');
+        if (this.checked) {
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    });
 });
 </script>
 <!--end::Dashboard Personalization Scripts-->

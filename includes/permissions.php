@@ -122,6 +122,23 @@ function get_page_permissions() {
         'pesquisas_colaborador.php' => ['COLABORADOR'],
         'pdis.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         'responder_pesquisa.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'], // Página pública para responder pesquisas
+        
+        // Recrutamento e Seleção - ADMIN e RH
+        'vagas.php' => ['ADMIN', 'RH'],
+        'vaga_add.php' => ['ADMIN', 'RH'],
+        'vaga_edit.php' => ['ADMIN', 'RH'],
+        'vaga_view.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'vaga_landing_page.php' => ['ADMIN', 'RH'],
+        'portal_vagas_config.php' => ['ADMIN', 'RH'],
+        'candidaturas.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'candidatura_view.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'kanban_selecao.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'etapas_processo.php' => ['ADMIN', 'RH'],
+        'automatizacoes_kanban.php' => ['ADMIN', 'RH'],
+        'formularios_cultura.php' => ['ADMIN', 'RH'],
+        'entrevistas.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'onboarding.php' => ['ADMIN', 'RH'],
+        'kanban_onboarding.php' => ['ADMIN', 'RH'],
     ];
     
     // Carrega permissões customizadas (se existir)

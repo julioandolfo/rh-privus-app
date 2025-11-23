@@ -6,6 +6,28 @@
  */
 
 /**
+ * Busca empresas disponíveis baseado no role do usuário
+ * 
+ * @param PDO $pdo Conexão com banco de dados
+ * @param array $usuario Usuário logado da sessão
+ * @return array Array de empresas
+ */
+function get_empresas_disponiveis($pdo, $usuario) {
+    if ($usuario['role'] === 'ADMIN') {
+        $stmt = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
+        return $stmt->fetchAll();
+    } elseif ($usuario['role'] === 'RH') {
+        if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+            $stmt = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id IN ($placeholders) AND status = 'ativo' ORDER BY nome_fantasia");
+            $stmt->execute($usuario['empresas_ids']);
+            return $stmt->fetchAll();
+        }
+    }
+    return [];
+}
+
+/**
  * Busca colaboradores disponíveis baseado no role do usuário
  * 
  * @param PDO $pdo Conexão com banco de dados
