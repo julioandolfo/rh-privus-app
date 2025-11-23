@@ -204,9 +204,9 @@ function atualizarContadores() {
     <?php foreach ($colunas as $coluna): ?>
     const count<?= $coluna['codigo'] ?> = document.querySelectorAll('[data-coluna-atual="<?= $coluna['codigo'] ?>"]').length;
     document.getElementById('count-<?= $coluna['codigo'] ?>').textContent = count<?= $coluna['codigo'] ?>;
-    const countTextEl = document.getElementById('count-text-<?= $coluna['codigo'] ?>');
-    if (countTextEl) {
-        countTextEl.textContent = count<?= $coluna['codigo'] ?> === 1 ? 'candidato' : 'candidato(s)';
+    const countTextEl<?= $coluna['codigo'] ?> = document.getElementById('count-text-<?= $coluna['codigo'] ?>');
+    if (countTextEl<?= $coluna['codigo'] ?>) {
+        countTextEl<?= $coluna['codigo'] ?>.textContent = count<?= $coluna['codigo'] ?> === 1 ? 'candidato' : 'candidato(s)';
     }
     <?php endforeach; ?>
 }
@@ -215,114 +215,169 @@ function atualizarContadores() {
 let draggedElement = null;
 let draggedFromColumn = null;
 
-document.querySelectorAll('.kanban-card').forEach(card => {
-    card.addEventListener('dragstart', function(e) {
-        draggedElement = this;
-        draggedFromColumn = this.dataset.colunaAtual;
-        this.style.opacity = '0.5';
-        e.dataTransfer.effectAllowed = 'move';
+function inicializarDragAndDrop() {
+    // Remove listeners antigos se existirem
+    document.querySelectorAll('.kanban-card').forEach(card => {
+        card.removeEventListener('dragstart', handleDragStart);
+        card.removeEventListener('dragend', handleDragEnd);
     });
     
-    card.addEventListener('dragend', function() {
-        this.style.opacity = '1';
+    document.querySelectorAll('.kanban-column').forEach(column => {
+        column.removeEventListener('dragover', handleDragOver);
+        column.removeEventListener('dragleave', handleDragLeave);
+        column.removeEventListener('drop', handleDrop);
     });
-});
+    
+    // Adiciona novos listeners
+    document.querySelectorAll('.kanban-card').forEach(card => {
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+    });
+    
+    document.querySelectorAll('.kanban-column').forEach(column => {
+        column.addEventListener('dragover', handleDragOver);
+        column.addEventListener('dragleave', handleDragLeave);
+        column.addEventListener('drop', handleDrop);
+    });
+}
 
-document.querySelectorAll('.kanban-column').forEach(column => {
-    column.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        this.style.backgroundColor = '#e1f0ff';
-        this.style.border = '2px dashed #009ef7';
+function handleDragStart(e) {
+    draggedElement = this;
+    draggedFromColumn = this.dataset.colunaAtual;
+    this.style.opacity = '0.5';
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.outerHTML);
+    e.dataTransfer.setData('text/plain', this.dataset.candidaturaId);
+}
+
+function handleDragEnd() {
+    this.style.opacity = '1';
+    // Remove estilos de drag over de todas as colunas
+    document.querySelectorAll('.kanban-column').forEach(col => {
+        col.style.backgroundColor = '';
+        col.style.border = '';
     });
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    this.style.backgroundColor = '#e1f0ff';
+    this.style.border = '2px dashed #009ef7';
+}
+
+function handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Só remove o estilo se realmente saiu da coluna (não apenas entrou em um filho)
+    if (!this.contains(e.relatedTarget)) {
+        this.style.backgroundColor = '';
+        this.style.border = '';
+    }
+}
+
+async function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.style.backgroundColor = '';
+    this.style.border = '';
     
-    column.addEventListener('dragleave', function() {
-        this.style.backgroundColor = '#f5f8fa';
-        this.style.border = 'none';
-    });
+    if (!draggedElement) return;
     
-    column.addEventListener('drop', async function(e) {
-        e.preventDefault();
-        this.style.backgroundColor = '#f5f8fa';
-        this.style.border = 'none';
+    const candidaturaId = draggedElement.dataset.candidaturaId;
+    const colunaDestino = this.closest('[data-coluna]').dataset.coluna;
+    
+    if (!colunaDestino) {
+        console.error('Coluna destino não encontrada');
+        return;
+    }
+    
+    if (draggedFromColumn === colunaDestino) {
+        return; // Mesma coluna, não faz nada
+    }
+    
+    // Move visualmente
+    this.appendChild(draggedElement);
+    draggedElement.dataset.colunaAtual = colunaDestino;
+    
+    // Atualiza contadores
+    atualizarContadores();
+    
+    // Salva no servidor
+    try {
+        const formData = new FormData();
+        formData.append('candidatura_id', candidaturaId);
+        formData.append('coluna_codigo', colunaDestino);
         
-        if (!draggedElement) return;
+        const response = await fetch('../api/recrutamento/kanban/mover.php', {
+            method: 'POST',
+            body: formData
+        });
         
-        const candidaturaId = draggedElement.dataset.candidaturaId;
-        const colunaDestino = this.closest('[data-coluna]').dataset.coluna;
+        const data = await response.json();
         
-        if (draggedFromColumn === colunaDestino) {
-            return; // Mesma coluna, não faz nada
-        }
-        
-        // Move visualmente
-        this.appendChild(draggedElement);
-        draggedElement.dataset.colunaAtual = colunaDestino;
-        
-        // Atualiza contadores
-        atualizarContadores();
-        
-        // Salva no servidor
-        try {
-            const formData = new FormData();
-            formData.append('candidatura_id', candidaturaId);
-            formData.append('coluna_codigo', colunaDestino);
-            
-            const response = await fetch('../api/recrutamento/kanban/mover.php', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await response.json();
-            
-            if (!data.success) {
-                alert('Erro ao mover: ' + data.message);
-                // Reverte movimento
-                const colunaOrigem = document.querySelector(`[data-coluna="${draggedFromColumn}"] .kanban-column`);
+        if (!data.success) {
+            alert('Erro ao mover: ' + data.message);
+            // Reverte movimento
+            const colunaOrigem = document.querySelector(`[data-coluna="${draggedFromColumn}"] .kanban-column`);
+            if (colunaOrigem) {
                 colunaOrigem.appendChild(draggedElement);
                 draggedElement.dataset.colunaAtual = draggedFromColumn;
                 atualizarContadores();
             }
-        } catch (error) {
-            console.error('Erro:', error);
-            alert('Erro ao mover candidatura');
-            // Reverte movimento
-            const colunaOrigem = document.querySelector(`[data-coluna="${draggedFromColumn}"] .kanban-column`);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao mover candidatura');
+        // Reverte movimento
+        const colunaOrigem = document.querySelector(`[data-coluna="${draggedFromColumn}"] .kanban-column`);
+        if (colunaOrigem) {
             colunaOrigem.appendChild(draggedElement);
             draggedElement.dataset.colunaAtual = draggedFromColumn;
             atualizarContadores();
         }
-        
-        draggedElement = null;
-        draggedFromColumn = null;
-    });
+    }
+    
+    draggedElement = null;
+    draggedFromColumn = null;
+}
+
+// Inicializa drag and drop quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', function() {
+    inicializarDragAndDrop();
 });
 
 // Filtro de vaga
-document.getElementById('filtroVaga').addEventListener('change', function() {
-    const vagaId = this.value;
-    if (vagaId) {
-        window.location.href = 'kanban_selecao.php?vaga_id=' + vagaId;
-    } else {
-        window.location.href = 'kanban_selecao.php';
-    }
-});
-
-// Busca de candidatos
-const searchInput = document.getElementById('kt_filter_search');
-if (searchInput) {
-    searchInput.addEventListener('keyup', function() {
-        const searchTerm = this.value.toLowerCase();
-        document.querySelectorAll('.kanban-card').forEach(card => {
-            const nome = card.dataset.nome || '';
-            if (nome.includes(searchTerm)) {
-                card.style.display = '';
+document.addEventListener('DOMContentLoaded', function() {
+    const filtroVaga = document.getElementById('filtroVaga');
+    if (filtroVaga) {
+        filtroVaga.addEventListener('change', function() {
+            const vagaId = this.value;
+            if (vagaId) {
+                window.location.href = 'kanban_selecao.php?vaga_id=' + vagaId;
             } else {
-                card.style.display = 'none';
+                window.location.href = 'kanban_selecao.php';
             }
         });
-    });
-}
+    }
+    
+    // Busca de candidatos
+    const searchInput = document.getElementById('kt_filter_search');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            document.querySelectorAll('.kanban-card').forEach(card => {
+                const nome = card.dataset.nome || '';
+                if (nome.includes(searchTerm)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    }
+});
 
 // Estilos adicionais com suporte a dark/light mode
 const style = document.createElement('style');
@@ -490,6 +545,12 @@ function aplicarCoresColunas() {
 document.addEventListener('DOMContentLoaded', function() {
     aplicarCoresColunas();
     
+    // Inicializa drag and drop
+    inicializarDragAndDrop();
+    
+    // Inicializa contadores
+    atualizarContadores();
+    
     // Observar mudanças no tema
     const observer = new MutationObserver(() => {
         aplicarCoresColunas();
@@ -507,9 +568,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 document.head.appendChild(style);
-
-// Inicializa contadores
-atualizarContadores();
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

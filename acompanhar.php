@@ -795,7 +795,7 @@ $status_color = $status_colors[$candidatura['status']] ?? '#009ef7';
                         Se você tiver alguma dúvida sobre sua candidatura, entre em contato conosco através do email:
                     </p>
                     <p class="text-center">
-                        <a href="mailto:<?= htmlspecialchars($candidatura['candidato_email']) ?>" class="btn btn-primary">
+                        <a href="mailto:rh@privus.com.br" class="btn btn-primary">
                             <i class="bi bi-envelope me-2"></i>
                             Entrar em Contato
                         </a>
