@@ -12,70 +12,70 @@ O erro foi: "Response served by service worker has redirections"
 O problema ocorria porque:
 
 1. **O `manifest.json` define `start_url: "/rh/"`** que aponta para `index.php`
-2. **O `index.php` faz redirect HTTP (302)** para `pages/dashboard.php` ou `login.php`
-3. **O Service Worker interceptava essa requisição** que resultava em redirect
-4. **Service Workers não podem servir respostas de redirect diretamente** - o navegador precisa seguir o redirect automaticamente
+2. **Várias páginas PHP fazem redirects HTTP (302):**
+   - `index.php` → redireciona para `pages/dashboard.php` ou `login.php`
+   - `logout.php` → redireciona para `login.php`
+   - `login.php` → redireciona para dashboard após autenticação
+3. **O Service Worker interceptava essas requisições** usando `event.respondWith()`
+4. **Service Workers NÃO PODEM servir respostas de redirect diretamente** - mesmo usando `redirect: 'follow'`
 
-Quando o PWA é instalado como bookmark e abre pela primeira vez, ele tenta carregar a `start_url`, e o service worker estava interferindo com o processo de redirect.
+### Por Que Service Workers Não Podem Servir Redirects?
 
-## ✅ Correções Implementadas
+Quando o Service Worker intercepta uma requisição com `event.respondWith()` e faz `fetch(request, { redirect: 'follow' })`, o navegador:
 
-### 1. Tratamento Especial para URLs que Podem Resultar em Redirects
+1. Segue o redirect automaticamente
+2. Retorna a resposta **final** (não a resposta de redirect)
+3. Marca `response.redirected = true`
 
-**Adicionado no `sw.js`:**
+O problema: **o navegador rejeita respostas com `redirected = true`** quando servidas por um Service Worker, gerando o erro:
+
+```
+a redirected response was used for a request whose redirect mode is not "follow"
+```
+
+**Solução:** Não interceptar páginas que fazem redirect! Deixar o navegador processar normalmente.
+
+## ✅ Solução Definitiva Implementada
+
+### A solução correta é **NÃO INTERCEPTAR** requisições que podem resultar em redirects!
+
+Service Workers **não podem servir respostas de redirect diretamente**, mesmo com `redirect: 'follow'`. A única solução é deixar o navegador processar essas requisições normalmente, sem interceptação.
+
+### 1. Não Interceptar Páginas PHP/HTML que Fazem Redirect
+
+**Implementado no `sw.js`:**
 ```javascript
-// CRÍTICO: Para páginas que podem resultar em redirects (index.php, /, etc)
-// ou páginas dinâmicas, sempre busca do servidor SEM interceptar redirects
+// CRÍTICO: Para páginas PHP, HTML ou caminhos dinâmicos que podem resultar em redirects,
+// NÃO intercepta a requisição - deixa o navegador lidar normalmente
 if (shouldNotCache(url) || 
     url.pathname === BASE_PATH + '/' || 
     url.pathname === BASE_PATH + '/index.php' ||
     url.pathname.endsWith('/')) {
     
-    event.respondWith(
-        fetch(request, {
-            cache: 'no-store',
-            redirect: 'follow' // CRÍTICO: Segue redirects automaticamente
-        })
-        .then((response) => {
-            // CRÍTICO: Se a resposta foi um redirect, retorna diretamente sem processar
-            if (response.redirected || 
-                response.status === 301 || 
-                response.status === 302 || 
-                response.status === 303 || 
-                response.status === 307 || 
-                response.status === 308) {
-                return response; // Retorna a resposta de redirect diretamente
-            }
-            return response;
-        })
-    );
+    // NÃO usa event.respondWith() - simplesmente retorna
+    // Isso faz o navegador processar a requisição normalmente, incluindo redirects
     return;
 }
 ```
 
-### 2. Verificação de Redirects em Todas as Respostas
+**Páginas que NÃO são interceptadas (processadas normalmente pelo navegador):**
+- `index.php` (redireciona para dashboard.php ou login.php)
+- `login.php` (pode redirecionar após autenticação)
+- `logout.php` (redireciona para login.php)
+- Todas as páginas `.php`, `.html`, `.htm`
+- Todas as URLs em `/api/`, `/pages/`, `/includes/`
 
-**Adicionado para assets estáticos também:**
-```javascript
-// CRÍTICO: Não cacheia respostas de redirect
-if (response.redirected || 
-    response.status === 301 || 
-    response.status === 302 || 
-    response.status === 303 || 
-    response.status === 307 || 
-    response.status === 308) {
-    return response; // Retorna sem cachear
-}
-```
+### 2. Apenas Assets Estáticos São Interceptados e Cacheados
 
-### 3. Uso Correto de `event.respondWith()`
+**O Service Worker APENAS intercepta:**
+- Arquivos CSS (`.css`)
+- Arquivos JavaScript (`.js`)
+- Imagens (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`)
+- Fontes (`.woff`, `.woff2`, `.ttf`, `.eot`)
 
-**Antes:** Retornava `fetch()` diretamente sem `event.respondWith()`
-**Depois:** Usa `event.respondWith()` para todas as requisições interceptadas, garantindo que o service worker não interfira com redirects
+### 3. Versão do Cache Atualizada
 
-### 4. Versão do Cache Atualizada
-
-**Atualizado:** `CACHE_NAME = 'rh-privus-v6'` para forçar atualização do service worker
+**Atualizado:** `CACHE_NAME = 'rh-privus-v7'` para forçar atualização do service worker
 
 ## 📋 Arquivos Modificados
 
@@ -83,7 +83,34 @@ if (response.redirected ||
 
 ## 🧪 Como Testar
 
-### Teste 1: Adicionar à Tela Principal (Bookmark)
+### Teste 1: Limpar Service Worker Antigo
+
+**IMPORTANTE:** Antes de testar, limpe o cache do Service Worker antigo:
+
+```javascript
+// Execute no console do navegador (F12)
+navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for(let registration of registrations) {
+        registration.unregister();
+    }
+    caches.keys().then(function(names) {
+        for (let name of names) {
+            caches.delete(name);
+        }
+    });
+    location.reload();
+});
+```
+
+### Teste 2: Verificar Console (sem erros)
+
+1. Abra o DevTools (F12)
+2. Vá na aba **Console**
+3. Faça login no sistema
+4. Clique em **Logout**
+5. **Não deve aparecer** o erro: `a redirected response was used for a request whose redirect mode is not "follow"`
+
+### Teste 3: Adicionar à Tela Principal (Bookmark)
 
 1. Abra o site no navegador (Chrome/Edge recomendado)
 2. Clique no ícone de instalação ou vá em **Menu** → **Instalar aplicativo** / **Adicionar à tela inicial**
@@ -91,12 +118,20 @@ if (response.redirected ||
 4. **Não deve aparecer** o erro "Response served by service worker has redirections"
 5. O app deve abrir normalmente e redirecionar para o dashboard ou login
 
-### Teste 2: Verificar Console
+### Teste 4: Testar Fluxo Completo
 
-1. Abra o DevTools (F12)
-2. Vá na aba **Console**
-3. Adicione o app à tela principal novamente
-4. **Não deve aparecer** nenhum erro relacionado a redirects
+1. Abra o console (F12) na aba **Console**
+2. Acesse `index.php` (deve redirecionar sem erros)
+3. Faça login (deve redirecionar para dashboard sem erros)
+4. Faça logout (deve redirecionar para login sem erros)
+5. **Nenhum erro de redirect deve aparecer no console**
+
+### Teste 5: Verificar Service Worker
+
+1. Abra DevTools (F12)
+2. Vá em **Application** → **Service Workers**
+3. Verifique se o Service Worker está ativo
+4. Verifique se a versão do cache é `rh-privus-v7`
 
 ### Teste 3: Limpar Cache Antigo
 
@@ -145,25 +180,63 @@ navigator.serviceWorker.getRegistrations().then(function(registrations) {
 ## 💡 O Que Mudou
 
 ### Antes:
-- Service Worker interceptava requisições que resultavam em redirects
-- Não verificava se a resposta era um redirect antes de processar
-- Retornava `fetch()` diretamente sem `event.respondWith()` em alguns casos
-- Erro aparecia ao adicionar bookmark
+- Service Worker interceptava **TODAS** as requisições usando `event.respondWith()`
+- Tentava lidar com redirects manualmente usando `redirect: 'follow'`
+- Erro: **"a redirected response was used for a request whose redirect mode is not follow"**
+- Ocorria em: `index.php`, `login.php`, `logout.php` e todas as páginas que fazem redirect
 
 ### Depois:
-- Service Worker detecta URLs que podem resultar em redirects
-- Verifica se a resposta foi um redirect antes de processar
-- Usa `event.respondWith()` corretamente para todas as requisições
-- Respostas de redirect são retornadas diretamente sem processamento
-- Sem erros ao adicionar bookmark
+- Service Worker **NÃO intercepta** páginas PHP/HTML (deixa navegador processar normalmente)
+- Service Worker **APENAS intercepta e cacheia** assets estáticos (CSS, JS, imagens, fonts)
+- **Sem erros de redirect** - navegador processa redirects nativamente
+- PWA funciona perfeitamente ao adicionar à tela principal
+
+### Por Que a Solução Anterior Não Funcionava?
+
+Mesmo usando `fetch(request, { redirect: 'follow' })` dentro de `event.respondWith()`, o Service Worker **não pode servir** uma resposta que foi redirecionada. A propriedade `response.redirected` fica `true`, e ao tentar retornar essa resposta, o navegador rejeita com o erro:
+
+```
+a redirected response was used for a request whose redirect mode is not "follow"
+```
+
+**A única solução é não interceptar essas requisições!**
 
 ## 🚨 Se Ainda Aparecer Erro
 
-1. **Limpe completamente o cache do Service Worker** (veja métodos acima)
-2. **Verifique se o arquivo `sw.js` foi atualizado no servidor**
-3. **Teste em modo anônimo/privado** para descartar cache
-4. **Verifique a versão do cache** - deve ser `rh-privus-v6`
-5. **Desinstale e reinstale o PWA** se necessário
+### Checklist de Verificação:
+
+1. ✅ **Limpe completamente o cache do Service Worker** (veja métodos acima)
+2. ✅ **Verifique se o arquivo `sw.js` foi atualizado no servidor**
+3. ✅ **Teste em modo anônimo/privado** para descartar cache
+4. ✅ **Verifique a versão do cache** - deve ser `rh-privus-v7`
+5. ✅ **Desinstale e reinstale o PWA** se necessário
+
+### Erros Específicos Corrigidos:
+
+Estes erros **NÃO devem mais aparecer**:
+
+```
+The FetchEvent for "http://localhost/rh-privus/index.php" resulted in a network error response: 
+a redirected response was used for a request whose redirect mode is not "follow".
+
+The FetchEvent for "http://localhost/rh-privus/login.php" resulted in a network error response: 
+a redirected response was used for a request whose redirect mode is not "follow".
+
+The FetchEvent for "http://localhost/rh-privus/logout.php" resulted in a network error response: 
+a redirected response was used for a request whose redirect mode is not "follow".
+```
+
+### Por Que Esses Arquivos Causavam Erro?
+
+- **`index.php`**: Redireciona para `pages/dashboard.php` ou `login.php`
+- **`login.php`**: Redireciona para dashboard após autenticação
+- **`logout.php`**: Redireciona para `login.php`
+
+Todos esses arquivos usam `header('Location: ...')` para fazer redirect HTTP 302.
+
+### Solução Implementada:
+
+O Service Worker agora **NÃO intercepta** nenhum desses arquivos. Eles são processados diretamente pelo navegador, que lida nativamente com redirects.
 
 ## 📝 Notas Técnicas
 

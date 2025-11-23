@@ -125,6 +125,14 @@ const OneSignalInit = {
                     notifyButton: {
                         enable: false, // Desabilita botão padrão, vamos usar nosso próprio
                     },
+                    // CRÍTICO: Desabilita popup próprio do OneSignal
+                    // Isso força usar APENAS a permissão nativa do navegador
+                    promptOptions: {
+                        autoPrompt: false, // NÃO mostra popup automático do OneSignal
+                        slidedown: {
+                            enabled: false, // Desabilita slidedown do OneSignal
+                        },
+                    },
                     allowLocalhostAsSecureOrigin: true, // Para testes em localhost
                     autoResubscribe: true,
                     serviceWorkerParam: {
@@ -134,6 +142,7 @@ const OneSignalInit = {
                 };
                 
                 console.log('🔧 Inicializando OneSignal com App ID:', self.appId);
+                console.log('🔧 Popup do OneSignal DESABILITADO - usando apenas permissão nativa');
                 
                 OneSignal.init(initConfig);
                 

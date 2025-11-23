@@ -537,7 +537,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                 </div>
             </div>
         <?php endif; ?>
-        
+        <div id="dashboard_grid_area">
         <?php if (is_colaborador() && !empty($colaborador_id)): ?>
         <!-- Dashboard do Colaborador -->
         
@@ -2036,8 +2036,9 @@ if (is_colaborador() && !empty($colaborador_id)) {
             <!--end::Col-->
         </div>
         <!--end::Row-->
-        <?php endif; ?>
-        <?php endif; ?>
+<?php endif; ?>
+<?php endif; ?>
+        </div>
         
     </div>
 </div>
@@ -2134,6 +2135,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const GRID_CONTAINER_ID = 'dashboard_grid_area';
     let grid = null;
     let editMode = false;
     let originalConfig = null;
@@ -2385,51 +2387,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }).then((result) => {
             if (result.isConfirmed) {
-                if (grid) {
-                    // Remove todos os items do grid
-                    const items = grid.save();
-                    items.forEach(item => {
-                        try {
-                            grid.removeWidget(item.el, true); // true = remove do DOM
-                        } catch (e) {
-                            console.warn('Erro ao remover widget:', e);
-                            // Força remoção do DOM se grid.removeWidget falhar
-                            if (item.el && item.el.parentNode) {
-                                item.el.remove();
-                            }
-                        }
-                    });
-                    
-                    // Remove também qualquer card que possa ter ficado no container
-                    const container = document.getElementById('kt_content_container');
-                    if (container) {
-                        const remainingItems = container.querySelectorAll('.grid-stack-item');
-                        remainingItems.forEach(item => {
-                            item.remove();
-                        });
-                    }
-                    
-                    cardsAdicionados.clear();
-                    
-                    // Limpa configuração no servidor também
-                    fetch('../api/dashboard/salvar_config.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ cards: [] })
-                    }).catch(err => console.error('Erro ao limpar configuração no servidor:', err));
-                    
-                    Swal.fire({
-                        text: 'Layout limpo! Adicione cards usando o botão "Adicionar Cards".',
-                        icon: 'success',
-                        buttonsStyling: false,
-                        confirmButtonText: 'Ok',
-                        customClass: {
-                            confirmButton: 'btn btn-primary'
-                        }
-                    });
-                } else {
+                if (!grid) {
                     Swal.fire({
                         text: 'Grid não inicializado',
                         icon: 'error',
@@ -2439,7 +2397,31 @@ document.addEventListener('DOMContentLoaded', function() {
                             confirmButton: 'btn btn-primary'
                         }
                     });
+                    return;
                 }
+                
+                aplicarLayoutPadrao();
+                
+                // Limpa configuração no servidor também
+                fetch('../api/dashboard/salvar_config.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ cards: [] })
+                }).catch(err => console.error('Erro ao limpar configuração no servidor:', err));
+                
+                cardsAdicionados.clear();
+                
+                Swal.fire({
+                    text: 'Layout redefinido para o padrão!',
+                    icon: 'success',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
             }
         });
     }
@@ -2626,8 +2608,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Converte cards existentes para GridStack items
     function converterCardsParaGrid(configuracao = null) {
-        const container = document.getElementById('kt_content_container');
-        if (!container) return [];
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (!container) {
+            console.error('Container não encontrado');
+            return [];
+        }
         
         // Adiciona classe grid-stack ao container se não tiver
         if (!container.classList.contains('grid-stack')) {
@@ -2637,6 +2622,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Se não há configuração, usa layout padrão
         let layoutParaUsar = configuracao;
         if (!layoutParaUsar || layoutParaUsar.length === 0) {
+            console.log('Usando layout padrão');
             layoutParaUsar = gerarLayoutPadrao();
         }
         
@@ -2650,17 +2636,24 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // Encontra todos os cards principais (col-xl-* dentro de rows)
+        console.log('Configuração a usar:', configMap);
+        
+        // Encontra todos os cards principais (col-xl-* ou com data-card-id)
         const rows = container.querySelectorAll('.row');
         let globalIndex = 0;
         const cardsProcessados = [];
         
-        rows.forEach(row => {
-            const cards = row.querySelectorAll(':scope > .col-xl-3, :scope > .col-xl-4, :scope > .col-xl-6, :scope > .col-xl-8, :scope > .col-xl-12');
+        rows.forEach((row, rowIndex) => {
+            const cards = row.querySelectorAll(':scope > .col-xl-3, :scope > .col-xl-4, :scope > .col-xl-6, :scope > .col-xl-8, :scope > .col-xl-12, :scope > [data-card-id]');
+            
+            console.log(`Row ${rowIndex}: encontrados ${cards.length} cards`);
             
             cards.forEach((card, index) => {
-                // Verifica se já é um grid item
-                if (card.classList.contains('grid-stack-item')) return;
+                // Verifica se já é um grid item - SE SIM, IGNORA
+                if (card.classList.contains('grid-stack-item')) {
+                    console.warn('Card já é grid-stack-item, ignorando:', card);
+                    return;
+                }
                 
                 // Salva classes originais antes de remover
                 const originalClasses = card.className;
@@ -2728,6 +2721,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Adiciona classes e atributos do GridStack
                 card.classList.add('grid-stack-item');
                 card.setAttribute('data-gs-id', cardId);
+                card.setAttribute('gs-id', cardId);
+                card.dataset.gsId = cardId;
                 card.setAttribute('data-gs-x', posX);
                 card.setAttribute('data-gs-y', posY);
                 card.setAttribute('data-gs-w', width);
@@ -2752,12 +2747,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 globalIndex++;
             });
             
-            // Remove row vazia após processar todos os cards
-            setTimeout(() => {
-                if (row.querySelectorAll(':scope > .col-xl-3, :scope > .col-xl-4, :scope > .col-xl-6, :scope > .col-xl-8, :scope > .col-xl-12').length === 0) {
-                    row.remove();
-                }
-            }, 100);
+            // NÃO REMOVE rows vazias - pode causar problemas ao resetar
+            // As rows vazias são necessárias para restaurar o layout depois
         });
         
         console.log('Conversão concluída:', cardsProcessados.length, 'cards convertidos');
@@ -2766,19 +2757,29 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializa GridStack
     function inicializarGrid(configuracao) {
-        const container = document.getElementById('kt_content_container');
+        const container = document.getElementById(GRID_CONTAINER_ID);
         if (!container) {
             console.error('Container kt_content_container não encontrado');
             return;
         }
         
+        console.log('Iniciando conversão de cards...');
+        
         // Converte cards para grid items primeiro (passa configuração para aplicar posições)
         const cardsProcessados = converterCardsParaGrid(configuracao);
         
+        if (cardsProcessados.length === 0) {
+            console.error('Nenhum card foi processado na conversão');
+            return;
+        }
+        
+        console.log('Cards processados:', cardsProcessados.length);
+        
         // Aguarda um pouco para garantir que a conversão foi feita
         setTimeout(() => {
-            // Remove grid anterior se existir
+            // Remove grid anterior se existir (NÃO DEVERIA EXISTIR, mas por segurança)
             if (grid) {
+                console.warn('Grid ainda existe, destruindo...');
                 try {
                     grid.destroy(false);
                 } catch (e) {
@@ -2790,7 +2791,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Verifica se há grid items
             const gridItems = container.querySelectorAll('.grid-stack-item');
             if (gridItems.length === 0) {
-                console.warn('Nenhum grid item encontrado');
+                console.error('Nenhum grid item encontrado após conversão');
                 return;
             }
             
@@ -2819,21 +2820,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 minRow: 1
             }, container);
             
+            if (!grid) {
+                console.error('Falha ao inicializar GridStack');
+                return;
+            }
+            
             // Aplica configuração se existir, senão usa layout padrão
             setTimeout(() => {
                 if (configuracao && configuracao.length > 0) {
                     console.log('Carregando configuração salva:', configuracao);
-                    try {
-                        // GridStack precisa que os elementos já tenham os atributos data-gs-*
-                        // A conversão já fez isso, então apenas força atualização
-                        grid.load(configuracao, false); // false = não remove items não na lista
-                    } catch (e) {
-                        console.error('Erro ao carregar configuração:', e);
-                        // Se falhar, tenta usar layout padrão
-                        setTimeout(() => aplicarLayoutPadrao(), 200);
-                    }
+                    aplicarConfiguracao(configuracao);
                 } else {
-                    // Se não tem configuração, aplica layout padrão
                     console.log('Aplicando layout padrão');
                     aplicarLayoutPadrao();
                 }
@@ -2853,6 +2850,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 200);
     }
     
+    // Busca node pelo ID
+    function getNodeById(id) {
+        if (!grid || !grid.engine || !grid.engine.nodes) return null;
+        return grid.engine.nodes.find(node => node.id === id) || null;
+    }
+    
     // Aplica layout padrão aos cards existentes
     function aplicarLayoutPadrao() {
         if (!grid) {
@@ -2861,53 +2864,150 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const layoutPadrao = gerarLayoutPadrao();
-        const items = grid.save();
-        const itemsMap = {};
+        if (!layoutPadrao.length) {
+            console.warn('Layout padrão vazio');
+            return;
+        }
         
-        // Cria mapa dos items existentes
-        items.forEach(item => {
-            if (item.id && item.el) {
-                itemsMap[item.id] = item;
+        grid.batchUpdate();
+        layoutPadrao.forEach(card => {
+            const node = getNodeById(card.id);
+            if (node && node.el) {
+                try {
+                    grid.update(node.el, {
+                        x: card.x,
+                        y: card.y,
+                        w: card.w,
+                        h: card.h
+                    });
+                } catch (err) {
+                    console.warn('Erro ao aplicar layout padrão ao card', card.id, err);
+                }
+            } else {
+                const element = document.querySelector(`[data-gs-id="${card.id}"]`);
+                if (element) {
+                    try {
+                        grid.update(element, {
+                            x: card.x,
+                            y: card.y,
+                            w: card.w,
+                            h: card.h
+                        });
+                    } catch (err) {
+                        console.warn('Erro ao posicionar elemento', card.id, err);
+                    }
+                }
+            }
+        });
+        grid.commit();
+    }
+    
+    // Aplica configuração salva
+    function aplicarConfiguracao(config) {
+        if (!grid || !Array.isArray(config) || config.length === 0) {
+            console.warn('Configuração inválida para aplicar');
+            return;
+        }
+        
+        grid.batchUpdate();
+        config.forEach(card => {
+            if (!card.id) return;
+            const node = getNodeById(card.id);
+            const element = node?.el || document.querySelector(`[data-gs-id="${card.id}"]`);
+            if (element) {
+                try {
+                    grid.update(element, {
+                        x: parseInt(card.x) || 0,
+                        y: parseInt(card.y) || 0,
+                        w: parseInt(card.w) || 3,
+                        h: parseInt(card.h) || 3
+                    });
+                } catch (err) {
+                    console.warn('Erro ao aplicar configuração ao card', card.id, err);
+                }
+            }
+        });
+        grid.commit();
+    }
+    
+    // Limpa e reseta o container para estado inicial
+    function resetarContainer() {
+        const container = document.getElementById(GRID_CONTAINER_ID);
+        if (!container) {
+            console.error('Container não encontrado para resetar');
+            return;
+        }
+        
+        console.log('Resetando container...');
+        
+        // Remove classe grid-stack
+        container.classList.remove('grid-stack');
+        
+        // Remove todos os grid items e reseta para layout Bootstrap
+        const gridItems = container.querySelectorAll('.grid-stack-item');
+        console.log('Grid items encontrados para resetar:', gridItems.length);
+        
+        gridItems.forEach((item, index) => {
+            console.log(`Resetando item ${index}:`, item.getAttribute('data-gs-id'));
+            
+            // Remove atributos do GridStack
+            item.removeAttribute('data-gs-x');
+            item.removeAttribute('data-gs-y');
+            item.removeAttribute('data-gs-w');
+            item.removeAttribute('data-gs-h');
+            item.removeAttribute('data-gs-id');
+            item.removeAttribute('gs-x');
+            item.removeAttribute('gs-y');
+            item.removeAttribute('gs-w');
+            item.removeAttribute('gs-h');
+            item.removeAttribute('gs-id');
+            
+            // Remove classes do GridStack
+            item.classList.remove('grid-stack-item');
+            item.classList.remove('ui-draggable');
+            item.classList.remove('ui-resizable');
+            item.classList.remove('ui-draggable-handle');
+            item.style.padding = '';
+            item.style.margin = '';
+            item.style.position = '';
+            item.style.left = '';
+            item.style.top = '';
+            item.style.width = '';
+            item.style.height = '';
+            
+            // Remove wrapper grid-stack-item-content se existir
+            const content = item.querySelector('.grid-stack-item-content');
+            if (content) {
+                console.log('Removendo wrapper grid-stack-item-content');
+                // Move conteúdo para fora do wrapper
+                while (content.firstChild) {
+                    item.appendChild(content.firstChild);
+                }
+                content.remove();
+            }
+            
+            // Re-adiciona classes Bootstrap originais se tiver data-card-id
+            const cardId = item.getAttribute('data-card-id');
+            if (cardId) {
+                // Determina tamanho baseado no card
+                if (cardId.includes('total_colaboradores') || 
+                    cardId.includes('colaboradores_ativos') || 
+                    cardId.includes('ocorrencias_mes') || 
+                    cardId.includes('colaboradores_inativos')) {
+                    item.classList.add('col-xl-3');
+                } else if (cardId.includes('grafico_ocorrencias_mes')) {
+                    item.classList.add('col-xl-8');
+                } else if (cardId.includes('grafico_colaboradores_status')) {
+                    item.classList.add('col-xl-4');
+                } else if (cardId.includes('grafico_ocorrencias_tipo')) {
+                    item.classList.add('col-xl-12');
+                } else {
+                    item.classList.add('col-xl-6');
+                }
             }
         });
         
-        // Aplica layout padrão apenas aos cards que existem
-        const layoutAplicar = layoutPadrao.filter(card => itemsMap[card.id]);
-        
-        if (layoutAplicar.length > 0) {
-            console.log('Aplicando layout padrão a', layoutAplicar.length, 'cards');
-            
-            // Usa grid.load para aplicar todas as posições de uma vez
-            try {
-                grid.load(layoutAplicar.map(card => ({
-                    id: card.id,
-                    x: card.x,
-                    y: card.y,
-                    w: card.w,
-                    h: card.h
-                })), false);
-            } catch (e) {
-                console.error('Erro ao aplicar layout padrão via grid.load:', e);
-                // Fallback: atualiza um por um
-                layoutAplicar.forEach(card => {
-                    const item = itemsMap[card.id];
-                    if (item && item.el) {
-                        try {
-                            grid.update(item.el, {
-                                x: card.x,
-                                y: card.y,
-                                w: card.w,
-                                h: card.h
-                            });
-                        } catch (err) {
-                            console.warn('Erro ao aplicar layout padrão ao card', card.id, err);
-                        }
-                    }
-                });
-            }
-        } else {
-            console.warn('Nenhum card encontrado para aplicar layout padrão');
-        }
+        console.log('Container resetado para estado inicial');
     }
     
     // Entra no modo de edição
@@ -2923,19 +3023,27 @@ document.addEventListener('DOMContentLoaded', function() {
         // Aguarda um pouco para garantir que o DOM está pronto
         setTimeout(() => {
             if (grid) {
-                console.log('Habilitando grid existente');
-                grid.enable();
-            } else {
-                console.log('Inicializando novo grid');
-                carregarConfiguracao().then(config => {
-                    // Se não há configuração, usa layout padrão
-                    if (!config || config.length === 0) {
-                        inicializarGrid(null); // null força uso do layout padrão
-                    } else {
-                        inicializarGrid(config);
-                    }
-                });
+                console.log('Destruindo grid existente para reiniciar');
+                try {
+                    grid.destroy(false);
+                } catch (e) {
+                    console.warn('Erro ao destruir grid:', e);
+                }
+                grid = null;
             }
+            
+            // Reseta container para estado inicial
+            resetarContainer();
+            
+            console.log('Inicializando novo grid');
+            carregarConfiguracao().then(config => {
+                // Se não há configuração, usa layout padrão
+                if (!config || config.length === 0) {
+                    inicializarGrid(null); // null força uso do layout padrão
+                } else {
+                    inicializarGrid(config);
+                }
+            });
         }, 200);
     }
     
@@ -2943,17 +3051,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function sairModoEdicao(salvar = false) {
         if (salvar && grid) {
             salvarConfiguracao().then(() => {
-                editMode = false;
-                document.body.classList.remove('dashboard-edit-mode');
-                document.getElementById('btn_personalizar_dashboard').classList.remove('d-none');
-                document.getElementById('btn_salvar_dashboard').classList.add('d-none');
-                document.getElementById('btn_adicionar_cards').classList.add('d-none');
-                document.getElementById('btn_limpar_layout').classList.add('d-none');
-                document.getElementById('btn_cancelar_dashboard').classList.add('d-none');
-                
-                if (grid) {
-                    grid.disable();
-                }
+                finalizarModoEdicao();
             }).catch(() => {
                 Swal.fire({
                     text: 'Erro ao salvar configuração',
@@ -2966,6 +3064,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
         } else {
+            // Cancelou - recarrega página para restaurar layout original
+            Swal.fire({
+                text: 'Deseja recarregar a página para restaurar o layout original?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, recarregar',
+                cancelButtonText: 'Não',
+                buttonsStyling: false,
+                customClass: {
+                    confirmButton: 'btn btn-primary',
+                    cancelButton: 'btn btn-light'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    location.reload();
+                } else {
+                    finalizarModoEdicao();
+                }
+            });
+        }
+    }
+    
+    // Finaliza modo de edição
+    function finalizarModoEdicao() {
         editMode = false;
         document.body.classList.remove('dashboard-edit-mode');
         document.getElementById('btn_personalizar_dashboard').classList.remove('d-none');
@@ -2973,14 +3095,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('btn_adicionar_cards').classList.add('d-none');
         document.getElementById('btn_limpar_layout').classList.add('d-none');
         document.getElementById('btn_cancelar_dashboard').classList.add('d-none');
-            
-            if (grid) {
-                grid.disable();
-                // Restaura configuração original se cancelou
-                if (originalConfig) {
-                    grid.load(originalConfig);
-                }
-            }
+        
+        if (grid) {
+            grid.disable();
         }
     }
     

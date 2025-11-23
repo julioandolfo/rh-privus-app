@@ -1,6 +1,6 @@
 // Service Worker - RH Privus PWA
 // OneSignal SDK será carregado automaticamente via OneSignalSDKWorker.js
-const CACHE_NAME = 'rh-privus-v6'; // Incrementado para forçar atualização (correção redirects)
+const CACHE_NAME = 'rh-privus-v7'; // Incrementado para forçar atualização (correção redirects definitiva)
 
 // Detecta BASE_PATH automaticamente
 // Funciona tanto em /rh-privus/ (localhost) quanto /rh/ (produção)
@@ -105,41 +105,16 @@ self.addEventListener('fetch', (event) => {
         return; // Deixa o browser lidar normalmente
     }
     
-    // CRÍTICO: Para páginas que podem resultar em redirects (index.php, /, etc)
-    // ou páginas dinâmicas, sempre busca do servidor SEM interceptar redirects
+    // CRÍTICO: Para páginas PHP, HTML ou caminhos dinâmicos que podem resultar em redirects,
+    // NÃO intercepta a requisição - deixa o navegador lidar normalmente
+    // Isso evita o erro "a redirected response was used for a request whose redirect mode is not follow"
     if (shouldNotCache(url) || 
         url.pathname === BASE_PATH + '/' || 
         url.pathname === BASE_PATH + '/index.php' ||
         url.pathname.endsWith('/')) {
         
-        // Usa event.respondWith para garantir que o service worker não interfira com redirects
-        event.respondWith(
-            fetch(request, {
-                cache: 'no-store',
-                redirect: 'follow' // CRÍTICO: Segue redirects automaticamente
-            })
-            .then((response) => {
-                // CRÍTICO: Se a resposta foi um redirect, retorna diretamente sem processar
-                // Service Workers não podem servir respostas de redirect diretamente
-                if (response.redirected || 
-                    response.status === 301 || 
-                    response.status === 302 || 
-                    response.status === 303 || 
-                    response.status === 307 || 
-                    response.status === 308) {
-                    // Retorna a resposta de redirect diretamente - o navegador vai seguir
-                    return response;
-                }
-                
-                // Para respostas normais, retorna sem cachear
-                return response;
-            })
-            .catch((error) => {
-                // Se falhar, deixa o navegador lidar normalmente
-                console.error('[SW] Erro ao buscar:', error);
-                throw error;
-            })
-        );
+        // NÃO usa event.respondWith() - simplesmente retorna
+        // Isso faz o navegador processar a requisição normalmente, incluindo redirects
         return;
     }
     
@@ -147,21 +122,10 @@ self.addEventListener('fetch', (event) => {
     // Isso garante que sempre pegue a versão mais recente
     event.respondWith(
         fetch(request, {
-            cache: 'no-cache', // Sempre valida com servidor
-            redirect: 'follow'
+            cache: 'no-cache' // Sempre valida com servidor
         })
         .then((response) => {
-            // CRÍTICO: Não cacheia respostas de redirect
-            if (response.redirected || 
-                response.status === 301 || 
-                response.status === 302 || 
-                response.status === 303 || 
-                response.status === 307 || 
-                response.status === 308) {
-                return response; // Retorna sem cachear
-            }
-            
-            // Só cacheia se for resposta válida de asset estático
+            // Só cacheia se for resposta válida de asset estático (200 OK)
             if (response && response.status === 200 && response.type === 'basic') {
                 // Verifica se é um asset estático (CSS, JS, imagens, fonts)
                 const contentType = response.headers.get('content-type') || '';
