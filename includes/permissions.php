@@ -116,6 +116,7 @@ function get_page_permissions() {
         // Feedbacks - todos podem enviar e ver seus próprios feedbacks
         'feedback_enviar.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         'feedback_meus.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'feedback_gestao.php' => ['ADMIN', 'RH'],
         'ver_feedback.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         
         // Notificações - todos podem ver suas próprias notificações
@@ -447,6 +448,7 @@ function can_access_feedbacks_menu() {
     $feedbacks_pages = [
         'feedback_enviar.php',
         'feedback_meus.php',
+        'feedback_gestao.php',
         'ver_feedback.php'
     ];
     

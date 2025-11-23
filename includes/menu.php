@@ -162,7 +162,7 @@ function getIcon($name) {
                 
                 <!--begin:Menu item-->
                 <?php if (can_access_feedbacks_menu()): ?>
-                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('feedback_enviar.php') || isActive('feedback_meus.php')) ? 'here show' : '' ?>">
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('feedback_enviar.php') || isActive('feedback_meus.php') || isActive('feedback_gestao.php')) ? 'here show' : '' ?>">
                     <!--begin:Menu link-->
                     <span class="menu-link">
                         <span class="menu-icon">
@@ -198,6 +198,18 @@ function getIcon($name) {
                                     <span class="bullet bullet-dot"></span>
                                 </span>
                                 <span class="menu-title">Meus Feedbacks</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <?php endif; ?>
+                        <?php if (can_access_page('feedback_gestao.php')): ?>
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('feedback_gestao.php') ?>" href="feedback_gestao.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Gestão de Feedbacks</span>
                             </a>
                         </div>
                         <!--end:Menu item-->
