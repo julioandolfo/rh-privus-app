@@ -389,42 +389,88 @@ document.getElementById('beneficioCustom').addEventListener('keypress', function
 })();
 
 // Submete formulário
-document.getElementById('formVaga').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    
-    // Converte valores de moeda para formato numérico antes de enviar
-    const salarioMin = document.getElementById('salario_min').value;
-    const salarioMax = document.getElementById('salario_max').value;
-    
-    if (salarioMin) {
-        const valorMin = salarioMin.replace(/\./g, '').replace(',', '.');
-        formData.set('salario_min', valorMin);
+document.addEventListener('DOMContentLoaded', function() {
+    const formVaga = document.getElementById('formVaga');
+    if (!formVaga) {
+        console.error('Formulário não encontrado!');
+        return;
     }
     
-    if (salarioMax) {
-        const valorMax = salarioMax.replace(/\./g, '').replace(',', '.');
-        formData.set('salario_max', valorMax);
-    }
+    let isSubmitting = false;
     
-    try {
-        const response = await fetch('../api/recrutamento/vagas/criar.php', {
-            method: 'POST',
-            body: formData
-        });
+    formVaga.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
         
-        const data = await response.json();
-        
-        if (data.success) {
-            alert('Vaga criada com sucesso!');
-            window.location.href = 'vagas.php';
-        } else {
-            alert('Erro: ' + data.message);
+        // Previne múltiplos envios
+        if (isSubmitting) {
+            console.warn('Formulário já está sendo enviado');
+            return false;
         }
-    } catch (error) {
-        alert('Erro ao criar vaga');
-        console.error(error);
-    }
+        
+        const btnSubmit = this.querySelector('button[type="submit"]');
+        const btnOriginalText = btnSubmit ? btnSubmit.innerHTML : '';
+        
+        // Marca como enviando
+        isSubmitting = true;
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+        }
+        
+        const formData = new FormData(this);
+        
+        // Converte valores de moeda para formato numérico antes de enviar
+        const salarioMin = document.getElementById('salario_min');
+        const salarioMax = document.getElementById('salario_max');
+        
+        if (salarioMin && salarioMin.value) {
+            const valorMin = salarioMin.value.replace(/\./g, '').replace(',', '.');
+            formData.set('salario_min', valorMin);
+        }
+        
+        if (salarioMax && salarioMax.value) {
+            const valorMax = salarioMax.value.replace(/\./g, '').replace(',', '.');
+            formData.set('salario_max', valorMax);
+        }
+        
+        try {
+            console.log('Enviando formulário...');
+            const response = await fetch('../api/recrutamento/vagas/criar.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            console.log('Resposta recebida:', response.status);
+            
+            if (!response.ok) {
+                throw new Error('Erro HTTP: ' + response.status);
+            }
+            
+            const data = await response.json();
+            console.log('Dados recebidos:', data);
+            
+            if (data.success) {
+                alert('Vaga criada com sucesso!');
+                window.location.href = 'vagas.php';
+            } else {
+                alert('Erro: ' + (data.message || 'Erro desconhecido'));
+                isSubmitting = false;
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = btnOriginalText;
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao criar vaga:', error);
+            alert('Erro ao criar vaga. Verifique o console para mais detalhes.');
+            isSubmitting = false;
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = btnOriginalText;
+            }
+        }
+    });
 });
 </script>
 
