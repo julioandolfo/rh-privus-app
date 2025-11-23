@@ -112,7 +112,21 @@ $comentarios = $stmt->fetchAll();
                         <div class="mt-4">
                             <h4>Anexos</h4>
                             <?php foreach ($anexos as $anexo): ?>
-                            <a href="<?= htmlspecialchars($anexo['caminho_arquivo']) ?>" target="_blank" class="btn btn-light-primary me-2">
+                            <?php
+                            // Constrói URL completa do arquivo
+                            $caminho_arquivo = $anexo['caminho_arquivo'];
+                            if (!preg_match('/^https?:\/\//', $caminho_arquivo)) {
+                                // Se o caminho já começa com /rh/, usa diretamente
+                                // Se não, adiciona /rh/ antes
+                                if (strpos($caminho_arquivo, '/rh/') === 0) {
+                                    $caminho_arquivo = get_base_url() . $caminho_arquivo;
+                                } else {
+                                    // Remove barra inicial se houver e adiciona /rh/
+                                    $caminho_arquivo = get_base_url() . '/rh' . ltrim($caminho_arquivo, '/');
+                                }
+                            }
+                            ?>
+                            <a href="<?= htmlspecialchars($caminho_arquivo) ?>" target="_blank" class="btn btn-light-primary me-2">
                                 <i class="ki-duotone ki-file fs-2"></i>
                                 <?= htmlspecialchars($anexo['nome_arquivo']) ?>
                             </a>

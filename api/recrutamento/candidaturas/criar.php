@@ -125,7 +125,7 @@ try {
         $caminho_completo = $upload_dir . $nome_arquivo;
         
         if (move_uploaded_file($_FILES['curriculo']['tmp_name'], $caminho_completo)) {
-            $caminho_relativo = '/uploads/candidaturas/' . $candidatura_id . '/' . $nome_arquivo;
+            $caminho_relativo = '/rh/uploads/candidaturas/' . $candidatura_id . '/' . $nome_arquivo;
             
             $stmt = $pdo->prepare("
                 INSERT INTO candidaturas_anexos 
@@ -155,7 +155,7 @@ try {
         'success' => true,
         'message' => 'Candidatura realizada com sucesso!',
         'token_acompanhamento' => $token,
-        'link_acompanhamento' => get_base_url() . '/acompanhar?token=' . $token
+        'link_acompanhamento' => get_base_url() . '/acompanhar.php?token=' . $token
     ]);
     
 } catch (Exception $e) {

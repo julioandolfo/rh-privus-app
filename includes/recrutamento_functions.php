@@ -474,7 +474,7 @@ function preparar_variaveis_email_candidatura($candidatura) {
         'vaga' => $candidatura['vaga_titulo'] ?? '',
         'empresa_nome' => $empresa_nome ?: ($candidatura['empresa_nome'] ?? ''),
         'data_candidatura' => $data_candidatura,
-        'link_acompanhamento' => get_base_url() . "/acompanhar?token=" . ($candidatura['token_acompanhamento'] ?? ''),
+        'link_acompanhamento' => get_base_url() . "/acompanhar.php?token=" . ($candidatura['token_acompanhamento'] ?? ''),
         'status' => $candidatura['status'] ?? '',
         'nota_geral' => $candidatura['nota_geral'] ?? ''
     ];
