@@ -279,7 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (data.dados_excluidos.etapas > 0) {
                             info.push(`${data.dados_excluidos.etapas} etapa(s)`);
                         }
-                        if (!empty(info)) {
+                        if (info.length > 0) {
                             mensagemSucesso += `\n\nTambém foram excluídos: ${info.join(', ')}.`;
                         }
                     }
