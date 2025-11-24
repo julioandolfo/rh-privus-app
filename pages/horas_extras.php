@@ -22,47 +22,125 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data_trabalho = $_POST['data_trabalho'] ?? date('Y-m-d');
         $quantidade_horas = str_replace(',', '.', $_POST['quantidade_horas'] ?? '0');
         $observacoes = sanitize($_POST['observacoes'] ?? '');
+        $tipo_pagamento = $_POST['tipo_pagamento'] ?? 'dinheiro';
         
         if (empty($colaborador_id) || empty($quantidade_horas) || $quantidade_horas <= 0) {
             redirect('horas_extras.php', 'Preencha os campos obrigatórios!', 'error');
         }
         
         try {
-            // Busca dados do colaborador e empresa
-            $stmt = $pdo->prepare("
-                SELECT c.salario, c.empresa_id, e.percentual_hora_extra
-                FROM colaboradores c
-                LEFT JOIN empresas e ON c.empresa_id = e.id
-                WHERE c.id = ?
-            ");
-            $stmt->execute([$colaborador_id]);
-            $colab_data = $stmt->fetch();
+            require_once __DIR__ . '/../includes/banco_horas_functions.php';
             
-            if (!$colab_data || !$colab_data['salario']) {
-                redirect('horas_extras.php', 'Colaborador não encontrado ou sem salário cadastrado!', 'error');
+            if ($tipo_pagamento === 'banco_horas') {
+                // Adiciona ao banco de horas
+                $motivo = sprintf(
+                    'Hora extra trabalhada em %s',
+                    date('d/m/Y', strtotime($data_trabalho))
+                );
+                
+                $resultado = adicionar_horas_banco(
+                    $colaborador_id,
+                    $quantidade_horas,
+                    'hora_extra',
+                    null, // Será atualizado após inserir hora_extra
+                    $motivo,
+                    $observacoes,
+                    $usuario['id'],
+                    $data_trabalho
+                );
+                
+                if (!$resultado['success']) {
+                    redirect('horas_extras.php', 'Erro ao adicionar ao banco de horas: ' . $resultado['error'], 'error');
+                }
+                
+                // Insere hora extra com tipo banco_horas
+                $stmt = $pdo->prepare("
+                    INSERT INTO horas_extras (
+                        colaborador_id, data_trabalho, quantidade_horas, 
+                        valor_hora, percentual_adicional, valor_total, 
+                        observacoes, usuario_id, tipo_pagamento, banco_horas_movimentacao_id
+                    ) VALUES (?, ?, ?, 0, 0, 0, ?, ?, 'banco_horas', ?)
+                ");
+                $stmt->execute([
+                    $colaborador_id, 
+                    $data_trabalho, 
+                    $quantidade_horas,
+                    $observacoes, 
+                    $usuario['id'],
+                    $resultado['movimentacao_id']
+                ]);
+                
+                redirect('horas_extras.php', 'Hora extra adicionada ao banco de horas com sucesso!');
+                
+            } else {
+                // Comportamento atual (pagar em dinheiro)
+                // Busca dados do colaborador e empresa
+                $stmt = $pdo->prepare("
+                    SELECT c.salario, c.empresa_id, e.percentual_hora_extra
+                    FROM colaboradores c
+                    LEFT JOIN empresas e ON c.empresa_id = e.id
+                    WHERE c.id = ?
+                ");
+                $stmt->execute([$colaborador_id]);
+                $colab_data = $stmt->fetch();
+                
+                if (!$colab_data || !$colab_data['salario']) {
+                    redirect('horas_extras.php', 'Colaborador não encontrado ou sem salário cadastrado!', 'error');
+                }
+                
+                // Calcula valor da hora normal (assumindo 220 horas/mês)
+                $valor_hora = $colab_data['salario'] / 220;
+                $percentual_adicional = $colab_data['percentual_hora_extra'] ?? 50.00;
+                
+                // Calcula valor total da hora extra
+                $valor_hora_extra = $valor_hora * (1 + ($percentual_adicional / 100));
+                $valor_total = $valor_hora_extra * $quantidade_horas;
+                
+                // Insere hora extra com tipo dinheiro
+                $stmt = $pdo->prepare("
+                    INSERT INTO horas_extras (colaborador_id, data_trabalho, quantidade_horas, valor_hora, percentual_adicional, valor_total, observacoes, usuario_id, tipo_pagamento)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'dinheiro')
+                ");
+                $stmt->execute([
+                    $colaborador_id, $data_trabalho, $quantidade_horas, $valor_hora, 
+                    $percentual_adicional, $valor_total, $observacoes, $usuario['id']
+                ]);
+                
+                redirect('horas_extras.php', 'Hora extra cadastrada com sucesso!');
             }
-            
-            // Calcula valor da hora normal (assumindo 220 horas/mês)
-            $valor_hora = $colab_data['salario'] / 220;
-            $percentual_adicional = $colab_data['percentual_hora_extra'] ?? 50.00;
-            
-            // Calcula valor total da hora extra
-            $valor_hora_extra = $valor_hora * (1 + ($percentual_adicional / 100));
-            $valor_total = $valor_hora_extra * $quantidade_horas;
-            
-            // Insere hora extra
-            $stmt = $pdo->prepare("
-                INSERT INTO horas_extras (colaborador_id, data_trabalho, quantidade_horas, valor_hora, percentual_adicional, valor_total, observacoes, usuario_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $colaborador_id, $data_trabalho, $quantidade_horas, $valor_hora, 
-                $percentual_adicional, $valor_total, $observacoes, $usuario['id']
-            ]);
-            
-            redirect('horas_extras.php', 'Hora extra cadastrada com sucesso!');
         } catch (PDOException $e) {
             redirect('horas_extras.php', 'Erro ao salvar: ' . $e->getMessage(), 'error');
+        }
+    } elseif ($action === 'remover_horas') {
+        $colaborador_id = (int)($_POST['colaborador_id'] ?? 0);
+        $quantidade_horas = str_replace(',', '.', $_POST['quantidade_horas'] ?? '0');
+        $motivo = sanitize($_POST['motivo'] ?? '');
+        $observacoes = sanitize($_POST['observacoes'] ?? '');
+        
+        if (empty($colaborador_id) || empty($quantidade_horas) || $quantidade_horas <= 0 || empty($motivo)) {
+            redirect('horas_extras.php', 'Preencha os campos obrigatórios!', 'error');
+        }
+        
+        try {
+            require_once __DIR__ . '/../includes/banco_horas_functions.php';
+            
+            $resultado = remover_horas_banco(
+                $colaborador_id,
+                $quantidade_horas,
+                'remocao_manual',
+                null,
+                $motivo,
+                $observacoes,
+                $usuario['id']
+            );
+            
+            if ($resultado['success']) {
+                redirect('horas_extras.php', 'Horas removidas do banco com sucesso!');
+            } else {
+                redirect('horas_extras.php', 'Erro: ' . $resultado['error'], 'error');
+            }
+        } catch (Exception $e) {
+            redirect('horas_extras.php', 'Erro ao remover horas: ' . $e->getMessage(), 'error');
         }
     } elseif ($action === 'delete') {
         $id = (int)($_POST['id'] ?? 0);
@@ -86,7 +164,8 @@ if ($usuario['role'] !== 'ADMIN') {
 
 $stmt = $pdo->prepare("
     SELECT h.*, c.nome_completo as colaborador_nome, c.empresa_id,
-           e.nome_fantasia as empresa_nome, u.nome as usuario_nome
+           e.nome_fantasia as empresa_nome, u.nome as usuario_nome,
+           COALESCE(h.tipo_pagamento, 'dinheiro') as tipo_pagamento
     FROM horas_extras h
     INNER JOIN colaboradores c ON h.colaborador_id = c.id
     LEFT JOIN empresas e ON c.empresa_id = e.id
@@ -178,7 +257,13 @@ require_once __DIR__ . '/../includes/header.php';
                 <!--begin::Card toolbar-->
                 <div class="card-toolbar">
                     <!--begin::Toolbar-->
-                    <div class="d-flex justify-content-end" data-kt-horaextra-table-toolbar="base">
+                    <div class="d-flex justify-content-end gap-2" data-kt-horaextra-table-toolbar="base">
+                        <!--begin::Remover horas do banco-->
+                        <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#kt_modal_remover_horas">
+                            <i class="ki-duotone ki-minus fs-2"></i>
+                            Remover Horas do Banco
+                        </button>
+                        <!--end::Remover horas do banco-->
                         <!--begin::Add hora extra-->
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_horaextra">
                             <i class="ki-duotone ki-plus fs-2"></i>
@@ -203,6 +288,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <th class="min-w-150px">Empresa</th>
                             <th class="min-w-100px">Data</th>
                             <th class="min-w-100px">Quantidade</th>
+                            <th class="min-w-100px">Tipo</th>
                             <th class="min-w-120px">Valor Hora</th>
                             <th class="min-w-100px">% Adicional</th>
                             <th class="min-w-120px">Valor Total</th>
@@ -221,10 +307,33 @@ require_once __DIR__ . '/../includes/header.php';
                             <td><?= htmlspecialchars($he['empresa_nome'] ?? '-') ?></td>
                             <td><?= date('d/m/Y', strtotime($he['data_trabalho'])) ?></td>
                             <td><?= number_format($he['quantidade_horas'], 2, ',', '.') ?>h</td>
-                            <td>R$ <?= number_format($he['valor_hora'], 2, ',', '.') ?></td>
-                            <td><?= number_format($he['percentual_adicional'], 2, ',', '.') ?>%</td>
                             <td>
-                                <span class="text-success fw-bold">R$ <?= number_format($he['valor_total'], 2, ',', '.') ?></span>
+                                <?php if (($he['tipo_pagamento'] ?? 'dinheiro') === 'banco_horas'): ?>
+                                    <span class="badge badge-info">Banco de Horas</span>
+                                <?php else: ?>
+                                    <span class="badge badge-success">R$</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (($he['tipo_pagamento'] ?? 'dinheiro') === 'banco_horas'): ?>
+                                    <span class="text-muted">-</span>
+                                <?php else: ?>
+                                    R$ <?= number_format($he['valor_hora'], 2, ',', '.') ?>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (($he['tipo_pagamento'] ?? 'dinheiro') === 'banco_horas'): ?>
+                                    <span class="text-muted">-</span>
+                                <?php else: ?>
+                                    <?= number_format($he['percentual_adicional'], 2, ',', '.') ?>%
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (($he['tipo_pagamento'] ?? 'dinheiro') === 'banco_horas'): ?>
+                                    <span class="text-muted">-</span>
+                                <?php else: ?>
+                                    <span class="text-success fw-bold">R$ <?= number_format($he['valor_total'], 2, ',', '.') ?></span>
+                                <?php endif; ?>
                             </td>
                             <td class="text-end">
                                 <button type="button" class="btn btn-sm btn-light-danger" onclick="deletarHoraExtra(<?= $he['id'] ?>)">
@@ -298,6 +407,40 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-12">
+                            <label class="required fw-semibold fs-6 mb-2">Tipo de Pagamento</label>
+                            <div class="form-check form-check-custom form-check-solid mb-3">
+                                <input class="form-check-input" type="radio" name="tipo_pagamento" 
+                                       id="tipo_pagamento_dinheiro" value="dinheiro" checked />
+                                <label class="form-check-label" for="tipo_pagamento_dinheiro">
+                                    Pagar em R$ (dinheiro)
+                                </label>
+                            </div>
+                            <div class="form-check form-check-custom form-check-solid">
+                                <input class="form-check-input" type="radio" name="tipo_pagamento" 
+                                       id="tipo_pagamento_banco" value="banco_horas" />
+                                <label class="form-check-label" for="tipo_pagamento_banco">
+                                    Adicionar ao Banco de Horas
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mostrar saldo atual quando selecionar banco de horas -->
+                    <div class="row mb-7" id="info_saldo_banco" style="display: none;">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <i class="ki-duotone ki-information-5 fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <strong>Saldo atual:</strong> <span id="saldo_atual_colaborador">-</span> horas
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7" id="card_calculo_dinheiro">
+                        <div class="col-md-12">
                             <div class="card card-flush bg-light-primary">
                                 <div class="card-body">
                                     <div class="d-flex align-items-center">
@@ -340,6 +483,73 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 <!--end::Modal-->
 
+<!--begin::Modal - Remover Horas do Banco-->
+<div class="modal fade" id="kt_modal_remover_horas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header" id="kt_modal_remover_horas_header">
+                <h2 class="fw-bold">Remover Horas do Banco</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <form id="kt_modal_remover_horas_form" method="POST" class="form">
+                    <input type="hidden" name="action" value="remover_horas">
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-12">
+                            <label class="required fw-semibold fs-6 mb-2">Colaborador</label>
+                            <?= render_select_colaborador('colaborador_id', 'colaborador_id_remover', null, $colaboradores, true) ?>
+                            <div id="saldo_atual_remover" class="mt-3" style="display: none;">
+                                <div class="alert alert-info">
+                                    <strong>Saldo atual:</strong> <span id="saldo_valor_remover">-</span> horas
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-6">
+                            <label class="required fw-semibold fs-6 mb-2">Quantidade de Horas a Remover</label>
+                            <input type="text" name="quantidade_horas" id="quantidade_horas_remover" class="form-control form-control-solid" placeholder="0,00" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-semibold fs-6 mb-2">Data da Movimentação</label>
+                            <input type="date" name="data_movimentacao" class="form-control form-control-solid" value="<?= date('Y-m-d') ?>" />
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-12">
+                            <label class="required fw-semibold fs-6 mb-2">Motivo</label>
+                            <textarea name="motivo" class="form-control form-control-solid" rows="3" required placeholder="Informe o motivo da remoção de horas..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-12">
+                            <label class="fw-semibold fs-6 mb-2">Observações</label>
+                            <textarea name="observacoes" class="form-control form-control-solid" rows="2"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center pt-5">
+                        <button type="reset" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <span class="indicator-label">Remover Horas</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal-->
+
 <script>
 // Dados dos colaboradores e empresas para cálculo
 const colaboradoresData = {
@@ -359,6 +569,13 @@ const empresasPercentual = {
 
 // Função para calcular valor total
 function calcularValorTotal() {
+    const tipoPagamento = document.querySelector('input[name="tipo_pagamento"]:checked')?.value;
+    
+    // Se for banco de horas, não calcula valor monetário
+    if (tipoPagamento === 'banco_horas') {
+        return;
+    }
+    
     const colaboradorId = document.getElementById('colaborador_id')?.value;
     const quantidadeHoras = parseFloat(document.getElementById('quantidade_horas')?.value.replace(',', '.') || 0);
     
@@ -412,13 +629,87 @@ function calcularValorTotal() {
 }
 
 // Event listeners
-document.getElementById('colaborador_id')?.addEventListener('change', calcularValorTotal);
+document.getElementById('colaborador_id')?.addEventListener('change', function() {
+    calcularValorTotal();
+    atualizarSaldoBanco();
+});
 document.getElementById('quantidade_horas')?.addEventListener('input', calcularValorTotal);
 document.getElementById('quantidade_horas')?.addEventListener('keyup', calcularValorTotal);
+
+// Event listeners para tipo de pagamento
+document.getElementById('tipo_pagamento_dinheiro')?.addEventListener('change', function() {
+    if (this.checked) {
+        document.getElementById('card_calculo_dinheiro').style.display = 'block';
+        document.getElementById('info_saldo_banco').style.display = 'none';
+    }
+});
+document.getElementById('tipo_pagamento_banco')?.addEventListener('change', function() {
+    if (this.checked) {
+        document.getElementById('card_calculo_dinheiro').style.display = 'none';
+        document.getElementById('info_saldo_banco').style.display = 'block';
+        atualizarSaldoBanco();
+    }
+});
+
+// Função para atualizar saldo do banco de horas
+function atualizarSaldoBanco() {
+    const colaboradorId = document.getElementById('colaborador_id')?.value;
+    if (!colaboradorId) {
+        document.getElementById('saldo_atual_colaborador').textContent = '-';
+        return;
+    }
+    
+    fetch(`../api/banco_horas/saldo.php?colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const saldo = parseFloat(data.data.saldo_total_horas || 0);
+                document.getElementById('saldo_atual_colaborador').textContent = 
+                    saldo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            } else {
+                document.getElementById('saldo_atual_colaborador').textContent = '0,00';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar saldo:', error);
+            document.getElementById('saldo_atual_colaborador').textContent = '-';
+        });
+}
+
+// Atualizar saldo no modal de remover horas
+document.getElementById('colaborador_id_remover')?.addEventListener('change', function() {
+    const colaboradorId = this.value;
+    const saldoDiv = document.getElementById('saldo_atual_remover');
+    const saldoValor = document.getElementById('saldo_valor_remover');
+    
+    if (!colaboradorId) {
+        saldoDiv.style.display = 'none';
+        return;
+    }
+    
+    saldoDiv.style.display = 'block';
+    saldoValor.textContent = 'Carregando...';
+    
+    fetch(`../api/banco_horas/saldo.php?colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const saldo = parseFloat(data.data.saldo_total_horas || 0);
+                saldoValor.textContent = saldo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            } else {
+                saldoValor.textContent = '0,00';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar saldo:', error);
+            saldoValor.textContent = '-';
+        });
+});
 
 // Máscara para quantidade de horas
 if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
     jQuery('#quantidade_horas').mask('#0,00', {reverse: true});
+    jQuery('#quantidade_horas_remover').mask('#0,00', {reverse: true});
     
     // Recalcula quando a máscara é aplicada
     jQuery('#quantidade_horas').on('input', function() {

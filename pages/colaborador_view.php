@@ -76,6 +76,15 @@ $bonus_colaborador = $stmt->fetchAll();
 $stmt = $pdo->query("SELECT * FROM tipos_bonus WHERE status = 'ativo' ORDER BY nome");
 $tipos_bonus = $stmt->fetchAll();
 
+// Busca saldo e histórico do banco de horas
+require_once __DIR__ . '/../includes/banco_horas_functions.php';
+$saldo_banco_horas = get_saldo_banco_horas($id);
+$historico_banco_horas = get_historico_banco_horas($id, [
+    'data_inicio' => date('Y-m-01', strtotime('-6 months')), // Últimos 6 meses
+    'data_fim' => date('Y-m-t')
+]);
+$dados_grafico = get_dados_grafico_banco_horas($id, 30); // Últimos 30 dias
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -188,6 +197,16 @@ require_once __DIR__ . '/../includes/header.php';
                             </a>
                         </li>
                         <?php endif; ?>
+                        <li class="nav-item mt-2 flex-shrink-0">
+                            <a class="nav-link text-active-primary me-5 me-md-10 py-5" data-bs-toggle="tab" href="#kt_tab_pane_banco_horas">
+                                <i class="ki-duotone ki-time fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <span class="d-none d-md-inline">Banco de Horas</span>
+                                <span class="d-md-none">Banco Horas</span>
+                            </a>
+                        </li>
                         <li class="nav-item mt-2 flex-shrink-0">
                             <a class="nav-link text-active-primary py-5" data-bs-toggle="tab" href="#kt_tab_pane_ocorrencias">
                                 <i class="ki-duotone ki-clipboard fs-2 me-2">
@@ -304,7 +323,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <!--end::Tab Pane - Jornada-->
                     
                     <!--begin::Tab Pane - Dados Pessoais-->
-                    <div class="tab-pane fade show active" id="kt_tab_pane_dados" role="tabpanel">
+                    <div class="tab-pane fade" id="kt_tab_pane_dados" role="tabpanel">
                         <div class="row">
                             <div class="col-lg-6 mb-7">
                                 <div class="card card-flush h-xl-100">
@@ -608,6 +627,176 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     <!--end::Tab Pane - Bônus/Pagamentos-->
                     <?php endif; ?>
+                    
+                    <!--begin::Tab Pane - Banco de Horas-->
+                    <div class="tab-pane fade" id="kt_tab_pane_banco_horas" role="tabpanel">
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <!-- Card de Saldo Atual -->
+                                <div class="card card-flush mb-5">
+                                    <div class="card-header border-0 pt-6">
+                                        <h3 class="card-title align-items-start flex-column">
+                                            <span class="card-label fw-bold fs-3 mb-1">Saldo Atual</span>
+                                            <span class="text-muted fw-semibold fs-7">Saldo de horas disponível no banco</span>
+                                        </h3>
+                                    </div>
+                                    <div class="card-body pt-0">
+                                        <div class="d-flex align-items-center justify-content-center py-10">
+                                            <div class="text-center">
+                                                <div class="mb-5">
+                                                    <?php 
+                                                    $saldo_total = $saldo_banco_horas['saldo_total_horas'];
+                                                    $cor_saldo = $saldo_total >= 0 ? 'success' : 'danger';
+                                                    $icone_saldo = $saldo_total >= 0 ? 'arrow-up' : 'arrow-down';
+                                                    ?>
+                                                    <div class="symbol symbol-circle symbol-100px mb-5">
+                                                        <div class="symbol-label bg-light-<?= $cor_saldo ?>">
+                                                            <i class="ki-duotone ki-<?= $icone_saldo ?> fs-2x text-<?= $cor_saldo ?>">
+                                                                <span class="path1"></span>
+                                                                <span class="path2"></span>
+                                                            </i>
+                                                        </div>
+                                                    </div>
+                                                    <h1 class="fw-bold text-gray-900 mb-2">
+                                                        <span class="text-<?= $cor_saldo ?>">
+                                                            <?= number_format($saldo_total, 2, ',', '.') ?>
+                                                        </span>
+                                                        <span class="fs-3 text-gray-600"> horas</span>
+                                                    </h1>
+                                                    <p class="text-gray-500 mb-0">
+                                                        Última atualização: <?= date('d/m/Y H:i', strtotime($saldo_banco_horas['ultima_atualizacao'])) ?>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Gráfico de Evolução -->
+                                <div class="card mb-5">
+                                    <div class="card-header border-0 pt-6">
+                                        <h3 class="card-title align-items-start flex-column">
+                                            <span class="card-label fw-bold fs-3 mb-1">Evolução do Saldo</span>
+                                            <span class="text-muted fw-semibold fs-7">Últimos 30 dias</span>
+                                        </h3>
+                                    </div>
+                                    <div class="card-body pt-0">
+                                        <canvas id="grafico_banco_horas" style="height: 300px;"></canvas>
+                                    </div>
+                                </div>
+                                
+                                <!-- Histórico de Movimentações -->
+                                <div class="card">
+                                    <div class="card-header border-0 pt-6">
+                                        <h3 class="card-title align-items-start flex-column">
+                                            <span class="card-label fw-bold fs-3 mb-1">Histórico de Movimentações</span>
+                                            <span class="text-muted fw-semibold fs-7">Todas as movimentações do banco de horas</span>
+                                        </h3>
+                                        <div class="card-toolbar">
+                                            <div class="d-flex gap-2">
+                                                <select id="filtro_tipo_historico" class="form-select form-select-solid w-150px">
+                                                    <option value="">Todos os tipos</option>
+                                                    <option value="credito">Créditos</option>
+                                                    <option value="debito">Débitos</option>
+                                                </select>
+                                                <select id="filtro_origem_historico" class="form-select form-select-solid w-150px">
+                                                    <option value="">Todas as origens</option>
+                                                    <option value="hora_extra">Horas Extras</option>
+                                                    <option value="ocorrencia">Ocorrências</option>
+                                                    <option value="ajuste_manual">Ajustes Manuais</option>
+                                                    <option value="remocao_manual">Remoções Manuais</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-body pt-0">
+                                        <?php if (empty($historico_banco_horas)): ?>
+                                            <div class="alert alert-info d-flex align-items-center p-5">
+                                                <i class="ki-duotone ki-information fs-2hx text-info me-4">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                </i>
+                                                <div class="d-flex flex-column">
+                                                    <h4 class="mb-1 text-info">Nenhuma movimentação</h4>
+                                                    <span>Nenhuma movimentação registrada no banco de horas.</span>
+                                                </div>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="table-responsive">
+                                                <table class="table align-middle table-row-dashed fs-6 gy-5" id="kt_table_historico_banco_horas">
+                                                    <thead>
+                                                        <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
+                                                            <th class="min-w-100px">Data</th>
+                                                            <th class="min-w-100px">Tipo</th>
+                                                            <th class="min-w-150px">Origem</th>
+                                                            <th class="min-w-100px">Quantidade</th>
+                                                            <th class="min-w-100px">Saldo Anterior</th>
+                                                            <th class="min-w-100px">Saldo Posterior</th>
+                                                            <th class="min-w-200px">Motivo</th>
+                                                            <th class="min-w-150px">Usuário</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody class="fw-semibold text-gray-600">
+                                                        <?php foreach ($historico_banco_horas as $mov): ?>
+                                                        <tr>
+                                                            <td><?= date('d/m/Y', strtotime($mov['data_movimentacao'])) ?></td>
+                                                            <td>
+                                                                <?php if ($mov['tipo'] === 'credito'): ?>
+                                                                    <span class="badge badge-success">Crédito</span>
+                                                                <?php else: ?>
+                                                                    <span class="badge badge-danger">Débito</span>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                            <td>
+                                                                <?php
+                                                                $origem_labels = [
+                                                                    'hora_extra' => 'Hora Extra',
+                                                                    'ocorrencia' => 'Ocorrência',
+                                                                    'ajuste_manual' => 'Ajuste Manual',
+                                                                    'remocao_manual' => 'Remoção Manual'
+                                                                ];
+                                                                echo htmlspecialchars($origem_labels[$mov['origem']] ?? ucfirst($mov['origem']));
+                                                                ?>
+                                                            </td>
+                                                            <td>
+                                                                <?php if ($mov['tipo'] === 'credito'): ?>
+                                                                    <span class="text-success fw-bold">+<?= number_format($mov['quantidade_horas'], 2, ',', '.') ?>h</span>
+                                                                <?php else: ?>
+                                                                    <span class="text-danger fw-bold">-<?= number_format($mov['quantidade_horas'], 2, ',', '.') ?>h</span>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                            <td><?= number_format($mov['saldo_anterior'], 2, ',', '.') ?>h</td>
+                                                            <td>
+                                                                <?php 
+                                                                $saldo_posterior = $mov['saldo_posterior'];
+                                                                $cor_posterior = $saldo_posterior >= 0 ? 'success' : 'danger';
+                                                                ?>
+                                                                <span class="text-<?= $cor_posterior ?> fw-bold">
+                                                                    <?= number_format($saldo_posterior, 2, ',', '.') ?>h
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <div class="text-gray-800" title="<?= htmlspecialchars($mov['motivo']) ?>">
+                                                                    <?= htmlspecialchars(mb_substr($mov['motivo'], 0, 50)) ?><?= mb_strlen($mov['motivo']) > 50 ? '...' : '' ?>
+                                                                </div>
+                                                                <?php if (!empty($mov['observacoes'])): ?>
+                                                                    <small class="text-muted"><?= htmlspecialchars(mb_substr($mov['observacoes'], 0, 30)) ?><?= mb_strlen($mov['observacoes']) > 30 ? '...' : '' ?></small>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                            <td><?= htmlspecialchars($mov['usuario_nome'] ?? 'Sistema') ?></td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Tab Pane - Banco de Horas-->
                     
                     <!--begin::Tab Pane - Ocorrências-->
                     <div class="tab-pane fade" id="kt_tab_pane_ocorrencias" role="tabpanel">
@@ -1224,6 +1413,129 @@ function renderizarGraficoRadar(feedbacks) {
         }
     });
 }
+
+// Gráfico de evolução do banco de horas
+let graficoBancoHoras = null;
+
+function inicializarGraficoBancoHoras() {
+    const ctx = document.getElementById('grafico_banco_horas');
+    if (!ctx) return;
+    
+    const dadosGrafico = <?= json_encode($dados_grafico) ?>;
+    
+    // Prepara dados para o gráfico
+    const labels = [];
+    const saldos = [];
+    let saldoAcumulado = <?= $saldo_banco_horas['saldo_total_horas'] ?>;
+    
+    // Calcula saldo acumulado dia a dia (de trás para frente)
+    const saldosPorData = {};
+    dadosGrafico.forEach(item => {
+        saldosPorData[item.data] = parseFloat(item.saldo_final_dia || 0);
+    });
+    
+    // Cria array de últimos 30 dias
+    const hoje = new Date();
+    for (let i = 29; i >= 0; i--) {
+        const data = new Date(hoje);
+        data.setDate(data.getDate() - i);
+        const dataStr = data.toISOString().split('T')[0];
+        labels.push(new Date(dataStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+        
+        if (saldosPorData[dataStr] !== undefined) {
+            saldos.push(saldosPorData[dataStr]);
+        } else {
+            // Se não tem dado para este dia, usa o último saldo conhecido
+            saldos.push(saldos.length > 0 ? saldos[saldos.length - 1] : saldoAcumulado);
+        }
+    }
+    
+    // Destrói gráfico anterior se existir
+    if (graficoBancoHoras) {
+        graficoBancoHoras.destroy();
+    }
+    
+    graficoBancoHoras = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Saldo (horas)',
+                data: saldos,
+                borderColor: 'rgb(0, 158, 247)',
+                backgroundColor: 'rgba(0, 158, 247, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 3,
+                pointHoverRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Saldo: ' + parseFloat(context.parsed.y).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' horas';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + 'h';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Inicializa gráfico quando a aba for ativada
+document.addEventListener('DOMContentLoaded', function() {
+    const tabBancoHoras = document.querySelector('[href="#kt_tab_pane_banco_horas"]');
+    if (tabBancoHoras) {
+        tabBancoHoras.addEventListener('shown.bs.tab', function() {
+            setTimeout(inicializarGraficoBancoHoras, 100);
+        });
+    }
+    
+    // Filtros do histórico
+    const filtroTipo = document.getElementById('filtro_tipo_historico');
+    const filtroOrigem = document.getElementById('filtro_origem_historico');
+    const tabelaHistorico = document.getElementById('kt_table_historico_banco_horas');
+    
+    if (filtroTipo && filtroOrigem && tabelaHistorico) {
+        function aplicarFiltros() {
+            const tipoFiltro = filtroTipo.value.toLowerCase();
+            const origemFiltro = filtroOrigem.value.toLowerCase();
+            const linhas = tabelaHistorico.querySelectorAll('tbody tr');
+            
+            linhas.forEach(linha => {
+                const tipo = linha.querySelector('td:nth-child(2)')?.textContent.trim().toLowerCase() || '';
+                const origem = linha.querySelector('td:nth-child(3)')?.textContent.trim().toLowerCase() || '';
+                
+                const mostraTipo = !tipoFiltro || tipo.includes(tipoFiltro);
+                const mostraOrigem = !origemFiltro || origem.includes(origemFiltro);
+                
+                linha.style.display = (mostraTipo && mostraOrigem) ? '' : 'none';
+            });
+        }
+        
+        filtroTipo.addEventListener('change', aplicarFiltros);
+        filtroOrigem.addEventListener('change', aplicarFiltros);
+    }
+});
 
 function formatarData(data) {
     if (!data) return '-';

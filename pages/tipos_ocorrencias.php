@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $requer_aprovacao = isset($_POST['requer_aprovacao']) ? 1 : 0;
         $conta_advertencia = isset($_POST['conta_advertencia']) ? 1 : 0;
         $calcula_desconto = isset($_POST['calcula_desconto']) ? 1 : 0;
+        $permite_desconto_banco_horas = isset($_POST['permite_desconto_banco_horas']) ? 1 : 0;
         $valor_desconto = !empty($_POST['valor_desconto']) ? (float)$_POST['valor_desconto'] : null;
         $template_descricao = sanitize($_POST['template_descricao'] ?? '');
         
@@ -101,16 +102,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare("
                     INSERT INTO tipos_ocorrencias 
                     (nome, codigo, categoria, categoria_id, severidade, permite_tempo_atraso, permite_tipo_ponto, 
-                     requer_aprovacao, conta_advertencia, calcula_desconto, valor_desconto, 
+                     requer_aprovacao, conta_advertencia, calcula_desconto, permite_desconto_banco_horas, valor_desconto, 
                      template_descricao, validacoes_customizadas, notificar_colaborador, 
                      notificar_colaborador_sistema, notificar_colaborador_email, notificar_colaborador_push,
                      notificar_gestor, notificar_gestor_sistema, notificar_gestor_email, notificar_gestor_push,
                      notificar_rh, notificar_rh_sistema, notificar_rh_email, notificar_rh_push, status) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto,
-                    $requer_aprovacao, $conta_advertencia, $calcula_desconto, $valor_desconto,
+                    $requer_aprovacao, $conta_advertencia, $calcula_desconto, $permite_desconto_banco_horas, $valor_desconto,
                     $template_descricao, $validacoes_customizadas, $notificar_colaborador,
                     $notificar_colaborador_sistema, $notificar_colaborador_email, $notificar_colaborador_push,
                     $notificar_gestor, $notificar_gestor_sistema, $notificar_gestor_email, $notificar_gestor_push,
@@ -139,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     UPDATE tipos_ocorrencias SET 
                     nome = ?, codigo = ?, categoria = ?, categoria_id = ?, severidade = ?, 
                     permite_tempo_atraso = ?, permite_tipo_ponto = ?, 
-                    requer_aprovacao = ?, conta_advertencia = ?, calcula_desconto = ?, 
+                    requer_aprovacao = ?, conta_advertencia = ?, calcula_desconto = ?, permite_desconto_banco_horas = ?,
                     valor_desconto = ?, template_descricao = ?, validacoes_customizadas = ?,
                     notificar_colaborador = ?, notificar_colaborador_sistema = ?, notificar_colaborador_email = ?, notificar_colaborador_push = ?,
                     notificar_gestor = ?, notificar_gestor_sistema = ?, notificar_gestor_email = ?, notificar_gestor_push = ?,
@@ -148,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $stmt->execute([
                     $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto,
-                    $requer_aprovacao, $conta_advertencia, $calcula_desconto, $valor_desconto,
+                    $requer_aprovacao, $conta_advertencia, $calcula_desconto, $permite_desconto_banco_horas, $valor_desconto,
                     $template_descricao, $validacoes_customizadas, $notificar_colaborador,
                     $notificar_colaborador_sistema, $notificar_colaborador_email, $notificar_colaborador_push,
                     $notificar_gestor, $notificar_gestor_sistema, $notificar_gestor_email, $notificar_gestor_push,
@@ -1355,6 +1356,7 @@ function editarTipoOcorrencia(tipo) {
     document.getElementById('requer_aprovacao').checked = tipo.requer_aprovacao == 1;
     document.getElementById('conta_advertencia').checked = tipo.conta_advertencia == 1;
     document.getElementById('calcula_desconto').checked = tipo.calcula_desconto == 1;
+    document.getElementById('permite_desconto_banco_horas').checked = tipo.permite_desconto_banco_horas == 1;
     document.getElementById('valor_desconto').value = tipo.valor_desconto || '';
     document.getElementById('notificar_colaborador').checked = tipo.notificar_colaborador != 0;
     document.getElementById('notificar_colaborador_sistema').checked = tipo.notificar_colaborador_sistema != 0;

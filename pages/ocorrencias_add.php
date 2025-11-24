@@ -141,12 +141,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $ocorrencia_id = $pdo->lastInsertId();
         
-        // Calcula e atualiza desconto se necessário
-        if ($tipo_ocorrencia_data && $tipo_ocorrencia_data['calcula_desconto']) {
-            $valor_desconto = calcular_desconto_ocorrencia($ocorrencia_id);
-            if ($valor_desconto > 0) {
-                $stmt = $pdo->prepare("UPDATE ocorrencias SET valor_desconto = ? WHERE id = ?");
-                $stmt->execute([$valor_desconto, $ocorrencia_id]);
+        // Verifica se deve descontar do banco de horas
+        $desconta_banco_horas = isset($_POST['desconta_banco_horas']) && $_POST['desconta_banco_horas'] == '1';
+        
+        if ($desconta_banco_horas && $tipo_ocorrencia_data && $tipo_ocorrencia_data['permite_desconto_banco_horas']) {
+            // Desconta do banco de horas
+            require_once __DIR__ . '/../includes/banco_horas_functions.php';
+            
+            $resultado = descontar_horas_banco_ocorrencia($ocorrencia_id, $usuario['id']);
+            
+            if (!$resultado['success']) {
+                // Log erro mas não impede criação da ocorrência
+                error_log('Erro ao descontar banco de horas: ' . $resultado['error']);
+            }
+        } else {
+            // Comportamento atual: calcula desconto em dinheiro
+            if ($tipo_ocorrencia_data && $tipo_ocorrencia_data['calcula_desconto']) {
+                $valor_desconto = calcular_desconto_ocorrencia($ocorrencia_id);
+                if ($valor_desconto > 0) {
+                    $stmt = $pdo->prepare("UPDATE ocorrencias SET valor_desconto = ? WHERE id = ?");
+                    $stmt->execute([$valor_desconto, $ocorrencia_id]);
+                }
             }
         }
         
@@ -396,6 +411,39 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     
+                    <!-- Campo: Desconto Banco de Horas -->
+                    <div class="row mb-7" id="campo_desconto_banco_horas" style="display: none;">
+                        <div class="col-md-12">
+                            <div class="card card-flush bg-light-warning">
+                                <div class="card-body">
+                                    <div class="form-check form-check-custom form-check-solid mb-3">
+                                        <input class="form-check-input" type="checkbox" name="desconta_banco_horas" 
+                                               id="desconta_banco_horas" value="1" />
+                                        <label class="form-check-label fw-bold" for="desconta_banco_horas">
+                                            Descontar do Banco de Horas
+                                        </label>
+                                    </div>
+                                    <div id="info_desconto_banco" style="display: none;">
+                                        <div class="d-flex flex-column gap-2">
+                                            <div>
+                                                <strong>Saldo atual:</strong> 
+                                                <span id="saldo_atual_ocorrencia">-</span> horas
+                                            </div>
+                                            <div>
+                                                <strong>Horas a descontar:</strong> 
+                                                <span id="horas_descontar_ocorrencia">-</span> horas
+                                            </div>
+                                            <div>
+                                                <strong>Saldo após:</strong> 
+                                                <span id="saldo_apos_ocorrencia">-</span> horas
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Campos dinâmicos serão inseridos aqui -->
                     <div id="campos_dinamicos_container" class="mb-7"></div>
                     
@@ -473,9 +521,22 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     const severidade = option.getAttribute('data-severidade') || 'moderada';
     const requerAprovacao = option.getAttribute('data-requer-aprovacao') === '1';
     const template = option.getAttribute('data-template') || '';
+    const permiteDescontoBanco = option.getAttribute('data-permite-desconto-banco') === '1';
+    const codigoTipo = option.getAttribute('data-codigo') || '';
     
     // Atualiza severidade
     document.getElementById('severidade').value = severidade;
+    
+    // Mostra/esconde campo de desconto banco de horas
+    const campoDescontoBanco = document.getElementById('campo_desconto_banco_horas');
+    if (permiteDescontoBanco) {
+        campoDescontoBanco.style.display = 'block';
+        atualizarInfoDescontoBanco();
+    } else {
+        campoDescontoBanco.style.display = 'none';
+        document.getElementById('desconta_banco_horas').checked = false;
+        document.getElementById('info_desconto_banco').style.display = 'none';
+    }
     
     // Mostra/esconde campo de tempo de atraso
     const campoTempo = document.getElementById('campo_tempo_atraso');
@@ -508,6 +569,74 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     
     // Atualiza campo oculto tipo para compatibilidade
     document.getElementById('tipo').value = option.text.trim();
+    
+    // Atualiza info de desconto banco quando tempo de atraso muda
+    const tempoAtraso = document.getElementById('tempo_atraso_minutos');
+    if (tempoAtraso) {
+        tempoAtraso.addEventListener('input', atualizarInfoDescontoBanco);
+    }
+});
+
+// Função para atualizar informações de desconto do banco de horas
+function atualizarInfoDescontoBanco() {
+    const colaboradorId = document.getElementById('colaborador_id')?.value;
+    const tipoOcorrencia = document.getElementById('tipo_ocorrencia_id');
+    const option = tipoOcorrencia?.options[tipoOcorrencia.selectedIndex];
+    const codigoTipo = option?.getAttribute('data-codigo') || '';
+    const tempoAtraso = parseFloat(document.getElementById('tempo_atraso_minutos')?.value || 0);
+    
+    if (!colaboradorId || !codigoTipo) {
+        document.getElementById('info_desconto_banco').style.display = 'none';
+        return;
+    }
+    
+    // Calcula horas a descontar baseado no tipo
+    let horasDescontar = 0;
+    if (codigoTipo === 'falta' || codigoTipo === 'ausencia_injustificada') {
+        horasDescontar = 8; // Jornada padrão
+    } else if (['atraso_entrada', 'atraso_almoco', 'atraso_cafe', 'saida_antecipada'].includes(codigoTipo)) {
+        horasDescontar = tempoAtraso / 60; // Converte minutos para horas
+    }
+    
+    // Busca saldo atual
+    fetch(`../api/banco_horas/saldo.php?colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const saldoAtual = parseFloat(data.data.saldo_total_horas || 0);
+                const saldoApos = saldoAtual - horasDescontar;
+                
+                document.getElementById('saldo_atual_ocorrencia').textContent = 
+                    saldoAtual.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('horas_descontar_ocorrencia').textContent = 
+                    horasDescontar.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('saldo_apos_ocorrencia').textContent = 
+                    saldoApos.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                // Mostra info se checkbox estiver marcado
+                if (document.getElementById('desconta_banco_horas').checked) {
+                    document.getElementById('info_desconto_banco').style.display = 'block';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar saldo:', error);
+        });
+}
+
+// Event listener para checkbox de desconto banco de horas
+document.getElementById('desconta_banco_horas')?.addEventListener('change', function() {
+    if (this.checked) {
+        document.getElementById('info_desconto_banco').style.display = 'block';
+        atualizarInfoDescontoBanco();
+    } else {
+        document.getElementById('info_desconto_banco').style.display = 'none';
+    }
+});
+
+// Atualiza quando colaborador muda
+document.getElementById('colaborador_id')?.addEventListener('change', function() {
+    atualizarInfoDescontoBanco();
 });
 
 // Carrega campos dinâmicos no formulário
