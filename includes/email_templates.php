@@ -199,9 +199,9 @@ function enviar_email_ocorrencia($ocorrencia_id) {
     // Busca dados da ocorrência
     $stmt = $pdo->prepare("
         SELECT o.*, 
-               c.nome_completo, c.email_pessoal,
+               c.nome_completo, c.email_pessoal, c.setor_id,
                e.nome_fantasia as empresa_nome,
-               s.nome_setor, s.gestor_id,
+               s.nome_setor,
                car.nome_cargo,
                u.nome as usuario_nome,
                t.nome as tipo_ocorrencia_nome,
@@ -217,6 +217,18 @@ function enviar_email_ocorrencia($ocorrencia_id) {
     ");
     $stmt->execute([$ocorrencia_id]);
     $ocorrencia = $stmt->fetch();
+    
+    // Busca gestor do setor se necessário
+    $gestor_id = null;
+    if (!empty($ocorrencia['setor_id'])) {
+        $stmt_gestor = $pdo->prepare("SELECT id FROM usuarios WHERE setor_id = ? AND role = 'GESTOR' AND status = 'ativo' LIMIT 1");
+        $stmt_gestor->execute([$ocorrencia['setor_id']]);
+        $gestor = $stmt_gestor->fetch();
+        if ($gestor) {
+            $gestor_id = $gestor['id'];
+        }
+    }
+    $ocorrencia['gestor_id'] = $gestor_id;
     
     if (!$ocorrencia) {
         return ['success' => false, 'message' => 'Ocorrência não encontrada.'];

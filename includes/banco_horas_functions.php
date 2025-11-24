@@ -242,8 +242,13 @@ function calcular_horas_desconto_ocorrencia($ocorrencia_id) {
         return $jornada_diaria;
     }
     
-    // Se for atraso, converte minutos em horas
+    // Se for atraso, verifica se considera dia inteiro
     if (in_array($tipo_codigo, ['atraso_entrada', 'atraso_almoco', 'atraso_cafe'])) {
+        // Se marcou para considerar como dia inteiro, retorna jornada diária
+        if (!empty($ocorrencia['considera_dia_inteiro']) && $ocorrencia['considera_dia_inteiro'] == 1) {
+            return $jornada_diaria;
+        }
+        // Senão, converte minutos em horas
         $minutos = $ocorrencia['tempo_atraso_minutos'] ?? 0;
         return $minutos / 60; // Converte minutos para horas
     }

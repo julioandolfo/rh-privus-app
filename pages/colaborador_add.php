@@ -15,7 +15,24 @@ $usuario = $_SESSION['usuario'];
 
 // Processa POST ANTES de incluir o header (para evitar erro de headers already sent)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $empresa_id = $_POST['empresa_id'] ?? ($usuario['role'] === 'ADMIN' ? null : $usuario['empresa_id']);
+    // Para RH, valida se a empresa selecionada está nas empresas permitidas
+    $empresa_id = $_POST['empresa_id'] ?? null;
+    if ($usuario['role'] === 'RH' && $empresa_id) {
+        if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+            if (!in_array($empresa_id, $usuario['empresas_ids'])) {
+                redirect('colaborador_add.php', 'Você não tem permissão para cadastrar colaboradores nesta empresa!', 'error');
+            }
+        } elseif (isset($usuario['empresa_id']) && $empresa_id != $usuario['empresa_id']) {
+            redirect('colaborador_add.php', 'Você não tem permissão para cadastrar colaboradores nesta empresa!', 'error');
+        }
+    } elseif ($usuario['role'] !== 'ADMIN' && empty($empresa_id)) {
+        // Se não for ADMIN e não tiver empresa_id no POST, usa a primeira empresa disponível
+        if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+            $empresa_id = $usuario['empresas_ids'][0];
+        } else {
+            $empresa_id = $usuario['empresa_id'] ?? null;
+        }
+    }
     $setor_id = $_POST['setor_id'] ?? null;
     $cargo_id = $_POST['cargo_id'] ?? null;
     $nome_completo = sanitize($_POST['nome_completo'] ?? '');
@@ -150,11 +167,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Busca empresas
 if ($usuario['role'] === 'ADMIN') {
     $stmt_empresas = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
+    $empresas = $stmt_empresas->fetchAll();
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id IN ($placeholders) AND status = 'ativo' ORDER BY nome_fantasia");
+        $stmt_empresas->execute($usuario['empresas_ids']);
+        $empresas = $stmt_empresas->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo'");
+        $stmt_empresas->execute([$usuario['empresa_id'] ?? 0]);
+        $empresas = $stmt_empresas->fetchAll();
+    }
 } else {
+    // Outros roles (GESTOR, etc) - apenas uma empresa
     $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo'");
-    $stmt_empresas->execute([$usuario['empresa_id']]);
+    $stmt_empresas->execute([$usuario['empresa_id'] ?? 0]);
+    $empresas = $stmt_empresas->fetchAll();
 }
-$empresas = $stmt_empresas->fetchAll();
 
 // Agora inclui o header (após processar POST para evitar erro de headers already sent)
 $page_title = 'Novo Colaborador';
@@ -170,7 +202,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data">
                         <div class="row">
-                            <?php if ($usuario['role'] === 'ADMIN'): ?>
+                            <?php if ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)): ?>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Empresa *</label>
                                 <select name="empresa_id" id="empresa_id" class="form-select" required>
@@ -181,17 +213,17 @@ require_once __DIR__ . '/../includes/header.php';
                                 </select>
                             </div>
                             <?php else: ?>
-                            <input type="hidden" name="empresa_id" value="<?= $usuario['empresa_id'] ?>">
+                            <input type="hidden" name="empresa_id" value="<?= !empty($empresas) ? $empresas[0]['id'] : ($usuario['empresa_id'] ?? '') ?>">
                             <?php endif; ?>
                             
-                            <div class="col-md-<?= $usuario['role'] === 'ADMIN' ? '3' : '6' ?> mb-3">
+                            <div class="col-md-<?= ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)) ? '3' : '6' ?> mb-3">
                                 <label class="form-label">Setor *</label>
                                 <select name="setor_id" id="setor_id" class="form-select" required>
                                     <option value="">Selecione...</option>
                                 </select>
                             </div>
                             
-                            <div class="col-md-<?= $usuario['role'] === 'ADMIN' ? '3' : '6' ?> mb-3">
+                            <div class="col-md-<?= ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)) ? '3' : '6' ?> mb-3">
                                 <label class="form-label">Cargo *</label>
                                 <select name="cargo_id" id="cargo_id" class="form-select" required>
                                     <option value="">Selecione...</option>
@@ -506,9 +538,48 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
     }
 });
 
+// Se houver apenas uma empresa (campo hidden), carrega setores e cargos automaticamente
+<?php if (($usuario['role'] !== 'ADMIN' && ($usuario['role'] !== 'RH' || count($empresas) <= 1)) && !empty($empresas)): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    const empresaId = '<?= $empresas[0]['id'] ?>';
+    const setorSelect = document.getElementById('setor_id');
+    const cargoSelect = document.getElementById('cargo_id');
+    
+    if (empresaId && setorSelect && cargoSelect) {
+        // Carrega setores
+        fetch(`../api/get_setores.php?empresa_id=${empresaId}`)
+            .then(r => r.json())
+            .then(data => {
+                setorSelect.innerHTML = '<option value="">Selecione...</option>';
+                const setores = Array.isArray(data) ? data : (data.setores || []);
+                setores.forEach(setor => {
+                    setorSelect.innerHTML += `<option value="${setor.id}">${setor.nome_setor}</option>`;
+                });
+            })
+            .catch(() => {
+                setorSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+            });
+        
+        // Carrega cargos
+        fetch(`../api/get_cargos.php?empresa_id=${empresaId}`)
+            .then(r => r.json())
+            .then(data => {
+                cargoSelect.innerHTML = '<option value="">Selecione...</option>';
+                const cargos = Array.isArray(data) ? data : (data.cargos || []);
+                cargos.forEach(cargo => {
+                    cargoSelect.innerHTML += `<option value="${cargo.id}">${cargo.nome_cargo}</option>`;
+                });
+            })
+            .catch(() => {
+                cargoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+            });
+    }
+});
+<?php endif; ?>
+
 // Carrega líderes quando empresa, setor ou nível hierárquico mudar
 function carregarLideres() {
-    const empresaId = document.getElementById('empresa_id')?.value || '<?= $usuario['role'] === 'ADMIN' ? '' : $usuario['empresa_id'] ?>';
+    const empresaId = document.getElementById('empresa_id')?.value || document.querySelector('input[name="empresa_id"][type="hidden"]')?.value || '<?= ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)) ? '' : (!empty($empresas) ? $empresas[0]['id'] : ($usuario['empresa_id'] ?? '')) ?>';
     const setorId = document.getElementById('setor_id')?.value || '';
     const nivelId = document.getElementById('nivel_hierarquico_id')?.value || '';
     const liderSelect = document.getElementById('lider_id');

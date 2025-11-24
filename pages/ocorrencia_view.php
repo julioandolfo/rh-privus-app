@@ -44,6 +44,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $e) {
             redirect('ocorrencia_view.php?id=' . $ocorrencia_id, 'Erro ao adicionar comentário: ' . $e->getMessage(), 'error');
         }
+    } elseif ($action === 'upload_anexo') {
+        require_once __DIR__ . '/../includes/ocorrencias_functions.php';
+        
+        if (empty($_FILES['anexo']['name'])) {
+            redirect('ocorrencia_view.php?id=' . $ocorrencia_id, 'Selecione um arquivo!', 'error');
+        }
+        
+        try {
+            $upload_result = upload_anexo_ocorrencia($_FILES['anexo'], $ocorrencia_id);
+            
+            if ($upload_result['success']) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO ocorrencias_anexos 
+                    (ocorrencia_id, nome_arquivo, caminho_arquivo, tipo_mime, tamanho_bytes, uploaded_by)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $ocorrencia_id,
+                    $upload_result['filename'],
+                    $upload_result['path'],
+                    $upload_result['mime_type'],
+                    $upload_result['size'],
+                    $usuario['id']
+                ]);
+                
+                registrar_historico_ocorrencia($ocorrencia_id, 'anexo_adicionado', $usuario['id'], null, null, null, 'Anexo adicionado: ' . $upload_result['filename']);
+                
+                redirect('ocorrencia_view.php?id=' . $ocorrencia_id, 'Anexo adicionado com sucesso!');
+            } else {
+                redirect('ocorrencia_view.php?id=' . $ocorrencia_id, 'Erro ao fazer upload: ' . $upload_result['error'], 'error');
+            }
+        } catch (PDOException $e) {
+            redirect('ocorrencia_view.php?id=' . $ocorrencia_id, 'Erro ao adicionar anexo: ' . $e->getMessage(), 'error');
+        }
     }
 }
 
@@ -53,6 +87,7 @@ $stmt = $pdo->prepare("
            c.nome_completo as colaborador_nome, c.email_pessoal,
            u.nome as usuario_nome,
            t.nome as tipo_ocorrencia_nome, t.categoria as tipo_categoria,
+           t.calcula_desconto, t.permite_desconto_banco_horas,
            aprovador.nome as aprovador_nome
     FROM ocorrencias o
     INNER JOIN colaboradores c ON o.colaborador_id = c.id
@@ -256,6 +291,118 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <?php endif; ?>
                         
+                        <?php if ($ocorrencia['considera_dia_inteiro']): ?>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <div class="alert alert-warning d-flex align-items-center p-5">
+                                    <i class="ki-duotone ki-information-5 fs-2hx text-warning me-4">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <div class="d-flex flex-column">
+                                        <h4 class="mb-1 text-dark">Considerada como Falta do Dia Inteiro</h4>
+                                        <span>Esta ocorrência foi registrada como falta completa do dia (8 horas de trabalho).</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- Impacto Financeiro/Tempo -->
+                        <div class="separator separator-dashed my-7"></div>
+                        <h4 class="fw-bold mb-5">Impacto da Ocorrência</h4>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <?php if ($ocorrencia['desconta_banco_horas']): ?>
+                                    <!-- Desconto em Banco de Horas -->
+                                    <div class="card card-flush bg-light-warning">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <i class="ki-duotone ki-time fs-2x text-warning me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <h5 class="fw-bold text-gray-800 mb-1">Desconto em Banco de Horas (Ficar Devendo Horas)</h5>
+                                                    <p class="text-gray-600 mb-0">Esta ocorrência está sendo descontada do saldo de horas do colaborador. O colaborador ficará devendo horas no banco de horas.</p>
+                                                </div>
+                                            </div>
+                                            <?php if ($ocorrencia['horas_descontadas']): ?>
+                                            <div class="mt-4">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="fw-semibold text-gray-700">Horas Descontadas:</span>
+                                                    <span class="fw-bold fs-4 text-warning"><?= number_format($ocorrencia['horas_descontadas'], 2, ',', '.') ?>h</span>
+                                                </div>
+                                                <?php 
+                                                require_once __DIR__ . '/../includes/banco_horas_functions.php';
+                                                $saldo_info = get_saldo_banco_horas($ocorrencia['colaborador_id']);
+                                                $saldo_atual = $saldo_info['saldo_total_horas'];
+                                                ?>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="fw-semibold text-gray-700">Saldo Atual do Banco de Horas:</span>
+                                                    <span class="fw-bold fs-5 <?= $saldo_atual >= 0 ? 'text-success' : 'text-danger' ?>">
+                                                        <?= number_format($saldo_atual, 2, ',', '.') ?>h
+                                                        <?php if ($saldo_atual < 0): ?>
+                                                            <span class="badge badge-danger ms-2">Em Débito</span>
+                                                        <?php endif; ?>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php elseif ($ocorrencia['valor_desconto']): ?>
+                                    <!-- Desconto em Dinheiro -->
+                                    <div class="card card-flush bg-light-danger">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <i class="ki-duotone ki-dollar fs-2x text-danger me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <h5 class="fw-bold text-gray-800 mb-1">Desconto do Pagamento (R$)</h5>
+                                                    <p class="text-gray-600 mb-0">Esta ocorrência será descontada no fechamento de pagamento do mês.</p>
+                                                </div>
+                                            </div>
+                                            <div class="mt-4">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="fw-semibold text-gray-700">Valor a Descontar:</span>
+                                                    <span class="fw-bold fs-4 text-danger">R$ <?= number_format($ocorrencia['valor_desconto'], 2, ',', '.') ?></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php elseif ($ocorrencia['calcula_desconto'] || $ocorrencia['permite_desconto_banco_horas']): ?>
+                                    <!-- Tipo permite desconto mas não foi aplicado -->
+                                    <div class="alert alert-info d-flex align-items-center p-5">
+                                        <i class="ki-duotone ki-information-5 fs-2x text-info me-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div class="d-flex flex-column">
+                                            <h4 class="mb-1 text-dark">Sem Impacto Financeiro Definido</h4>
+                                            <span>Esta ocorrência permite desconto, mas não foi configurado se será descontado do pagamento (R$) ou do banco de horas. É apenas informativa no momento.</span>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <!-- Sem impacto -->
+                                    <div class="alert alert-success d-flex align-items-center p-5">
+                                        <i class="ki-duotone ki-check-circle fs-2x text-success me-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <div class="d-flex flex-column">
+                                            <h4 class="mb-1 text-dark">Sem Impacto Financeiro</h4>
+                                            <span>Esta ocorrência não está gerando desconto em dinheiro nem em banco de horas. É apenas informativa e não afeta pagamentos ou saldo de horas.</span>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        
                         <?php if (!empty($campos_dinamicos_valores)): ?>
                         <div class="separator separator-dashed my-7"></div>
                         <h4 class="fw-bold mb-5">Campos Adicionais</h4>
@@ -411,32 +558,61 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
                 
                 <!-- Anexos -->
-                <?php if (!empty($anexos)): ?>
                 <div class="card mb-5">
                     <div class="card-header">
                         <h3 class="card-title">Anexos (<?= count($anexos) ?>)</h3>
                     </div>
                     <div class="card-body">
-                        <?php foreach ($anexos as $anexo): ?>
-                        <div class="d-flex align-items-center mb-5">
-                            <div class="symbol symbol-45px me-3">
-                                <i class="ki-duotone ki-file fs-2x text-primary"></i>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="fw-bold text-gray-800"><?= htmlspecialchars($anexo['nome_arquivo']) ?></div>
-                                <div class="text-muted fs-7">
-                                    <?= format_file_size($anexo['tamanho_bytes'] ?? 0) ?> - 
-                                    <?= formatar_data($anexo['created_at'], 'd/m/Y H:i') ?>
+                        <?php if (!empty($anexos)): ?>
+                            <?php foreach ($anexos as $anexo): ?>
+                            <div class="d-flex align-items-center mb-5">
+                                <div class="symbol symbol-45px me-3">
+                                    <i class="ki-duotone ki-file fs-2x text-primary"></i>
                                 </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold text-gray-800"><?= htmlspecialchars($anexo['nome_arquivo']) ?></div>
+                                    <div class="text-muted fs-7">
+                                        <?= format_file_size($anexo['tamanho_bytes'] ?? 0) ?> - 
+                                        <?= formatar_data($anexo['created_at'], 'd/m/Y H:i') ?>
+                                        <?php if ($anexo['uploaded_by_nome']): ?>
+                                        - Enviado por: <?= htmlspecialchars($anexo['uploaded_by_nome']) ?>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <a href="../<?= htmlspecialchars($anexo['caminho_arquivo']) ?>" target="_blank" class="btn btn-sm btn-light">
+                                    <i class="ki-duotone ki-download fs-2"></i>
+                                </a>
                             </div>
-                            <a href="../<?= htmlspecialchars($anexo['caminho_arquivo']) ?>" target="_blank" class="btn btn-sm btn-light">
-                                <i class="ki-duotone ki-download fs-2"></i>
-                            </a>
-                        </div>
-                        <?php endforeach; ?>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="text-center text-muted py-5">
+                                <i class="ki-duotone ki-file fs-3x mb-3"></i>
+                                <p>Nenhum anexo ainda.</p>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <!-- Formulário de Upload -->
+                        <?php if (has_role(['ADMIN', 'RH', 'GESTOR'])): ?>
+                        <div class="separator separator-dashed my-7"></div>
+                        <form method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="action" value="upload_anexo">
+                            <div class="mb-5">
+                                <label class="fw-semibold fs-6 mb-2">Adicionar Anexo</label>
+                                <input type="file" name="anexo" class="form-control form-control-solid" 
+                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" required />
+                                <small class="text-muted d-block mt-2">
+                                    Formatos aceitos: PDF, DOC, DOCX, XLS, XLSX ou imagens. Máximo 10MB.
+                                    <br><strong>Exemplo:</strong> Atestado médico, comprovante, etc.
+                                </small>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ki-duotone ki-upload fs-2"></i>
+                                Enviar Anexo
+                            </button>
+                        </form>
+                        <?php endif; ?>
                     </div>
                 </div>
-                <?php endif; ?>
                 
                 <!-- Informações Adicionais -->
                 <div class="card">
@@ -452,10 +628,12 @@ require_once __DIR__ . '/../includes/header.php';
                             <label class="fw-semibold fs-6 text-gray-500">Data de Registro</label>
                             <div class="fw-bold fs-6"><?= formatar_data($ocorrencia['created_at'], 'd/m/Y H:i') ?></div>
                         </div>
-                        <?php if ($ocorrencia['valor_desconto']): ?>
+                        <?php if ($ocorrencia['considera_dia_inteiro']): ?>
                         <div class="mb-5">
-                            <label class="fw-semibold fs-6 text-gray-500">Desconto Calculado</label>
-                            <div class="fw-bold fs-6 text-danger">R$ <?= number_format($ocorrencia['valor_desconto'], 2, ',', '.') ?></div>
+                            <label class="fw-semibold fs-6 text-gray-500">Dia Inteiro</label>
+                            <div class="fw-bold fs-6">
+                                <span class="badge badge-light-warning">Considerada como falta do dia inteiro (8h)</span>
+                            </div>
                         </div>
                         <?php endif; ?>
                     </div>

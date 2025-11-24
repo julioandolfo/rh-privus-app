@@ -6260,9 +6260,18 @@ input[type="radio"]:checked + .emocao-option {
                                     $stmt_emp = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
                                     $empresas_anotacao = $stmt_emp->fetchAll();
                                 } elseif ($usuario['role'] === 'RH') {
-                                    $stmt_emp = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo' ORDER BY nome_fantasia");
-                                    $stmt_emp->execute([$usuario['empresa_id']]);
-                                    $empresas_anotacao = $stmt_emp->fetchAll();
+                                    // RH pode ter múltiplas empresas
+                                    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                                        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                                        $stmt_emp = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id IN ($placeholders) AND status = 'ativo' ORDER BY nome_fantasia");
+                                        $stmt_emp->execute($usuario['empresas_ids']);
+                                        $empresas_anotacao = $stmt_emp->fetchAll();
+                                    } else {
+                                        // Fallback para compatibilidade
+                                        $stmt_emp = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo' ORDER BY nome_fantasia");
+                                        $stmt_emp->execute([$usuario['empresa_id'] ?? 0]);
+                                        $empresas_anotacao = $stmt_emp->fetchAll();
+                                    }
                                 } else {
                                     $empresas_anotacao = [];
                                 }

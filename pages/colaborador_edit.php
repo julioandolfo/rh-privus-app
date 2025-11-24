@@ -30,7 +30,17 @@ if (!can_access_colaborador($id)) {
 
 // Processa POST ANTES de incluir o header (para evitar erro de headers already sent)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $empresa_id = $_POST['empresa_id'] ?? ($usuario['role'] === 'ADMIN' ? null : $usuario['empresa_id']);
+    // Para RH, valida se a empresa selecionada está nas empresas permitidas
+    $empresa_id = $_POST['empresa_id'] ?? $colaborador['empresa_id'];
+    if ($usuario['role'] === 'RH' && $empresa_id) {
+        if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+            if (!in_array($empresa_id, $usuario['empresas_ids'])) {
+                redirect('colaborador_edit.php?id=' . $id, 'Você não tem permissão para editar colaboradores desta empresa!', 'error');
+            }
+        } elseif (isset($usuario['empresa_id']) && $empresa_id != $usuario['empresa_id']) {
+            redirect('colaborador_edit.php?id=' . $id, 'Você não tem permissão para editar colaboradores desta empresa!', 'error');
+        }
+    }
     $setor_id = $_POST['setor_id'] ?? null;
     $cargo_id = $_POST['cargo_id'] ?? null;
     $nome_completo = sanitize($_POST['nome_completo'] ?? '');
@@ -122,11 +132,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Busca empresas
 if ($usuario['role'] === 'ADMIN') {
     $stmt_empresas = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
+    $empresas = $stmt_empresas->fetchAll();
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id IN ($placeholders) AND status = 'ativo' ORDER BY nome_fantasia");
+        $stmt_empresas->execute($usuario['empresas_ids']);
+        $empresas = $stmt_empresas->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo'");
+        $stmt_empresas->execute([$usuario['empresa_id'] ?? 0]);
+        $empresas = $stmt_empresas->fetchAll();
+    }
 } else {
+    // Outros roles (GESTOR, etc) - apenas uma empresa
     $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo'");
-    $stmt_empresas->execute([$usuario['empresa_id']]);
+    $stmt_empresas->execute([$usuario['empresa_id'] ?? 0]);
+    $empresas = $stmt_empresas->fetchAll();
 }
-$empresas = $stmt_empresas->fetchAll();
 
 // Busca setores da empresa do colaborador
 $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
@@ -152,7 +177,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data">
                         <div class="row">
-                            <?php if ($usuario['role'] === 'ADMIN'): ?>
+                            <?php if ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)): ?>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Empresa *</label>
                                 <select name="empresa_id" id="empresa_id" class="form-select" required>
@@ -168,7 +193,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <input type="hidden" name="empresa_id" value="<?= $colaborador['empresa_id'] ?>">
                             <?php endif; ?>
                             
-                            <div class="col-md-<?= $usuario['role'] === 'ADMIN' ? '3' : '6' ?> mb-3">
+                            <div class="col-md-<?= ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)) ? '3' : '6' ?> mb-3">
                                 <label class="form-label">Setor *</label>
                                 <select name="setor_id" id="setor_id" class="form-select" required>
                                     <option value="">Selecione...</option>
@@ -180,7 +205,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 </select>
                             </div>
                             
-                            <div class="col-md-<?= $usuario['role'] === 'ADMIN' ? '3' : '6' ?> mb-3">
+                            <div class="col-md-<?= ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)) ? '3' : '6' ?> mb-3">
                                 <label class="form-label">Cargo *</label>
                                 <select name="cargo_id" id="cargo_id" class="form-select" required>
                                     <option value="">Selecione...</option>
@@ -413,7 +438,7 @@ require_once __DIR__ . '/../includes/header.php';
 <script>
 // Carrega líderes quando empresa, setor ou nível hierárquico mudar
 function carregarLideres() {
-    const empresaId = document.getElementById('empresa_id')?.value || '<?= $colaborador['empresa_id'] ?>';
+    const empresaId = document.getElementById('empresa_id')?.value || document.querySelector('input[name="empresa_id"][type="hidden"]')?.value || '<?= $colaborador['empresa_id'] ?>';
     const setorId = document.getElementById('setor_id')?.value || '<?= $colaborador['setor_id'] ?>';
     const nivelId = document.getElementById('nivel_hierarquico_id')?.value || '<?= $colaborador['nivel_hierarquico_id'] ?? '' ?>';
     const liderSelect = document.getElementById('lider_id');

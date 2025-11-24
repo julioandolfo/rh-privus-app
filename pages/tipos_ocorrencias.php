@@ -56,6 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conta_advertencia = isset($_POST['conta_advertencia']) ? 1 : 0;
         $calcula_desconto = isset($_POST['calcula_desconto']) ? 1 : 0;
         $permite_desconto_banco_horas = isset($_POST['permite_desconto_banco_horas']) ? 1 : 0;
+        $permite_ocorrencia_rapida = isset($_POST['permite_ocorrencia_rapida']) ? 1 : 0;
+        $permite_considerar_dia_inteiro = isset($_POST['permite_considerar_dia_inteiro']) ? 1 : 0;
         $valor_desconto = !empty($_POST['valor_desconto']) ? (float)$_POST['valor_desconto'] : null;
         $template_descricao = sanitize($_POST['template_descricao'] ?? '');
         
@@ -102,16 +104,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare("
                     INSERT INTO tipos_ocorrencias 
                     (nome, codigo, categoria, categoria_id, severidade, permite_tempo_atraso, permite_tipo_ponto, 
-                     requer_aprovacao, conta_advertencia, calcula_desconto, permite_desconto_banco_horas, valor_desconto, 
+                     requer_aprovacao, conta_advertencia, calcula_desconto, permite_desconto_banco_horas, permite_ocorrencia_rapida, permite_considerar_dia_inteiro, valor_desconto, 
                      template_descricao, validacoes_customizadas, notificar_colaborador, 
                      notificar_colaborador_sistema, notificar_colaborador_email, notificar_colaborador_push,
                      notificar_gestor, notificar_gestor_sistema, notificar_gestor_email, notificar_gestor_push,
                      notificar_rh, notificar_rh_sistema, notificar_rh_email, notificar_rh_push, status) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto,
-                    $requer_aprovacao, $conta_advertencia, $calcula_desconto, $permite_desconto_banco_horas, $valor_desconto,
+                    $requer_aprovacao, $conta_advertencia, $calcula_desconto, $permite_desconto_banco_horas, $permite_ocorrencia_rapida, $permite_considerar_dia_inteiro, $valor_desconto,
                     $template_descricao, $validacoes_customizadas, $notificar_colaborador,
                     $notificar_colaborador_sistema, $notificar_colaborador_email, $notificar_colaborador_push,
                     $notificar_gestor, $notificar_gestor_sistema, $notificar_gestor_email, $notificar_gestor_push,
@@ -140,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     UPDATE tipos_ocorrencias SET 
                     nome = ?, codigo = ?, categoria = ?, categoria_id = ?, severidade = ?, 
                     permite_tempo_atraso = ?, permite_tipo_ponto = ?, 
-                    requer_aprovacao = ?, conta_advertencia = ?, calcula_desconto = ?, permite_desconto_banco_horas = ?,
+                    requer_aprovacao = ?, conta_advertencia = ?, calcula_desconto = ?, permite_desconto_banco_horas = ?, permite_ocorrencia_rapida = ?, permite_considerar_dia_inteiro = ?,
                     valor_desconto = ?, template_descricao = ?, validacoes_customizadas = ?,
                     notificar_colaborador = ?, notificar_colaborador_sistema = ?, notificar_colaborador_email = ?, notificar_colaborador_push = ?,
                     notificar_gestor = ?, notificar_gestor_sistema = ?, notificar_gestor_email = ?, notificar_gestor_push = ?,
@@ -149,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $stmt->execute([
                     $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto,
-                    $requer_aprovacao, $conta_advertencia, $calcula_desconto, $permite_desconto_banco_horas, $valor_desconto,
+                    $requer_aprovacao, $conta_advertencia, $calcula_desconto, $permite_desconto_banco_horas, $permite_ocorrencia_rapida, $permite_considerar_dia_inteiro, $valor_desconto,
                     $template_descricao, $validacoes_customizadas, $notificar_colaborador,
                     $notificar_colaborador_sistema, $notificar_colaborador_email, $notificar_colaborador_push,
                     $notificar_gestor, $notificar_gestor_sistema, $notificar_gestor_email, $notificar_gestor_push,
@@ -516,6 +518,26 @@ require_once __DIR__ . '/../includes/header.php';
                                     </div>
                                 </div>
                             </div>
+                            
+                            <div class="row mb-7">
+                                <div class="col-md-12">
+                                    <div class="card card-flush bg-light-info">
+                                        <div class="card-body">
+                                            <div class="form-check form-check-custom form-check-solid">
+                                                <input class="form-check-input" type="checkbox" name="permite_considerar_dia_inteiro" id="permite_considerar_dia_inteiro" value="1" />
+                                                <label class="form-check-label fw-semibold" for="permite_considerar_dia_inteiro">
+                                                    Permite considerar como dia inteiro (falta)
+                                                </label>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">
+                                                <strong>Como funciona:</strong> Quando marcado, ao criar uma ocorrência deste tipo, será possível marcar uma opção para considerar como falta do dia inteiro (8 horas) ao invés de apenas minutos de atraso.
+                                                <br><strong>Quando usar:</strong> Útil para tipos de ocorrência como "Atraso" onde às vezes o colaborador falta o dia inteiro e você quer registrar como falta completa.
+                                                <br><strong>Importante:</strong> Se marcado, o sistema permitirá escolher entre informar minutos de atraso OU considerar como dia inteiro.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <!-- Aba Configurações -->
@@ -600,7 +622,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         </div>
                                         <div class="card-body">
                                             <p class="text-gray-700 mb-0">
-                                                <strong>Como funciona:</strong> Quando marcado, o sistema calcula automaticamente um desconto no salário do colaborador baseado nesta ocorrência.
+                                                <strong>Como funciona:</strong> Quando marcado, o sistema calcula automaticamente um desconto no salário do colaborador baseado nesta ocorrência. Ao criar a ocorrência, será possível escolher entre descontar do pagamento (R$) ou do banco de horas (se também marcar "Permite Desconto Banco de Horas").
                                             </p>
                                             <p class="text-gray-600 mt-2 mb-0">
                                                 <strong>Opções de cálculo:</strong>
@@ -608,10 +630,14 @@ require_once __DIR__ . '/../includes/header.php';
                                             <ul class="text-gray-600 mt-2">
                                                 <li><strong>Valor fixo:</strong> Se você informar um valor abaixo, será descontado esse valor fixo</li>
                                                 <li><strong>Por tempo de atraso:</strong> Se deixar vazio, calcula proporcionalmente ao tempo de atraso informado na ocorrência</li>
+                                                <li><strong>Por dia inteiro:</strong> Se marcar "considerar dia inteiro", calcula como falta completa (8 horas ou 1 dia de trabalho)</li>
                                             </ul>
                                             <p class="text-gray-600 mt-2 mb-0">
                                                 <strong>Quando usar:</strong> Para ocorrências que geram descontos salariais (atrasos, faltas, etc).
                                             </p>
+                                            <div class="alert alert-info mt-4 mb-0">
+                                                <strong>💡 Dica:</strong> Se você também marcar "Permite Desconto Banco de Horas" abaixo, ao criar a ocorrência o usuário poderá escolher entre descontar em R$ (no fechamento) ou em horas (ficar devendo no banco de horas).
+                                            </div>
                                             <div class="mt-5" id="campo_valor_desconto" style="display: none;">
                                                 <label class="fw-semibold fs-6 mb-2">Valor Fixo do Desconto (R$)</label>
                                                 <input type="number" name="valor_desconto" id="valor_desconto" class="form-control form-control-solid" step="0.01" min="0" placeholder="0.00" />
@@ -619,6 +645,70 @@ require_once __DIR__ . '/../includes/header.php';
                                                     <strong>Informe um valor fixo</strong> para descontar sempre esse valor, ou <strong>deixe vazio</strong> para calcular automaticamente baseado no tempo de atraso informado na ocorrência.
                                                 </small>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Campo: Permite Desconto Banco de Horas -->
+                            <div class="row mb-7">
+                                <div class="col-md-12">
+                                    <div class="card card-flush bg-light-warning mb-5">
+                                        <div class="card-header">
+                                            <div class="card-title">
+                                                <div class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="permite_desconto_banco_horas" id="permite_desconto_banco_horas" value="1" />
+                                                    <label class="form-check-label fw-bold fs-5" for="permite_desconto_banco_horas">
+                                                        Permite Desconto do Banco de Horas
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="text-gray-700 mb-0">
+                                                <strong>Como funciona:</strong> Quando marcado, ao criar uma ocorrência deste tipo, será possível escolher entre descontar do pagamento (R$) ou descontar do banco de horas (ficar devendo horas).
+                                            </p>
+                                            <p class="text-gray-600 mt-2 mb-0">
+                                                <strong>Quando usar:</strong> Marque esta opção para tipos de ocorrências onde você quer dar a opção de descontar em horas ao invés de dinheiro (ex: Faltas, Atrasos).
+                                            </p>
+                                            <div class="alert alert-warning mt-4 mb-0">
+                                                <strong>Importante:</strong> 
+                                                <ul class="mb-0 mt-2">
+                                                    <li>Se marcar <strong>"Calcula Desconto Automático"</strong> E <strong>"Permite Desconto Banco de Horas"</strong>: O usuário poderá escolher entre desconto em R$ ou banco de horas ao criar a ocorrência.</li>
+                                                    <li>Se marcar apenas <strong>"Calcula Desconto Automático"</strong>: Só aparecerá opção de desconto em R$.</li>
+                                                    <li>Se marcar apenas <strong>"Permite Desconto Banco de Horas"</strong>: Só aparecerá opção de desconto em banco de horas.</li>
+                                                    <li>Se não marcar nenhum: A ocorrência será apenas informativa, sem impacto financeiro.</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Campo: Permite Ocorrência Rápida -->
+                            <div class="row mb-7">
+                                <div class="col-md-12">
+                                    <div class="card card-flush bg-light-info">
+                                        <div class="card-header">
+                                            <div class="card-title">
+                                                <div class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="permite_ocorrencia_rapida" id="permite_ocorrencia_rapida" value="1" />
+                                                    <label class="form-check-label fw-bold fs-5" for="permite_ocorrencia_rapida">
+                                                        Disponível em Ocorrências Rápidas
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="text-gray-700 mb-0">
+                                                <strong>Como funciona:</strong> Quando marcado, este tipo de ocorrência aparecerá como opção no formulário de "Ocorrência Rápida", permitindo que seja selecionado para criar ocorrências de forma simplificada.
+                                            </p>
+                                            <p class="text-gray-600 mt-2 mb-0">
+                                                <strong>Quando usar:</strong> Marque esta opção para tipos de ocorrências que são comuns no dia a dia e podem ser registradas rapidamente sem precisar preencher muitos campos (ex: Elogios, Advertências simples, Comportamento inadequado).
+                                            </p>
+                                            <p class="text-gray-600 mt-2 mb-0">
+                                                <strong>Importante:</strong> Tipos que requerem muitos campos específicos (como tempo de atraso, tipo de ponto, etc.) geralmente não devem ser marcados para ocorrências rápidas.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -1356,7 +1446,18 @@ function editarTipoOcorrencia(tipo) {
     document.getElementById('requer_aprovacao').checked = tipo.requer_aprovacao == 1;
     document.getElementById('conta_advertencia').checked = tipo.conta_advertencia == 1;
     document.getElementById('calcula_desconto').checked = tipo.calcula_desconto == 1;
-    document.getElementById('permite_desconto_banco_horas').checked = tipo.permite_desconto_banco_horas == 1;
+    const permiteDescontoBanco = document.getElementById('permite_desconto_banco_horas');
+    if (permiteDescontoBanco) {
+        permiteDescontoBanco.checked = (tipo.permite_desconto_banco_horas == 1 || tipo.permite_desconto_banco_horas === '1');
+    }
+    const permiteOcorrenciaRapida = document.getElementById('permite_ocorrencia_rapida');
+    if (permiteOcorrenciaRapida) {
+        permiteOcorrenciaRapida.checked = (tipo.permite_ocorrencia_rapida == 1 || tipo.permite_ocorrencia_rapida === '1');
+    }
+    const permiteConsiderarDiaInteiro = document.getElementById('permite_considerar_dia_inteiro');
+    if (permiteConsiderarDiaInteiro) {
+        permiteConsiderarDiaInteiro.checked = (tipo.permite_considerar_dia_inteiro == 1 || tipo.permite_considerar_dia_inteiro === '1');
+    }
     document.getElementById('valor_desconto').value = tipo.valor_desconto || '';
     document.getElementById('notificar_colaborador').checked = tipo.notificar_colaborador != 0;
     document.getElementById('notificar_colaborador_sistema').checked = tipo.notificar_colaborador_sistema != 0;

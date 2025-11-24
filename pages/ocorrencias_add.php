@@ -24,7 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data_ocorrencia = $_POST['data_ocorrencia'] ?? date('Y-m-d');
     $hora_ocorrencia = $_POST['hora_ocorrencia'] ?? null;
     $tempo_atraso_minutos = !empty($_POST['tempo_atraso_minutos']) ? (int)$_POST['tempo_atraso_minutos'] : null;
-    $tipo_ponto = $_POST['tipo_ponto'] ?? null;
+    $tipo_ponto = !empty($_POST['tipo_ponto']) ? $_POST['tipo_ponto'] : null;
+    // Valida se tipo_ponto é um valor válido do ENUM
+    if ($tipo_ponto && !in_array($tipo_ponto, ['entrada', 'almoco', 'cafe', 'saida'])) {
+        $tipo_ponto = null;
+    }
+    $considera_dia_inteiro = isset($_POST['considera_dia_inteiro']) && $_POST['considera_dia_inteiro'] == '1';
     $severidade = $_POST['severidade'] ?? null;
     $tags = !empty($_POST['tags']) ? json_encode($_POST['tags']) : null;
     $campos_dinamicos_valores = !empty($_POST['campos_dinamicos']) ? json_encode($_POST['campos_dinamicos']) : null;
@@ -73,8 +78,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        // Valida campos dinâmicos se existirem
+        // Valida campos obrigatórios baseado no tipo
         if ($tipo_ocorrencia_data && $tipo_ocorrencia_id) {
+            // Valida tempo de atraso se obrigatório (mas não se considerar dia inteiro estiver marcado)
+            if ($tipo_ocorrencia_data['permite_tempo_atraso'] && empty($tempo_atraso_minutos) && !$considera_dia_inteiro) {
+                redirect('ocorrencias_add.php', 'Informe o tempo de atraso em minutos ou marque "Considerar como falta do dia inteiro"!', 'error');
+            }
+            
+            // Valida tipo de ponto se obrigatório
+            if ($tipo_ocorrencia_data['permite_tipo_ponto'] && empty($tipo_ponto)) {
+                redirect('ocorrencias_add.php', 'Selecione o tipo de ponto!', 'error');
+            }
+            
+            // Valida campos dinâmicos se existirem
             $campos_dinamicos = get_campos_dinamicos_tipo($tipo_ocorrencia_id);
             if (!empty($campos_dinamicos) && !empty($_POST['campos_dinamicos'])) {
                 $erros_validacao = validar_campos_dinamicos($campos_dinamicos, $_POST['campos_dinamicos']);
@@ -120,8 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 colaborador_id, usuario_id, tipo, tipo_ocorrencia_id, 
                 descricao, data_ocorrencia, hora_ocorrencia, 
                 tempo_atraso_minutos, tipo_ponto, severidade, status_aprovacao,
-                tags, campos_dinamicos
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                considera_dia_inteiro, tags, campos_dinamicos
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $colaborador_id, 
@@ -135,14 +151,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tipo_ponto,
             $severidade,
             $status_aprovacao,
+            $considera_dia_inteiro ? 1 : 0,
             $tags,
             $campos_dinamicos_valores
         ]);
         
         $ocorrencia_id = $pdo->lastInsertId();
         
-        // Verifica se deve descontar do banco de horas
-        $desconta_banco_horas = isset($_POST['desconta_banco_horas']) && $_POST['desconta_banco_horas'] == '1';
+        // Verifica tipo de desconto escolhido
+        $tipo_desconto = $_POST['tipo_desconto'] ?? 'dinheiro';
+        $desconta_banco_horas = ($tipo_desconto === 'banco_horas') ? true : false;
         
         if ($desconta_banco_horas && $tipo_ocorrencia_data && $tipo_ocorrencia_data['permite_desconto_banco_horas']) {
             // Desconta do banco de horas
@@ -344,9 +362,14 @@ require_once __DIR__ . '/../includes/header.php';
                                     <option value="<?= $tipo['id'] ?>" 
                                         data-permite-tempo="<?= $tipo['permite_tempo_atraso'] ?>"
                                         data-permite-ponto="<?= $tipo['permite_tipo_ponto'] ?>"
+                                        data-permite-dia-inteiro="<?= $tipo['permite_considerar_dia_inteiro'] ?? 0 ?>"
+                                        data-permite-desconto-banco="<?= $tipo['permite_desconto_banco_horas'] ?? 0 ?>"
+                                        data-calcula-desconto="<?= $tipo['calcula_desconto'] ?? 0 ?>"
+                                        data-valor-desconto="<?= $tipo['valor_desconto'] ?? 0 ?>"
                                         data-severidade="<?= htmlspecialchars($tipo['severidade'] ?? 'moderada') ?>"
                                         data-requer-aprovacao="<?= $tipo['requer_aprovacao'] ?? 0 ?>"
-                                        data-template="<?= htmlspecialchars($tipo['template_descricao'] ?? '') ?>">
+                                        data-template="<?= htmlspecialchars($tipo['template_descricao'] ?? '') ?>"
+                                        data-codigo="<?= htmlspecialchars($tipo['codigo'] ?? '') ?>">
                                         <?= htmlspecialchars($tipo['nome']) ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -398,6 +421,26 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     
+                    <!-- Campo: Considerar Dia Inteiro -->
+                    <div class="row mb-7" id="campo_considera_dia_inteiro" style="display: none;">
+                        <div class="col-md-12">
+                            <div class="card card-flush bg-light-warning">
+                                <div class="card-body">
+                                    <div class="form-check form-check-custom form-check-solid">
+                                        <input class="form-check-input" type="checkbox" name="considera_dia_inteiro" id="considera_dia_inteiro" value="1" />
+                                        <label class="form-check-label fw-bold" for="considera_dia_inteiro">
+                                            Considerar como falta do dia inteiro (8 horas)
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">
+                                        Quando marcado, esta ocorrência será tratada como falta completa do dia (8 horas de trabalho) ao invés de apenas minutos de atraso.
+                                        <br><strong>Importante:</strong> Se marcar esta opção, o campo de minutos será ignorado e será considerado como falta do dia inteiro.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="row mb-7" id="campo_tipo_ponto" style="display: none;">
                         <div class="col-md-6">
                             <label class="fw-semibold fs-6 mb-2">Tipo de Ponto</label>
@@ -411,19 +454,45 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     
-                    <!-- Campo: Desconto Banco de Horas -->
-                    <div class="row mb-7" id="campo_desconto_banco_horas" style="display: none;">
+                    <!-- Campo: Tipo de Desconto (R$ ou Banco de Horas) -->
+                    <div class="row mb-7" id="campo_tipo_desconto" style="display: none;">
                         <div class="col-md-12">
-                            <div class="card card-flush bg-light-warning">
+                            <div class="card card-flush bg-light-info">
                                 <div class="card-body">
-                                    <div class="form-check form-check-custom form-check-solid mb-3">
-                                        <input class="form-check-input" type="checkbox" name="desconta_banco_horas" 
-                                               id="desconta_banco_horas" value="1" />
-                                        <label class="form-check-label fw-bold" for="desconta_banco_horas">
-                                            Descontar do Banco de Horas
+                                    <h5 class="fw-bold mb-4">Como será descontado?</h5>
+                                    <div class="form-check form-check-custom form-check-solid mb-5">
+                                        <input class="form-check-input" type="radio" name="tipo_desconto" 
+                                               id="tipo_desconto_dinheiro" value="dinheiro" checked />
+                                        <label class="form-check-label fw-bold" for="tipo_desconto_dinheiro">
+                                            <i class="ki-duotone ki-dollar fs-2 text-danger me-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Descontar do Pagamento (R$)
                                         </label>
+                                        <div class="text-muted fs-7 ms-8 mt-1">
+                                            O valor será descontado no fechamento de pagamento do mês
+                                        </div>
                                     </div>
-                                    <div id="info_desconto_banco" style="display: none;">
+                                    <div class="form-check form-check-custom form-check-solid mb-3" id="opcao_banco_horas_container">
+                                        <input class="form-check-input" type="radio" name="tipo_desconto" 
+                                               id="tipo_desconto_banco_horas" value="banco_horas" />
+                                        <label class="form-check-label fw-bold" for="tipo_desconto_banco_horas">
+                                            <i class="ki-duotone ki-time fs-2 text-warning me-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Descontar do Banco de Horas (Ficar Devendo Horas)
+                                        </label>
+                                        <div class="text-muted fs-7 ms-8 mt-1">
+                                            O colaborador ficará devendo horas no banco de horas
+                                        </div>
+                                    </div>
+                                    <input type="hidden" name="desconta_banco_horas" id="desconta_banco_horas" value="0" />
+                                    
+                                    <!-- Informações do Banco de Horas (quando selecionado) -->
+                                    <div id="info_desconto_banco" style="display: none;" class="mt-4 p-4 bg-light-warning rounded">
+                                        <h6 class="fw-bold mb-3">Informações do Banco de Horas</h6>
                                         <div class="d-flex flex-column gap-2">
                                             <div>
                                                 <strong>Saldo atual:</strong> 
@@ -438,6 +507,18 @@ require_once __DIR__ . '/../includes/header.php';
                                                 <span id="saldo_apos_ocorrencia">-</span> horas
                                             </div>
                                         </div>
+                                    </div>
+                                    
+                                    <!-- Informações do Desconto em R$ (quando selecionado) -->
+                                    <div id="info_desconto_dinheiro" style="display: none;" class="mt-4 p-4 bg-light-danger rounded">
+                                        <h6 class="fw-bold mb-3">Informações do Desconto em Dinheiro</h6>
+                                        <div>
+                                            <strong>Valor a descontar:</strong> 
+                                            <span id="valor_desconto_ocorrencia" class="fw-bold fs-4 text-danger">-</span>
+                                        </div>
+                                        <small class="text-muted d-block mt-2">
+                                            Este valor será calculado automaticamente e descontado no fechamento de pagamento.
+                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -518,35 +599,85 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     const option = this.options[this.selectedIndex];
     const permiteTempo = option.getAttribute('data-permite-tempo') === '1';
     const permitePonto = option.getAttribute('data-permite-ponto') === '1';
+    const permiteDiaInteiro = option.getAttribute('data-permite-dia-inteiro') === '1';
     const severidade = option.getAttribute('data-severidade') || 'moderada';
     const requerAprovacao = option.getAttribute('data-requer-aprovacao') === '1';
     const template = option.getAttribute('data-template') || '';
     const permiteDescontoBanco = option.getAttribute('data-permite-desconto-banco') === '1';
+    const calculaDesconto = option.getAttribute('data-calcula-desconto') === '1';
     const codigoTipo = option.getAttribute('data-codigo') || '';
     
     // Atualiza severidade
     document.getElementById('severidade').value = severidade;
     
-    // Mostra/esconde campo de desconto banco de horas
-    const campoDescontoBanco = document.getElementById('campo_desconto_banco_horas');
-    if (permiteDescontoBanco) {
-        campoDescontoBanco.style.display = 'block';
-        atualizarInfoDescontoBanco();
+    // Mostra/esconde campo de tipo de desconto (R$ ou Banco de Horas)
+    const campoTipoDesconto = document.getElementById('campo_tipo_desconto');
+    const opcaoBancoHoras = document.getElementById('opcao_banco_horas_container');
+    
+    // Mostra campo se permite desconto em R$ OU banco de horas
+    if (permiteDescontoBanco || calculaDesconto) {
+        campoTipoDesconto.style.display = 'block';
+        
+        // Mostra/esconde opção de banco de horas
+        if (permiteDescontoBanco) {
+            opcaoBancoHoras.style.display = 'block';
+        } else {
+            opcaoBancoHoras.style.display = 'none';
+            // Se não permite banco de horas, força seleção de dinheiro
+            document.getElementById('tipo_desconto_dinheiro').checked = true;
+            document.getElementById('desconta_banco_horas').value = '0';
+        }
+        
+        // Se só permite um tipo, seleciona automaticamente
+        if (permiteDescontoBanco && !calculaDesconto) {
+            document.getElementById('tipo_desconto_banco_horas').checked = true;
+            document.getElementById('desconta_banco_horas').value = '1';
+            atualizarInfoDescontoBanco();
+        } else if (!permiteDescontoBanco && calculaDesconto) {
+            document.getElementById('tipo_desconto_dinheiro').checked = true;
+            document.getElementById('desconta_banco_horas').value = '0';
+        } else {
+            atualizarInfoDescontoBanco();
+            atualizarValorDescontoDinheiro();
+        }
     } else {
-        campoDescontoBanco.style.display = 'none';
-        document.getElementById('desconta_banco_horas').checked = false;
+        campoTipoDesconto.style.display = 'none';
+        document.getElementById('desconta_banco_horas').value = '0';
         document.getElementById('info_desconto_banco').style.display = 'none';
+        document.getElementById('info_desconto_dinheiro').style.display = 'none';
+    }
+    
+    // Mostra/esconde campo de considerar dia inteiro primeiro
+    const campoDiaInteiro = document.getElementById('campo_considera_dia_inteiro');
+    if (permiteDiaInteiro) {
+        campoDiaInteiro.style.display = 'block';
+    } else {
+        campoDiaInteiro.style.display = 'none';
+        document.getElementById('considera_dia_inteiro').checked = false;
     }
     
     // Mostra/esconde campo de tempo de atraso
     const campoTempo = document.getElementById('campo_tempo_atraso');
+    const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
+    
     if (permiteTempo) {
-        campoTempo.style.display = 'block';
-        document.getElementById('tempo_atraso_minutos').required = true;
+        // Se permite considerar dia inteiro E está marcado, esconde o campo de minutos
+        if (permiteDiaInteiro && consideraDiaInteiro) {
+            campoTempo.style.display = 'none';
+            document.getElementById('tempo_atraso_minutos').value = '';
+            document.getElementById('tempo_atraso_minutos').required = false;
+            document.getElementById('tempo_atraso_minutos').disabled = true;
+        } else {
+            campoTempo.style.display = 'block';
+            document.getElementById('tempo_atraso_minutos').disabled = false;
+            // Só torna obrigatório se não permitir considerar dia inteiro OU se não estiver marcado como dia inteiro
+            document.getElementById('tempo_atraso_minutos').required = !permiteDiaInteiro || !consideraDiaInteiro;
+        }
     } else {
         campoTempo.style.display = 'none';
         document.getElementById('tempo_atraso_minutos').value = '';
         document.getElementById('tempo_atraso_minutos').required = false;
+        document.getElementById('tempo_atraso_minutos').disabled = false;
     }
     
     // Mostra/esconde campo de tipo de ponto
@@ -573,8 +704,14 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     // Atualiza info de desconto banco quando tempo de atraso muda
     const tempoAtraso = document.getElementById('tempo_atraso_minutos');
     if (tempoAtraso) {
-        tempoAtraso.addEventListener('input', atualizarInfoDescontoBanco);
+        tempoAtraso.addEventListener('input', function() {
+            atualizarInfoDescontoBanco();
+            atualizarValorDescontoDinheiro();
+        });
     }
+    
+    // Atualiza valores quando tipo de ocorrência muda
+    atualizarValorDescontoDinheiro();
 });
 
 // Função para atualizar informações de desconto do banco de horas
@@ -592,10 +729,16 @@ function atualizarInfoDescontoBanco() {
     
     // Calcula horas a descontar baseado no tipo
     let horasDescontar = 0;
+    const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
+    
     if (codigoTipo === 'falta' || codigoTipo === 'ausencia_injustificada') {
         horasDescontar = 8; // Jornada padrão
     } else if (['atraso_entrada', 'atraso_almoco', 'atraso_cafe', 'saida_antecipada'].includes(codigoTipo)) {
-        horasDescontar = tempoAtraso / 60; // Converte minutos para horas
+        if (consideraDiaInteiro) {
+            horasDescontar = 8; // Considera como falta do dia inteiro
+        } else {
+            horasDescontar = tempoAtraso / 60; // Converte minutos para horas
+        }
     }
     
     // Busca saldo atual
@@ -613,9 +756,15 @@ function atualizarInfoDescontoBanco() {
                 document.getElementById('saldo_apos_ocorrencia').textContent = 
                     saldoApos.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 
-                // Mostra info se checkbox estiver marcado
-                if (document.getElementById('desconta_banco_horas').checked) {
+                // Mostra info baseado no tipo selecionado
+                const tipoDesconto = document.querySelector('input[name="tipo_desconto"]:checked')?.value;
+                if (tipoDesconto === 'banco_horas') {
                     document.getElementById('info_desconto_banco').style.display = 'block';
+                    document.getElementById('info_desconto_dinheiro').style.display = 'none';
+                } else {
+                    document.getElementById('info_desconto_banco').style.display = 'none';
+                    document.getElementById('info_desconto_dinheiro').style.display = 'block';
+                    atualizarValorDescontoDinheiro();
                 }
             }
         })
@@ -624,19 +773,136 @@ function atualizarInfoDescontoBanco() {
         });
 }
 
-// Event listener para checkbox de desconto banco de horas
-document.getElementById('desconta_banco_horas')?.addEventListener('change', function() {
+// Função para calcular e atualizar valor do desconto em R$
+function atualizarValorDescontoDinheiro() {
+    const colaboradorId = document.getElementById('colaborador_id')?.value;
+    const tipoOcorrencia = document.getElementById('tipo_ocorrencia_id');
+    const option = tipoOcorrencia?.options[tipoOcorrencia.selectedIndex];
+    
+    if (!colaboradorId || !option) {
+        document.getElementById('valor_desconto_ocorrencia').textContent = '-';
+        return;
+    }
+    
+    const valorFixo = parseFloat(option.getAttribute('data-valor-desconto') || 0);
+    const codigoTipo = option.getAttribute('data-codigo') || '';
+    const tempoAtraso = parseFloat(document.getElementById('tempo_atraso_minutos')?.value || 0);
+    const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
+    
+    // Se tem valor fixo, usa ele
+    if (valorFixo > 0) {
+        document.getElementById('valor_desconto_ocorrencia').textContent = 
+            'R$ ' + valorFixo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        return;
+    }
+    
+    // Busca informações do colaborador
+    fetch(`../api/colaboradores/info.php?colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                document.getElementById('valor_desconto_ocorrencia').textContent = 'Erro ao buscar dados do colaborador';
+                console.error('Erro na API:', data.error);
+                return;
+            }
+            
+            if (!data.data.salario || data.data.salario <= 0) {
+                document.getElementById('valor_desconto_ocorrencia').textContent = 'Salário não informado';
+                console.warn('Salário não encontrado para colaborador:', colaboradorId, data);
+                return;
+            }
+            
+            const salario = parseFloat(data.data.salario);
+            const jornadaDiaria = parseFloat(data.data.jornada_diaria_horas || 8);
+            const horasMes = 220; // Padrão CLT
+            const valorHora = salario / horasMes;
+            let valorDesconto = 0;
+            
+            // Calcula desconto baseado no tipo
+            if (codigoTipo === 'falta' || codigoTipo === 'ausencia_injustificada') {
+                // Falta completa = jornada diária
+                valorDesconto = valorHora * jornadaDiaria;
+            } else if (['atraso_entrada', 'atraso_almoco', 'atraso_cafe', 'saida_antecipada'].includes(codigoTipo)) {
+                if (consideraDiaInteiro) {
+                    // Considera como falta do dia inteiro
+                    valorDesconto = valorHora * jornadaDiaria;
+                } else if (tempoAtraso > 0) {
+                    // Calcula proporcional aos minutos
+                    const valorMinuto = valorHora / 60;
+                    valorDesconto = valorMinuto * tempoAtraso;
+                }
+            }
+            
+            if (valorDesconto > 0) {
+                document.getElementById('valor_desconto_ocorrencia').textContent = 
+                    'R$ ' + valorDesconto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            } else {
+                document.getElementById('valor_desconto_ocorrencia').textContent = 'R$ 0,00';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao calcular desconto:', error);
+            document.getElementById('valor_desconto_ocorrencia').textContent = 'Erro ao calcular';
+        });
+}
+
+// Event listeners para radio buttons de tipo de desconto
+document.getElementById('tipo_desconto_dinheiro')?.addEventListener('change', function() {
     if (this.checked) {
-        document.getElementById('info_desconto_banco').style.display = 'block';
-        atualizarInfoDescontoBanco();
-    } else {
+        document.getElementById('desconta_banco_horas').value = '0';
         document.getElementById('info_desconto_banco').style.display = 'none';
+        document.getElementById('info_desconto_dinheiro').style.display = 'block';
+        atualizarValorDescontoDinheiro();
+    }
+});
+
+document.getElementById('tipo_desconto_banco_horas')?.addEventListener('change', function() {
+    if (this.checked) {
+        document.getElementById('desconta_banco_horas').value = '1';
+        document.getElementById('info_desconto_banco').style.display = 'block';
+        document.getElementById('info_desconto_dinheiro').style.display = 'none';
+        atualizarInfoDescontoBanco();
     }
 });
 
 // Atualiza quando colaborador muda
 document.getElementById('colaborador_id')?.addEventListener('change', function() {
     atualizarInfoDescontoBanco();
+    atualizarValorDescontoDinheiro();
+});
+
+// Atualiza quando considera dia inteiro muda
+document.getElementById('considera_dia_inteiro')?.addEventListener('change', function() {
+    const campoTempo = document.getElementById('campo_tempo_atraso');
+    const tempoInput = document.getElementById('tempo_atraso_minutos');
+    const tipoOcorrencia = document.getElementById('tipo_ocorrencia_id');
+    const option = tipoOcorrencia?.options[tipoOcorrencia.selectedIndex];
+    const permiteTempo = option?.getAttribute('data-permite-tempo') === '1';
+    
+    if (this.checked) {
+        // Se marcou dia inteiro, esconde campo de minutos
+        if (campoTempo) {
+            campoTempo.style.display = 'none';
+        }
+        if (tempoInput) {
+            tempoInput.required = false;
+            tempoInput.disabled = true;
+            tempoInput.value = '';
+        }
+    } else {
+        // Se desmarcou, mostra e habilita campo de minutos
+        if (permiteTempo && campoTempo) {
+            campoTempo.style.display = 'block';
+        }
+        if (tempoInput) {
+            tempoInput.disabled = false;
+            if (permiteTempo) {
+                tempoInput.required = true;
+            }
+        }
+    }
+    atualizarInfoDescontoBanco();
+    atualizarValorDescontoDinheiro();
 });
 
 // Carrega campos dinâmicos no formulário
@@ -798,25 +1064,28 @@ document.getElementById('kt_form_ocorrencia').addEventListener('submit', functio
     const permiteTempo = option.getAttribute('data-permite-tempo') === '1';
     const permitePonto = option.getAttribute('data-permite-ponto') === '1';
     
-    // Valida tempo de atraso se obrigatório
+    // Valida tempo de atraso se obrigatório (mas não se considerar dia inteiro estiver marcado)
     if (permiteTempo) {
-        const tempoAtraso = document.getElementById('tempo_atraso_minutos').value;
-        if (!tempoAtraso || tempoAtraso <= 0) {
-            e.preventDefault();
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    text: 'Informe o tempo de atraso em minutos!',
-                    icon: 'error',
-                    buttonsStyling: false,
-                    confirmButtonText: 'Ok, entendi!',
-                    customClass: {
-                        confirmButton: 'btn fw-bold btn-primary'
-                    }
-                });
-            } else {
-                alert('Informe o tempo de atraso em minutos!');
+        const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
+        if (!consideraDiaInteiro) {
+            const tempoAtraso = document.getElementById('tempo_atraso_minutos').value;
+            if (!tempoAtraso || tempoAtraso <= 0) {
+                e.preventDefault();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        text: 'Informe o tempo de atraso em minutos ou marque "Considerar como falta do dia inteiro"!',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'Ok, entendi!',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    });
+                } else {
+                    alert('Informe o tempo de atraso em minutos ou marque "Considerar como falta do dia inteiro"!');
+                }
+                return false;
             }
-            return false;
         }
     }
     

@@ -116,6 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $quantidade_horas = str_replace(',', '.', $_POST['quantidade_horas'] ?? '0');
         $motivo = sanitize($_POST['motivo'] ?? '');
         $observacoes = sanitize($_POST['observacoes'] ?? '');
+        $data_remocao = $_POST['data_movimentacao'] ?? date('Y-m-d');
         
         if (empty($colaborador_id) || empty($quantidade_horas) || $quantidade_horas <= 0 || empty($motivo)) {
             redirect('horas_extras.php', 'Preencha os campos obrigatórios!', 'error');
@@ -124,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             require_once __DIR__ . '/../includes/banco_horas_functions.php';
             
+            // Remove horas do banco (a função já gerencia a transação internamente)
             $resultado = remover_horas_banco(
                 $colaborador_id,
                 $quantidade_horas,
@@ -131,14 +133,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 null,
                 $motivo,
                 $observacoes,
-                $usuario['id']
+                $usuario['id'],
+                $data_remocao
             );
             
-            if ($resultado['success']) {
-                redirect('horas_extras.php', 'Horas removidas do banco com sucesso!');
-            } else {
+            if (!$resultado['success']) {
                 redirect('horas_extras.php', 'Erro: ' . $resultado['error'], 'error');
             }
+            
+            // Busca dados do colaborador para criar registro na tabela horas_extras
+            $stmt_colab = $pdo->prepare("SELECT salario, empresa_id FROM colaboradores WHERE id = ?");
+            $stmt_colab->execute([$colaborador_id]);
+            $colab_data = $stmt_colab->fetch();
+            
+            if ($colab_data) {
+                // Busca percentual da empresa
+                $stmt_empresa = $pdo->prepare("SELECT percentual_hora_extra FROM empresas WHERE id = ?");
+                $stmt_empresa->execute([$colab_data['empresa_id']]);
+                $empresa_data = $stmt_empresa->fetch();
+                $percentual_adicional = $empresa_data['percentual_hora_extra'] ?? 50;
+                
+                // Calcula valores (mesmo que não sejam usados, mantém consistência)
+                $salario = (float)$colab_data['salario'];
+                $valor_hora = $salario / 220; // Base mensal padrão
+                $valor_hora_extra = $valor_hora * (1 + ($percentual_adicional / 100));
+                $valor_total = $valor_hora_extra * $quantidade_horas;
+                
+                // Insere registro na tabela horas_extras para aparecer na listagem
+                // Usa quantidade negativa para indicar remoção
+                $stmt_insert = $pdo->prepare("
+                    INSERT INTO horas_extras (
+                        colaborador_id, data_trabalho, quantidade_horas, 
+                        valor_hora, percentual_adicional, valor_total, 
+                        observacoes, usuario_id, tipo_pagamento
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'banco_horas')
+                ");
+                $observacoes_completas = !empty($observacoes) 
+                    ? "Remoção: {$motivo}. {$observacoes}" 
+                    : "Remoção: {$motivo}";
+                
+                $stmt_insert->execute([
+                    $colaborador_id,
+                    $data_remocao,
+                    -abs($quantidade_horas), // Quantidade negativa para indicar remoção
+                    $valor_hora,
+                    $percentual_adicional,
+                    -abs($valor_total), // Valor negativo
+                    $observacoes_completas,
+                    $usuario['id']
+                ]);
+            }
+            
+            redirect('horas_extras.php', 'Horas removidas do banco com sucesso!');
+            
         } catch (Exception $e) {
             redirect('horas_extras.php', 'Erro ao remover horas: ' . $e->getMessage(), 'error');
         }
@@ -296,7 +343,10 @@ require_once __DIR__ . '/../includes/header.php';
                         </tr>
                     </thead>
                     <tbody class="fw-semibold text-gray-600">
-                        <?php foreach ($horas_extras as $he): ?>
+                        <?php foreach ($horas_extras as $he): 
+                            $is_remocao = ($he['quantidade_horas'] < 0);
+                            $tipo_pagamento = $he['tipo_pagamento'] ?? 'dinheiro';
+                        ?>
                         <tr>
                             <td><?= $he['id'] ?></td>
                             <td>
@@ -306,30 +356,40 @@ require_once __DIR__ . '/../includes/header.php';
                             </td>
                             <td><?= htmlspecialchars($he['empresa_nome'] ?? '-') ?></td>
                             <td><?= date('d/m/Y', strtotime($he['data_trabalho'])) ?></td>
-                            <td><?= number_format($he['quantidade_horas'], 2, ',', '.') ?>h</td>
                             <td>
-                                <?php if (($he['tipo_pagamento'] ?? 'dinheiro') === 'banco_horas'): ?>
+                                <?php if ($is_remocao): ?>
+                                    <span class="text-gray-600">-<?= number_format(abs($he['quantidade_horas']), 2, ',', '.') ?>h</span>
+                                <?php else: ?>
+                                    <?= number_format($he['quantidade_horas'], 2, ',', '.') ?>h
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($is_remocao): ?>
+                                    <span class="badge badge-light-warning">Remoção Banco</span>
+                                <?php elseif ($tipo_pagamento === 'banco_horas'): ?>
                                     <span class="badge badge-info">Banco de Horas</span>
                                 <?php else: ?>
                                     <span class="badge badge-success">R$</span>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if (($he['tipo_pagamento'] ?? 'dinheiro') === 'banco_horas'): ?>
+                                <?php if ($tipo_pagamento === 'banco_horas'): ?>
                                     <span class="text-muted">-</span>
                                 <?php else: ?>
                                     R$ <?= number_format($he['valor_hora'], 2, ',', '.') ?>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if (($he['tipo_pagamento'] ?? 'dinheiro') === 'banco_horas'): ?>
+                                <?php if ($tipo_pagamento === 'banco_horas'): ?>
                                     <span class="text-muted">-</span>
                                 <?php else: ?>
                                     <?= number_format($he['percentual_adicional'], 2, ',', '.') ?>%
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if (($he['tipo_pagamento'] ?? 'dinheiro') === 'banco_horas'): ?>
+                                <?php if ($is_remocao): ?>
+                                    <span class="text-gray-600">-</span>
+                                <?php elseif ($tipo_pagamento === 'banco_horas'): ?>
                                     <span class="text-muted">-</span>
                                 <?php else: ?>
                                     <span class="text-success fw-bold">R$ <?= number_format($he['valor_total'], 2, ',', '.') ?></span>

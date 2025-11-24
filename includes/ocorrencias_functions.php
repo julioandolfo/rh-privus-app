@@ -226,7 +226,7 @@ function calcular_desconto_ocorrencia($ocorrencia_id) {
     $pdo = getDB();
     
     $stmt = $pdo->prepare("
-        SELECT o.*, t.calcula_desconto, t.valor_desconto, c.salario_base
+        SELECT o.*, t.calcula_desconto, t.valor_desconto, c.salario, c.jornada_diaria_horas
         FROM ocorrencias o
         INNER JOIN tipos_ocorrencias t ON o.tipo_ocorrencia_id = t.id
         INNER JOIN colaboradores c ON o.colaborador_id = c.id
@@ -244,11 +244,20 @@ function calcular_desconto_ocorrencia($ocorrencia_id) {
         return (float)$ocorrencia['valor_desconto'];
     }
     
+    // Se considera dia inteiro, calcula como falta completa
+    if (!empty($ocorrencia['considera_dia_inteiro']) && $ocorrencia['considera_dia_inteiro'] == 1 && $ocorrencia['salario']) {
+        // Calcula valor do dia de trabalho
+        $jornada_diaria = $ocorrencia['jornada_diaria_horas'] ?? 8; // Padrão 8h
+        $horas_mes = 220; // Padrão CLT
+        $valor_hora = $ocorrencia['salario'] / $horas_mes;
+        return $valor_hora * $jornada_diaria;
+    }
+    
     // Se tem tempo de atraso, calcula proporcional ao salário
-    if ($ocorrencia['tempo_atraso_minutos'] && $ocorrencia['salario_base']) {
+    if ($ocorrencia['tempo_atraso_minutos'] && $ocorrencia['salario']) {
         // Calcula valor por minuto trabalhado
         $horas_mes = 220; // Padrão CLT
-        $valor_minuto = ($ocorrencia['salario_base'] / ($horas_mes * 60));
+        $valor_minuto = ($ocorrencia['salario'] / ($horas_mes * 60));
         return $valor_minuto * $ocorrencia['tempo_atraso_minutos'];
     }
     
@@ -332,12 +341,10 @@ function enviar_notificacoes_ocorrencia($ocorrencia_id) {
                t.notificar_colaborador, t.notificar_colaborador_sistema, t.notificar_colaborador_email, t.notificar_colaborador_push,
                t.notificar_gestor, t.notificar_gestor_sistema, t.notificar_gestor_email, t.notificar_gestor_push,
                t.notificar_rh, t.notificar_rh_sistema, t.notificar_rh_email, t.notificar_rh_push,
-               c.nome_completo, c.email_pessoal, c.setor_id,
-               s.gestor_id
+               c.nome_completo, c.email_pessoal, c.setor_id
         FROM ocorrencias o
         INNER JOIN tipos_ocorrencias t ON o.tipo_ocorrencia_id = t.id
         INNER JOIN colaboradores c ON o.colaborador_id = c.id
-        LEFT JOIN setores s ON c.setor_id = s.id
         WHERE o.id = ?
     ");
     $stmt->execute([$ocorrencia_id]);
@@ -346,6 +353,18 @@ function enviar_notificacoes_ocorrencia($ocorrencia_id) {
     if (!$ocorrencia) {
         return false;
     }
+    
+    // Busca gestor do setor se necessário
+    $gestor_id = null;
+    if ($ocorrencia['notificar_gestor'] && !empty($ocorrencia['setor_id'])) {
+        $stmt_gestor = $pdo->prepare("SELECT id FROM usuarios WHERE setor_id = ? AND role = 'GESTOR' AND status = 'ativo' LIMIT 1");
+        $stmt_gestor->execute([$ocorrencia['setor_id']]);
+        $gestor = $stmt_gestor->fetch();
+        if ($gestor) {
+            $gestor_id = $gestor['id'];
+        }
+    }
+    $ocorrencia['gestor_id'] = $gestor_id;
     
     require_once __DIR__ . '/notificacoes.php';
     require_once __DIR__ . '/push_notifications.php';

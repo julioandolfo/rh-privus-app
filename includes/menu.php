@@ -701,6 +701,18 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('ocorrencias_add.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('ocorrencias_add.php') ?>" href="ocorrencias_add.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Nova Ocorrência</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
                             <?php if (can_access_page('ocorrencias_rapida.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
