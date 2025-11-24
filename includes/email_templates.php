@@ -64,8 +64,10 @@ function enviar_email_template($codigo_template, $email_destinatario, $variaveis
 
 /**
  * Envia email de boas-vindas para novo colaborador
+ * @param int $colaborador_id ID do colaborador
+ * @param string|null $senha_plana Senha em texto claro para incluir no email (opcional)
  */
-function enviar_email_novo_colaborador($colaborador_id) {
+function enviar_email_novo_colaborador($colaborador_id, $senha_plana = null) {
     $pdo = getDB();
     
     // Busca dados do colaborador
@@ -87,6 +89,9 @@ function enviar_email_novo_colaborador($colaborador_id) {
         return ['success' => false, 'message' => 'Colaborador não encontrado ou sem email cadastrado.'];
     }
     
+    // Determina login (CPF ou email)
+    $usuario_login = !empty($colab['cpf']) ? formatar_cpf($colab['cpf']) : $colab['email_pessoal'];
+    
     // Prepara variáveis
     $variaveis = [
         'nome_completo' => $colab['nome_completo'],
@@ -97,8 +102,26 @@ function enviar_email_novo_colaborador($colaborador_id) {
         'tipo_contrato' => $colab['tipo_contrato'],
         'cpf' => formatar_cpf($colab['cpf'] ?? ''),
         'email_pessoal' => $colab['email_pessoal'],
-        'telefone' => $colab['telefone'] ?? ''
+        'telefone' => $colab['telefone'] ?? '',
+        'usuario_login' => $usuario_login,
+        'senha' => $senha_plana ?? '',
+        'dados_acesso_html' => ''
     ];
+    
+    // Se houver senha, prepara HTML e texto com dados de acesso
+    if (!empty($senha_plana)) {
+        $variaveis['dados_acesso_html'] = '
+            <div style="background-color: #f8f9fa; border-left: 4px solid #0d6efd; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                <h3 style="margin-top: 0; color: #0d6efd;">Dados de Acesso ao Sistema</h3>
+                <p style="margin-bottom: 10px;"><strong>Usuário:</strong> ' . htmlspecialchars($usuario_login) . '</p>
+                <p style="margin-bottom: 10px;"><strong>Senha:</strong> <code style="background-color: #e9ecef; padding: 4px 8px; border-radius: 3px;">' . htmlspecialchars($senha_plana) . '</code></p>
+                <p style="margin-bottom: 0; color: #6c757d; font-size: 14px;"><em>Guarde estas informações com segurança. Você pode alterar sua senha após o primeiro acesso.</em></p>
+            </div>
+        ';
+        $variaveis['dados_acesso_texto'] = "\n\nDADOS DE ACESSO AO SISTEMA:\nUsuário: " . $usuario_login . "\nSenha: " . $senha_plana . "\n\nGuarde estas informações com segurança. Você pode alterar sua senha após o primeiro acesso.";
+    } else {
+        $variaveis['dados_acesso_texto'] = '';
+    }
     
     return enviar_email_template('novo_colaborador', $colab['email_pessoal'], $variaveis);
 }

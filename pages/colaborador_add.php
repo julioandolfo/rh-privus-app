@@ -152,10 +152,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        // Envia email de boas-vindas se template estiver ativo
-        if (!empty($email_pessoal)) {
+        // Envia email de boas-vindas se solicitado e template estiver ativo
+        $enviar_email = isset($_POST['enviar_email_boas_vindas']) && $_POST['enviar_email_boas_vindas'] == '1';
+        if ($enviar_email && !empty($email_pessoal)) {
             require_once __DIR__ . '/../includes/email_templates.php';
-            enviar_email_novo_colaborador($colaborador_id);
+            // Passa a senha em texto claro apenas para o email (não armazena)
+            $senha_para_email = !empty($senha) ? $senha : null;
+            enviar_email_novo_colaborador($colaborador_id, $senha_para_email);
         }
         
         redirect('colaboradores.php', 'Colaborador cadastrado com sucesso!');
@@ -475,8 +478,20 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Senha de Acesso</label>
-                                <input type="password" name="senha" class="form-control" minlength="6" placeholder="Opcional - mínimo 6 caracteres">
+                                <input type="password" name="senha" id="senha" class="form-control" minlength="6" placeholder="Opcional - mínimo 6 caracteres">
                                 <small class="text-muted">Permite acesso ao sistema como colaborador</small>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="enviar_email_boas_vindas" id="enviar_email_boas_vindas" value="1" checked>
+                                    <label class="form-check-label" for="enviar_email_boas_vindas">
+                                        <strong>Enviar email de boas-vindas</strong>
+                                    </label>
+                                    <small class="d-block text-muted">Envia email automático com dados de cadastro e acesso ao sistema (se senha for informada)</small>
+                                </div>
                             </div>
                         </div>
                         

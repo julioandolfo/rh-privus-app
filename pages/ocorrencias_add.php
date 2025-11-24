@@ -614,34 +614,57 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     const campoTipoDesconto = document.getElementById('campo_tipo_desconto');
     const opcaoBancoHoras = document.getElementById('opcao_banco_horas_container');
     
+    console.log('permiteDescontoBanco:', permiteDescontoBanco);
+    console.log('calculaDesconto:', calculaDesconto);
+    console.log('campoTipoDesconto encontrado:', campoTipoDesconto);
+    
     // Mostra campo se permite desconto em R$ OU banco de horas
     if (permiteDescontoBanco || calculaDesconto) {
-        campoTipoDesconto.style.display = 'block';
+        if (campoTipoDesconto) {
+            campoTipoDesconto.style.display = 'block';
+            console.log('Campo tipo desconto EXIBIDO');
+        }
         
         // Mostra/esconde opção de banco de horas
-        if (permiteDescontoBanco) {
-            opcaoBancoHoras.style.display = 'block';
-        } else {
-            opcaoBancoHoras.style.display = 'none';
-            // Se não permite banco de horas, força seleção de dinheiro
-            document.getElementById('tipo_desconto_dinheiro').checked = true;
-            document.getElementById('desconta_banco_horas').value = '0';
+        if (opcaoBancoHoras) {
+            if (permiteDescontoBanco) {
+                opcaoBancoHoras.style.display = 'block';
+                console.log('Opção banco horas EXIBIDA');
+            } else {
+                opcaoBancoHoras.style.display = 'none';
+                console.log('Opção banco horas OCULTA');
+                // Se não permite banco de horas, força seleção de dinheiro
+                const radioDinheiro = document.getElementById('tipo_desconto_dinheiro');
+                if (radioDinheiro) {
+                    radioDinheiro.checked = true;
+                }
+                document.getElementById('desconta_banco_horas').value = '0';
+            }
         }
         
         // Se só permite um tipo, seleciona automaticamente
         if (permiteDescontoBanco && !calculaDesconto) {
-            document.getElementById('tipo_desconto_banco_horas').checked = true;
+            const radioBanco = document.getElementById('tipo_desconto_banco_horas');
+            if (radioBanco) {
+                radioBanco.checked = true;
+            }
             document.getElementById('desconta_banco_horas').value = '1';
             atualizarInfoDescontoBanco();
         } else if (!permiteDescontoBanco && calculaDesconto) {
-            document.getElementById('tipo_desconto_dinheiro').checked = true;
+            const radioDinheiro = document.getElementById('tipo_desconto_dinheiro');
+            if (radioDinheiro) {
+                radioDinheiro.checked = true;
+            }
             document.getElementById('desconta_banco_horas').value = '0';
         } else {
             atualizarInfoDescontoBanco();
             atualizarValorDescontoDinheiro();
         }
     } else {
-        campoTipoDesconto.style.display = 'none';
+        if (campoTipoDesconto) {
+            campoTipoDesconto.style.display = 'none';
+            console.log('Campo tipo desconto OCULTO');
+        }
         document.getElementById('desconta_banco_horas').value = '0';
         document.getElementById('info_desconto_banco').style.display = 'none';
         document.getElementById('info_desconto_dinheiro').style.display = 'none';
@@ -660,28 +683,43 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     const campoTempo = document.getElementById('campo_tempo_atraso');
     const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
     
-    if (permiteTempo) {
+    console.log('permiteTempo:', permiteTempo);
+    console.log('campoTempo encontrado:', campoTempo);
+    console.log('permiteDiaInteiro:', permiteDiaInteiro);
+    console.log('consideraDiaInteiro:', consideraDiaInteiro);
+    
+    if (permiteTempo && campoTempo) {
         // Se permite considerar dia inteiro E está marcado, esconde o campo de minutos
         if (permiteDiaInteiro && consideraDiaInteiro) {
             campoTempo.style.display = 'none';
+            console.log('Campo tempo OCULTO (dia inteiro marcado)');
             document.getElementById('tempo_atraso_minutos').value = '';
             document.getElementById('tempo_atraso_minutos').required = false;
             document.getElementById('tempo_atraso_minutos').disabled = true;
         } else {
             campoTempo.style.display = 'block';
+            console.log('Campo tempo EXIBIDO');
             document.getElementById('tempo_atraso_minutos').disabled = false;
             // Só torna obrigatório se não permitir considerar dia inteiro OU se não estiver marcado como dia inteiro
             document.getElementById('tempo_atraso_minutos').required = !permiteDiaInteiro || !consideraDiaInteiro;
         }
     } else {
-        campoTempo.style.display = 'none';
-        document.getElementById('tempo_atraso_minutos').value = '';
-        document.getElementById('tempo_atraso_minutos').required = false;
-        document.getElementById('tempo_atraso_minutos').disabled = false;
+        if (campoTempo) {
+            campoTempo.style.display = 'none';
+            console.log('Campo tempo OCULTO (não permite tempo)');
+        }
+        const tempoInput = document.getElementById('tempo_atraso_minutos');
+        if (tempoInput) {
+            tempoInput.value = '';
+            tempoInput.required = false;
+            tempoInput.disabled = false;
+        }
     }
     
-    // Re-adiciona listener após mudança de tipo de ocorrência
-    setTimeout(adicionarListenerTempoAtraso, 50);
+    // Re-adiciona listener após mudança de tipo de ocorrência (quando campo é habilitado)
+    if (permiteTempo && (!permiteDiaInteiro || !consideraDiaInteiro)) {
+        setTimeout(adicionarListenerTempoAtraso, 100);
+    }
     
     // Mostra/esconde campo de tipo de ponto
     const campoPonto = document.getElementById('campo_tipo_ponto');
@@ -711,6 +749,7 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
 
 // Função para atualizar valores quando tempo de atraso muda
 function atualizarValoresTempoAtraso() {
+    console.log('atualizarValoresTempoAtraso chamada');
     atualizarInfoDescontoBanco();
     atualizarValorDescontoDinheiro();
 }
@@ -718,25 +757,61 @@ function atualizarValoresTempoAtraso() {
 // Listener global para campo de tempo de atraso (atualiza em tempo real)
 function adicionarListenerTempoAtraso() {
     const tempoAtraso = document.getElementById('tempo_atraso_minutos');
-    if (tempoAtraso && !tempoAtraso.hasAttribute('data-listener-adicionado')) {
-        // Marca que o listener já foi adicionado para evitar duplicação
-        tempoAtraso.setAttribute('data-listener-adicionado', 'true');
+    if (tempoAtraso) {
+        // Remove listeners anteriores se existirem (usando clone para remover todos)
+        const novoInput = tempoAtraso.cloneNode(true);
+        tempoAtraso.parentNode.replaceChild(novoInput, tempoAtraso);
         
-        // Adiciona listener de input (atualiza enquanto digita)
-        tempoAtraso.addEventListener('input', atualizarValoresTempoAtraso);
-        
-        // Também atualiza quando perde o foco (change)
-        tempoAtraso.addEventListener('change', atualizarValoresTempoAtraso);
+        // Adiciona listeners no novo elemento
+        const campoAtualizado = document.getElementById('tempo_atraso_minutos');
+        if (campoAtualizado) {
+            // Listener de input (atualiza enquanto digita)
+            campoAtualizado.addEventListener('input', function() {
+                atualizarValoresTempoAtraso();
+            });
+            
+            // Listener de change (atualiza quando perde o foco)
+            campoAtualizado.addEventListener('change', function() {
+                atualizarValoresTempoAtraso();
+            });
+            
+            // Listener de keyup (atualiza quando solta a tecla)
+            campoAtualizado.addEventListener('keyup', function() {
+                atualizarValoresTempoAtraso();
+            });
+        }
     }
 }
 
-// Adiciona listener quando a página carrega
+// Usa delegação de eventos para garantir que funcione mesmo quando campo é criado dinamicamente
+document.addEventListener('input', function(e) {
+    if (e.target && e.target.id === 'tempo_atraso_minutos') {
+        console.log('Evento input capturado no campo tempo_atraso_minutos, valor:', e.target.value);
+        atualizarValoresTempoAtraso();
+    }
+});
+
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'tempo_atraso_minutos') {
+        console.log('Evento change capturado no campo tempo_atraso_minutos, valor:', e.target.value);
+        atualizarValoresTempoAtraso();
+    }
+});
+
+document.addEventListener('keyup', function(e) {
+    if (e.target && e.target.id === 'tempo_atraso_minutos') {
+        console.log('Evento keyup capturado no campo tempo_atraso_minutos, valor:', e.target.value);
+        atualizarValoresTempoAtraso();
+    }
+});
+
+// Adiciona listener quando a página carrega (para garantir que funcione se campo já existir)
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(adicionarListenerTempoAtraso, 100);
+        setTimeout(adicionarListenerTempoAtraso, 200);
     });
 } else {
-    setTimeout(adicionarListenerTempoAtraso, 100);
+    setTimeout(adicionarListenerTempoAtraso, 200);
 }
 
 // Função para atualizar informações de desconto do banco de horas
@@ -757,7 +832,13 @@ function atualizarInfoDescontoBanco() {
     const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
     
     if (codigoTipo === 'falta' || codigoTipo === 'ausencia_injustificada') {
-        horasDescontar = 8; // Jornada padrão
+        // Para falta: se considerar dia inteiro OU não tem tempo de atraso informado, calcula como dia inteiro
+        if (consideraDiaInteiro || tempoAtraso === 0) {
+            horasDescontar = 8; // Jornada padrão
+        } else {
+            // Se tem tempo de atraso informado e não está marcado como dia inteiro, calcula proporcional
+            horasDescontar = tempoAtraso / 60; // Converte minutos para horas
+        }
     } else if (['atraso_entrada', 'atraso_almoco', 'atraso_cafe', 'saida_antecipada'].includes(codigoTipo)) {
         if (consideraDiaInteiro) {
             horasDescontar = 8; // Considera como falta do dia inteiro
@@ -800,24 +881,52 @@ function atualizarInfoDescontoBanco() {
 
 // Função para calcular e atualizar valor do desconto em R$
 function atualizarValorDescontoDinheiro() {
+    console.log('=== atualizarValorDescontoDinheiro chamada ===');
     const colaboradorId = document.getElementById('colaborador_id')?.value;
     const tipoOcorrencia = document.getElementById('tipo_ocorrencia_id');
     const option = tipoOcorrencia?.options[tipoOcorrencia.selectedIndex];
     
+    console.log('colaboradorId:', colaboradorId);
+    console.log('option:', option);
+    
+    // Garante que o container está visível ANTES de calcular
+    const containerInfo = document.getElementById('info_desconto_dinheiro');
+    const tipoDesconto = document.querySelector('input[name="tipo_desconto"]:checked')?.value;
+    console.log('Tipo de desconto:', tipoDesconto);
+    console.log('Container encontrado:', containerInfo);
+    
+    if (containerInfo && (tipoDesconto === 'dinheiro' || !tipoDesconto)) {
+        containerInfo.style.display = 'block';
+        console.log('Container info_desconto_dinheiro FORÇADO a exibir');
+    }
+    
     if (!colaboradorId || !option) {
-        document.getElementById('valor_desconto_ocorrencia').textContent = '-';
+        console.log('Sem colaborador ou tipo de ocorrência');
+        const elementoValor = document.getElementById('valor_desconto_ocorrencia');
+        if (elementoValor) {
+            elementoValor.textContent = '-';
+        }
         return;
     }
     
     const valorFixo = parseFloat(option.getAttribute('data-valor-desconto') || 0);
     const codigoTipo = option.getAttribute('data-codigo') || '';
-    const tempoAtraso = parseFloat(document.getElementById('tempo_atraso_minutos')?.value || 0);
+    const tempoAtrasoInput = document.getElementById('tempo_atraso_minutos');
+    const tempoAtraso = parseFloat(tempoAtrasoInput?.value || 0);
     const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
+    
+    console.log('valorFixo:', valorFixo);
+    console.log('codigoTipo:', codigoTipo);
+    console.log('tempoAtraso:', tempoAtraso);
+    console.log('consideraDiaInteiro:', consideraDiaInteiro);
     
     // Se tem valor fixo, usa ele
     if (valorFixo > 0) {
-        document.getElementById('valor_desconto_ocorrencia').textContent = 
-            'R$ ' + valorFixo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const elementoValor = document.getElementById('valor_desconto_ocorrencia');
+        if (elementoValor) {
+            elementoValor.textContent = 'R$ ' + valorFixo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            console.log('Valor fixo atualizado:', elementoValor.textContent);
+        }
         return;
     }
     
@@ -843,26 +952,59 @@ function atualizarValorDescontoDinheiro() {
             const valorHora = salario / horasMes;
             let valorDesconto = 0;
             
+            console.log('salario:', salario);
+            console.log('jornadaDiaria:', jornadaDiaria);
+            console.log('valorHora:', valorHora);
+            
             // Calcula desconto baseado no tipo
             if (codigoTipo === 'falta' || codigoTipo === 'ausencia_injustificada') {
-                // Falta completa = jornada diária
-                valorDesconto = valorHora * jornadaDiaria;
+                // Para falta: se considerar dia inteiro OU não tem tempo de atraso informado, calcula como dia inteiro
+                if (consideraDiaInteiro || tempoAtraso === 0) {
+                    // Falta completa = jornada diária
+                    valorDesconto = valorHora * jornadaDiaria;
+                    console.log('Calculado como falta completa (dia inteiro):', valorDesconto);
+                } else {
+                    // Se tem tempo de atraso informado e não está marcado como dia inteiro, calcula proporcional
+                    const valorMinuto = valorHora / 60;
+                    valorDesconto = valorMinuto * tempoAtraso;
+                    console.log('Calculado proporcional aos minutos (falta com tempo):', valorDesconto, '(minutos:', tempoAtraso, ')');
+                }
             } else if (['atraso_entrada', 'atraso_almoco', 'atraso_cafe', 'saida_antecipada'].includes(codigoTipo)) {
                 if (consideraDiaInteiro) {
                     // Considera como falta do dia inteiro
                     valorDesconto = valorHora * jornadaDiaria;
+                    console.log('Calculado como dia inteiro:', valorDesconto);
                 } else {
                     // Calcula proporcional aos minutos (mesmo que seja 0, mostra 0)
                     const valorMinuto = valorHora / 60;
                     valorDesconto = valorMinuto * tempoAtraso;
+                    console.log('Calculado proporcional aos minutos:', valorDesconto, '(minutos:', tempoAtraso, ')');
                 }
             }
             
-            if (valorDesconto > 0) {
-                document.getElementById('valor_desconto_ocorrencia').textContent = 
-                    'R$ ' + valorDesconto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const elementoValor = document.getElementById('valor_desconto_ocorrencia');
+            // containerInfo e tipoDesconto já foram declarados no início da função
+            
+            console.log('Elemento valor_desconto_ocorrencia encontrado:', elementoValor);
+            console.log('Container info_desconto_dinheiro encontrado:', containerInfo);
+            console.log('Tipo de desconto selecionado:', tipoDesconto);
+            
+            if (elementoValor) {
+                const valorFormatado = valorDesconto > 0 
+                    ? 'R$ ' + valorDesconto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                    : 'R$ 0,00';
+                
+                elementoValor.textContent = valorFormatado;
+                console.log('Valor atualizado para:', valorFormatado);
+                console.log('Elemento após atualização:', elementoValor.textContent);
+                
+                // Garante que o container está visível se o tipo de desconto for dinheiro
+                if (containerInfo && tipoDesconto === 'dinheiro') {
+                    containerInfo.style.display = 'block';
+                    console.log('Container info_desconto_dinheiro exibido');
+                }
             } else {
-                document.getElementById('valor_desconto_ocorrencia').textContent = 'R$ 0,00';
+                console.error('Elemento valor_desconto_ocorrencia não encontrado!');
             }
         })
         .catch(error => {
@@ -914,6 +1056,9 @@ document.getElementById('considera_dia_inteiro')?.addEventListener('change', fun
             tempoInput.disabled = true;
             tempoInput.value = '';
         }
+        // Atualiza valores imediatamente (considera como dia inteiro)
+        atualizarInfoDescontoBanco();
+        atualizarValorDescontoDinheiro();
     } else {
         // Se desmarcou, mostra e habilita campo de minutos
         if (permiteTempo && campoTempo) {
@@ -924,10 +1069,13 @@ document.getElementById('considera_dia_inteiro')?.addEventListener('change', fun
             if (permiteTempo) {
                 tempoInput.required = true;
             }
+            // Re-adiciona listener quando campo é habilitado
+            setTimeout(adicionarListenerTempoAtraso, 50);
         }
+        // Atualiza valores imediatamente
+        atualizarInfoDescontoBanco();
+        atualizarValorDescontoDinheiro();
     }
-    atualizarInfoDescontoBanco();
-    atualizarValorDescontoDinheiro();
 });
 
 // Carrega campos dinâmicos no formulário

@@ -226,7 +226,7 @@ function calcular_desconto_ocorrencia($ocorrencia_id) {
     $pdo = getDB();
     
     $stmt = $pdo->prepare("
-        SELECT o.*, t.calcula_desconto, t.valor_desconto, c.salario, c.jornada_diaria_horas
+        SELECT o.*, t.calcula_desconto, t.valor_desconto, t.codigo as tipo_codigo, c.salario
         FROM ocorrencias o
         INNER JOIN tipos_ocorrencias t ON o.tipo_ocorrencia_id = t.id
         INNER JOIN colaboradores c ON o.colaborador_id = c.id
@@ -244,21 +244,35 @@ function calcular_desconto_ocorrencia($ocorrencia_id) {
         return (float)$ocorrencia['valor_desconto'];
     }
     
+    if (!$ocorrencia['salario']) {
+        return 0;
+    }
+    
+    $jornada_diaria = 8; // Padrão 8h (coluna não existe na tabela colaboradores)
+    $horas_mes = 220; // Padrão CLT
+    $valor_hora = $ocorrencia['salario'] / $horas_mes;
+    $tipo_codigo = $ocorrencia['tipo_codigo'] ?? '';
+    
     // Se considera dia inteiro, calcula como falta completa
-    if (!empty($ocorrencia['considera_dia_inteiro']) && $ocorrencia['considera_dia_inteiro'] == 1 && $ocorrencia['salario']) {
-        // Calcula valor do dia de trabalho
-        $jornada_diaria = $ocorrencia['jornada_diaria_horas'] ?? 8; // Padrão 8h
-        $horas_mes = 220; // Padrão CLT
-        $valor_hora = $ocorrencia['salario'] / $horas_mes;
+    if (!empty($ocorrencia['considera_dia_inteiro']) && $ocorrencia['considera_dia_inteiro'] == 1) {
+        return $valor_hora * $jornada_diaria;
+    }
+    
+    // Se for falta ou ausência injustificada e não tem tempo de atraso, calcula como dia inteiro
+    if (in_array($tipo_codigo, ['falta', 'ausencia_injustificada']) && empty($ocorrencia['tempo_atraso_minutos'])) {
         return $valor_hora * $jornada_diaria;
     }
     
     // Se tem tempo de atraso, calcula proporcional ao salário
-    if ($ocorrencia['tempo_atraso_minutos'] && $ocorrencia['salario']) {
+    if ($ocorrencia['tempo_atraso_minutos']) {
         // Calcula valor por minuto trabalhado
-        $horas_mes = 220; // Padrão CLT
-        $valor_minuto = ($ocorrencia['salario'] / ($horas_mes * 60));
+        $valor_minuto = $valor_hora / 60;
         return $valor_minuto * $ocorrencia['tempo_atraso_minutos'];
+    }
+    
+    // Se for falta sem tempo de atraso, calcula como dia inteiro
+    if (in_array($tipo_codigo, ['falta', 'ausencia_injustificada'])) {
+        return $valor_hora * $jornada_diaria;
     }
     
     return 0;
