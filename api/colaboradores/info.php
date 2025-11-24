@@ -39,7 +39,6 @@ try {
         SELECT 
             id,
             salario,
-            jornada_diaria_horas,
             tipo_contrato
         FROM colaboradores 
         WHERE id = ?
@@ -103,11 +102,8 @@ try {
         }
     }
     
-    // Converte jornada diária para float
-    $jornada_diaria = 8.0; // Padrão
-    if (isset($colaborador['jornada_diaria_horas']) && $colaborador['jornada_diaria_horas'] !== null && $colaborador['jornada_diaria_horas'] !== '' && $colaborador['jornada_diaria_horas'] > 0) {
-        $jornada_diaria = (float)$colaborador['jornada_diaria_horas'];
-    }
+    // Jornada diária padrão (8 horas) - coluna não existe na tabela colaboradores
+    $jornada_diaria = 8.0;
     
     echo json_encode([
         'success' => true,

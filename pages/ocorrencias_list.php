@@ -30,8 +30,16 @@ $where = [];
 $params = [];
 
 if ($usuario['role'] === 'RH') {
-    $where[] = "c.empresa_id = ?";
-    $params[] = $usuario['empresa_id'];
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where[] = "c.empresa_id IN ($placeholders)";
+        $params = array_merge($params, $usuario['empresas_ids']);
+    } else {
+        // Fallback para compatibilidade
+        $where[] = "c.empresa_id = ?";
+        $params[] = $usuario['empresa_id'] ?? 0;
+    }
 } elseif ($usuario['role'] === 'GESTOR') {
     $stmt = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
     $stmt->execute([$usuario['id']]);
@@ -110,16 +118,27 @@ $ocorrencias = $stmt->fetchAll();
 // Busca colaboradores para filtro
 if ($usuario['role'] === 'ADMIN') {
     $stmt_colab = $pdo->query("SELECT id, nome_completo FROM colaboradores WHERE status = 'ativo' ORDER BY nome_completo");
+    $colaboradores = $stmt_colab->fetchAll();
 } elseif ($usuario['role'] === 'RH') {
-    $stmt_colab = $pdo->prepare("SELECT id, nome_completo FROM colaboradores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_completo");
-    $stmt_colab->execute([$usuario['empresa_id']]);
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt_colab = $pdo->prepare("SELECT id, nome_completo FROM colaboradores WHERE empresa_id IN ($placeholders) AND status = 'ativo' ORDER BY nome_completo");
+        $stmt_colab->execute($usuario['empresas_ids']);
+        $colaboradores = $stmt_colab->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt_colab = $pdo->prepare("SELECT id, nome_completo FROM colaboradores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_completo");
+        $stmt_colab->execute([$usuario['empresa_id'] ?? 0]);
+        $colaboradores = $stmt_colab->fetchAll();
+    }
 } elseif ($usuario['role'] === 'GESTOR') {
     $stmt_colab = $pdo->prepare("SELECT id, nome_completo FROM colaboradores WHERE setor_id = ? AND status = 'ativo' ORDER BY nome_completo");
     $stmt_colab->execute([$setor_id]);
+    $colaboradores = $stmt_colab->fetchAll();
 } else {
     $colaboradores = [];
 }
-$colaboradores = isset($stmt_colab) ? $stmt_colab->fetchAll() : [];
 
 // Busca tipos de ocorrências do banco
 try {

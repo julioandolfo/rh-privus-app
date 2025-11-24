@@ -680,6 +680,9 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
         document.getElementById('tempo_atraso_minutos').disabled = false;
     }
     
+    // Re-adiciona listener após mudança de tipo de ocorrência
+    setTimeout(adicionarListenerTempoAtraso, 50);
+    
     // Mostra/esconde campo de tipo de ponto
     const campoPonto = document.getElementById('campo_tipo_ponto');
     if (permitePonto) {
@@ -701,18 +704,40 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     // Atualiza campo oculto tipo para compatibilidade
     document.getElementById('tipo').value = option.text.trim();
     
-    // Atualiza info de desconto banco quando tempo de atraso muda
-    const tempoAtraso = document.getElementById('tempo_atraso_minutos');
-    if (tempoAtraso) {
-        tempoAtraso.addEventListener('input', function() {
-            atualizarInfoDescontoBanco();
-            atualizarValorDescontoDinheiro();
-        });
-    }
-    
     // Atualiza valores quando tipo de ocorrência muda
+    atualizarInfoDescontoBanco();
     atualizarValorDescontoDinheiro();
 });
+
+// Função para atualizar valores quando tempo de atraso muda
+function atualizarValoresTempoAtraso() {
+    atualizarInfoDescontoBanco();
+    atualizarValorDescontoDinheiro();
+}
+
+// Listener global para campo de tempo de atraso (atualiza em tempo real)
+function adicionarListenerTempoAtraso() {
+    const tempoAtraso = document.getElementById('tempo_atraso_minutos');
+    if (tempoAtraso && !tempoAtraso.hasAttribute('data-listener-adicionado')) {
+        // Marca que o listener já foi adicionado para evitar duplicação
+        tempoAtraso.setAttribute('data-listener-adicionado', 'true');
+        
+        // Adiciona listener de input (atualiza enquanto digita)
+        tempoAtraso.addEventListener('input', atualizarValoresTempoAtraso);
+        
+        // Também atualiza quando perde o foco (change)
+        tempoAtraso.addEventListener('change', atualizarValoresTempoAtraso);
+    }
+}
+
+// Adiciona listener quando a página carrega
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(adicionarListenerTempoAtraso, 100);
+    });
+} else {
+    setTimeout(adicionarListenerTempoAtraso, 100);
+}
 
 // Função para atualizar informações de desconto do banco de horas
 function atualizarInfoDescontoBanco() {
@@ -826,8 +851,8 @@ function atualizarValorDescontoDinheiro() {
                 if (consideraDiaInteiro) {
                     // Considera como falta do dia inteiro
                     valorDesconto = valorHora * jornadaDiaria;
-                } else if (tempoAtraso > 0) {
-                    // Calcula proporcional aos minutos
+                } else {
+                    // Calcula proporcional aos minutos (mesmo que seja 0, mostra 0)
                     const valorMinuto = valorHora / 60;
                     valorDesconto = valorMinuto * tempoAtraso;
                 }

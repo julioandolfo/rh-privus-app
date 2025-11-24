@@ -204,9 +204,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Busca horas extras
 $where = '';
 $params = [];
-if ($usuario['role'] !== 'ADMIN') {
+if ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where = "WHERE c.empresa_id IN ($placeholders)";
+        $params = $usuario['empresas_ids'];
+    } else {
+        // Fallback para compatibilidade
+        $where = "WHERE c.empresa_id = ?";
+        $params[] = $usuario['empresa_id'] ?? 0;
+    }
+} elseif ($usuario['role'] !== 'ADMIN') {
     $where = "WHERE c.empresa_id = ?";
-    $params[] = $usuario['empresa_id'];
+    $params[] = $usuario['empresa_id'] ?? 0;
 }
 
 $stmt = $pdo->prepare("
@@ -243,11 +254,25 @@ foreach ($colaboradores_raw as $colab) {
 // Busca percentuais das empresas para cálculo
 if ($usuario['role'] === 'ADMIN') {
     $stmt = $pdo->query("SELECT id, percentual_hora_extra FROM empresas");
+    $empresas_percentual = $stmt->fetchAll();
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt = $pdo->prepare("SELECT id, percentual_hora_extra FROM empresas WHERE id IN ($placeholders)");
+        $stmt->execute($usuario['empresas_ids']);
+        $empresas_percentual = $stmt->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt = $pdo->prepare("SELECT id, percentual_hora_extra FROM empresas WHERE id = ?");
+        $stmt->execute([$usuario['empresa_id'] ?? 0]);
+        $empresas_percentual = $stmt->fetchAll();
+    }
 } else {
     $stmt = $pdo->prepare("SELECT id, percentual_hora_extra FROM empresas WHERE id = ?");
-    $stmt->execute([$usuario['empresa_id']]);
+    $stmt->execute([$usuario['empresa_id'] ?? 0]);
+    $empresas_percentual = $stmt->fetchAll();
 }
-$empresas_percentual = $stmt->fetchAll();
 
 $page_title = 'Horas Extras';
 require_once __DIR__ . '/../includes/header.php';
