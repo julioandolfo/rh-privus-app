@@ -179,8 +179,15 @@ if (is_colaborador() && !empty($colaborador_id)) {
         if ($usuario['role'] === 'ADMIN') {
             $stmt = $pdo->query("SELECT COUNT(*) as total FROM colaboradores");
         } elseif ($usuario['role'] === 'RH') {
-            $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE empresa_id = ?");
-            $stmt->execute([$usuario['empresa_id']]);
+            // RH pode ter múltiplas empresas
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE empresa_id IN ($placeholders)");
+                $stmt->execute($usuario['empresas_ids']);
+            } else {
+                $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE empresa_id = ?");
+                $stmt->execute([$usuario['empresa_id'] ?? 0]);
+            }
         } elseif ($usuario['role'] === 'GESTOR') {
             $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE setor_id = ?");
             $stmt->execute([$setor_id]);
@@ -192,8 +199,15 @@ if (is_colaborador() && !empty($colaborador_id)) {
         if ($usuario['role'] === 'ADMIN') {
             $stmt = $pdo->query("SELECT COUNT(*) as total FROM colaboradores WHERE status = 'ativo'");
         } elseif ($usuario['role'] === 'RH') {
-            $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE empresa_id = ? AND status = 'ativo'");
-            $stmt->execute([$usuario['empresa_id']]);
+            // RH pode ter múltiplas empresas
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE empresa_id IN ($placeholders) AND status = 'ativo'");
+                $stmt->execute($usuario['empresas_ids']);
+            } else {
+                $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE empresa_id = ? AND status = 'ativo'");
+                $stmt->execute([$usuario['empresa_id'] ?? 0]);
+            }
         } elseif ($usuario['role'] === 'GESTOR') {
             $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM colaboradores WHERE setor_id = ? AND status = 'ativo'");
             $stmt->execute([$setor_id]);
@@ -207,13 +221,26 @@ if (is_colaborador() && !empty($colaborador_id)) {
             $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM ocorrencias WHERE DATE_FORMAT(data_ocorrencia, '%Y-%m') = ?");
             $stmt->execute([$mes_atual]);
         } elseif ($usuario['role'] === 'RH') {
-            $stmt = $pdo->prepare("
-                SELECT COUNT(*) as total 
-                FROM ocorrencias o
-                INNER JOIN colaboradores c ON o.colaborador_id = c.id
-                WHERE c.empresa_id = ? AND DATE_FORMAT(o.data_ocorrencia, '%Y-%m') = ?
-            ");
-            $stmt->execute([$usuario['empresa_id'], $mes_atual]);
+            // RH pode ter múltiplas empresas
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) as total 
+                    FROM ocorrencias o
+                    INNER JOIN colaboradores c ON o.colaborador_id = c.id
+                    WHERE c.empresa_id IN ($placeholders) AND DATE_FORMAT(o.data_ocorrencia, '%Y-%m') = ?
+                ");
+                $params = array_merge($usuario['empresas_ids'], [$mes_atual]);
+                $stmt->execute($params);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) as total 
+                    FROM ocorrencias o
+                    INNER JOIN colaboradores c ON o.colaborador_id = c.id
+                    WHERE c.empresa_id = ? AND DATE_FORMAT(o.data_ocorrencia, '%Y-%m') = ?
+                ");
+                $stmt->execute([$usuario['empresa_id'] ?? 0, $mes_atual]);
+            }
         } elseif ($usuario['role'] === 'GESTOR') {
             $stmt = $pdo->prepare("
                 SELECT COUNT(*) as total 
@@ -237,13 +264,26 @@ if (is_colaborador() && !empty($colaborador_id)) {
                 $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM ocorrencias WHERE DATE_FORMAT(data_ocorrencia, '%Y-%m') = ?");
                 $stmt->execute([$mes]);
             } elseif ($usuario['role'] === 'RH') {
-                $stmt = $pdo->prepare("
-                    SELECT COUNT(*) as total 
-                    FROM ocorrencias o
-                    INNER JOIN colaboradores c ON o.colaborador_id = c.id
-                    WHERE c.empresa_id = ? AND DATE_FORMAT(o.data_ocorrencia, '%Y-%m') = ?
-                ");
-                $stmt->execute([$usuario['empresa_id'], $mes]);
+                // RH pode ter múltiplas empresas
+                if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                    $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(*) as total 
+                        FROM ocorrencias o
+                        INNER JOIN colaboradores c ON o.colaborador_id = c.id
+                        WHERE c.empresa_id IN ($placeholders) AND DATE_FORMAT(o.data_ocorrencia, '%Y-%m') = ?
+                    ");
+                    $params = array_merge($usuario['empresas_ids'], [$mes]);
+                    $stmt->execute($params);
+                } else {
+                    $stmt = $pdo->prepare("
+                        SELECT COUNT(*) as total 
+                        FROM ocorrencias o
+                        INNER JOIN colaboradores c ON o.colaborador_id = c.id
+                        WHERE c.empresa_id = ? AND DATE_FORMAT(o.data_ocorrencia, '%Y-%m') = ?
+                    ");
+                    $stmt->execute([$usuario['empresa_id'] ?? 0, $mes]);
+                }
             } elseif ($usuario['role'] === 'GESTOR') {
                 $stmt = $pdo->prepare("
                     SELECT COUNT(*) as total 
@@ -269,16 +309,32 @@ if (is_colaborador() && !empty($colaborador_id)) {
             ");
             $stmt->execute([$data_inicio]);
         } elseif ($usuario['role'] === 'RH') {
-            $stmt = $pdo->prepare("
-                SELECT o.tipo, COUNT(*) as total
-                FROM ocorrencias o
-                INNER JOIN colaboradores c ON o.colaborador_id = c.id
-                WHERE c.empresa_id = ? AND o.data_ocorrencia >= ?
-                GROUP BY o.tipo
-                ORDER BY total DESC
-                LIMIT 10
-            ");
-            $stmt->execute([$usuario['empresa_id'], $data_inicio]);
+            // RH pode ter múltiplas empresas
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT o.tipo, COUNT(*) as total
+                    FROM ocorrencias o
+                    INNER JOIN colaboradores c ON o.colaborador_id = c.id
+                    WHERE c.empresa_id IN ($placeholders) AND o.data_ocorrencia >= ?
+                    GROUP BY o.tipo
+                    ORDER BY total DESC
+                    LIMIT 10
+                ");
+                $params = array_merge($usuario['empresas_ids'], [$data_inicio]);
+                $stmt->execute($params);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT o.tipo, COUNT(*) as total
+                    FROM ocorrencias o
+                    INNER JOIN colaboradores c ON o.colaborador_id = c.id
+                    WHERE c.empresa_id = ? AND o.data_ocorrencia >= ?
+                    GROUP BY o.tipo
+                    ORDER BY total DESC
+                    LIMIT 10
+                ");
+                $stmt->execute([$usuario['empresa_id'] ?? 0, $data_inicio]);
+            }
         } elseif ($usuario['role'] === 'GESTOR') {
             $stmt = $pdo->prepare("
                 SELECT o.tipo, COUNT(*) as total
@@ -301,13 +357,25 @@ if (is_colaborador() && !empty($colaborador_id)) {
                 GROUP BY status
             ");
         } elseif ($usuario['role'] === 'RH') {
-            $stmt = $pdo->prepare("
-                SELECT status, COUNT(*) as total
-                FROM colaboradores
-                WHERE empresa_id = ?
-                GROUP BY status
-            ");
-            $stmt->execute([$usuario['empresa_id']]);
+            // RH pode ter múltiplas empresas
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT status, COUNT(*) as total
+                    FROM colaboradores
+                    WHERE empresa_id IN ($placeholders)
+                    GROUP BY status
+                ");
+                $stmt->execute($usuario['empresas_ids']);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT status, COUNT(*) as total
+                    FROM colaboradores
+                    WHERE empresa_id = ?
+                    GROUP BY status
+                ");
+                $stmt->execute([$usuario['empresa_id'] ?? 0]);
+            }
         } elseif ($usuario['role'] === 'GESTOR') {
             $stmt = $pdo->prepare("
                 SELECT status, COUNT(*) as total
@@ -335,16 +403,32 @@ if (is_colaborador() && !empty($colaborador_id)) {
             ");
             $stmt->execute([$data_inicio]);
         } elseif ($usuario['role'] === 'RH') {
-            $stmt = $pdo->prepare("
-                SELECT c.id, c.nome_completo, c.foto, COUNT(o.id) as total_ocorrencias
-                FROM colaboradores c
-                LEFT JOIN ocorrencias o ON c.id = o.colaborador_id AND o.data_ocorrencia >= ?
-                WHERE c.empresa_id = ? AND c.status = 'ativo'
-                GROUP BY c.id, c.nome_completo, c.foto
-                ORDER BY total_ocorrencias DESC
-                LIMIT 10
-            ");
-            $stmt->execute([$data_inicio, $usuario['empresa_id']]);
+            // RH pode ter múltiplas empresas
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT c.id, c.nome_completo, c.foto, COUNT(o.id) as total_ocorrencias
+                    FROM colaboradores c
+                    LEFT JOIN ocorrencias o ON c.id = o.colaborador_id AND o.data_ocorrencia >= ?
+                    WHERE c.empresa_id IN ($placeholders) AND c.status = 'ativo'
+                    GROUP BY c.id, c.nome_completo, c.foto
+                    ORDER BY total_ocorrencias DESC
+                    LIMIT 10
+                ");
+                $params = array_merge([$data_inicio], $usuario['empresas_ids']);
+                $stmt->execute($params);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT c.id, c.nome_completo, c.foto, COUNT(o.id) as total_ocorrencias
+                    FROM colaboradores c
+                    LEFT JOIN ocorrencias o ON c.id = o.colaborador_id AND o.data_ocorrencia >= ?
+                    WHERE c.empresa_id = ? AND c.status = 'ativo'
+                    GROUP BY c.id, c.nome_completo, c.foto
+                    ORDER BY total_ocorrencias DESC
+                    LIMIT 10
+                ");
+                $stmt->execute([$data_inicio, $usuario['empresa_id'] ?? 0]);
+            }
         } elseif ($usuario['role'] === 'GESTOR') {
             $stmt = $pdo->prepare("
                 SELECT c.id, c.nome_completo, c.foto, COUNT(o.id) as total_ocorrencias
@@ -384,22 +468,43 @@ if (is_colaborador() && !empty($colaborador_id)) {
                 LIMIT 10
             ");
         } elseif ($usuario['role'] === 'RH') {
-            $stmt = $pdo->prepare("
-                SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
-                       DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia
-                FROM colaboradores c
-                WHERE c.empresa_id = ? 
-                AND c.status = 'ativo'
-                AND c.data_nascimento IS NOT NULL
-                ORDER BY 
-                    CASE 
-                        WHEN DATE_FORMAT(c.data_nascimento, '%m-%d') >= '$mes_dia_hoje'
-                        THEN DATE_FORMAT(c.data_nascimento, '%m-%d')
-                        ELSE CONCAT('12-31-', DATE_FORMAT(c.data_nascimento, '%m-%d'))
-                    END ASC
-                LIMIT 10
-            ");
-            $stmt->execute([$usuario['empresa_id']]);
+            // RH pode ter múltiplas empresas
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
+                           DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia
+                    FROM colaboradores c
+                    WHERE c.empresa_id IN ($placeholders) 
+                    AND c.status = 'ativo'
+                    AND c.data_nascimento IS NOT NULL
+                    ORDER BY 
+                        CASE 
+                            WHEN DATE_FORMAT(c.data_nascimento, '%m-%d') >= '$mes_dia_hoje'
+                            THEN DATE_FORMAT(c.data_nascimento, '%m-%d')
+                            ELSE CONCAT('12-31-', DATE_FORMAT(c.data_nascimento, '%m-%d'))
+                        END ASC
+                    LIMIT 10
+                ");
+                $stmt->execute($usuario['empresas_ids']);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
+                           DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia
+                    FROM colaboradores c
+                    WHERE c.empresa_id = ? 
+                    AND c.status = 'ativo'
+                    AND c.data_nascimento IS NOT NULL
+                    ORDER BY 
+                        CASE 
+                            WHEN DATE_FORMAT(c.data_nascimento, '%m-%d') >= '$mes_dia_hoje'
+                            THEN DATE_FORMAT(c.data_nascimento, '%m-%d')
+                            ELSE CONCAT('12-31-', DATE_FORMAT(c.data_nascimento, '%m-%d'))
+                        END ASC
+                    LIMIT 10
+                ");
+                $stmt->execute([$usuario['empresa_id'] ?? 0]);
+            }
         } elseif ($usuario['role'] === 'GESTOR') {
             $stmt = $pdo->prepare("
                 SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
@@ -1964,17 +2069,33 @@ if (is_colaborador() && !empty($colaborador_id)) {
                             ");
                             $stmt->execute();
                         } elseif ($usuario['role'] === 'RH') {
-                            $stmt = $pdo->prepare("
-                                SELECT p.*, c.nome_completo as colaborador_nome, c.foto as colaborador_foto,
-                                       u.nome as usuario_nome
-                                FROM promocoes p
-                                INNER JOIN colaboradores c ON p.colaborador_id = c.id
-                                LEFT JOIN usuarios u ON p.usuario_id = u.id
-                                WHERE c.empresa_id = ?
-                                ORDER BY p.data_promocao DESC, p.created_at DESC
-                                LIMIT 10
-                            ");
-                            $stmt->execute([$usuario['empresa_id']]);
+                            // RH pode ter múltiplas empresas
+                            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                                $stmt = $pdo->prepare("
+                                    SELECT p.*, c.nome_completo as colaborador_nome, c.foto as colaborador_foto,
+                                           u.nome as usuario_nome
+                                    FROM promocoes p
+                                    INNER JOIN colaboradores c ON p.colaborador_id = c.id
+                                    LEFT JOIN usuarios u ON p.usuario_id = u.id
+                                    WHERE c.empresa_id IN ($placeholders)
+                                    ORDER BY p.data_promocao DESC, p.created_at DESC
+                                    LIMIT 10
+                                ");
+                                $stmt->execute($usuario['empresas_ids']);
+                            } else {
+                                $stmt = $pdo->prepare("
+                                    SELECT p.*, c.nome_completo as colaborador_nome, c.foto as colaborador_foto,
+                                           u.nome as usuario_nome
+                                    FROM promocoes p
+                                    INNER JOIN colaboradores c ON p.colaborador_id = c.id
+                                    LEFT JOIN usuarios u ON p.usuario_id = u.id
+                                    WHERE c.empresa_id = ?
+                                    ORDER BY p.data_promocao DESC, p.created_at DESC
+                                    LIMIT 10
+                                ");
+                                $stmt->execute([$usuario['empresa_id'] ?? 0]);
+                            }
                         } elseif ($usuario['role'] === 'GESTOR') {
                             $stmt = $pdo->prepare("
                                 SELECT p.*, c.nome_completo as colaborador_nome, c.foto as colaborador_foto,
@@ -6302,9 +6423,17 @@ input[type="radio"]:checked + .emocao-option {
                                     $stmt_set = $pdo->query("SELECT id, nome_setor FROM setores WHERE status = 'ativo' ORDER BY nome_setor");
                                     $setores_anotacao = $stmt_set->fetchAll();
                                 } elseif ($usuario['role'] === 'RH') {
-                                    $stmt_set = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
-                                    $stmt_set->execute([$usuario['empresa_id']]);
-                                    $setores_anotacao = $stmt_set->fetchAll();
+                                    // RH pode ter múltiplas empresas
+                                    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                                        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                                        $stmt_set = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id IN ($placeholders) AND status = 'ativo' ORDER BY nome_setor");
+                                        $stmt_set->execute($usuario['empresas_ids']);
+                                        $setores_anotacao = $stmt_set->fetchAll();
+                                    } else {
+                                        $stmt_set = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
+                                        $stmt_set->execute([$usuario['empresa_id'] ?? 0]);
+                                        $setores_anotacao = $stmt_set->fetchAll();
+                                    }
                                 } elseif ($usuario['role'] === 'GESTOR') {
                                     $stmt_set = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE id = ? AND status = 'ativo' ORDER BY nome_setor");
                                     $stmt_set->execute([$setor_id]);

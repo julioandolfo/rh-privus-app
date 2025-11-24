@@ -34,21 +34,47 @@ $colaboradores = get_colaboradores_disponiveis($pdo, $usuario);
 $setores = [];
 if ($usuario['role'] === 'ADMIN') {
     $stmt = $pdo->query("SELECT id, nome_setor FROM setores ORDER BY nome_setor");
+    $setores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id IN ($placeholders) ORDER BY nome_setor");
+        $stmt->execute($usuario['empresas_ids']);
+        $setores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $stmt = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? ORDER BY nome_setor");
+        $stmt->execute([$usuario['empresa_id'] ?? 0]);
+        $setores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 } else {
     $stmt = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? ORDER BY nome_setor");
-    $stmt->execute([$usuario['empresa_id']]);
+    $stmt->execute([$usuario['empresa_id'] ?? 0]);
+    $setores = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-$setores = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Busca cargos
 $cargos = [];
 if ($usuario['role'] === 'ADMIN') {
     $stmt = $pdo->query("SELECT id, nome_cargo FROM cargos ORDER BY nome_cargo");
+    $cargos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt = $pdo->prepare("SELECT id, nome_cargo FROM cargos WHERE empresa_id IN ($placeholders) ORDER BY nome_cargo");
+        $stmt->execute($usuario['empresas_ids']);
+        $cargos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $stmt = $pdo->prepare("SELECT id, nome_cargo FROM cargos WHERE empresa_id = ? ORDER BY nome_cargo");
+        $stmt->execute([$usuario['empresa_id'] ?? 0]);
+        $cargos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 } else {
     $stmt = $pdo->prepare("SELECT id, nome_cargo FROM cargos WHERE empresa_id = ? ORDER BY nome_cargo");
-    $stmt->execute([$usuario['empresa_id']]);
+    $stmt->execute([$usuario['empresa_id'] ?? 0]);
+    $cargos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-$cargos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Monta query base para buscar emoções
 $where_conditions = ["e.data_registro >= ?", "e.data_registro <= ?"];
@@ -56,9 +82,16 @@ $params = [$data_inicio, $data_fim];
 
 // Aplica filtros de permissão primeiro
 if ($usuario['role'] === 'RH') {
-    $where_conditions[] = "(c.empresa_id = ? OR u.empresa_id = ?)";
-    $params[] = $usuario['empresa_id'];
-    $params[] = $usuario['empresa_id'];
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where_conditions[] = "(c.empresa_id IN ($placeholders) OR u.empresa_id IN ($placeholders))";
+        $params = array_merge($params, $usuario['empresas_ids'], $usuario['empresas_ids']);
+    } else {
+        $where_conditions[] = "(c.empresa_id = ? OR u.empresa_id = ?)";
+        $params[] = $usuario['empresa_id'] ?? 0;
+        $params[] = $usuario['empresa_id'] ?? 0;
+    }
 } elseif ($usuario['role'] === 'GESTOR') {
     $where_conditions[] = "(c.setor_id = ? OR u.setor_id = ? OR c.empresa_id = ? OR u.empresa_id = ?)";
     $params[] = $usuario['setor_id'];

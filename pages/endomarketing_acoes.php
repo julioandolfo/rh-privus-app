@@ -153,14 +153,24 @@ if ($usuario['role'] === 'ADMIN') {
 // Busca setores para filtro
 if ($usuario['role'] === 'ADMIN') {
     $stmt_setores = $pdo->query("SELECT id, nome_setor FROM setores WHERE status = 'ativo' ORDER BY nome_setor");
+    $setores = $stmt_setores->fetchAll();
 } elseif ($usuario['role'] === 'RH') {
-    $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
-    $stmt_setores->execute([$usuario['empresa_id']]);
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id IN ($placeholders) AND status = 'ativo' ORDER BY nome_setor");
+        $stmt_setores->execute($usuario['empresas_ids']);
+        $setores = $stmt_setores->fetchAll();
+    } else {
+        $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
+        $stmt_setores->execute([$usuario['empresa_id'] ?? 0]);
+        $setores = $stmt_setores->fetchAll();
+    }
 } else {
     $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE id = ? AND status = 'ativo'");
     $stmt_setores->execute([$setor_id]);
+    $setores = $stmt_setores->fetchAll();
 }
-$setores = $stmt_setores->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>

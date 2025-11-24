@@ -67,11 +67,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Busca empresas
 if ($usuario['role'] === 'ADMIN') {
     $stmt = $pdo->query("SELECT * FROM empresas ORDER BY nome_fantasia");
+    $empresas = $stmt->fetchAll();
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt = $pdo->prepare("SELECT * FROM empresas WHERE id IN ($placeholders) ORDER BY nome_fantasia");
+        $stmt->execute($usuario['empresas_ids']);
+        $empresas = $stmt->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt = $pdo->prepare("SELECT * FROM empresas WHERE id = ? ORDER BY nome_fantasia");
+        $stmt->execute([$usuario['empresa_id'] ?? 0]);
+        $empresas = $stmt->fetchAll();
+    }
 } else {
+    // Outros roles (GESTOR, etc) - apenas uma empresa
     $stmt = $pdo->prepare("SELECT * FROM empresas WHERE id = ? ORDER BY nome_fantasia");
-    $stmt->execute([$usuario['empresa_id']]);
+    $stmt->execute([$usuario['empresa_id'] ?? 0]);
+    $empresas = $stmt->fetchAll();
 }
-$empresas = $stmt->fetchAll();
 
 // Agora inclui o header (após processar POST para evitar erro de headers already sent)
 $page_title = 'Empresas';

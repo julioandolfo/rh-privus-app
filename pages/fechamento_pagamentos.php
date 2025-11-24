@@ -274,9 +274,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Busca fechamentos
 $where = '';
 $params = [];
-if ($usuario['role'] !== 'ADMIN') {
+if ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where = "WHERE f.empresa_id IN ($placeholders)";
+        $params = $usuario['empresas_ids'];
+    } else {
+        $where = "WHERE f.empresa_id = ?";
+        $params[] = $usuario['empresa_id'] ?? 0;
+    }
+} elseif ($usuario['role'] !== 'ADMIN') {
     $where = "WHERE f.empresa_id = ?";
-    $params[] = $usuario['empresa_id'];
+    $params[] = $usuario['empresa_id'] ?? 0;
 }
 
 $stmt = $pdo->prepare("
@@ -293,11 +303,24 @@ $fechamentos = $stmt->fetchAll();
 // Busca empresas para o select
 if ($usuario['role'] === 'ADMIN') {
     $stmt = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
+    $empresas = $stmt->fetchAll();
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id IN ($placeholders) AND status = 'ativo' ORDER BY nome_fantasia");
+        $stmt->execute($usuario['empresas_ids']);
+        $empresas = $stmt->fetchAll();
+    } else {
+        $stmt = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo'");
+        $stmt->execute([$usuario['empresa_id'] ?? 0]);
+        $empresas = $stmt->fetchAll();
+    }
 } else {
     $stmt = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo'");
-    $stmt->execute([$usuario['empresa_id']]);
+    $stmt->execute([$usuario['empresa_id'] ?? 0]);
+    $empresas = $stmt->fetchAll();
 }
-$empresas = $stmt->fetchAll();
 
 // Se está visualizando um fechamento específico
 $fechamento_view = null;

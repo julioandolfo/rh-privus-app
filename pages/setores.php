@@ -17,7 +17,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'add' || $action === 'edit') {
-        $empresa_id = $_POST['empresa_id'] ?? ($usuario['role'] === 'ADMIN' ? null : $usuario['empresa_id']);
+        $empresa_id = $_POST['empresa_id'] ?? null;
+        
+        // Para RH, valida se a empresa selecionada está nas empresas permitidas
+        if ($usuario['role'] === 'RH' && $empresa_id) {
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                if (!in_array($empresa_id, $usuario['empresas_ids'])) {
+                    redirect('setores.php', 'Você não tem permissão para criar setores nesta empresa!', 'error');
+                }
+            } elseif (isset($usuario['empresa_id']) && $empresa_id != $usuario['empresa_id']) {
+                redirect('setores.php', 'Você não tem permissão para criar setores nesta empresa!', 'error');
+            }
+        } elseif ($usuario['role'] !== 'ADMIN' && empty($empresa_id)) {
+            // Se não for ADMIN e não tiver empresa_id no POST, usa a primeira empresa disponível
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $empresa_id = $usuario['empresas_ids'][0];
+            } else {
+                $empresa_id = $usuario['empresa_id'] ?? null;
+            }
+        }
+        
         $nome_setor = sanitize($_POST['nome_setor'] ?? '');
         $descricao = sanitize($_POST['descricao'] ?? '');
         $status = $_POST['status'] ?? 'ativo';
@@ -60,7 +79,34 @@ if ($usuario['role'] === 'ADMIN') {
         LEFT JOIN empresas e ON s.empresa_id = e.id
         ORDER BY e.nome_fantasia, s.nome_setor
     ");
+    $setores = $stmt->fetchAll();
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt = $pdo->prepare("
+            SELECT s.*, e.nome_fantasia as empresa_nome 
+            FROM setores s
+            LEFT JOIN empresas e ON s.empresa_id = e.id
+            WHERE s.empresa_id IN ($placeholders)
+            ORDER BY e.nome_fantasia, s.nome_setor
+        ");
+        $stmt->execute($usuario['empresas_ids']);
+        $setores = $stmt->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt = $pdo->prepare("
+            SELECT s.*, e.nome_fantasia as empresa_nome 
+            FROM setores s
+            LEFT JOIN empresas e ON s.empresa_id = e.id
+            WHERE s.empresa_id = ?
+            ORDER BY s.nome_setor
+        ");
+        $stmt->execute([$usuario['empresa_id'] ?? 0]);
+        $setores = $stmt->fetchAll();
+    }
 } else {
+    // Outros roles (GESTOR, etc) - apenas uma empresa
     $stmt = $pdo->prepare("
         SELECT s.*, e.nome_fantasia as empresa_nome 
         FROM setores s
@@ -68,18 +114,33 @@ if ($usuario['role'] === 'ADMIN') {
         WHERE s.empresa_id = ?
         ORDER BY s.nome_setor
     ");
-    $stmt->execute([$usuario['empresa_id']]);
+    $stmt->execute([$usuario['empresa_id'] ?? 0]);
+    $setores = $stmt->fetchAll();
 }
-$setores = $stmt->fetchAll();
 
 // Busca empresas para select
 if ($usuario['role'] === 'ADMIN') {
     $stmt_empresas = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
+    $empresas = $stmt_empresas->fetchAll();
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id IN ($placeholders) AND status = 'ativo' ORDER BY nome_fantasia");
+        $stmt_empresas->execute($usuario['empresas_ids']);
+        $empresas = $stmt_empresas->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo'");
+        $stmt_empresas->execute([$usuario['empresa_id'] ?? 0]);
+        $empresas = $stmt_empresas->fetchAll();
+    }
 } else {
+    // Outros roles (GESTOR, etc) - apenas uma empresa
     $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo'");
-    $stmt_empresas->execute([$usuario['empresa_id']]);
+    $stmt_empresas->execute([$usuario['empresa_id'] ?? 0]);
+    $empresas = $stmt_empresas->fetchAll();
 }
-$empresas = $stmt_empresas->fetchAll();
 
 $page_title = 'Setores';
 require_once __DIR__ . '/../includes/header.php';
@@ -151,7 +212,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <thead>
                         <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
                             <th class="min-w-50px">ID</th>
-                            <?php if ($usuario['role'] === 'ADMIN'): ?>
+                            <?php if ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && isset($usuario['empresas_ids']) && count($usuario['empresas_ids']) > 1)): ?>
                             <th class="min-w-150px">Empresa</th>
                             <?php endif; ?>
                             <th class="min-w-200px">Nome do Setor</th>
@@ -164,7 +225,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php foreach ($setores as $setor): ?>
                         <tr>
                             <td><?= $setor['id'] ?></td>
-                            <?php if ($usuario['role'] === 'ADMIN'): ?>
+                            <?php if ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && isset($usuario['empresas_ids']) && count($usuario['empresas_ids']) > 1)): ?>
                             <td>
                                 <a href="#" class="text-gray-800 text-hover-primary mb-1"><?= htmlspecialchars($setor['empresa_nome']) ?></a>
                             </td>
@@ -235,7 +296,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="action" id="setor_action" value="add">
                     <input type="hidden" name="id" id="setor_id">
                     
-                    <?php if ($usuario['role'] === 'ADMIN'): ?>
+                    <?php if ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)): ?>
                     <div class="mb-7">
                         <label class="required fw-semibold fs-6 mb-2">Empresa</label>
                         <select name="empresa_id" id="empresa_id" class="form-select form-select-solid" required>
@@ -246,7 +307,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </select>
                     </div>
                     <?php else: ?>
-                    <input type="hidden" name="empresa_id" value="<?= $usuario['empresa_id'] ?>">
+                    <input type="hidden" name="empresa_id" value="<?= !empty($empresas) ? $empresas[0]['id'] : ($usuario['empresa_id'] ?? '') ?>">
                     <?php endif; ?>
                     
                     <div class="mb-7">
@@ -355,7 +416,7 @@ var KTSetoresList = function() {
                         url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
                     },
                     columnDefs: [
-                        { orderable: false, targets: <?= $usuario['role'] === 'ADMIN' ? 5 : 4 ?> }
+                        { orderable: false, targets: <?= ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && isset($usuario['empresas_ids']) && count($usuario['empresas_ids']) > 1)) ? 5 : 4 ?> }
                     ]
                 });
                 

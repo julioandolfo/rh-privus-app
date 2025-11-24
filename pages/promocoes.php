@@ -57,9 +57,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Busca promoções
 $where = '';
 $params = [];
-if ($usuario['role'] !== 'ADMIN') {
+if ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where = "WHERE c.empresa_id IN ($placeholders)";
+        $params = $usuario['empresas_ids'];
+    } else {
+        // Fallback para compatibilidade
+        $where = "WHERE c.empresa_id = ?";
+        $params[] = $usuario['empresa_id'] ?? 0;
+    }
+} elseif ($usuario['role'] !== 'ADMIN') {
     $where = "WHERE c.empresa_id = ?";
-    $params[] = $usuario['empresa_id'];
+    $params[] = $usuario['empresa_id'] ?? 0;
 }
 
 $stmt = $pdo->prepare("

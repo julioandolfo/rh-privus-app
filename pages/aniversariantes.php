@@ -50,24 +50,47 @@ try {
         ");
         $stmt->execute();
     } elseif ($usuario['role'] === 'RH') {
-        $stmt = $pdo->prepare("
-            SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
-                   e.nome_fantasia as empresa_nome,
-                   s.nome_setor,
-                   car.nome_cargo,
-                   DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia,
-                   DAY(c.data_nascimento) as dia,
-                   MONTH(c.data_nascimento) as mes
-            FROM colaboradores c
-            LEFT JOIN empresas e ON c.empresa_id = e.id
-            LEFT JOIN setores s ON c.setor_id = s.id
-            LEFT JOIN cargos car ON c.cargo_id = car.id
-            WHERE c.empresa_id = ? 
-            AND c.status = 'ativo'
-            AND c.data_nascimento IS NOT NULL
-            ORDER BY MONTH(c.data_nascimento), DAY(c.data_nascimento)
-        ");
-        $stmt->execute([$usuario['empresa_id']]);
+        // RH pode ter múltiplas empresas
+        if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+            $stmt = $pdo->prepare("
+                SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
+                       e.nome_fantasia as empresa_nome,
+                       s.nome_setor,
+                       car.nome_cargo,
+                       DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia,
+                       DAY(c.data_nascimento) as dia,
+                       MONTH(c.data_nascimento) as mes
+                FROM colaboradores c
+                LEFT JOIN empresas e ON c.empresa_id = e.id
+                LEFT JOIN setores s ON c.setor_id = s.id
+                LEFT JOIN cargos car ON c.cargo_id = car.id
+                WHERE c.empresa_id IN ($placeholders) 
+                AND c.status = 'ativo'
+                AND c.data_nascimento IS NOT NULL
+                ORDER BY MONTH(c.data_nascimento), DAY(c.data_nascimento)
+            ");
+            $stmt->execute($usuario['empresas_ids']);
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,
+                       e.nome_fantasia as empresa_nome,
+                       s.nome_setor,
+                       car.nome_cargo,
+                       DATE_FORMAT(c.data_nascimento, '%m-%d') as mes_dia,
+                       DAY(c.data_nascimento) as dia,
+                       MONTH(c.data_nascimento) as mes
+                FROM colaboradores c
+                LEFT JOIN empresas e ON c.empresa_id = e.id
+                LEFT JOIN setores s ON c.setor_id = s.id
+                LEFT JOIN cargos car ON c.cargo_id = car.id
+                WHERE c.empresa_id = ? 
+                AND c.status = 'ativo'
+                AND c.data_nascimento IS NOT NULL
+                ORDER BY MONTH(c.data_nascimento), DAY(c.data_nascimento)
+            ");
+            $stmt->execute([$usuario['empresa_id'] ?? 0]);
+        }
     } elseif ($usuario['role'] === 'GESTOR') {
         $stmt = $pdo->prepare("
             SELECT c.id, c.nome_completo, c.foto, c.data_nascimento,

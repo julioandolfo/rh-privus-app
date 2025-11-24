@@ -22,8 +22,16 @@ $where = [];
 $params = [];
 
 if ($usuario['role'] === 'RH') {
-    $where[] = "c.empresa_id = ?";
-    $params[] = $usuario['empresa_id'];
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where[] = "c.empresa_id IN ($placeholders)";
+        $params = array_merge($params, $usuario['empresas_ids']);
+    } else {
+        // Fallback para compatibilidade
+        $where[] = "c.empresa_id = ?";
+        $params[] = $usuario['empresa_id'] ?? 0;
+    }
 } elseif ($usuario['role'] === 'GESTOR') {
     // Busca setor do gestor
     $stmt = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
@@ -73,6 +81,19 @@ $colaboradores = $stmt->fetchAll();
 if ($usuario['role'] === 'ADMIN') {
     $stmt_empresas = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
     $empresas = $stmt_empresas->fetchAll();
+} elseif ($usuario['role'] === 'RH') {
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id IN ($placeholders) AND status = 'ativo' ORDER BY nome_fantasia");
+        $stmt_empresas->execute($usuario['empresas_ids']);
+        $empresas = $stmt_empresas->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt_empresas = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id = ? AND status = 'ativo' ORDER BY nome_fantasia");
+        $stmt_empresas->execute([$usuario['empresa_id'] ?? 0]);
+        $empresas = $stmt_empresas->fetchAll();
+    }
 } else {
     $empresas = [];
 }
@@ -80,14 +101,25 @@ if ($usuario['role'] === 'ADMIN') {
 // Busca setores para filtro
 if ($usuario['role'] === 'ADMIN') {
     $stmt_setores = $pdo->query("SELECT id, nome_setor FROM setores WHERE status = 'ativo' ORDER BY nome_setor");
+    $setores = $stmt_setores->fetchAll();
 } elseif ($usuario['role'] === 'RH') {
-    $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
-    $stmt_setores->execute([$usuario['empresa_id']]);
+    // RH pode ter múltiplas empresas
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id IN ($placeholders) AND status = 'ativo' ORDER BY nome_setor");
+        $stmt_setores->execute($usuario['empresas_ids']);
+        $setores = $stmt_setores->fetchAll();
+    } else {
+        // Fallback para compatibilidade
+        $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
+        $stmt_setores->execute([$usuario['empresa_id'] ?? 0]);
+        $setores = $stmt_setores->fetchAll();
+    }
 } else {
     $stmt_setores = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE id = ? AND status = 'ativo'");
     $stmt_setores->execute([$setor_id]);
+    $setores = $stmt_setores->fetchAll();
 }
-$setores = $stmt_setores->fetchAll();
 
 $page_title = 'Colaboradores';
 require_once __DIR__ . '/../includes/header.php';
