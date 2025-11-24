@@ -156,6 +156,17 @@ function get_page_permissions() {
         'comunicados.php' => ['ADMIN', 'RH'],
         'comunicado_add.php' => ['ADMIN', 'RH'],
         'comunicado_view.php' => ['ADMIN', 'RH'],
+        
+        // Contratos - ADMIN e RH
+        'contratos.php' => ['ADMIN', 'RH'],
+        'contrato_add.php' => ['ADMIN', 'RH'],
+        'contrato_view.php' => ['ADMIN', 'RH'],
+        'contrato_templates.php' => ['ADMIN', 'RH'],
+        'contrato_template_add.php' => ['ADMIN', 'RH'],
+        'contrato_template_edit.php' => ['ADMIN', 'RH'],
+        
+        // Configurações Autentique - apenas ADMIN
+        'configuracoes_autentique.php' => ['ADMIN'],
     ];
     
     // Carrega permissões customizadas (se existir)

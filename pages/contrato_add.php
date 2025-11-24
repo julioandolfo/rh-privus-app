@@ -1,0 +1,611 @@
+<?php
+/**
+ * Criar Novo Contrato
+ */
+
+$page_title = 'Criar Contrato';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/contratos_functions.php';
+require_once __DIR__ . '/../includes/autentique_service.php';
+require_once __DIR__ . '/../includes/select_colaborador.php';
+
+require_page_permission('contrato_add.php');
+
+$pdo = getDB();
+$usuario = $_SESSION['usuario'];
+$colaborador_id = intval($_GET['colaborador_id'] ?? 0);
+
+// Busca templates ativos
+$stmt = $pdo->query("SELECT id, nome FROM contratos_templates WHERE ativo = 1 ORDER BY nome");
+$templates = $stmt->fetchAll();
+
+// Busca colaboradores disponíveis
+$colaboradores = get_colaboradores_disponiveis($pdo, $usuario);
+
+// Se tem colaborador_id, busca dados
+$colaborador = null;
+if ($colaborador_id > 0) {
+    $colaborador = buscar_dados_colaborador_completos($colaborador_id);
+    if (!$colaborador) {
+        redirect('colaboradores.php', 'Colaborador não encontrado!', 'error');
+    }
+}
+
+// Processa POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $colaborador_id = intval($_POST['colaborador_id'] ?? 0);
+    $template_id = intval($_POST['template_id'] ?? 0);
+    $titulo = trim($_POST['titulo'] ?? '');
+    $descricao_funcao = trim($_POST['descricao_funcao'] ?? '');
+    $data_criacao = $_POST['data_criacao'] ?? date('Y-m-d');
+    $data_vencimento = !empty($_POST['data_vencimento']) ? $_POST['data_vencimento'] : null;
+    $observacoes = trim($_POST['observacoes'] ?? '');
+    $acao = $_POST['acao'] ?? 'rascunho'; // rascunho ou enviar
+    
+    if (empty($colaborador_id) || empty($titulo)) {
+        redirect('contrato_add.php', 'Preencha todos os campos obrigatórios!', 'error');
+    }
+    
+    // Busca colaborador
+    $colaborador = buscar_dados_colaborador_completos($colaborador_id);
+    if (!$colaborador) {
+        redirect('contrato_add.php', 'Colaborador não encontrado!', 'error');
+    }
+    
+    // Busca template se informado
+    $template_html = '';
+    if ($template_id > 0) {
+        $stmt = $pdo->prepare("SELECT conteudo_html FROM contratos_templates WHERE id = ?");
+        $stmt->execute([$template_id]);
+        $template = $stmt->fetch();
+        if ($template) {
+            $template_html = $template['conteudo_html'];
+        }
+    }
+    
+    // Se não tem template, usa conteúdo customizado
+    if (empty($template_html)) {
+        $template_html = $_POST['conteudo_customizado'] ?? '';
+    }
+    
+    if (empty($template_html)) {
+        redirect('contrato_add.php?colaborador_id=' . $colaborador_id, 'Selecione um template ou crie um conteúdo customizado!', 'error');
+    }
+    
+    // Substitui variáveis
+    $contrato_data = [
+        'titulo' => $titulo,
+        'descricao_funcao' => $descricao_funcao,
+        'data_criacao' => $data_criacao,
+        'data_vencimento' => $data_vencimento,
+        'observacoes' => $observacoes
+    ];
+    
+    $conteudo_final = substituir_variaveis_contrato($template_html, $colaborador, $contrato_data);
+    
+    try {
+        $pdo->beginTransaction();
+        
+        // Gera PDF
+        $pdf_path = gerar_pdf_contrato($conteudo_final, $titulo);
+        
+        // Insere contrato
+        $stmt = $pdo->prepare("
+            INSERT INTO contratos (
+                colaborador_id, template_id, titulo, descricao_funcao,
+                conteudo_final_html, pdf_path, status, criado_por_usuario_id,
+                data_criacao, data_vencimento, observacoes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $colaborador_id,
+            $template_id > 0 ? $template_id : null,
+            $titulo,
+            $descricao_funcao,
+            $conteudo_final,
+            $pdf_path,
+            $acao === 'enviar' ? 'enviado' : 'rascunho',
+            $usuario['id'],
+            $data_criacao,
+            $data_vencimento,
+            $observacoes
+        ]);
+        
+        $contrato_id = $pdo->lastInsertId();
+        
+        // Se for enviar, integra com Autentique
+        if ($acao === 'enviar') {
+            try {
+                $service = new AutentiqueService();
+                
+                // Converte PDF para base64
+                $pdf_base64 = pdf_para_base64($pdf_path);
+                
+                // Prepara signatários
+                $signatarios = [];
+                
+                // Colaborador como primeiro signatário
+                $signatarios[] = [
+                    'email' => $colaborador['email_pessoal'] ?? $colaborador['email'] ?? '',
+                    'x' => 100,
+                    'y' => 100
+                ];
+                
+                // Testemunhas (se houver)
+                $testemunhas = $_POST['testemunhas'] ?? [];
+                foreach ($testemunhas as $index => $testemunha) {
+                    if (!empty($testemunha['email'])) {
+                        $signatarios[] = [
+                            'email' => $testemunha['email'],
+                            'x' => 100,
+                            'y' => ($index + 2) * 150 + 100
+                        ];
+                    }
+                }
+                
+                // Cria documento no Autentique
+                $resultado = $service->criarDocumento($titulo, $pdf_base64, $signatarios);
+                
+                if ($resultado) {
+                    // Atualiza contrato com dados do Autentique
+                    $stmt = $pdo->prepare("
+                        UPDATE contratos 
+                        SET autentique_document_id = ?, autentique_token = ?, status = 'enviado'
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([
+                        $resultado['id'],
+                        $resultado['token'],
+                        $contrato_id
+                    ]);
+                    
+                    // Insere signatários
+                    $ordem = 0;
+                    
+                    // Colaborador
+                    $stmt = $pdo->prepare("
+                        INSERT INTO contratos_signatarios 
+                        (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura)
+                        VALUES (?, 'colaborador', ?, ?, ?, ?, ?)
+                    ");
+                    $signer = $resultado['signers'][0] ?? null;
+                    $stmt->execute([
+                        $contrato_id,
+                        $colaborador['nome_completo'],
+                        $colaborador['email_pessoal'] ?? $colaborador['email'] ?? '',
+                        formatar_cpf($colaborador['cpf'] ?? ''),
+                        $signer['id'] ?? null,
+                        $ordem++
+                    ]);
+                    
+                    // Testemunhas
+                    foreach ($testemunhas as $index => $testemunha) {
+                        if (!empty($testemunha['email'])) {
+                            $signer = $resultado['signers'][$index + 1] ?? null;
+                            
+                            // Cria link público para testemunha
+                            $link_publico = null;
+                            $link_expiracao = null;
+                            if ($signer && $signer['id']) {
+                                try {
+                                    $link_result = $service->criarLinkPublico($resultado['id'], $signer['id']);
+                                    if ($link_result) {
+                                        $link_publico = $link_result['link'];
+                                        $link_expiracao = $link_result['expiresAt'] ?? date('Y-m-d H:i:s', strtotime('+30 days'));
+                                    }
+                                } catch (Exception $e) {
+                                    error_log('Erro ao criar link público: ' . $e->getMessage());
+                                }
+                            }
+                            
+                            $stmt = $pdo->prepare("
+                                INSERT INTO contratos_signatarios 
+                                (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico, link_expiracao)
+                                VALUES (?, 'testemunha', ?, ?, ?, ?, ?, ?, ?)
+                            ");
+                            $stmt->execute([
+                                $contrato_id,
+                                $testemunha['nome'] ?? '',
+                                $testemunha['email'],
+                                formatar_cpf($testemunha['cpf'] ?? ''),
+                                $signer['id'] ?? null,
+                                $ordem++,
+                                $link_publico,
+                                $link_expiracao
+                            ]);
+                        }
+                    }
+                    
+                    // TODO: Enviar notificações por email
+                }
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                redirect('contrato_add.php?colaborador_id=' . $colaborador_id, 
+                    'Erro ao enviar para Autentique: ' . $e->getMessage(), 'error');
+            }
+        }
+        
+        $pdo->commit();
+        
+        redirect('contratos.php', 'Contrato criado com sucesso!', 'success');
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        redirect('contrato_add.php?colaborador_id=' . $colaborador_id, 
+            'Erro ao criar contrato: ' . $e->getMessage(), 'error');
+    }
+}
+
+require_once __DIR__ . '/../includes/header.php';
+?>
+
+<!--begin::Toolbar-->
+<div class="toolbar d-flex flex-stack mb-3 mb-lg-5" id="kt_toolbar">
+    <div id="kt_toolbar_container" class="container-fluid d-flex flex-stack flex-wrap">
+        <div class="page-title d-flex flex-column me-5 py-2">
+            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0">Criar Contrato</h1>
+            <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 pt-1">
+                <li class="breadcrumb-item text-muted">
+                    <a href="dashboard.php" class="text-muted text-hover-primary">Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-200 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-muted">Contratos</li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-200 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-gray-900">Criar</li>
+            </ul>
+        </div>
+    </div>
+</div>
+<!--end::Toolbar-->
+
+<!--begin::Post-->
+<div class="post d-flex flex-column-fluid" id="kt_post">
+    <div id="kt_content_container" class="container-xxl">
+        
+        <form method="POST" id="form_contrato">
+            <div class="row">
+                <!--begin::Col - Formulário-->
+                <div class="col-lg-6">
+                    <!--begin::Card-->
+                    <div class="card mb-5">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1">Informações do Contrato</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <div class="mb-10">
+                                <label class="required fw-semibold fs-6 mb-2">Selecione um colaborador</label>
+                                <?= render_select_colaborador('colaborador_id', 'colaborador_id', $colaborador_id, $colaboradores, true) ?>
+                            </div>
+                            
+                            <div class="mb-10">
+                                <label class="form-label">Template (opcional)</label>
+                                <select name="template_id" id="template_id" class="form-select form-select-solid">
+                                    <option value="">Sem template (conteúdo customizado)</option>
+                                    <?php foreach ($templates as $template): ?>
+                                    <option value="<?= $template['id'] ?>"><?= htmlspecialchars($template['nome']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-10">
+                                <label class="form-label required">Título do Contrato</label>
+                                <input type="text" name="titulo" class="form-control form-control-solid" required />
+                            </div>
+                            
+                            <div class="mb-10">
+                                <label class="form-label required">Descrição da Função</label>
+                                <textarea name="descricao_funcao" class="form-control form-control-solid" rows="3" required 
+                                          placeholder="Descreva as funções e responsabilidades do colaborador neste contrato"></textarea>
+                            </div>
+                            
+                            <div class="row mb-10">
+                                <div class="col-md-6">
+                                    <label class="form-label">Data de Criação</label>
+                                    <input type="date" name="data_criacao" class="form-control form-control-solid" 
+                                           value="<?= date('Y-m-d') ?>" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Data de Vencimento (opcional)</label>
+                                    <input type="date" name="data_vencimento" class="form-control form-control-solid" />
+                                </div>
+                            </div>
+                            
+                            <div class="mb-10">
+                                <label class="form-label">Observações</label>
+                                <textarea name="observacoes" class="form-control form-control-solid" rows="2"></textarea>
+                            </div>
+                            
+                            <div class="mb-10" id="conteudo_customizado_container" style="display: none;">
+                                <label class="form-label">Conteúdo Customizado</label>
+                                <textarea id="conteudo_customizado" name="conteudo_customizado" class="form-control" rows="10"></textarea>
+                                <div class="form-text">Use variáveis como {{colaborador.nome_completo}}, {{colaborador.cpf}}, etc.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Card-->
+                    
+                    <!--begin::Card - Testemunhas-->
+                    <div class="card mb-5">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1">Testemunhas (opcional)</span>
+                                <span class="text-muted fw-semibold fs-7">Adicione testemunhas que também precisarão assinar</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <div id="testemunhas_container">
+                                <!-- Testemunhas serão adicionadas aqui via JavaScript -->
+                            </div>
+                            <button type="button" class="btn btn-light-primary" id="btn_adicionar_testemunha">
+                                <i class="ki-duotone ki-plus fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Adicionar Testemunha
+                            </button>
+                        </div>
+                    </div>
+                    <!--end::Card-->
+                </div>
+                <!--end::Col-->
+                
+                <!--begin::Col - Preview-->
+                <div class="col-lg-6">
+                    <!--begin::Card - Preview-->
+                    <div class="card mb-5">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1">Preview do Contrato</span>
+                                <span class="text-muted fw-semibold fs-7">Visualização com dados do colaborador</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <div id="preview_contrato" class="border rounded p-5 bg-light" style="min-height: 400px;">
+                                <p class="text-muted text-center py-10">
+                                    Selecione um colaborador e template para ver o preview
+                                </p>
+                            </div>
+                            <div class="mt-5">
+                                <button type="button" class="btn btn-light-primary" id="btn_atualizar_preview">
+                                    <i class="ki-duotone ki-arrows-circle fs-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Atualizar Preview
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Card-->
+                </div>
+                <!--end::Col-->
+            </div>
+            
+            <!--begin::Actions-->
+            <div class="card">
+                <div class="card-footer d-flex justify-content-end py-6 px-9">
+                    <a href="contratos.php" class="btn btn-light btn-active-light-primary me-2">Cancelar</a>
+                    <button type="submit" name="acao" value="rascunho" class="btn btn-light-warning me-2">
+                        Salvar como Rascunho
+                    </button>
+                    <button type="submit" name="acao" value="enviar" class="btn btn-primary">
+                        <span class="indicator-label">Enviar para Assinatura</span>
+                        <span class="indicator-progress">Enviando...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </div>
+            <!--end::Actions-->
+        </form>
+        
+    </div>
+</div>
+<!--end::Post-->
+
+<script>
+let testemunhaIndex = 0;
+
+// Adiciona testemunha
+document.getElementById('btn_adicionar_testemunha')?.addEventListener('click', function() {
+    const container = document.getElementById('testemunhas_container');
+    const index = testemunhaIndex++;
+    
+    const html = `
+        <div class="card mb-5 testemunha-item" data-index="${index}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Testemunha ${index + 1}</h5>
+                    <button type="button" class="btn btn-sm btn-light-danger btn-remover-testemunha">
+                        <i class="ki-duotone ki-trash fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                            <span class="path5"></span>
+                        </i>
+                    </button>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="testemunhas[${index}][nome]" class="form-control form-control-solid" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required">Email</label>
+                        <input type="email" name="testemunhas[${index}][email]" class="form-control form-control-solid" required />
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label">CPF</label>
+                        <input type="text" name="testemunhas[${index}][cpf]" class="form-control form-control-solid" 
+                               placeholder="000.000.000-00" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+    
+    // Adiciona evento de remover
+    container.querySelector(`.testemunha-item[data-index="${index}"] .btn-remover-testemunha`)?.addEventListener('click', function() {
+        this.closest('.testemunha-item').remove();
+    });
+});
+
+// Atualiza preview
+document.getElementById('btn_atualizar_preview')?.addEventListener('click', function() {
+    atualizarPreview();
+});
+
+// Quando seleciona template ou colaborador, atualiza preview
+document.getElementById('template_id')?.addEventListener('change', function() {
+    const templateId = this.value;
+    const colaboradorId = document.getElementById('colaborador_id').value;
+    
+    if (templateId && colaboradorId) {
+        carregarTemplate(templateId, colaboradorId);
+    } else {
+        document.getElementById('conteudo_customizado_container').style.display = templateId ? 'none' : 'block';
+    }
+});
+
+// Listener para Select2 (quando usar Select2)
+if (typeof jQuery !== 'undefined') {
+    jQuery(document).on('select2:select', '#colaborador_id', function() {
+        atualizarPreview();
+    });
+}
+
+// Listener padrão também (fallback)
+document.getElementById('colaborador_id')?.addEventListener('change', function() {
+    atualizarPreview();
+});
+
+function atualizarPreview() {
+    const colaboradorId = document.getElementById('colaborador_id').value;
+    const templateId = document.getElementById('template_id').value;
+    const titulo = document.querySelector('[name="titulo"]').value;
+    const descricaoFuncao = document.querySelector('[name="descricao_funcao"]').value;
+    const dataCriacao = document.querySelector('[name="data_criacao"]').value;
+    const dataVencimento = document.querySelector('[name="data_vencimento"]').value;
+    const observacoes = document.querySelector('[name="observacoes"]').value;
+    const conteudoCustomizado = document.getElementById('conteudo_customizado').value;
+    
+    if (!colaboradorId) {
+        document.getElementById('preview_contrato').innerHTML = '<p class="text-muted text-center py-10">Selecione um colaborador</p>';
+        return;
+    }
+    
+    const preview = document.getElementById('preview_contrato');
+    preview.innerHTML = '<div class="text-center py-10"><div class="spinner-border text-primary"></div><p class="mt-3">Carregando preview...</p></div>';
+    
+    fetch(`../api/contratos/preview.php?colaborador_id=${colaboradorId}&template_id=${templateId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            titulo: titulo,
+            descricao_funcao: descricaoFuncao,
+            data_criacao: dataCriacao,
+            data_vencimento: dataVencimento,
+            observacoes: observacoes,
+            conteudo_customizado: conteudoCustomizado
+        })
+    })
+    .then(response => {
+        // Verifica se a resposta é realmente JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                throw new Error('Resposta não é JSON. Resposta: ' + text.substring(0, 200));
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            preview.innerHTML = data.html;
+        } else {
+            preview.innerHTML = `<div class="alert alert-danger">
+                <strong>Erro ao gerar preview:</strong><br>
+                ${data.message || 'Erro desconhecido'}
+                ${data.error ? '<br><small>' + data.error + '</small>' : ''}
+            </div>`;
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao gerar preview:', error);
+        preview.innerHTML = `<div class="alert alert-danger">
+            <strong>Erro ao gerar preview:</strong><br>
+            ${error.message || 'Erro desconhecido'}
+        </div>`;
+    });
+}
+
+function carregarTemplate(templateId, colaboradorId) {
+    fetch(`../api/contratos/carregar_template.php?template_id=${templateId}&colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.preview) {
+                document.getElementById('preview_contrato').innerHTML = data.preview;
+            }
+        });
+}
+
+// Submit com loading
+document.getElementById('form_contrato')?.addEventListener('submit', function(e) {
+    const submitBtn = this.querySelector('button[type="submit"][value="enviar"]');
+    if (submitBtn && this.querySelector('[name="acao"]:checked, button[type="submit"]:focus')?.value === 'enviar') {
+        submitBtn.setAttribute('data-kt-indicator', 'on');
+        submitBtn.disabled = true;
+    }
+});
+
+</script>
+
+<!--begin::Select2 CSS-->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    /* Ajusta a altura do Select2 */
+    .select2-container .select2-selection--single {
+        height: 44px !important;
+        padding: 0.75rem 1rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 44px !important;
+        padding-left: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 42px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+    }
+    
+    .select2-container .select2-selection--single .select2-selection__rendered img,
+    .select2-container .select2-selection--single .select2-selection__rendered .symbol {
+        margin-right: 8px !important;
+    }
+</style>
+<!--end::Select2 CSS-->
+
+<!--begin::Select Colaborador Script-->
+<script src="../assets/js/select-colaborador.js"></script>
+<!--end::Select Colaborador Script-->
+
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+

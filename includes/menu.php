@@ -655,6 +655,18 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('contratos.php') || can_access_page('contrato_add.php') || can_access_page('contrato_templates.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= (isActive('contratos.php') || isActive('contrato_add.php') || isActive('contrato_view.php') || isActive('contrato_templates.php') || isActive('contrato_template_add.php') || isActive('contrato_template_edit.php')) ? 'active' : '' ?>" href="contratos.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Contratos</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
                         </div>
                         <!--end:Menu sub-->
                     </div>
@@ -943,7 +955,7 @@ function getIcon($name) {
                     <?php endif; ?>
                     
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php') || isActive('configuracoes_pontos.php') || isActive('templates_email.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php') || isActive('configuracoes_pontos.php') || isActive('templates_email.php') || isActive('configuracoes_autentique.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -1026,6 +1038,18 @@ function getIcon($name) {
                                         <span class="bullet bullet-dot"></span>
                                     </span>
                                     <span class="menu-title">Pontos</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('configuracoes_autentique.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('configuracoes_autentique.php') ?>" href="configuracoes_autentique.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Autentique</span>
                                 </a>
                             </div>
                             <!--end:Menu item-->

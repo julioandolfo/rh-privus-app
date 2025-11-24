@@ -51,16 +51,27 @@ function get_colaboradores_disponiveis($pdo, $usuario) {
                 ORDER BY nome_completo
             ");
         } elseif ($usuario['role'] === 'RH') {
-            if (empty($usuario['empresa_id'])) {
+            // Verifica se tem empresas_ids (novo formato) ou empresa_id (formato antigo)
+            if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT id, nome_completo, foto 
+                    FROM colaboradores 
+                    WHERE empresa_id IN ($placeholders) AND status = 'ativo' 
+                    ORDER BY nome_completo
+                ");
+                $stmt->execute($usuario['empresas_ids']);
+            } elseif (!empty($usuario['empresa_id'])) {
+                $stmt = $pdo->prepare("
+                    SELECT id, nome_completo, foto 
+                    FROM colaboradores 
+                    WHERE empresa_id = ? AND status = 'ativo' 
+                    ORDER BY nome_completo
+                ");
+                $stmt->execute([$usuario['empresa_id']]);
+            } else {
                 return [];
             }
-            $stmt = $pdo->prepare("
-                SELECT id, nome_completo, foto 
-                FROM colaboradores 
-                WHERE empresa_id = ? AND status = 'ativo' 
-                ORDER BY nome_completo
-            ");
-            $stmt->execute([$usuario['empresa_id']]);
         } elseif ($usuario['role'] === 'GESTOR') {
             if (empty($usuario['id'])) {
                 return [];
