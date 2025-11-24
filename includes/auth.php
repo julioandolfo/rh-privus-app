@@ -4,10 +4,14 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/session_config.php';
 
-// Inicia sessão se não estiver iniciada
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+// Inicia sessão com configuração de 30 dias
+iniciar_sessao_30_dias();
+
+// Verifica e renova sessão se usuário estiver logado
+if (isset($_SESSION['usuario'])) {
+    verificar_e_renovar_sessao();
 }
 
 /**

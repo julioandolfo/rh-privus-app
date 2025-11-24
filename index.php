@@ -11,10 +11,11 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
-// Inicia sessão ANTES de qualquer coisa
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Carrega configuração de sessão ANTES de iniciar
+require_once __DIR__ . '/includes/session_config.php';
+
+// Inicia sessão com configuração de 30 dias ANTES de qualquer coisa
+iniciar_sessao_30_dias();
 
 // Tenta carregar os arquivos necessários
 try {

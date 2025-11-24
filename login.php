@@ -3,12 +3,11 @@
  * Página de Login - Metronic Theme
  */
 
-// Inicia sessão
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/session_config.php';
+
+// Inicia sessão com configuração de 30 dias
+iniciar_sessao_30_dias();
 
 // Se já estiver logado, redireciona
 if (isset($_SESSION['usuario'])) {
@@ -90,6 +89,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'colaborador_id' => $usuario['colaborador_id']
                 ];
                 
+                // Define timestamp de login e última atividade
+                $_SESSION['login_time'] = time();
+                $_SESSION['ultima_atividade'] = time();
+                
+                // Renova cookie de sessão para 30 dias
+                renovar_cookie_sessao();
+                
                 // Adiciona pontos por acesso diário
                 require_once __DIR__ . '/includes/pontuacao.php';
                 adicionar_pontos('acesso_diario', $usuario['id'], $usuario['colaborador_id'] ?? null);
@@ -152,6 +158,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'colaborador_id' => $colaborador['id']
                         ];
                     }
+                    
+                    // Define timestamp de login e última atividade
+                    $_SESSION['login_time'] = time();
+                    $_SESSION['ultima_atividade'] = time();
+                    
+                    // Renova cookie de sessão para 30 dias
+                    renovar_cookie_sessao();
                     
                     // Registra acesso no histórico
                     require_once __DIR__ . '/includes/engajamento.php';

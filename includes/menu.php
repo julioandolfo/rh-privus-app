@@ -518,6 +518,54 @@ function getIcon($name) {
                     <?php endif; ?>
                     <?php endif; ?>
                 
+                <?php if (can_access_page('comunicados.php') || can_access_page('comunicado_add.php')): ?>
+                    <!--begin:Menu item - Comunicados-->
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('comunicados.php') || isActive('comunicado_add.php') || isActive('comunicado_view.php')) ? 'here show' : '' ?>">
+                        <!--begin:Menu link-->
+                        <span class="menu-link">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-message-text fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Comunicados</span>
+                            <span class="menu-arrow"></span>
+                        </span>
+                        <!--end:Menu link-->
+                        <!--begin:Menu sub-->
+                        <div class="menu-sub menu-sub-accordion">
+                            <?php if (can_access_page('comunicado_add.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('comunicado_add.php') ?>" href="comunicado_add.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Adicionar Novo Comunicado</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('comunicados.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('comunicados.php') ?>" href="comunicados.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Ver Comunicados</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                        </div>
+                        <!--end:Menu sub-->
+                    </div>
+                    <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <?php if (can_access_colaboradores_menu()): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('colaboradores.php') || isActive('emocoes_analise.php') || isActive('promocoes.php') || isActive('horas_extras.php') || isActive('fechamento_pagamentos.php')) ? 'here show' : '' ?>">

@@ -151,6 +151,11 @@ function get_page_permissions() {
         'onboarding.php' => ['ADMIN', 'RH'],
         'kanban_onboarding.php' => ['ADMIN', 'RH'],
         'analytics_recrutamento.php' => ['ADMIN', 'RH'],
+        
+        // Comunicados - ADMIN e RH podem criar/gerenciar, todos podem ver
+        'comunicados.php' => ['ADMIN', 'RH'],
+        'comunicado_add.php' => ['ADMIN', 'RH'],
+        'comunicado_view.php' => ['ADMIN', 'RH'],
     ];
     
     // Carrega permissões customizadas (se existir)

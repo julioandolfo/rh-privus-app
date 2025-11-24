@@ -138,6 +138,22 @@ function check_permission($role_required) {
  * Verifica se usuário está logado
  */
 function require_login() {
+    // Garante que sessão está iniciada
+    if (!function_exists('iniciar_sessao_30_dias')) {
+        require_once __DIR__ . '/session_config.php';
+    }
+    if (session_status() === PHP_SESSION_NONE) {
+        iniciar_sessao_30_dias();
+    }
+    
+    // Renova sessão se usuário estiver logado
+    if (isset($_SESSION['usuario'])) {
+        if (!function_exists('verificar_e_renovar_sessao')) {
+            require_once __DIR__ . '/session_config.php';
+        }
+        verificar_e_renovar_sessao();
+    }
+    
     if (!isset($_SESSION['usuario'])) {
         // Limpa qualquer output buffer antes do redirect
         if (ob_get_level() > 0) {

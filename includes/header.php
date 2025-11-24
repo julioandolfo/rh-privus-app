@@ -3,8 +3,17 @@
  * Header do Sistema - Metronic Theme
  */
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+// Carrega configuração de sessão
+if (!function_exists('iniciar_sessao_30_dias')) {
+    require_once __DIR__ . '/session_config.php';
+}
+
+// Inicia sessão com configuração de 30 dias
+iniciar_sessao_30_dias();
+
+// Renova sessão se usuário estiver logado
+if (isset($_SESSION['usuario'])) {
+    verificar_e_renovar_sessao();
 }
 
 if (!isset($_SESSION['usuario'])) {
@@ -416,3 +425,8 @@ $usuario = $_SESSION['usuario'];
                     <!--begin::Container-->
                     <div id="kt_content_container" class="container-xxl">
                         <?= get_session_alert(); ?>
+                        
+                        <?php 
+                        // Inclui modal de comunicados
+                        require_once __DIR__ . '/comunicados_modal.php'; 
+                        ?>
