@@ -422,9 +422,32 @@ $tipos_ocorrencias = [
                                 </td>
                                 <td><?= htmlspecialchars($ocorrencia['usuario_nome'] ?? 'N/A') ?></td>
                                 <td class="text-end">
-                                    <a href="ocorrencia_view.php?id=<?= $ocorrencia['id'] ?>" class="btn btn-sm btn-light btn-active-light-primary">
-                                        Ver Detalhes
-                                    </a>
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <a href="ocorrencia_view.php?id=<?= $ocorrencia['id'] ?>" class="btn btn-sm btn-light btn-active-light-primary" title="Ver Detalhes">
+                                            <i class="ki-duotone ki-eye fs-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                        </a>
+                                        <?php if (has_role(['ADMIN', 'RH'])): ?>
+                                        <a href="ocorrencias_edit.php?id=<?= $ocorrencia['id'] ?>" class="btn btn-sm btn-light btn-active-light-warning" title="Editar">
+                                            <i class="ki-duotone ki-pencil fs-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                        </a>
+                                        <a href="#" onclick="deletarOcorrencia(<?= $ocorrencia['id'] ?>); return false;" class="btn btn-sm btn-light btn-active-light-danger" title="Deletar">
+                                            <i class="ki-duotone ki-trash fs-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                                <span class="path4"></span>
+                                                <span class="path5"></span>
+                                            </i>
+                                        </a>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -463,6 +486,76 @@ var KTOcorrenciasList = function() {
         }
     };
 }();
+
+// Função para deletar ocorrência
+function deletarOcorrencia(ocorrenciaId) {
+    Swal.fire({
+        title: 'Tem certeza?',
+        text: 'Esta ação não pode ser desfeita! A ocorrência será permanentemente deletada.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, deletar!',
+        cancelButtonText: 'Cancelar',
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: 'btn fw-bold btn-danger',
+            cancelButton: 'btn fw-bold btn-light'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Envia requisição para deletar
+            fetch('../api/ocorrencias/delete.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ocorrencia_id: ocorrenciaId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Deletado!',
+                        text: 'A ocorrência foi deletada com sucesso.',
+                        icon: 'success',
+                        buttonsStyling: false,
+                        confirmButtonText: 'Ok',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Erro!',
+                        text: data.message || 'Erro ao deletar ocorrência.',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'Ok',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    title: 'Erro!',
+                    text: 'Erro ao deletar ocorrência: ' + error.message,
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn fw-bold btn-primary'
+                    }
+                });
+            });
+        }
+    });
+}
 
 // Aguarda jQuery estar disponível
 (function waitForDependencies() {

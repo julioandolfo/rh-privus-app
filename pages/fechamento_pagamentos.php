@@ -95,6 +95,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $bonus_data = $stmt->fetch();
                 $total_bonus = $bonus_data['total_bonus'] ?? 0;
                 
+                // Busca ocorrências com desconto em R$ do período
+                // Apenas ocorrências que têm valor_desconto > 0 e não desconta do banco de horas
+                $stmt = $pdo->prepare("
+                    SELECT SUM(valor_desconto) as total_descontos
+                    FROM ocorrencias
+                    WHERE colaborador_id = ?
+                    AND data_ocorrencia >= ?
+                    AND data_ocorrencia <= ?
+                    AND valor_desconto > 0
+                    AND (desconta_banco_horas = 0 OR desconta_banco_horas IS NULL)
+                ");
+                $stmt->execute([$colab_id, $data_inicio, $data_fim]);
+                $ocorrencias_data = $stmt->fetch();
+                $total_descontos_ocorrencias = $ocorrencias_data['total_descontos'] ?? 0;
+                
                 // Insere bônus no fechamento
                 $stmt = $pdo->prepare("
                     SELECT cb.*, tb.nome as tipo_bonus_nome
@@ -127,15 +142,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
                 
-                $valor_total = $salario_base + $valor_horas_extras + $total_bonus;
+                $valor_total = $salario_base + $valor_horas_extras + $total_bonus - $total_descontos_ocorrencias;
                 
                 // Insere item
                 $stmt = $pdo->prepare("
                     INSERT INTO fechamentos_pagamento_itens 
-                    (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, valor_total)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$fechamento_id, $colab_id, $salario_base, $horas_extras, $valor_horas_extras, $valor_total]);
+                $stmt->execute([
+                    $fechamento_id, 
+                    $colab_id, 
+                    $salario_base, 
+                    $horas_extras, 
+                    $valor_horas_extras, 
+                    $total_descontos_ocorrencias,
+                    $valor_total
+                ]);
                 
                 $total_pagamento += $valor_total;
                 $total_horas_extras += $valor_horas_extras;
@@ -629,7 +652,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="text-muted">R$ 0,00</span>
                                 <?php endif; ?>
                             </td>
-                            <td>R$ <?= number_format($item['descontos'] ?? 0, 2, ',', '.') ?></td>
+                            <td class="text-danger fw-bold">R$ <?= number_format($item['descontos'] ?? 0, 2, ',', '.') ?></td>
                             <td>R$ <?= number_format($item['adicionais'] ?? 0, 2, ',', '.') ?></td>
                             <td><strong>R$ <?= number_format($valor_total_com_bonus, 2, ',', '.') ?></strong></td>
                             <?php if ($fechamento_view['status'] === 'fechado'): ?>
@@ -898,7 +921,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <div class="col-md-6">
                             <label class="fw-semibold fs-6 mb-2">Descontos</label>
-                            <input type="text" name="descontos" id="item_descontos" class="form-control form-control-solid" />
+                            <input type="text" name="descontos" id="item_descontos" class="form-control form-control-solid text-danger fw-bold" />
                         </div>
                     </div>
                     

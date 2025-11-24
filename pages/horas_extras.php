@@ -701,6 +701,18 @@ function calcularValorTotal() {
     // Atualiza exibição
     valorTotalEl.textContent = 'R$ ' + valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
+    // Converte horas para horas:minutos
+    const horasInteiras = Math.floor(quantidadeHoras);
+    const minutos = Math.round((quantidadeHoras - horasInteiras) * 60);
+    let horasMinutosTexto = '';
+    if (horasInteiras > 0 && minutos > 0) {
+        horasMinutosTexto = ` (${horasInteiras}h ${minutos}min)`;
+    } else if (horasInteiras > 0 && minutos === 0) {
+        horasMinutosTexto = ` (${horasInteiras}h)`;
+    } else if (horasInteiras === 0 && minutos > 0) {
+        horasMinutosTexto = ` (${minutos}min)`;
+    }
+    
     // Atualiza detalhes
     detalhesEl.innerHTML = `
         <div class="d-flex flex-column gap-1">
@@ -708,7 +720,7 @@ function calcularValorTotal() {
             <span>Valor Hora Normal: R$ ${valorHora.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
             <span>Percentual Adicional: ${percentual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}%</span>
             <span>Valor Hora Extra: R$ ${valorHoraExtra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-            <span class="fw-bold mt-1">${quantidadeHoras.toLocaleString('pt-BR', {minimumFractionDigits: 2})}h × R$ ${valorHoraExtra.toLocaleString('pt-BR', {minimumFractionDigits: 2})} = R$ ${valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+            <span class="fw-bold mt-1">${quantidadeHoras.toLocaleString('pt-BR', {minimumFractionDigits: 2})}h${horasMinutosTexto} × R$ ${valorHoraExtra.toLocaleString('pt-BR', {minimumFractionDigits: 2})} = R$ ${valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
         </div>
     `;
 }
