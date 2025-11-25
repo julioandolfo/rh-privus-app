@@ -3146,25 +3146,52 @@ document.addEventListener('DOMContentLoaded', function() {
     function garantirCardIdsBase() {
         const container = document.getElementById(GRID_CONTAINER_ID);
         if (!container) {
+            console.warn('Container não encontrado em garantirCardIdsBase');
             return;
         }
 
-        const candidatos = container.querySelectorAll('.row > div[class*="col-"]:not([data-card-id])');
+        // Busca cards de múltiplas formas
+        let candidatos = Array.from(container.querySelectorAll('.row > div[class*="col-"]:not([data-card-id])'));
+        
+        // Se não encontrou em .row > div[class*="col-"], tenta outras estruturas
+        if (candidatos.length === 0) {
+            // Busca diretamente por cards sem data-card-id
+            candidatos = Array.from(container.querySelectorAll('.card:not([data-card-id]), a.card:not([data-card-id])'));
+            
+            // Se ainda não encontrou, busca por elementos que contenham cards
+            if (candidatos.length === 0) {
+                const todosElementos = Array.from(container.children);
+                candidatos = todosElementos.filter(el => {
+                    return el.querySelector('.card, a.card') && !el.hasAttribute('data-card-id');
+                });
+            }
+        }
+        
         let autoIndex = 0;
 
-        candidatos.forEach(coluna => {
-            if (!coluna.querySelector('.card')) {
+        candidatos.forEach(elemento => {
+            // Verifica se tem card dentro
+            const temCard = elemento.querySelector('.card, a.card');
+            if (!temCard && !elemento.classList.contains('card') && !elemento.classList.contains('a.card')) {
                 return;
             }
 
-            let idGerado = gerarIdParaCard(coluna, autoIndex++);
+            let idGerado = gerarIdParaCard(elemento, autoIndex++);
             let sufixo = 1;
             while (document.querySelector(`[data-card-id="${idGerado}"]`)) {
                 idGerado = `${idGerado}_${sufixo++}`;
             }
 
-            coluna.setAttribute('data-card-id', idGerado);
+            elemento.setAttribute('data-card-id', idGerado);
+            // Também adiciona data-gs-id se não tiver
+            if (!elemento.hasAttribute('data-gs-id')) {
+                elemento.setAttribute('data-gs-id', idGerado);
+            }
+            
+            console.log('ID atribuído em garantirCardIdsBase:', idGerado);
         });
+        
+        console.log('garantirCardIdsBase concluído. Cards processados:', candidatos.length);
     }
 
     function limparEspacamentosCard(elemento) {
@@ -4230,42 +4257,122 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        const cards = Array.from(container.querySelectorAll('[data-card-id]'));
+        // Garante que todos os cards têm data-card-id antes de processar
+        garantirCardIdsBase();
+        
+        // Busca cards de múltiplas formas para garantir que encontra todos
+        // IMPORTANTE: Busca apenas elementos diretos do container, não filhos de outros cards
+        let cards = Array.from(container.children).filter(el => {
+            // Ignora elementos que são filhos de outros cards processados
+            const temId = el.hasAttribute('data-card-id') || el.hasAttribute('data-gs-id');
+            const temCard = el.querySelector('.card, a.card') || el.classList.contains('card') || el.classList.contains('a.card');
+            
+            // Se tem ID, é um card válido
+            if (temId) {
+                // Verifica se não é filho de outro card com ID
+                const paiComId = el.parentElement?.closest('[data-card-id], [data-gs-id]');
+                return !paiComId || paiComId === container;
+            }
+            
+            // Se tem card mas não tem ID, pode ser um card válido
+            if (temCard) {
+                // Verifica se não é filho de outro card
+                const paiComId = el.parentElement?.closest('[data-card-id], [data-gs-id]');
+                return !paiComId || paiComId === container;
+            }
+            
+            return false;
+        });
+        
+        // Se não encontrou nos filhos diretos, tenta buscar por data-card-id (mas filtra duplicatas)
         if (cards.length === 0) {
-            console.warn('Nenhum card com data-card-id encontrado');
+            const todosComId = Array.from(container.querySelectorAll('[data-card-id], [data-gs-id]'));
+            // Remove duplicatas - se um elemento é filho de outro com ID, mantém apenas o pai mais próximo do container
+            cards = todosComId.filter(el => {
+                // Verifica se é filho direto do container
+                if (el.parentElement === container) {
+                    return true;
+                }
+                // Verifica se tem um pai com ID que não seja o container
+                const paiComId = el.parentElement?.closest('[data-card-id], [data-gs-id]');
+                return !paiComId || paiComId === container;
+            });
+        }
+        
+        // Se ainda não encontrou, busca por elementos com card dentro de colunas Bootstrap
+        if (cards.length === 0) {
+            console.log('Nenhum card com data-card-id encontrado, tentando outras formas...');
+            const colunasComCard = Array.from(container.children).filter(col => {
+                return col.classList.toString().match(/col-(xl|md|lg|sm)-/) && col.querySelector('.card, a.card');
+            });
+            cards = colunasComCard;
+            
+            // Atribui IDs aos cards encontrados
+            cards.forEach((card, index) => {
+                if (!card.hasAttribute('data-card-id')) {
+                    const cardId = gerarIdParaCard(card, index);
+                    card.setAttribute('data-card-id', cardId);
+                    if (!card.hasAttribute('data-gs-id')) {
+                        card.setAttribute('data-gs-id', cardId);
+                    }
+                    console.log('ID atribuído ao card:', cardId);
+                }
+            });
+        }
+        
+        if (cards.length === 0) {
+            console.warn('Nenhum card encontrado no container após todas as tentativas');
+            console.log('Container HTML:', container.innerHTML.substring(0, 500));
             return [];
         }
         
-        console.log('Cards no container:', cards.length);
+        console.log('Cards encontrados no container:', cards.length);
         console.log('Cards no layout salvo:', idsNoLayout.size, Array.from(idsNoLayout));
         
         let globalIndex = 0;
         const cardsProcessados = [];
+        const idsProcessados = new Set(); // Evita processar o mesmo card duas vezes
         
         cards.forEach(card => {
+            // Ignora se já é um grid-stack-item (já foi processado)
             if (card.classList.contains('grid-stack-item')) {
                 return;
             }
             
-            let cardId = card.getAttribute('data-card-id') || card.getAttribute('data-gs-id');
+            let cardId = card.getAttribute('data-card-id') || card.getAttribute('data-gs-id') || card.getAttribute('gs-id');
             
             if (!cardId) {
                 const link = card.querySelector('a[href]');
-                const title = card.querySelector('.card-label, h3, h4, h5');
+                const title = card.querySelector('.card-label, h3, h4, h5, .card-title');
                 if (link) {
                     const href = link.getAttribute('href');
                     cardId = 'card_' + href.replace(/[^a-z0-9]/gi, '_').toLowerCase();
                 } else if (title) {
-                    cardId = 'card_' + title.textContent.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 50);
+                    cardId = 'card_' + slugify(title.textContent.trim());
                 } else {
-                    cardId = 'card_' + globalIndex;
+                    cardId = 'card_' + globalIndex + '_' + Date.now();
                 }
+                
+                // Atribui o ID gerado
+                card.setAttribute('data-card-id', cardId);
+                if (!card.hasAttribute('data-gs-id')) {
+                    card.setAttribute('data-gs-id', cardId);
+                }
+                console.log('ID gerado e atribuído ao card:', cardId);
             }
+            
+            // Evita processar o mesmo card duas vezes
+            if (idsProcessados.has(cardId)) {
+                console.log('⚠️ Card já foi processado, ignorando duplicata:', cardId);
+                return;
+            }
+            idsProcessados.add(cardId);
             
             // Se há configuração salva E o card NÃO está nela, remove este card
             if (configuracao && configuracao.length > 0 && !idsNoLayout.has(cardId)) {
                 console.log('❌ Card não está no layout salvo, removendo:', cardId);
                 card.remove(); // Remove do DOM
+                idsProcessados.delete(cardId); // Remove do set pois foi removido
                 return;
             } else if (configuracao && configuracao.length > 0) {
                 console.log('✅ Card está no layout salvo, processando:', cardId);
@@ -4470,6 +4577,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         // Remove classes que podem desabilitar drag/resize
                         item.classList.remove('ui-draggable-disabled', 'ui-resizable-disabled');
+                        
+                        // Força a habilitação do drag e resize no widget
+                        if (editMode && grid) {
+                            try {
+                                // Remove atributos que desabilitam
+                                item.removeAttribute('gs-no-move');
+                                item.removeAttribute('gs-no-resize');
+                                item.removeAttribute('gs-locked');
+                                
+                                // Força a atualização do widget
+                                if (node) {
+                                    node.noMove = false;
+                                    node.noResize = false;
+                                    node.locked = false;
+                                }
+                            } catch (e) {
+                                console.warn('Erro ao habilitar drag/resize no widget:', e);
+                            }
+                        }
                     } catch (err) {
                         console.warn('Erro ao criar widget:', err);
                     }
@@ -4500,15 +4626,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (editMode && grid) {
                     setTimeout(() => {
                         try {
-                            // Habilita o grid para edição
-                            grid.enable();
+                            // IMPORTANTE: Desabilita primeiro para garantir reset completo
+                            grid.disable();
                             
-                            // Força a atualização das opções do grid
+                            // Força a atualização das opções do grid ANTES de reabilitar
                             if (grid.opts) {
                                 grid.opts.disableDrag = false;
                                 grid.opts.disableResize = false;
                                 grid.opts.staticGrid = false;
                             }
+                            
+                            // Reabilita o grid com as novas opções
+                            grid.enable();
                             
                             // Garante que todos os widgets estão habilitados
                             const allItems = container.querySelectorAll('.grid-stack-item');
@@ -4516,9 +4645,19 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Remove classes que desabilitam drag/resize
                                 item.classList.remove('ui-draggable-disabled', 'ui-resizable-disabled');
                                 
+                                // Remove atributos que desabilitam
+                                item.removeAttribute('gs-no-move');
+                                item.removeAttribute('gs-no-resize');
+                                item.removeAttribute('gs-locked');
+                                
                                 // Garante que o widget está registrado
                                 const node = grid.engine.nodes.find(n => n.el === item);
-                                if (!node) {
+                                if (node) {
+                                    // Força a habilitação no node
+                                    node.noMove = false;
+                                    node.noResize = false;
+                                    node.locked = false;
+                                } else {
                                     try {
                                         grid.makeWidget(item);
                                     } catch (err) {
@@ -4533,6 +4672,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                     if (node.el) {
                                         // Remove classes de desabilitado
                                         node.el.classList.remove('ui-draggable-disabled', 'ui-resizable-disabled');
+                                        // Remove atributos
+                                        node.el.removeAttribute('gs-no-move');
+                                        node.el.removeAttribute('gs-no-resize');
+                                        node.el.removeAttribute('gs-locked');
+                                        // Atualiza o node
+                                        node.noMove = false;
+                                        node.noResize = false;
+                                        node.locked = false;
                                     }
                                 });
                             }
@@ -4545,24 +4692,27 @@ document.addEventListener('DOMContentLoaded', function() {
                                 staticGrid: grid.opts?.staticGrid
                             });
                             
-                            // Debug: verifica se os widgets têm os handlers corretos
-                            allItems.forEach(item => {
-                                const hasDraggable = item.classList.contains('ui-draggable') || item.classList.contains('ui-draggable-handle');
-                                const hasResizable = item.classList.contains('ui-resizable');
-                                console.log('Widget', item.getAttribute('data-gs-id'), {
-                                    hasDraggable,
-                                    hasResizable,
-                                    disabled: item.classList.contains('ui-draggable-disabled') || item.classList.contains('ui-resizable-disabled')
-                                });
-                            });
-                            
-                            // Força a re-inicialização do drag e resize usando a API do GridStack
-                            // Isso garante que os handlers sejam criados corretamente
-                            try {
-                                // Desabilita e reabilita o grid para forçar a recriação dos handlers
+                            // Força uma segunda passagem para garantir que os handlers estão ativos
+                            setTimeout(() => {
+                                // Desabilita e reabilita novamente para forçar recriação dos handlers
                                 grid.disable();
                                 setTimeout(() => {
                                     grid.enable();
+                                    
+                                    // Verifica se os widgets têm os handlers corretos
+                                    allItems.forEach(item => {
+                                        const hasDraggable = item.classList.contains('ui-draggable') || item.classList.contains('ui-draggable-handle');
+                                        const hasResizable = item.classList.contains('ui-resizable');
+                                        const node = grid.engine.nodes.find(n => n.el === item);
+                                        console.log('Widget', item.getAttribute('data-gs-id'), {
+                                            hasDraggable,
+                                            hasResizable,
+                                            disabled: item.classList.contains('ui-draggable-disabled') || item.classList.contains('ui-resizable-disabled'),
+                                            nodeNoMove: node?.noMove,
+                                            nodeNoResize: node?.noResize
+                                        });
+                                    });
+                                    
                                     console.log('✅ GridStack reabilitado para garantir handlers');
                                     
                                     // Adiciona botões de remover após grid estar pronto
@@ -4572,9 +4722,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         }, 100);
                                     }
                                 }, 100);
-                            } catch (e) {
-                                console.warn('Erro ao reabilitar grid:', e);
-                            }
+                            }, 200);
                         } catch (e) {
                             console.error('Erro ao habilitar grid:', e);
                         }
@@ -4712,7 +4860,42 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Templates salvos:', cardTemplates.size);
         console.log('Cards adicionados (salvos):', cardsAdicionados.size, Array.from(cardsAdicionados));
         
-        // Limpa o container
+        // Se não há templates salvos mas há cards no DOM, preserva-os
+        // Isso acontece quando não há layout salvo ainda
+        if (cardTemplates.size === 0 && cardsAdicionados.size === 0) {
+            console.log('Nenhum template salvo e nenhum card adicionado - preservando cards do DOM');
+            // Garante que todos os cards têm data-card-id antes de continuar
+            garantirCardIdsBase();
+            
+            // Remove apenas classes do GridStack, mas mantém os cards
+            container.classList.remove('grid-stack', 'grid-stack-rtl', 'grid-stack-animate');
+            container.removeAttribute('gs-current-row');
+            container.style.height = '';
+            
+            // Remove atributos do GridStack dos cards existentes
+            container.querySelectorAll('[data-gs-id], [gs-id]').forEach(card => {
+                card.removeAttribute('gs-x');
+                card.removeAttribute('gs-y');
+                card.removeAttribute('gs-w');
+                card.removeAttribute('gs-h');
+                card.removeAttribute('gs-id');
+                card.removeAttribute('data-gs-x');
+                card.removeAttribute('data-gs-y');
+                card.removeAttribute('data-gs-w');
+                card.removeAttribute('data-gs-h');
+                card.classList.remove('grid-stack-item', 'ui-draggable', 'ui-resizable', 'ui-draggable-dragging', 'ui-resizable-resizing');
+                card.style.position = '';
+                card.style.left = '';
+                card.style.top = '';
+                card.style.width = '';
+                card.style.height = '';
+            });
+            
+            console.log('Cards do DOM preservados para conversão');
+            return;
+        }
+        
+        // Limpa o container apenas se temos templates para restaurar
         container.innerHTML = '';
         
         // Restaura APENAS os cards que estão no cardsAdicionados (layout salvo)
@@ -4727,7 +4910,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const cardClone = template.cloneNode(true);
             
-            // Remove atributos do GridStack
+            // Remove atributos do GridStack (posição e tamanho)
                 cardClone.removeAttribute('gs-x');
                 cardClone.removeAttribute('gs-y');
                 cardClone.removeAttribute('gs-w');
@@ -4737,7 +4920,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 cardClone.removeAttribute('data-gs-y');
                 cardClone.removeAttribute('data-gs-w');
                 cardClone.removeAttribute('data-gs-h');
-                cardClone.removeAttribute('data-gs-id');
+                // NÃO remove data-gs-id e data-card-id - são necessários para identificação
+            
+            // Garante que o card tem data-card-id e data-gs-id corretos
+                if (!cardClone.hasAttribute('data-card-id')) {
+                    cardClone.setAttribute('data-card-id', cardId);
+                }
+                if (!cardClone.hasAttribute('data-gs-id')) {
+                    cardClone.setAttribute('data-gs-id', cardId);
+                }
             
             // Remove classes do GridStack
                 cardClone.classList.remove('grid-stack-item', 'ui-draggable', 'ui-resizable', 'ui-draggable-dragging', 'ui-resizable-resizing');
@@ -4773,7 +4964,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         } else if (cardTemplates.size === 0) {
-            console.warn('Nenhum template disponível');
+            console.warn('Nenhum template disponível - cards serão preservados do DOM');
         } else if (cardsAdicionados.size === 0) {
             console.log('Nenhum card foi adicionado ainda (layout vazio)');
         }
@@ -4817,6 +5008,59 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById(GRID_CONTAINER_ID);
         if (container) {
             container.style.opacity = '1';
+        }
+        
+        // IMPORTANTE: Salva templates dos cards ANTES de limpar o container
+        // Isso garante que os cards atuais sejam preservados mesmo se não tiverem data-card-id
+        console.log('Salvando templates dos cards antes de entrar em modo de edição...');
+        const containerTemp = document.getElementById(GRID_CONTAINER_ID);
+        if (containerTemp) {
+            // Garante que todos os cards têm data-card-id
+            garantirCardIdsBase();
+            
+            // Salva templates de todos os cards visíveis no container
+            containerTemp.querySelectorAll('[data-card-id], [data-gs-id], .card, a.card').forEach(cardElement => {
+                // Encontra o elemento pai que contém o card completo
+                let cardContainer = cardElement;
+                if (!cardElement.hasAttribute('data-card-id') && !cardElement.hasAttribute('data-gs-id')) {
+                    // Se o elemento não tem ID, procura pelo pai que tenha
+                    cardContainer = cardElement.closest('[data-card-id], [data-gs-id]') || cardElement.closest('.col-xl-3, .col-xl-4, .col-xl-6, .col-xl-8, .col-xl-12');
+                }
+                
+                if (!cardContainer) return;
+                
+                // Gera ou obtém o ID do card
+                let cardId = cardContainer.getAttribute('data-card-id') || 
+                            cardContainer.getAttribute('data-gs-id') ||
+                            cardContainer.getAttribute('gs-id');
+                
+                if (!cardId) {
+                    // Tenta gerar ID baseado no conteúdo
+                    const link = cardContainer.querySelector('a[href]');
+                    const title = cardContainer.querySelector('.card-label, h3, h4, h5, .card-title');
+                    if (link) {
+                        const href = link.getAttribute('href');
+                        cardId = 'card_' + href.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                    } else if (title) {
+                        cardId = 'card_' + slugify(title.textContent.trim());
+                    } else {
+                        cardId = 'card_auto_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    }
+                    
+                    // Atribui o ID gerado
+                    cardContainer.setAttribute('data-card-id', cardId);
+                    if (!cardContainer.hasAttribute('data-gs-id')) {
+                        cardContainer.setAttribute('data-gs-id', cardId);
+                    }
+                }
+                
+                // Salva o template se ainda não foi salvo
+                if (cardId && !cardTemplates.has(cardId)) {
+                    const templateClone = cardContainer.cloneNode(true);
+                    cardTemplates.set(cardId, templateClone);
+                    console.log('Template salvo antes de entrar em modo de edição:', cardId);
+                }
+            });
         }
         
         // Adiciona botões de remover nos cards após entrar no modo de edição
