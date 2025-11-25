@@ -47,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $cpf = preg_replace('/[^0-9]/', '', $_POST['cpf'] ?? '');
     $rg = sanitize($_POST['rg'] ?? '');
     $data_nascimento = $_POST['data_nascimento'] ?? null;
+    $estado_civil = $_POST['estado_civil'] ?? null;
     $telefone = sanitize($_POST['telefone'] ?? '');
     $email_pessoal = sanitize($_POST['email_pessoal'] ?? '');
     $data_inicio = $_POST['data_inicio'] ?? null;
@@ -109,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("
             UPDATE colaboradores 
             SET empresa_id = ?, setor_id = ?, cargo_id = ?, nivel_hierarquico_id = ?, lider_id = ?, 
-                nome_completo = ?, cpf = ?, cnpj = ?, rg = ?, data_nascimento = ?, telefone = ?, email_pessoal = ?, 
+                nome_completo = ?, cpf = ?, cnpj = ?, rg = ?, data_nascimento = ?, estado_civil = ?, telefone = ?, email_pessoal = ?, 
                 data_inicio = ?, status = ?, tipo_contrato = ?, salario = ?, pix = ?, banco = ?, agencia = ?, conta = ?, tipo_conta = ?, 
                 cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade_endereco = ?, estado_endereco = ?, 
                 observacoes = ?, foto = ?, senha_hash = ?
@@ -117,11 +118,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
         $stmt->execute([
             $empresa_id, $setor_id, $cargo_id, $nivel_hierarquico_id, $lider_id, $nome_completo, $cpf, 
-            !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $telefone, $email_pessoal, $data_inicio, 
+            !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $estado_civil ?: null, $telefone, $email_pessoal, $data_inicio, 
             $status, $tipo_contrato, $salario, $pix, $banco, $agencia, $conta, $tipo_conta, 
             !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco, 
             !empty($estado_endereco) ? $estado_endereco : null, $observacoes, $foto_path, $senha_hash, $id
         ]);
+        
+        // Processa filhos (remove todos e adiciona novamente)
+        $stmt_delete_filhos = $pdo->prepare("DELETE FROM colaboradores_filhos WHERE colaborador_id = ?");
+        $stmt_delete_filhos->execute([$id]);
+        
+        if (isset($_POST['filhos']) && is_array($_POST['filhos'])) {
+            foreach ($_POST['filhos'] as $filho) {
+                if (!empty($filho['nome'])) {
+                    $nome_filho = sanitize($filho['nome']);
+                    $data_nasc_filho = !empty($filho['data_nascimento']) ? $filho['data_nascimento'] : null;
+                    $idade_filho = !empty($filho['idade']) ? (int)$filho['idade'] : null;
+                    
+                    // Calcula idade se tiver data de nascimento
+                    if ($data_nasc_filho && !$idade_filho) {
+                        $data_nasc = new DateTime($data_nasc_filho);
+                        $hoje = new DateTime();
+                        $idade_filho = $hoje->diff($data_nasc)->y;
+                    }
+                    
+                    $stmt_filho = $pdo->prepare("
+                        INSERT INTO colaboradores_filhos (colaborador_id, nome, data_nascimento, idade)
+                        VALUES (?, ?, ?, ?)
+                    ");
+                    $stmt_filho->execute([$id, $nome_filho, $data_nasc_filho, $idade_filho]);
+                }
+            }
+        }
+        
+        // Processa formações (remove todas e adiciona novamente)
+        $stmt_delete_formacoes = $pdo->prepare("DELETE FROM colaboradores_formacoes WHERE colaborador_id = ?");
+        $stmt_delete_formacoes->execute([$id]);
+        
+        if (isset($_POST['formacoes']) && is_array($_POST['formacoes'])) {
+            foreach ($_POST['formacoes'] as $formacao) {
+                if (!empty($formacao['nome'])) {
+                    $stmt_formacao = $pdo->prepare("
+                        INSERT INTO colaboradores_formacoes 
+                        (colaborador_id, tipo, nome, instituicao, data_inicio, data_conclusao, carga_horaria, status, observacoes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt_formacao->execute([
+                        $id,
+                        $formacao['tipo'] ?? 'curso',
+                        sanitize($formacao['nome']),
+                        !empty($formacao['instituicao']) ? sanitize($formacao['instituicao']) : null,
+                        !empty($formacao['data_inicio']) ? $formacao['data_inicio'] : null,
+                        !empty($formacao['data_conclusao']) ? $formacao['data_conclusao'] : null,
+                        !empty($formacao['carga_horaria']) ? (int)$formacao['carga_horaria'] : null,
+                        $formacao['status'] ?? 'concluido',
+                        !empty($formacao['observacoes']) ? sanitize($formacao['observacoes']) : null
+                    ]);
+                }
+            }
+        }
         
         redirect('colaborador_view.php?id=' . $id, 'Colaborador atualizado com sucesso!');
     } catch (PDOException $e) {
@@ -288,12 +343,64 @@ require_once __DIR__ . '/../includes/header.php';
                                 <input type="date" name="data_nascimento" class="form-control" value="<?= $colaborador['data_nascimento'] ?>">
                             </div>
                             <div class="col-md-3 mb-3">
+                                <label class="form-label">Estado Civil</label>
+                                <select name="estado_civil" class="form-select">
+                                    <option value="">Selecione...</option>
+                                    <option value="solteiro" <?= ($colaborador['estado_civil'] ?? '') === 'solteiro' ? 'selected' : '' ?>>Solteiro(a)</option>
+                                    <option value="casado" <?= ($colaborador['estado_civil'] ?? '') === 'casado' ? 'selected' : '' ?>>Casado(a)</option>
+                                    <option value="divorciado" <?= ($colaborador['estado_civil'] ?? '') === 'divorciado' ? 'selected' : '' ?>>Divorciado(a)</option>
+                                    <option value="viuvo" <?= ($colaborador['estado_civil'] ?? '') === 'viuvo' ? 'selected' : '' ?>>Viúvo(a)</option>
+                                    <option value="uniao_estavel" <?= ($colaborador['estado_civil'] ?? '') === 'uniao_estavel' ? 'selected' : '' ?>>União Estável</option>
+                                    <option value="outro" <?= ($colaborador['estado_civil'] ?? '') === 'outro' ? 'selected' : '' ?>>Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
                                 <label class="form-label">Telefone</label>
                                 <input type="text" name="telefone" class="form-control" value="<?= htmlspecialchars($colaborador['telefone']) ?>">
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Email Pessoal</label>
                                 <input type="email" name="email_pessoal" class="form-control" value="<?= htmlspecialchars($colaborador['email_pessoal']) ?>">
+                            </div>
+                        </div>
+                        
+                        <!-- Filhos -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Filhos</h5>
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="adicionarFilho()">
+                                        <i class="ki-duotone ki-plus fs-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Adicionar Filho
+                                    </button>
+                                </div>
+                                <div id="filhos_container">
+                                    <!-- Filhos serão adicionados aqui dinamicamente -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Formações -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Cursos e Formações</h5>
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="adicionarFormacao()">
+                                        <i class="ki-duotone ki-plus fs-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Adicionar Formação
+                                    </button>
+                                </div>
+                                <div id="formacoes_container">
+                                    <!-- Formações serão adicionadas aqui dinamicamente -->
+                                </div>
                             </div>
                         </div>
                         
@@ -716,6 +823,232 @@ document.getElementById('foto')?.addEventListener('change', function(e) {
     } else {
         document.getElementById('foto_preview').style.display = 'none';
     }
+});
+</script>
+
+<script>
+// Gerenciamento de Filhos
+let filhosCount = 0;
+
+function adicionarFilho(nome = '', dataNascimento = '', idade = '') {
+    filhosCount++;
+    const container = document.getElementById('filhos_container');
+    const filhoDiv = document.createElement('div');
+    filhoDiv.className = 'card card-flush mb-3';
+    filhoDiv.id = 'filho_' + filhosCount;
+    
+    // Escapa valores para HTML
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+    
+    const nomeEscaped = escapeHtml(nome || '');
+    const dataNascimentoEscaped = escapeHtml(dataNascimento || '');
+    const idadeEscaped = escapeHtml(idade || '');
+    
+    filhoDiv.innerHTML = 
+        '<div class="card-body">' +
+            '<div class="d-flex justify-content-between align-items-center mb-3">' +
+                '<h6 class="mb-0">Filho ' + filhosCount + '</h6>' +
+                '<button type="button" class="btn btn-sm btn-light-danger" onclick="removerFilho(' + filhosCount + ')">' +
+                    '<i class="ki-duotone ki-trash fs-2">' +
+                        '<span class="path1"></span>' +
+                        '<span class="path2"></span>' +
+                        '<span class="path3"></span>' +
+                        '<span class="path4"></span>' +
+                        '<span class="path5"></span>' +
+                    '</i>' +
+                    'Remover' +
+                '</button>' +
+            '</div>' +
+            '<div class="row">' +
+                '<div class="col-md-4 mb-3">' +
+                    '<label class="form-label">Nome *</label>' +
+                    '<input type="text" name="filhos[' + filhosCount + '][nome]" class="form-control" value="' + nomeEscaped + '" required>' +
+                '</div>' +
+                '<div class="col-md-4 mb-3">' +
+                    '<label class="form-label">Data de Nascimento</label>' +
+                    '<input type="date" name="filhos[' + filhosCount + '][data_nascimento]" class="form-control" value="' + dataNascimentoEscaped + '" onchange="calcularIdadeFilho(' + filhosCount + ', this.value)">' +
+                '</div>' +
+                '<div class="col-md-4 mb-3">' +
+                    '<label class="form-label">Idade</label>' +
+                    '<input type="number" name="filhos[' + filhosCount + '][idade]" id="idade_filho_' + filhosCount + '" class="form-control" min="0" max="120" value="' + idadeEscaped + '">' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    container.appendChild(filhoDiv);
+}
+
+function removerFilho(id) {
+    const filhoDiv = document.getElementById('filho_' + id);
+    if (filhoDiv) {
+        filhoDiv.remove();
+    }
+}
+
+function calcularIdadeFilho(id, dataNascimento) {
+    if (dataNascimento) {
+        const dataNasc = new Date(dataNascimento);
+        const hoje = new Date();
+        const idade = hoje.getFullYear() - dataNasc.getFullYear();
+        const mes = hoje.getMonth() - dataNasc.getMonth();
+        const idadeCalculada = mes < 0 || (mes === 0 && hoje.getDate() < dataNasc.getDate()) ? idade - 1 : idade;
+        document.getElementById('idade_filho_' + id).value = idadeCalculada;
+    }
+}
+
+// Gerenciamento de Formações
+let formacoesCount = 0;
+
+function adicionarFormacao(tipo = 'curso', nome = '', instituicao = '', dataInicio = '', dataConclusao = '', cargaHoraria = '', status = 'concluido', observacoes = '') {
+    formacoesCount++;
+    const container = document.getElementById('formacoes_container');
+    const formacaoDiv = document.createElement('div');
+    formacaoDiv.className = 'card card-flush mb-3';
+    formacaoDiv.id = 'formacao_' + formacoesCount;
+    
+    // Escapa valores para HTML
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+    
+    const tipoEscaped = escapeHtml(tipo || 'curso');
+    const nomeEscaped = escapeHtml(nome || '');
+    const instituicaoEscaped = escapeHtml(instituicao || '');
+    const dataInicioEscaped = escapeHtml(dataInicio || '');
+    const dataConclusaoEscaped = escapeHtml(dataConclusao || '');
+    const cargaHorariaEscaped = escapeHtml(cargaHoraria || '');
+    const statusEscaped = escapeHtml(status || 'concluido');
+    const observacoesEscaped = escapeHtml(observacoes || '');
+    
+    formacaoDiv.innerHTML = 
+        '<div class="card-body">' +
+            '<div class="d-flex justify-content-between align-items-center mb-3">' +
+                '<h6 class="mb-0">Formação ' + formacoesCount + '</h6>' +
+                '<button type="button" class="btn btn-sm btn-light-danger" onclick="removerFormacao(' + formacoesCount + ')">' +
+                    '<i class="ki-duotone ki-trash fs-2">' +
+                        '<span class="path1"></span>' +
+                        '<span class="path2"></span>' +
+                        '<span class="path3"></span>' +
+                        '<span class="path4"></span>' +
+                        '<span class="path5"></span>' +
+                    '</i>' +
+                    'Remover' +
+                '</button>' +
+            '</div>' +
+            '<div class="row">' +
+                '<div class="col-md-3 mb-3">' +
+                    '<label class="form-label">Tipo *</label>' +
+                    '<select name="formacoes[' + formacoesCount + '][tipo]" class="form-select" required>' +
+                        '<option value="curso"' + (tipoEscaped === 'curso' ? ' selected' : '') + '>Curso</option>' +
+                        '<option value="graduacao"' + (tipoEscaped === 'graduacao' ? ' selected' : '') + '>Graduação</option>' +
+                        '<option value="pos_graduacao"' + (tipoEscaped === 'pos_graduacao' ? ' selected' : '') + '>Pós-Graduação</option>' +
+                        '<option value="mestrado"' + (tipoEscaped === 'mestrado' ? ' selected' : '') + '>Mestrado</option>' +
+                        '<option value="doutorado"' + (tipoEscaped === 'doutorado' ? ' selected' : '') + '>Doutorado</option>' +
+                        '<option value="tecnico"' + (tipoEscaped === 'tecnico' ? ' selected' : '') + '>Técnico</option>' +
+                        '<option value="certificacao"' + (tipoEscaped === 'certificacao' ? ' selected' : '') + '>Certificação</option>' +
+                        '<option value="outro"' + (tipoEscaped === 'outro' ? ' selected' : '') + '>Outro</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div class="col-md-5 mb-3">' +
+                    '<label class="form-label">Nome do Curso/Formação *</label>' +
+                    '<input type="text" name="formacoes[' + formacoesCount + '][nome]" class="form-control" value="' + nomeEscaped + '" required>' +
+                '</div>' +
+                '<div class="col-md-4 mb-3">' +
+                    '<label class="form-label">Instituição</label>' +
+                    '<input type="text" name="formacoes[' + formacoesCount + '][instituicao]" class="form-control" value="' + instituicaoEscaped + '">' +
+                '</div>' +
+                '<div class="col-md-3 mb-3">' +
+                    '<label class="form-label">Data Início</label>' +
+                    '<input type="date" name="formacoes[' + formacoesCount + '][data_inicio]" class="form-control" value="' + dataInicioEscaped + '">' +
+                '</div>' +
+                '<div class="col-md-3 mb-3">' +
+                    '<label class="form-label">Data Conclusão</label>' +
+                    '<input type="date" name="formacoes[' + formacoesCount + '][data_conclusao]" class="form-control" value="' + dataConclusaoEscaped + '">' +
+                '</div>' +
+                '<div class="col-md-2 mb-3">' +
+                    '<label class="form-label">Carga Horária</label>' +
+                    '<input type="number" name="formacoes[' + formacoesCount + '][carga_horaria]" class="form-control" min="0" placeholder="Horas" value="' + cargaHorariaEscaped + '">' +
+                '</div>' +
+                '<div class="col-md-2 mb-3">' +
+                    '<label class="form-label">Status</label>' +
+                    '<select name="formacoes[' + formacoesCount + '][status]" class="form-select">' +
+                        '<option value="concluido"' + (statusEscaped === 'concluido' ? ' selected' : '') + '>Concluído</option>' +
+                        '<option value="em_andamento"' + (statusEscaped === 'em_andamento' ? ' selected' : '') + '>Em Andamento</option>' +
+                        '<option value="trancado"' + (statusEscaped === 'trancado' ? ' selected' : '') + '>Trancado</option>' +
+                        '<option value="cancelado"' + (statusEscaped === 'cancelado' ? ' selected' : '') + '>Cancelado</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div class="col-md-2 mb-3">' +
+                    '<label class="form-label">&nbsp;</label>' +
+                    '<div class="d-flex align-items-end h-100">' +
+                        '<button type="button" class="btn btn-sm btn-light" onclick="removerFormacao(' + formacoesCount + ')">' +
+                            '<i class="ki-duotone ki-trash fs-2 text-danger">' +
+                                '<span class="path1"></span>' +
+                                '<span class="path2"></span>' +
+                                '<span class="path3"></span>' +
+                                '<span class="path4"></span>' +
+                                '<span class="path5"></span>' +
+                            '</i>' +
+                        '</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="col-md-12 mb-3">' +
+                    '<label class="form-label">Observações</label>' +
+                    '<textarea name="formacoes[' + formacoesCount + '][observacoes]" class="form-control" rows="2">' + observacoesEscaped + '</textarea>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    container.appendChild(formacaoDiv);
+}
+
+function removerFormacao(id) {
+    const formacaoDiv = document.getElementById('formacao_' + id);
+    if (formacaoDiv) {
+        formacaoDiv.remove();
+    }
+}
+
+// Carrega filhos e formações existentes ao abrir a página
+document.addEventListener('DOMContentLoaded', function() {
+    <?php
+    // Busca filhos existentes
+    $stmt_filhos = $pdo->prepare("SELECT * FROM colaboradores_filhos WHERE colaborador_id = ? ORDER BY id");
+    $stmt_filhos->execute([$id]);
+    $filhos_existentes = $stmt_filhos->fetchAll();
+    
+    foreach ($filhos_existentes as $filho):
+    ?>
+    adicionarFilho(
+        <?= json_encode($filho['nome']) ?>,
+        <?= json_encode($filho['data_nascimento']) ?>,
+        <?= json_encode($filho['idade']) ?>
+    );
+    <?php endforeach; ?>
+    
+    <?php
+    // Busca formações existentes
+    $stmt_formacoes = $pdo->prepare("SELECT * FROM colaboradores_formacoes WHERE colaborador_id = ? ORDER BY id");
+    $stmt_formacoes->execute([$id]);
+    $formacoes_existentes = $stmt_formacoes->fetchAll();
+    
+    foreach ($formacoes_existentes as $formacao):
+    ?>
+    adicionarFormacao(
+        <?= json_encode($formacao['tipo']) ?>,
+        <?= json_encode($formacao['nome']) ?>,
+        <?= json_encode($formacao['instituicao']) ?>,
+        <?= json_encode($formacao['data_inicio']) ?>,
+        <?= json_encode($formacao['data_conclusao']) ?>,
+        <?= json_encode($formacao['carga_horaria']) ?>,
+        <?= json_encode($formacao['status']) ?>,
+        <?= json_encode($formacao['observacoes']) ?>
+    );
+    <?php endforeach; ?>
 });
 </script>
 

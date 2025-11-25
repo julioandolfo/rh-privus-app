@@ -389,6 +389,11 @@ function can_access_estrutura() {
  * @return bool True se tem acesso a pelo menos uma página de colaboradores
  */
 function can_access_colaboradores_menu() {
+    // Colaboradores não devem ver o menu "Colaboradores" (apenas "Meus Pagamentos")
+    if (is_colaborador()) {
+        return false;
+    }
+    
     $colaboradores_pages = [
         'colaboradores.php',
         'colaborador_add.php',

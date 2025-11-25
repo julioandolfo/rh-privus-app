@@ -260,35 +260,39 @@ require_once __DIR__ . '/../includes/header.php';
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-end">
-                                        <?php if ($status === 'pendente' || $status === 'rejeitado'): ?>
-                                            <button type="button" class="btn btn-sm btn-primary" 
-                                                    onclick="enviarDocumento(<?= $fechamento['fechamento_id'] ?>, <?= $item['item_id'] ?>)">
-                                                <i class="ki-duotone ki-file-up fs-5">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                Enviar Documento
-                                            </button>
-                                        <?php elseif ($status === 'enviado'): ?>
+                                        <div class="d-flex gap-2 justify-content-end">
                                             <button type="button" class="btn btn-sm btn-light-info" 
-                                                    onclick="verDocumento(<?= $fechamento['fechamento_id'] ?>, <?= $item['item_id'] ?>)">
+                                                    onclick="verDetalhesPagamentoColaborador(<?= $fechamento['fechamento_id'] ?>, <?= $colaborador_id ?>)">
                                                 <i class="ki-duotone ki-eye fs-5">
                                                     <span class="path1"></span>
                                                     <span class="path2"></span>
                                                     <span class="path3"></span>
                                                 </i>
-                                                Ver Enviado
+                                                Ver Detalhes
                                             </button>
-                                        <?php elseif ($status === 'aprovado'): ?>
-                                            <button type="button" class="btn btn-sm btn-light-success" 
-                                                    onclick="verDocumento(<?= $fechamento['fechamento_id'] ?>, <?= $item['item_id'] ?>)">
-                                                <i class="ki-duotone ki-check-circle fs-5">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                Ver Aprovado
-                                            </button>
-                                        <?php endif; ?>
+                                            <?php if ($status === 'pendente' || $status === 'rejeitado'): ?>
+                                                <button type="button" class="btn btn-sm btn-primary" 
+                                                        onclick="enviarDocumento(<?= $fechamento['fechamento_id'] ?>, <?= $item['item_id'] ?>)">
+                                                    <i class="ki-duotone ki-file-up fs-5">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                    Enviar Documento
+                                                </button>
+                                            <?php elseif ($status === 'enviado' || $status === 'aprovado'): ?>
+                                                <button type="button" class="btn btn-sm btn-light-<?= $status === 'aprovado' ? 'success' : 'info' ?>" 
+                                                        onclick="verDocumento(<?= $fechamento['fechamento_id'] ?>, <?= $item['item_id'] ?>)">
+                                                    <i class="ki-duotone ki-<?= $status === 'aprovado' ? 'check-circle' : 'eye' ?> fs-5">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                        <?php if ($status === 'enviado'): ?>
+                                                        <span class="path3"></span>
+                                                        <?php endif; ?>
+                                                    </i>
+                                                    Ver Documento
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -378,6 +382,37 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 <!--end::Modal-->
 
+<!--begin::Modal - Detalhes Completos do Pagamento-->
+<div class="modal fade" id="kt_modal_detalhes_pagamento_colaborador" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-1000px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold" id="kt_modal_detalhes_pagamento_colaborador_titulo">Detalhes do Pagamento</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div id="kt_modal_detalhes_pagamento_colaborador_conteudo">
+                    <div class="text-center py-10">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <div class="text-muted mt-3">Carregando detalhes...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer flex-center">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal-->
+
 <script>
 // Enviar documento
 function enviarDocumento(fechamentoId, itemId) {
@@ -387,6 +422,336 @@ function enviarDocumento(fechamentoId, itemId) {
     
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_enviar_documento'));
     modal.show();
+}
+
+// Ver detalhes completos do pagamento (colaborador)
+function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
+    const titulo = document.getElementById('kt_modal_detalhes_pagamento_colaborador_titulo');
+    const conteudo = document.getElementById('kt_modal_detalhes_pagamento_colaborador_conteudo');
+    
+    // Mostra loading
+    conteudo.innerHTML = `
+        <div class="text-center py-10">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <div class="text-muted mt-3">Carregando detalhes...</div>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_pagamento_colaborador'));
+    modal.show();
+    
+    // Busca dados via API (mesma função do admin)
+    fetch(`../api/get_detalhes_pagamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const d = data.data;
+                
+                titulo.textContent = `Detalhes do Pagamento - ${d.fechamento.mes_referencia_formatado}`;
+                
+                // Usa o mesmo HTML do modal do admin (código completo igual ao fechamento_pagamentos.php)
+                let html = `
+                    <div class="mb-10">
+                        <!-- Informações do Fechamento -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Informações do Fechamento</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Mês/Ano de Referência:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.mes_referencia_formatado}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Fechamento:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.data_fechamento_formatada}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Empresa:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.empresa_nome}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Período:</strong><br>
+                                        <span class="text-gray-800">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Resumo Financeiro -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Resumo Financeiro</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <tbody>
+                                            <tr>
+                                                <td class="fw-bold">Salário Base</td>
+                                                <td class="text-end">
+                                                    <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Horas Extras (Total)</td>
+                                                <td class="text-end">
+                                                    <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Valor Horas Extras</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Total de Bônus</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ${d.bonus.total_desconto_ocorrencias > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Desconto por Ocorrências (Bônus)</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.ocorrencias.total_descontos > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Descontos (Ocorrências)</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.item.descontos > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Outros Descontos</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.item.adicionais > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-success">Adicionais</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">+R$ ${parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            <tr class="border-top border-2">
+                                                <td class="fw-bold fs-4">Valor Total</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold fs-3">R$ ${parseFloat(d.item.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes de Horas Extras -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Detalhes de Horas Extras</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-5">
+                                    <h5 class="fw-bold mb-3">Resumo</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-success rounded">
+                                                <i class="ki-duotone ki-money fs-2x text-success me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Horas Pagas em R$</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                    <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-info rounded">
+                                                <i class="ki-duotone ki-time fs-2x text-info me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Horas em Banco</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_banco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-primary rounded">
+                                                <i class="ki-duotone ki-chart-simple fs-2x text-primary me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Total de Horas</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.total_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${d.horas_extras.registros.length > 0 ? `
+                                <h5 class="fw-bold mb-3">Registros Individuais</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Data</th>
+                                                <th>Quantidade</th>
+                                                <th>Valor/Hora</th>
+                                                <th>% Adicional</th>
+                                                <th>Valor Total</th>
+                                                <th>Tipo</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.horas_extras.registros.map(he => `
+                                                <tr>
+                                                    <td>${new Date(he.data_trabalho + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                                                    <td>${parseFloat(he.quantidade_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</td>
+                                                    <td>R$ ${parseFloat(he.valor_hora || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${parseFloat(he.percentual_adicional || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</td>
+                                                    <td class="fw-bold">R$ ${parseFloat(he.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>
+                                                        ${he.tipo_pagamento === 'banco_horas' 
+                                                            ? '<span class="badge badge-light-info">Banco de Horas</span>' 
+                                                            : '<span class="badge badge-light-success">Dinheiro</span>'}
+                                                    </td>
+                                                    <td>${he.observacoes || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste período.</p>'}
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes de Bônus -->
+                        ${d.bonus.lista.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Detalhes de Bônus</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Tipo de Bônus</th>
+                                                <th>Tipo</th>
+                                                <th>Valor Original</th>
+                                                <th>Desconto Ocorrências</th>
+                                                <th>Valor Final</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.bonus.lista.map(b => {
+                                                const tipoValor = b.tipo_valor || 'variavel';
+                                                const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : tipoValor === 'informativo' ? 'Informativo' : 'Variável';
+                                                const tipoBadge = tipoValor === 'fixo' ? 'primary' : tipoValor === 'informativo' ? 'info' : 'success';
+                                                const valorOriginal = parseFloat(b.valor_original || b.valor || 0);
+                                                const descontoOcorrencias = parseFloat(b.desconto_ocorrencias || 0);
+                                                const valorFinal = parseFloat(b.valor || 0);
+                                                
+                                                return `
+                                                    <tr>
+                                                        <td class="fw-bold">${b.tipo_bonus_nome}</td>
+                                                        <td><span class="badge badge-light-${tipoBadge}">${tipoLabel}</span></td>
+                                                        <td>R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        <td class="text-danger">${descontoOcorrencias > 0 ? '-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</td>
+                                                        <td class="fw-bold text-success">R$ ${valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        <td>${b.observacoes || '-'}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Ocorrências com Desconto -->
+                        ${d.ocorrencias.descontos.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Ocorrências com Desconto em R$</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Data</th>
+                                                <th>Tipo</th>
+                                                <th>Descrição</th>
+                                                <th>Valor Desconto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.ocorrencias.descontos.map(occ => `
+                                                <tr>
+                                                    <td>${new Date(occ.data_ocorrencia + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                                                    <td><span class="badge badge-light-danger">${occ.tipo_ocorrencia_nome || occ.tipo_ocorrencia_codigo || '-'}</span></td>
+                                                    <td>${occ.descricao || '-'}</td>
+                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(occ.valor_desconto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                conteudo.innerHTML = html;
+            } else {
+                conteudo.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="ki-duotone ki-information-5 fs-2x me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        ${data.message || 'Erro ao carregar detalhes do pagamento'}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            conteudo.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ki-duotone ki-information-5 fs-2x me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Erro ao carregar detalhes do pagamento
+                </div>
+            `;
+        });
 }
 
 // Ver documento

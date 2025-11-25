@@ -1072,6 +1072,22 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
+                <!--begin:Menu item - Meus Pagamentos (apenas para colaboradores)-->
+                <?php if (can_access_page('meus_pagamentos.php')): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('meus_pagamentos.php') ?>" href="meus_pagamentos.php">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-<?= getIcon('wallet') ?> fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Meus Pagamentos</span>
+                    </a>
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <!--begin:Menu item-->
                 <div class="menu-item">
                     <a class="menu-link <?= isActive('minha_conta.php') ?>" href="minha_conta.php">

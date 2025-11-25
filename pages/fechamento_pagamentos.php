@@ -9,6 +9,177 @@ require_once __DIR__ . '/../includes/permissions.php';
 
 require_page_permission('fechamento_pagamentos.php');
 
+/**
+ * Calcula desconto de bônus baseado nas ocorrências configuradas
+ */
+function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_id, $valor_bonus, $data_inicio, $data_fim) {
+    // Busca configurações de desconto por ocorrências para este tipo de bônus
+    $stmt = $pdo->prepare("
+        SELECT tbo.*, to_cod.codigo as tipo_ocorrencia_codigo
+        FROM tipos_bonus_ocorrencias tbo
+        INNER JOIN tipos_ocorrencias to_cod ON tbo.tipo_ocorrencia_id = to_cod.id
+        WHERE tbo.tipo_bonus_id = ? AND tbo.ativo = 1
+    ");
+    $stmt->execute([$tipo_bonus_id]);
+    $configuracoes = $stmt->fetchAll();
+    
+    if (empty($configuracoes)) {
+        return 0;
+    }
+    
+    $desconto_total = 0;
+    $detalhes_desconto = [];
+    
+    foreach ($configuracoes as $config) {
+        // Verifica período anterior primeiro (se configurado)
+        $verificar_periodo_anterior = !empty($config['verificar_periodo_anterior']);
+        $periodo_anterior_meses = (int)($config['periodo_anterior_meses'] ?? 1);
+        
+        $total_ocorrencias_periodo_anterior = 0;
+        $total_ocorrencias_periodo_atual = 0;
+        
+        // Se deve verificar período anterior
+        if ($verificar_periodo_anterior) {
+            // Calcula período anterior (meses anteriores ao início do fechamento)
+            $data_inicio_anterior = date('Y-m-01', strtotime($data_inicio . ' -' . $periodo_anterior_meses . ' months'));
+            $data_fim_anterior = date('Y-m-t', strtotime($data_inicio_anterior));
+            
+            // Busca ocorrências no período anterior
+            $where_conditions_anterior = [
+                "o.colaborador_id = ?",
+                "o.data_ocorrencia >= ?",
+                "o.data_ocorrencia <= ?",
+                "o.tipo_ocorrencia_id = ?"
+            ];
+            $params_anterior = [$colaborador_id, $data_inicio_anterior, $data_fim_anterior, $config['tipo_ocorrencia_id']];
+            
+            if ($config['desconta_apenas_aprovadas']) {
+                $where_conditions_anterior[] = "o.status_aprovacao = 'aprovada'";
+            }
+            
+            if (!$config['desconta_banco_horas']) {
+                $where_conditions_anterior[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
+            }
+            
+            $sql_anterior = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_conditions_anterior);
+            $stmt_anterior = $pdo->prepare($sql_anterior);
+            $stmt_anterior->execute($params_anterior);
+            $resultado_anterior = $stmt_anterior->fetch();
+            $total_ocorrencias_periodo_anterior = (int)($resultado_anterior['total'] ?? 0);
+            
+            // Se encontrou ocorrência no período anterior e tipo é 'total', zera o bônus completamente
+            if ($total_ocorrencias_periodo_anterior > 0 && $config['tipo_desconto'] === 'total') {
+                return $valor_bonus; // Retorna o valor total do bônus como desconto
+            }
+        }
+        
+        // Define período de busca (período atual do fechamento)
+        $periodo_inicio = $data_inicio;
+        $periodo_fim = $data_fim;
+        
+        if (!empty($config['periodo_dias'])) {
+            // Se tem período específico, calcula a partir da data fim
+            $periodo_inicio = date('Y-m-d', strtotime($data_fim . ' -' . $config['periodo_dias'] . ' days'));
+        }
+        
+        // Monta condições da query para período atual
+        $where_conditions = [
+            "o.colaborador_id = ?",
+            "o.data_ocorrencia >= ?",
+            "o.data_ocorrencia <= ?",
+            "o.tipo_ocorrencia_id = ?"
+        ];
+        $params = [$colaborador_id, $periodo_inicio, $periodo_fim, $config['tipo_ocorrencia_id']];
+        
+        // Filtro de aprovação
+        if ($config['desconta_apenas_aprovadas']) {
+            $where_conditions[] = "o.status_aprovacao = 'aprovada'";
+        }
+        
+        // Filtro de banco de horas
+        if (!$config['desconta_banco_horas']) {
+            $where_conditions[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
+        }
+        
+        // Busca ocorrências do tipo configurado no período atual
+        $sql = "
+            SELECT COUNT(*) as total_ocorrencias
+            FROM ocorrencias o
+            WHERE " . implode(' AND ', $where_conditions);
+        
+        $stmt_ocorrencias = $pdo->prepare($sql);
+        $stmt_ocorrencias->execute($params);
+        $resultado = $stmt_ocorrencias->fetch();
+        $total_ocorrencias_periodo_atual = (int)($resultado['total_ocorrencias'] ?? 0);
+        
+        // Se tipo é 'total' e encontrou ocorrência no período atual, zera o bônus completamente
+        if ($total_ocorrencias_periodo_atual > 0 && $config['tipo_desconto'] === 'total') {
+            return $valor_bonus; // Retorna o valor total do bônus como desconto
+        }
+        
+        // Se encontrou ocorrência no período anterior (mesmo que não seja tipo 'total'), também zera
+        if ($total_ocorrencias_periodo_anterior > 0) {
+            return $valor_bonus; // Retorna o valor total do bônus como desconto
+        }
+        
+        // Se não encontrou ocorrências ou não é tipo 'total', calcula desconto normalmente
+        if ($total_ocorrencias_periodo_atual > 0) {
+            $desconto_config = 0;
+            
+            // Calcula desconto baseado no tipo
+            if ($config['tipo_desconto'] === 'fixo' && !empty($config['valor_desconto'])) {
+                // Desconto fixo por ocorrência
+                $desconto_config = (float)$config['valor_desconto'] * $total_ocorrencias_periodo_atual;
+            } elseif ($config['tipo_desconto'] === 'percentual' && !empty($config['valor_desconto'])) {
+                // Desconto percentual do valor do bônus
+                $percentual = (float)$config['valor_desconto'] / 100;
+                $desconto_config = $valor_bonus * $percentual * $total_ocorrencias_periodo_atual;
+            } else {
+                // Desconto proporcional (divide por dias úteis do período)
+                $dias_uteis_periodo = calcular_dias_uteis($periodo_inicio, $periodo_fim);
+                if ($dias_uteis_periodo > 0) {
+                    $valor_por_dia = $valor_bonus / $dias_uteis_periodo;
+                    $desconto_config = $valor_por_dia * $total_ocorrencias_periodo_atual;
+                }
+            }
+            
+            $desconto_total += $desconto_config;
+            
+            $detalhes_desconto[] = [
+                'tipo_ocorrencia_id' => $config['tipo_ocorrencia_id'],
+                'tipo_ocorrencia_codigo' => $config['tipo_ocorrencia_codigo'],
+                'total_ocorrencias' => $total_ocorrencias_periodo_atual,
+                'total_ocorrencias_periodo_anterior' => $total_ocorrencias_periodo_anterior,
+                'desconto' => $desconto_config,
+                'tipo_desconto' => $config['tipo_desconto'],
+                'verificar_periodo_anterior' => $verificar_periodo_anterior
+            ];
+        }
+    }
+    
+    return $desconto_total;
+}
+
+/**
+ * Calcula dias úteis entre duas datas (exclui sábados e domingos)
+ */
+function calcular_dias_uteis($data_inicio, $data_fim) {
+    $inicio = new DateTime($data_inicio);
+    $fim = new DateTime($data_fim);
+    $dias_uteis = 0;
+    
+    while ($inicio <= $fim) {
+        $dia_semana = (int)$inicio->format('w');
+        // 0 = domingo, 6 = sábado
+        if ($dia_semana != 0 && $dia_semana != 6) {
+            $dias_uteis++;
+        }
+        $inicio->modify('+1 day');
+    }
+    
+    return $dias_uteis > 0 ? $dias_uteis : 20; // Fallback para 20 dias se cálculo der 0
+}
+
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
@@ -62,38 +233,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $salario_base = $colab['salario'];
                 
-                // Busca horas extras do período
+                // Busca horas extras do período (separando por tipo de pagamento)
+                // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
                 $stmt = $pdo->prepare("
-                    SELECT SUM(quantidade_horas) as total_horas, SUM(valor_total) as total_valor
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN quantidade_horas ELSE 0 END), 0) as total_horas_dinheiro,
+                        COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN valor_total ELSE 0 END), 0) as total_valor_dinheiro,
+                        COALESCE(SUM(CASE WHEN tipo_pagamento = 'banco_horas' THEN quantidade_horas ELSE 0 END), 0) as total_horas_banco,
+                        COALESCE(SUM(quantidade_horas), 0) as total_horas,
+                        COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN valor_total ELSE 0 END), 0) as total_valor
                     FROM horas_extras
                     WHERE colaborador_id = ? AND data_trabalho >= ? AND data_trabalho <= ?
                 ");
                 $stmt->execute([$colab_id, $data_inicio, $data_fim]);
                 $he_data = $stmt->fetch();
                 
-                $horas_extras = $he_data['total_horas'] ?? 0;
-                $valor_horas_extras = $he_data['total_valor'] ?? 0;
+                $horas_extras = (float)($he_data['total_horas'] ?? 0);
+                $horas_extras_dinheiro = (float)($he_data['total_horas_dinheiro'] ?? 0);
+                $horas_extras_banco = (float)($he_data['total_horas_banco'] ?? 0);
+                $valor_horas_extras = (float)($he_data['total_valor'] ?? 0);
                 
                 // Busca bônus ativos do colaborador no período
-                // Lógica: bônus está ativo se:
-                // - É permanente (ambas datas NULL) OU
-                // - Não tem data_inicio OU data_inicio <= fim do período
-                // - E não tem data_fim OU data_fim >= início do período
+                // Considera o tipo de bônus: fixo (usa valor_fixo), variavel (usa valor do colaborador), informativo (não soma)
                 $stmt = $pdo->prepare("
-                    SELECT SUM(valor) as total_bonus
-                    FROM colaboradores_bonus
-                    WHERE colaborador_id = ?
+                    SELECT 
+                        cb.*,
+                        tb.tipo_valor,
+                        tb.valor_fixo,
+                        tb.nome as tipo_bonus_nome
+                    FROM colaboradores_bonus cb
+                    INNER JOIN tipos_bonus tb ON cb.tipo_bonus_id = tb.id
+                    WHERE cb.colaborador_id = ?
                     AND (
-                        (data_inicio IS NULL AND data_fim IS NULL)
+                        (cb.data_inicio IS NULL AND cb.data_fim IS NULL)
                         OR (
-                            (data_inicio IS NULL OR data_inicio <= ?)
-                            AND (data_fim IS NULL OR data_fim >= ?)
+                            (cb.data_inicio IS NULL OR cb.data_inicio <= ?)
+                            AND (cb.data_fim IS NULL OR cb.data_fim >= ?)
                         )
                     )
                 ");
                 $stmt->execute([$colab_id, $data_fim, $data_inicio]);
-                $bonus_data = $stmt->fetch();
-                $total_bonus = $bonus_data['total_bonus'] ?? 0;
+                $bonus_list_calc = $stmt->fetchAll();
+                
+                // Calcula total de bônus considerando o tipo e desconto por ocorrências configuradas
+                $total_bonus = 0;
+                foreach ($bonus_list_calc as $bonus_calc) {
+                    $tipo_valor = $bonus_calc['tipo_valor'] ?? 'variavel';
+                    
+                    if ($tipo_valor === 'informativo') {
+                        // Informativo não soma no total
+                        continue;
+                    }
+                    
+                    // Determina valor base do bônus
+                    $valor_base = 0;
+                    if ($tipo_valor === 'fixo') {
+                        $valor_base = (float)($bonus_calc['valor_fixo'] ?? 0);
+                    } else {
+                        $valor_base = (float)($bonus_calc['valor'] ?? 0);
+                    }
+                    
+                    // Calcula desconto por ocorrências configuradas
+                    $desconto_ocorrencias = calcular_desconto_bonus_ocorrencias(
+                        $pdo,
+                        $bonus_calc['tipo_bonus_id'],
+                        $colab_id,
+                        $valor_base,
+                        $data_inicio,
+                        $data_fim
+                    );
+                    
+                    // Limita desconto ao valor do bônus (não pode ficar negativo)
+                    if ($desconto_ocorrencias > $valor_base) {
+                        $desconto_ocorrencias = $valor_base;
+                    }
+                    
+                    $total_bonus += ($valor_base - $desconto_ocorrencias);
+                }
                 
                 // Busca ocorrências com desconto em R$ do período
                 // Apenas ocorrências que têm valor_desconto > 0 e não desconta do banco de horas
@@ -110,41 +326,174 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ocorrencias_data = $stmt->fetch();
                 $total_descontos_ocorrencias = $ocorrencias_data['total_descontos'] ?? 0;
                 
-                // Insere bônus no fechamento
-                $stmt = $pdo->prepare("
-                    SELECT cb.*, tb.nome as tipo_bonus_nome
-                    FROM colaboradores_bonus cb
-                    INNER JOIN tipos_bonus tb ON cb.tipo_bonus_id = tb.id
-                    WHERE cb.colaborador_id = ?
-                    AND (
-                        (cb.data_inicio IS NULL AND cb.data_fim IS NULL)
-                        OR (
-                            (cb.data_inicio IS NULL OR cb.data_inicio <= ?)
-                            AND (cb.data_fim IS NULL OR cb.data_fim >= ?)
-                        )
-                    )
-                ");
-                $stmt->execute([$colab_id, $data_fim, $data_inicio]);
-                $bonus_list = $stmt->fetchAll();
-                
-                foreach ($bonus_list as $bonus) {
+                // Insere bônus no fechamento (incluindo informativos para registro)
+                foreach ($bonus_list_calc as $bonus) {
+                    $tipo_valor = $bonus['tipo_valor'] ?? 'variavel';
+                    $valor_original = 0;
+                    
+                    if ($tipo_valor === 'fixo') {
+                        // Usa valor fixo do tipo de bônus
+                        $valor_original = (float)($bonus['valor_fixo'] ?? 0);
+                    } elseif ($tipo_valor === 'variavel') {
+                        // Usa valor do colaborador
+                        $valor_original = (float)($bonus['valor'] ?? 0);
+                    }
+                    // Informativo: valor_original = 0 (não soma, mas registra)
+                    
+                    // Calcula desconto por ocorrências configuradas
+                    $desconto_ocorrencias = calcular_desconto_bonus_ocorrencias(
+                        $pdo,
+                        $bonus['tipo_bonus_id'],
+                        $colab_id,
+                        $valor_original,
+                        $data_inicio,
+                        $data_fim
+                    );
+                    
+                    // Limita desconto ao valor do bônus (não pode ficar negativo)
+                    if ($desconto_ocorrencias > $valor_original) {
+                        $desconto_ocorrencias = $valor_original;
+                    }
+                    
+                    $valor_a_usar = $valor_original - $desconto_ocorrencias;
+                    
+                    // Busca detalhes do desconto para salvar em JSON
+                    // Usa a mesma função de cálculo que já retorna os detalhes
+                    $detalhes_array = [];
+                    
+                    // Busca configurações
+                    $stmt_configs = $pdo->prepare("
+                        SELECT tbo.*, to_cod.codigo as tipo_ocorrencia_codigo, to_cod.nome as tipo_ocorrencia_nome
+                        FROM tipos_bonus_ocorrencias tbo
+                        INNER JOIN tipos_ocorrencias to_cod ON tbo.tipo_ocorrencia_id = to_cod.id
+                        WHERE tbo.tipo_bonus_id = ? AND tbo.ativo = 1
+                    ");
+                    $stmt_configs->execute([$bonus['tipo_bonus_id']]);
+                    $configs_detalhes = $stmt_configs->fetchAll();
+                    
+                    foreach ($configs_detalhes as $config_det) {
+                        $verificar_periodo_anterior = !empty($config_det['verificar_periodo_anterior']);
+                        $periodo_anterior_meses = (int)($config_det['periodo_anterior_meses'] ?? 1);
+                        
+                        $total_periodo_anterior = 0;
+                        $total_periodo_atual = 0;
+                        
+                        // Verifica período anterior se configurado
+                        if ($verificar_periodo_anterior) {
+                            $data_inicio_anterior = date('Y-m-01', strtotime($data_inicio . ' -' . $periodo_anterior_meses . ' months'));
+                            $data_fim_anterior = date('Y-m-t', strtotime($data_inicio_anterior));
+                            
+                            $where_anterior = [
+                                "o.colaborador_id = ?",
+                                "o.data_ocorrencia >= ?",
+                                "o.data_ocorrencia <= ?",
+                                "o.tipo_ocorrencia_id = ?"
+                            ];
+                            $params_anterior = [$colab_id, $data_inicio_anterior, $data_fim_anterior, $config_det['tipo_ocorrencia_id']];
+                            
+                            if ($config_det['desconta_apenas_aprovadas']) {
+                                $where_anterior[] = "o.status_aprovacao = 'aprovada'";
+                            }
+                            
+                            if (!$config_det['desconta_banco_horas']) {
+                                $where_anterior[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
+                            }
+                            
+                            $sql_anterior = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_anterior);
+                            $stmt_anterior = $pdo->prepare($sql_anterior);
+                            $stmt_anterior->execute($params_anterior);
+                            $result_anterior = $stmt_anterior->fetch();
+                            $total_periodo_anterior = (int)($result_anterior['total'] ?? 0);
+                        }
+                        
+                        // Verifica período atual
+                        $where_atual = [
+                            "o.colaborador_id = ?",
+                            "o.data_ocorrencia >= ?",
+                            "o.data_ocorrencia <= ?",
+                            "o.tipo_ocorrencia_id = ?"
+                        ];
+                        $params_atual = [$colab_id, $data_inicio, $data_fim, $config_det['tipo_ocorrencia_id']];
+                        
+                        if ($config_det['desconta_apenas_aprovadas']) {
+                            $where_atual[] = "o.status_aprovacao = 'aprovada'";
+                        }
+                        
+                        if (!$config_det['desconta_banco_horas']) {
+                            $where_atual[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
+                        }
+                        
+                        $sql_atual = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_atual);
+                        $stmt_atual = $pdo->prepare($sql_atual);
+                        $stmt_atual->execute($params_atual);
+                        $result_atual = $stmt_atual->fetch();
+                        $total_periodo_atual = (int)($result_atual['total'] ?? 0);
+                        
+                        // Adiciona aos detalhes se encontrou ocorrências
+                        if ($total_periodo_anterior > 0 || $total_periodo_atual > 0) {
+                            $detalhes_array[] = [
+                                'tipo_ocorrencia_id' => $config_det['tipo_ocorrencia_id'],
+                                'tipo_ocorrencia_codigo' => $config_det['tipo_ocorrencia_codigo'],
+                                'tipo_ocorrencia_nome' => $config_det['tipo_ocorrencia_nome'],
+                                'total_ocorrencias_periodo_atual' => $total_periodo_atual,
+                                'total_ocorrencias_periodo_anterior' => $total_periodo_anterior,
+                                'tipo_desconto' => $config_det['tipo_desconto'],
+                                'valor_desconto' => $config_det['valor_desconto'],
+                                'verificar_periodo_anterior' => $verificar_periodo_anterior,
+                                'periodo_anterior_meses' => $periodo_anterior_meses
+                            ];
+                        }
+                    }
+                    
+                    $detalhes_json = json_encode($detalhes_array);
+                    
                     $stmt = $pdo->prepare("
                         INSERT INTO fechamentos_pagamento_bonus 
-                        (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, observacoes)
-                        VALUES (?, ?, ?, ?, ?)
+                        (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, valor_original, desconto_ocorrencias, detalhes_desconto, observacoes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ");
+                    
+                    $observacao = $tipo_valor === 'fixo' 
+                        ? 'Bônus automático (valor fixo do tipo)' 
+                        : ($tipo_valor === 'informativo' 
+                            ? 'Bônus informativo (não soma no total)' 
+                            : 'Bônus automático do fechamento');
+                    
+                    if ($desconto_ocorrencias > 0) {
+                        $total_ocorrencias_atual = array_sum(array_column($detalhes_array, 'total_ocorrencias_periodo_atual'));
+                        $total_ocorrencias_anterior = array_sum(array_column($detalhes_array, 'total_ocorrencias_periodo_anterior'));
+                        
+                        if ($desconto_ocorrencias >= $valor_original) {
+                            $observacao .= ' | Bônus zerado completamente';
+                            if ($total_ocorrencias_anterior > 0) {
+                                $observacao .= ' (ocorrência no período anterior)';
+                            } elseif ($total_ocorrencias_atual > 0) {
+                                $observacao .= ' (ocorrência no período atual)';
+                            }
+                        } else {
+                            $observacao .= ' | Desconto por ' . $total_ocorrencias_atual . ' ocorrência(s) no período atual';
+                            if ($total_ocorrencias_anterior > 0) {
+                                $observacao .= ' e ' . $total_ocorrencias_anterior . ' no período anterior';
+                            }
+                            $observacao .= ': R$ ' . number_format($desconto_ocorrencias, 2, ',', '.');
+                        }
+                    }
+                    
                     $stmt->execute([
                         $fechamento_id, 
                         $colab_id, 
                         $bonus['tipo_bonus_id'], 
-                        $bonus['valor'],
-                        'Bônus automático do fechamento'
+                        $valor_a_usar,
+                        $valor_original,
+                        $desconto_ocorrencias,
+                        $detalhes_json,
+                        $observacao
                     ]);
                 }
                 
                 $valor_total = $salario_base + $valor_horas_extras + $total_bonus - $total_descontos_ocorrencias;
                 
-                // Insere item
+                // Insere item (salva também informações sobre tipo de horas extras)
                 $stmt = $pdo->prepare("
                     INSERT INTO fechamentos_pagamento_itens 
                     (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total)
@@ -159,6 +508,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $total_descontos_ocorrencias,
                     $valor_total
                 ]);
+                
+                // Salva detalhes das horas extras (para exibição)
+                $item_id = $pdo->lastInsertId();
+                if ($horas_extras > 0) {
+                    // Busca detalhes das horas extras para salvar em JSON (se necessário no futuro)
+                    $stmt_he_detalhes = $pdo->prepare("
+                        SELECT tipo_pagamento, SUM(quantidade_horas) as total_horas, SUM(valor_total) as total_valor
+                        FROM horas_extras
+                        WHERE colaborador_id = ? AND data_trabalho >= ? AND data_trabalho <= ?
+                        GROUP BY tipo_pagamento
+                    ");
+                    $stmt_he_detalhes->execute([$colab_id, $data_inicio, $data_fim]);
+                    $he_detalhes = $stmt_he_detalhes->fetchAll();
+                }
                 
                 $total_pagamento += $valor_total;
                 $total_horas_extras += $valor_horas_extras;
@@ -405,7 +768,9 @@ if (isset($_GET['view'])) {
         // Primeiro tenta buscar dos bônus salvos no fechamento
         foreach ($itens_fechamento as $item) {
             $stmt = $pdo->prepare("
-                SELECT fb.*, tb.nome as tipo_bonus_nome
+                SELECT fb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo,
+                       COALESCE(fb.valor_original, fb.valor) as valor_original,
+                       COALESCE(fb.desconto_ocorrencias, 0) as desconto_ocorrencias
                 FROM fechamentos_pagamento_bonus fb
                 INNER JOIN tipos_bonus tb ON fb.tipo_bonus_id = tb.id
                 WHERE fb.fechamento_pagamento_id = ? AND fb.colaborador_id = ?
@@ -416,7 +781,7 @@ if (isset($_GET['view'])) {
             // Se não encontrou bônus salvos no fechamento, busca bônus ativos do colaborador
             if (empty($bonus_salvos)) {
                 $stmt = $pdo->prepare("
-                    SELECT cb.*, tb.nome as tipo_bonus_nome
+                    SELECT cb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo
                     FROM colaboradores_bonus cb
                     INNER JOIN tipos_bonus tb ON cb.tipo_bonus_id = tb.id
                     WHERE cb.colaborador_id = ?
@@ -430,6 +795,32 @@ if (isset($_GET['view'])) {
                 ");
                 $stmt->execute([$item['colaborador_id'], $data_fim_periodo, $data_inicio_periodo]);
                 $bonus_salvos = $stmt->fetchAll();
+                
+                // Ajusta valores baseado no tipo e calcula desconto se necessário
+                foreach ($bonus_salvos as &$bonus) {
+                    $tipo_valor = $bonus['tipo_valor'] ?? 'variavel';
+                    if ($tipo_valor === 'fixo') {
+                        $bonus['valor'] = $bonus['valor_fixo'] ?? 0;
+                    }
+                    
+                    // Inicializa campos de desconto se não existirem
+                    if (!isset($bonus['valor_original']) || $bonus['valor_original'] === null) {
+                        $bonus['valor_original'] = $bonus['valor'] ?? 0;
+                    }
+                    if (!isset($bonus['desconto_ocorrencias']) || $bonus['desconto_ocorrencias'] === null) {
+                        // Se não tem desconto salvo, calcula agora (para fechamentos antigos)
+                        $bonus['desconto_ocorrencias'] = calcular_desconto_bonus_ocorrencias(
+                            $pdo,
+                            $bonus['tipo_bonus_id'],
+                            $item['colaborador_id'],
+                            $bonus['valor_original'],
+                            $data_inicio_periodo,
+                            $data_fim_periodo
+                        );
+                        // Ajusta valor final
+                        $bonus['valor'] = $bonus['valor_original'] - $bonus['desconto_ocorrencias'];
+                    }
+                }
             }
             
             $bonus_por_colaborador[$item['colaborador_id']] = $bonus_salvos;
@@ -618,7 +1009,33 @@ require_once __DIR__ . '/../includes/header.php';
                     <tbody>
                         <?php foreach ($itens_fechamento as $item): 
                             $bonus_colab = $bonus_por_colaborador[$item['colaborador_id']] ?? [];
-                            $total_bonus = array_sum(array_column($bonus_colab, 'valor'));
+                            // Calcula total de bônus considerando apenas os que não são informativos
+                            // O valor já vem com desconto aplicado se houver
+                            $total_bonus = 0;
+                            foreach ($bonus_colab as $bonus_item) {
+                                $tipo_valor = $bonus_item['tipo_valor'] ?? 'variavel';
+                                if ($tipo_valor !== 'informativo') {
+                                    // Usa o valor já descontado (se houver desconto por faltas, já está aplicado)
+                                    $total_bonus += (float)($bonus_item['valor'] ?? 0);
+                                }
+                            }
+                            
+                            // Busca detalhes das horas extras para mostrar tipo de pagamento
+                            // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
+                            $stmt_he = $pdo->prepare("
+                                SELECT 
+                                    COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN quantidade_horas ELSE 0 END), 0) as horas_dinheiro,
+                                    COALESCE(SUM(CASE WHEN tipo_pagamento = 'banco_horas' THEN quantidade_horas ELSE 0 END), 0) as horas_banco,
+                                    COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN valor_total ELSE 0 END), 0) as valor_dinheiro
+                                FROM horas_extras
+                                WHERE colaborador_id = ? AND data_trabalho >= ? AND data_trabalho <= ?
+                            ");
+                            $stmt_he->execute([$item['colaborador_id'], $data_inicio_periodo, $data_fim_periodo]);
+                            $he_detalhes = $stmt_he->fetch();
+                            $horas_dinheiro = (float)($he_detalhes['horas_dinheiro'] ?? 0);
+                            $horas_banco = (float)($he_detalhes['horas_banco'] ?? 0);
+                            $valor_dinheiro = (float)($he_detalhes['valor_dinheiro'] ?? 0);
+                            
                             $valor_total_com_bonus = $item['salario_base'] + $item['valor_horas_extras'] + $total_bonus + ($item['adicionais'] ?? 0) - ($item['descontos'] ?? 0);
                         ?>
                         <tr>
@@ -633,17 +1050,89 @@ require_once __DIR__ . '/../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td>R$ <?= number_format($item['salario_base'], 2, ',', '.') ?></td>
-                            <td><?= number_format($item['horas_extras'], 2, ',', '.') ?>h</td>
-                            <td>R$ <?= number_format($item['valor_horas_extras'], 2, ',', '.') ?></td>
                             <td>
-                                <?php if ($total_bonus > 0): ?>
+                                <?php if ($horas_dinheiro > 0 || $horas_banco > 0): ?>
+                                    <div class="d-flex flex-column">
+                                        <?php if ($horas_dinheiro > 0): ?>
+                                            <span class="text-success fw-bold">
+                                                <?= number_format($horas_dinheiro, 2, ',', '.') ?>h
+                                                <small class="text-muted">(R$)</small>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if ($horas_banco > 0): ?>
+                                            <span class="text-info fw-bold">
+                                                <?= number_format($horas_banco, 2, ',', '.') ?>h
+                                                <small class="text-muted">(Banco)</small>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if ($horas_dinheiro > 0 && $horas_banco > 0): ?>
+                                            <small class="text-muted mt-1">
+                                                Total: <?= number_format($horas_dinheiro + $horas_banco, 2, ',', '.') ?>h
+                                            </small>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="text-muted">0h</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($valor_dinheiro > 0): ?>
+                                    <span class="text-success fw-bold">R$ <?= number_format($valor_dinheiro, 2, ',', '.') ?></span>
+                                <?php elseif ($horas_banco > 0): ?>
+                                    <span class="text-info">
+                                        <i class="ki-duotone ki-information-5 fs-7">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        Banco de Horas
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted">R$ 0,00</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php 
+                                // Separa bônus informativos dos que somam
+                                $bonus_somam = [];
+                                $bonus_informativos = [];
+                                foreach ($bonus_colab as $bonus_item) {
+                                    $tipo_valor = $bonus_item['tipo_valor'] ?? 'variavel';
+                                    if ($tipo_valor === 'informativo') {
+                                        $bonus_informativos[] = $bonus_item;
+                                    } else {
+                                        $bonus_somam[] = $bonus_item;
+                                    }
+                                }
+                                ?>
+                                <?php 
+                                // Verifica se há descontos por ocorrências
+                                $tem_desconto_ocorrencias = false;
+                                $total_desconto_ocorrencias = 0;
+                                foreach ($bonus_colab as $bonus_item) {
+                                    if (!empty($bonus_item['desconto_ocorrencias']) && $bonus_item['desconto_ocorrencias'] > 0) {
+                                        $tem_desconto_ocorrencias = true;
+                                        $total_desconto_ocorrencias += (float)$bonus_item['desconto_ocorrencias'];
+                                    }
+                                }
+                                ?>
+                                <?php if ($total_bonus > 0 || !empty($bonus_informativos) || $tem_desconto_ocorrencias): ?>
                                     <?php if (!empty($bonus_colab)): ?>
                                     <a href="#" class="text-success fw-bold text-hover-primary" onclick="mostrarDetalhesBonus(<?= htmlspecialchars(json_encode([
                                         'colaborador_nome' => $item['colaborador_nome'],
                                         'bonus' => $bonus_colab,
-                                        'total' => $total_bonus
+                                        'total' => $total_bonus,
+                                        'bonus_somam' => $bonus_somam,
+                                        'bonus_informativos' => $bonus_informativos,
+                                        'total_desconto_ocorrencias' => $total_desconto_ocorrencias
                                     ])) ?>); return false;" title="Clique para ver detalhes dos bônus">
                                         R$ <?= number_format($total_bonus, 2, ',', '.') ?>
+                                        <?php if ($tem_desconto_ocorrencias): ?>
+                                            <br><small class="text-danger">Desconto ocorrências: -R$ <?= number_format($total_desconto_ocorrencias, 2, ',', '.') ?></small>
+                                        <?php endif; ?>
+                                        <?php if (!empty($bonus_informativos)): ?>
+                                            <span class="badge badge-light-info ms-1" title="Possui bônus informativos"><?= count($bonus_informativos) ?> info</span>
+                                        <?php endif; ?>
                                     </a>
                                     <?php else: ?>
                                     <strong class="text-success">R$ <?= number_format($total_bonus, 2, ',', '.') ?></strong>
@@ -706,8 +1195,42 @@ require_once __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'aberto'): ?>
                             <td>
-                                <button type="button" class="btn btn-sm btn-primary" onclick="editarItem(<?= htmlspecialchars(json_encode($item)) ?>)">
-                                    Editar
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-light-primary dropdown-toggle" type="button" id="dropdownAcoes_<?= $item['id'] ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Ações
+                                    </button>
+                                    <ul class="dropdown-menu" aria-labelledby="dropdownAcoes_<?= $item['id'] ?>">
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="editarItem(<?= htmlspecialchars(json_encode($item)) ?>); return false;">
+                                                <i class="ki-duotone ki-pencil fs-6 me-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Editar
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="verDetalhesPagamento(<?= $fechamento_view['id'] ?>, <?= $item['colaborador_id'] ?>); return false;">
+                                                <i class="ki-duotone ki-eye fs-6 me-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                </i>
+                                                Ver Detalhes
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <?php else: ?>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-light-info" onclick="verDetalhesPagamento(<?= $fechamento_view['id'] ?>, <?= $item['colaborador_id'] ?>)">
+                                    <i class="ki-duotone ki-eye fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Ver Detalhes
                                 </button>
                             </td>
                             <?php endif; ?>
@@ -813,6 +1336,36 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
                 <div id="kt_modal_detalhes_bonus_conteudo">
                     <!-- Conteúdo será preenchido via JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer flex-center">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalhes Completos do Pagamento -->
+<div class="modal fade" id="kt_modal_detalhes_pagamento" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-1000px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold" id="kt_modal_detalhes_pagamento_titulo">Detalhes do Pagamento</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div id="kt_modal_detalhes_pagamento_conteudo">
+                    <div class="text-center py-10">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <div class="text-muted mt-3">Carregando detalhes...</div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer flex-center">
@@ -1067,6 +1620,10 @@ function renderizarBonusContainer() {
     
     let html = '';
     bonusItemAtual.forEach((bonus, index) => {
+        const valorOriginal = parseFloat(bonus.valor_original || bonus.valor || 0);
+        const descontoOcorrencias = parseFloat(bonus.desconto_ocorrencias || 0);
+        const valorFinal = parseFloat(bonus.valor || 0);
+        
         html += `
             <div class="d-flex align-items-center gap-3 mb-3 p-3 border rounded" data-bonus-index="${index}">
                 <div class="flex-grow-1">
@@ -1078,12 +1635,22 @@ function renderizarBonusContainer() {
                         </option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="input-group input-group-sm">
+                    <div class="input-group input-group-sm mb-2">
                         <span class="input-group-text">R$</span>
                         <input type="text" class="form-control bonus_valor" data-index="${index}" 
-                               value="${parseFloat(bonus.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}" 
+                               value="${valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}" 
                                placeholder="0,00" required />
                     </div>
+                    ${descontoOcorrencias > 0 ? `
+                    <div class="alert alert-warning py-2 px-3 mb-0">
+                        <small class="d-block">
+                            <strong>Valor Original:</strong> R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </small>
+                        <small class="d-block text-danger">
+                            <strong>Desconto por Ocorrências:</strong> -R$ ${descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </small>
+                    </div>
+                    ` : ''}
                 </div>
                 <button type="button" class="btn btn-sm btn-light-danger" onclick="removerBonusItem(${index})">
                     <i class="ki-duotone ki-trash fs-5">
@@ -1246,16 +1813,34 @@ function mostrarDetalhesBonus(dados) {
     
     let html = '<div class="mb-7">';
     html += '<div class="d-flex justify-content-between align-items-center mb-5">';
-    html += '<h4 class="fw-bold text-gray-800">Total de Bônus</h4>';
-    html += '<span class="text-success fw-bold fs-2">R$ ' + parseFloat(dados.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
+    html += '<h4 class="fw-bold text-gray-800">Total de Bônus (somados)</h4>';
+    html += '<span class="text-success fw-bold fs-2">R$ ' + parseFloat(dados.total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
     html += '</div>';
     
-    if (dados.bonus && dados.bonus.length > 0) {
-        html += '<div class="table-responsive">';
+    // Mostra total de desconto por ocorrências se houver
+    if (dados.total_desconto_ocorrencias && dados.total_desconto_ocorrencias > 0) {
+        html += '<div class="alert alert-warning d-flex align-items-center mb-5">';
+        html += '<i class="ki-duotone ki-information-5 fs-2x text-warning me-3">';
+        html += '<span class="path1"></span>';
+        html += '<span class="path2"></span>';
+        html += '<span class="path3"></span>';
+        html += '</i>';
+        html += '<div>';
+        html += '<strong>Desconto Total por Ocorrências:</strong> ';
+        html += '<span class="fw-bold text-danger fs-3">-R$ ' + parseFloat(dados.total_desconto_ocorrencias || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
+        html += '</div>';
+        html += '</div>';
+    }
+    
+    // Mostra bônus que somam no total
+    if (dados.bonus_somam && dados.bonus_somam.length > 0) {
+        html += '<h5 class="fw-bold mb-3">Bônus que Somam no Total</h5>';
+        html += '<div class="table-responsive mb-5">';
         html += '<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
         html += '<thead>';
         html += '<tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">';
         html += '<th class="min-w-150px">Tipo de Bônus</th>';
+        html += '<th class="min-w-100px">Tipo</th>';
         html += '<th class="min-w-100px text-end">Valor</th>';
         html += '<th class="min-w-100px">Data Início</th>';
         html += '<th class="min-w-100px">Data Fim</th>';
@@ -1264,10 +1849,28 @@ function mostrarDetalhesBonus(dados) {
         html += '</thead>';
         html += '<tbody>';
         
-        dados.bonus.forEach(function(bonus) {
+        dados.bonus_somam.forEach(function(bonus) {
+            const tipoValor = bonus.tipo_valor || 'variavel';
+            const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : 'Variável';
+            const tipoBadge = tipoValor === 'fixo' ? 'primary' : 'success';
+            const valorOriginal = parseFloat(bonus.valor_original || bonus.valor || 0);
+            const descontoOcorrencias = parseFloat(bonus.desconto_ocorrencias || 0);
+            const valorFinal = parseFloat(bonus.valor || 0);
+            
             html += '<tr>';
             html += '<td><span class="fw-bold text-gray-800">' + (bonus.tipo_bonus_nome || '-') + '</span></td>';
-            html += '<td class="text-end"><span class="fw-bold text-success">R$ ' + parseFloat(bonus.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td>';
+            html += '<td><span class="badge badge-light-' + tipoBadge + '">' + tipoLabel + '</span></td>';
+            html += '<td class="text-end">';
+            if (descontoOcorrencias > 0) {
+                html += '<div class="d-flex flex-column align-items-end">';
+                html += '<span class="text-muted text-decoration-line-through fs-7">R$ ' + valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
+                html += '<span class="text-danger fs-7">-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
+                html += '<span class="fw-bold text-success">R$ ' + valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
+                html += '</div>';
+            } else {
+                html += '<span class="fw-bold text-success">R$ ' + valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
+            }
+            html += '</td>';
             html += '<td>' + (bonus.data_inicio ? new Date(bonus.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td>';
             html += '<td>' + (bonus.data_fim ? new Date(bonus.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td>';
             html += '<td>' + (bonus.observacoes || '-') + '</td>';
@@ -1277,7 +1880,38 @@ function mostrarDetalhesBonus(dados) {
         html += '</tbody>';
         html += '</table>';
         html += '</div>';
-    } else {
+    }
+    
+    // Mostra bônus informativos
+    if (dados.bonus_informativos && dados.bonus_informativos.length > 0) {
+        html += '<h5 class="fw-bold mb-3 text-info">Bônus Informativos (não somam no total)</h5>';
+        html += '<div class="table-responsive mb-5">';
+        html += '<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
+        html += '<thead>';
+        html += '<tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">';
+        html += '<th class="min-w-150px">Tipo de Bônus</th>';
+        html += '<th class="min-w-100px">Data Início</th>';
+        html += '<th class="min-w-100px">Data Fim</th>';
+        html += '<th class="min-w-200px">Observações</th>';
+        html += '</tr>';
+        html += '</thead>';
+        html += '<tbody>';
+        
+        dados.bonus_informativos.forEach(function(bonus) {
+            html += '<tr>';
+            html += '<td><span class="fw-bold text-gray-800">' + (bonus.tipo_bonus_nome || '-') + '</span></td>';
+            html += '<td>' + (bonus.data_inicio ? new Date(bonus.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td>';
+            html += '<td>' + (bonus.data_fim ? new Date(bonus.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td>';
+            html += '<td>' + (bonus.observacoes || '-') + '</td>';
+            html += '</tr>';
+        });
+        
+        html += '</tbody>';
+        html += '</table>';
+        html += '</div>';
+    }
+    
+    if ((!dados.bonus_somam || dados.bonus_somam.length === 0) && (!dados.bonus_informativos || dados.bonus_informativos.length === 0)) {
         html += '<div class="alert alert-info">Nenhum bônus encontrado.</div>';
     }
     
@@ -1400,6 +2034,864 @@ function rejeitarDocumento(itemId) {
             });
         }
     });
+}
+
+// Ver detalhes completos do pagamento
+function verDetalhesPagamento(fechamentoId, colaboradorId) {
+    const titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
+    const conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
+    
+    // Mostra loading
+    conteudo.innerHTML = `
+        <div class="text-center py-10">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <div class="text-muted mt-3">Carregando detalhes...</div>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_pagamento'));
+    modal.show();
+    
+    // Busca dados via API
+    fetch(`../api/get_detalhes_pagamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const d = data.data;
+                
+                titulo.textContent = `Detalhes do Pagamento - ${d.colaborador.nome_completo}`;
+                
+                let html = `
+                    <div class="mb-10">
+                        <!-- Informações do Fechamento -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Informações do Fechamento</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Mês/Ano de Referência:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.mes_referencia_formatado}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Fechamento:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.data_fechamento_formatada}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Empresa:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.empresa_nome}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Período:</strong><br>
+                                        <span class="text-gray-800">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Informações do Colaborador -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Colaborador</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Nome:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.nome_completo}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>CPF:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.cpf || '-'}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Cargo:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.cargo || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Resumo Financeiro -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Resumo Financeiro</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <tbody>
+                                            <tr>
+                                                <td class="fw-bold">Salário Base</td>
+                                                <td class="text-end">
+                                                    <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Horas Extras (Total)</td>
+                                                <td class="text-end">
+                                                    <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Valor Horas Extras</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Total de Bônus</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ${d.bonus.total_desconto_ocorrencias > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Desconto por Ocorrências (Bônus)</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.ocorrencias.total_descontos > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Descontos (Ocorrências)</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.item.descontos > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Outros Descontos</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.item.adicionais > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-success">Adicionais</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">+R$ ${parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            <tr class="border-top border-2">
+                                                <td class="fw-bold fs-4">Valor Total</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold fs-3">R$ ${parseFloat(d.item.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes de Horas Extras -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Detalhes de Horas Extras</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-5">
+                                    <h5 class="fw-bold mb-3">Resumo</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-success rounded">
+                                                <i class="ki-duotone ki-money fs-2x text-success me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Horas Pagas em R$</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                    <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-info rounded">
+                                                <i class="ki-duotone ki-time fs-2x text-info me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Horas em Banco</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_banco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-primary rounded">
+                                                <i class="ki-duotone ki-chart-simple fs-2x text-primary me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Total de Horas</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.total_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${d.horas_extras.registros.length > 0 ? `
+                                <h5 class="fw-bold mb-3">Registros Individuais</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Data</th>
+                                                <th>Quantidade</th>
+                                                <th>Valor/Hora</th>
+                                                <th>% Adicional</th>
+                                                <th>Valor Total</th>
+                                                <th>Tipo</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.horas_extras.registros.map(he => `
+                                                <tr>
+                                                    <td>${new Date(he.data_trabalho + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                                                    <td>${parseFloat(he.quantidade_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</td>
+                                                    <td>R$ ${parseFloat(he.valor_hora || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${parseFloat(he.percentual_adicional || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</td>
+                                                    <td class="fw-bold">R$ ${parseFloat(he.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>
+                                                        ${he.tipo_pagamento === 'banco_horas' 
+                                                            ? '<span class="badge badge-light-info">Banco de Horas</span>' 
+                                                            : '<span class="badge badge-light-success">Dinheiro</span>'}
+                                                    </td>
+                                                    <td>${he.observacoes || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste período.</p>'}
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes de Bônus -->
+                        ${d.bonus.lista.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Detalhes de Bônus</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Tipo de Bônus</th>
+                                                <th>Tipo</th>
+                                                <th>Valor Original</th>
+                                                <th>Desconto Ocorrências</th>
+                                                <th>Valor Final</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.bonus.lista.map(b => {
+                                                const tipoValor = b.tipo_valor || 'variavel';
+                                                const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : tipoValor === 'informativo' ? 'Informativo' : 'Variável';
+                                                const tipoBadge = tipoValor === 'fixo' ? 'primary' : tipoValor === 'informativo' ? 'info' : 'success';
+                                                const valorOriginal = parseFloat(b.valor_original || b.valor || 0);
+                                                const descontoOcorrencias = parseFloat(b.desconto_ocorrencias || 0);
+                                                const valorFinal = parseFloat(b.valor || 0);
+                                                
+                                                return `
+                                                    <tr>
+                                                        <td class="fw-bold">${b.tipo_bonus_nome}</td>
+                                                        <td><span class="badge badge-light-${tipoBadge}">${tipoLabel}</span></td>
+                                                        <td>R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        <td class="text-danger">${descontoOcorrencias > 0 ? '-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</td>
+                                                        <td class="fw-bold text-success">R$ ${valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        <td>${b.observacoes || '-'}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                ${d.bonus.lista.some(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0) ? `
+                                <div class="separator separator-dashed my-5"></div>
+                                <h5 class="fw-bold mb-3">Detalhes de Descontos por Ocorrências</h5>
+                                ${d.bonus.lista.filter(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0).map(b => `
+                                    <div class="mb-5">
+                                        <h6 class="fw-bold text-gray-800 mb-3">${b.tipo_bonus_nome}</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-row-bordered">
+                                                <thead>
+                                                    <tr class="fw-bold fs-7">
+                                                        <th>Ocorrência</th>
+                                                        <th>Período Atual</th>
+                                                        <th>Período Anterior</th>
+                                                        <th>Tipo Desconto</th>
+                                                        <th>Desconto Aplicado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    ${b.detalhes_desconto_array.map(det => `
+                                                        <tr>
+                                                            <td>${det.tipo_ocorrencia_nome || det.tipo_ocorrencia_codigo || '-'}</td>
+                                                            <td>${det.total_ocorrencias_periodo_atual || 0} ocorrência(s)</td>
+                                                            <td>${det.total_ocorrencias_periodo_anterior || 0} ocorrência(s)</td>
+                                                            <td>
+                                                                ${det.tipo_desconto === 'total' ? '<span class="badge badge-light-danger">Valor Total</span>' : 
+                                                                  det.tipo_desconto === 'fixo' ? '<span class="badge badge-light-warning">Fixo</span>' :
+                                                                  det.tipo_desconto === 'percentual' ? '<span class="badge badge-light-info">Percentual</span>' :
+                                                                  '<span class="badge badge-light-primary">Proporcional</span>'}
+                                                            </td>
+                                                            <td class="text-danger fw-bold">-R$ ${parseFloat(det.desconto_aplicado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        </tr>
+                                                    `).join('')}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Ocorrências com Desconto -->
+                        ${d.ocorrencias.descontos.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Ocorrências com Desconto em R$</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Data</th>
+                                                <th>Tipo</th>
+                                                <th>Descrição</th>
+                                                <th>Valor Desconto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.ocorrencias.descontos.map(occ => `
+                                                <tr>
+                                                    <td>${new Date(occ.data_ocorrencia + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                                                    <td><span class="badge badge-light-danger">${occ.tipo_ocorrencia_nome || occ.tipo_ocorrencia_codigo || '-'}</span></td>
+                                                    <td>${occ.descricao || '-'}</td>
+                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(occ.valor_desconto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Status do Documento -->
+                        ${d.documento.status ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">Status do Documento</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Status:</strong><br>
+                                        ${d.documento.status === 'aprovado' ? '<span class="badge badge-light-success">Aprovado</span>' :
+                                          d.documento.status === 'enviado' ? '<span class="badge badge-light-warning">Enviado</span>' :
+                                          d.documento.status === 'rejeitado' ? '<span class="badge badge-light-danger">Rejeitado</span>' :
+                                          '<span class="badge badge-light-secondary">Pendente</span>'}
+                                    </div>
+                                    ${d.documento.data_envio ? `
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Envio:</strong><br>
+                                        <span class="text-gray-800">${new Date(d.documento.data_envio).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${d.documento.data_aprovacao ? `
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Aprovação:</strong><br>
+                                        <span class="text-gray-800">${new Date(d.documento.data_aprovacao).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${d.documento.observacoes ? `
+                                    <div class="col-md-12 mb-3">
+                                        <strong>Observações:</strong><br>
+                                        <span class="text-gray-800">${d.documento.observacoes}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                conteudo.innerHTML = html;
+            } else {
+                conteudo.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="ki-duotone ki-information-5 fs-2x me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        ${data.message || 'Erro ao carregar detalhes do pagamento'}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            conteudo.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ki-duotone ki-information-5 fs-2x me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Erro ao carregar detalhes do pagamento
+                </div>
+            `;
+        });
+}
+
+// Ver detalhes completos do pagamento
+function verDetalhesPagamento(fechamentoId, colaboradorId) {
+    const titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
+    const conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
+    
+    // Mostra loading
+    conteudo.innerHTML = `
+        <div class="text-center py-10">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <div class="text-muted mt-3">Carregando detalhes...</div>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_pagamento'));
+    modal.show();
+    
+    // Busca dados via API
+    fetch(`../api/get_detalhes_pagamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const d = data.data;
+                
+                titulo.textContent = `Detalhes do Pagamento - ${d.colaborador.nome_completo}`;
+                
+                let html = `
+                    <div class="mb-10">
+                        <!-- Informações do Fechamento -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Informações do Fechamento</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Mês/Ano de Referência:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.mes_referencia_formatado}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Fechamento:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.data_fechamento_formatada}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Empresa:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.empresa_nome}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Período:</strong><br>
+                                        <span class="text-gray-800">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Informações do Colaborador -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Colaborador</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Nome:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.nome_completo}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>CPF:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.cpf || '-'}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Cargo:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.cargo || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Resumo Financeiro -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Resumo Financeiro</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <tbody>
+                                            <tr>
+                                                <td class="fw-bold">Salário Base</td>
+                                                <td class="text-end">
+                                                    <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Horas Extras (Total)</td>
+                                                <td class="text-end">
+                                                    <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Valor Horas Extras</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Total de Bônus</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ${d.bonus.total_desconto_ocorrencias > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Desconto por Ocorrências (Bônus)</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.ocorrencias.total_descontos > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Descontos (Ocorrências)</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.item.descontos > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Outros Descontos</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.item.adicionais > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-success">Adicionais</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">+R$ ${parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            <tr class="border-top border-2">
+                                                <td class="fw-bold fs-4">Valor Total</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold fs-3">R$ ${parseFloat(d.item.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes de Horas Extras -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Detalhes de Horas Extras</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-5">
+                                    <h5 class="fw-bold mb-3">Resumo</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-success rounded">
+                                                <i class="ki-duotone ki-money fs-2x text-success me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Horas Pagas em R$</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                    <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-info rounded">
+                                                <i class="ki-duotone ki-time fs-2x text-info me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Horas em Banco</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_banco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-primary rounded">
+                                                <i class="ki-duotone ki-chart-simple fs-2x text-primary me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Total de Horas</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.total_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${d.horas_extras.registros.length > 0 ? `
+                                <h5 class="fw-bold mb-3">Registros Individuais</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Data</th>
+                                                <th>Quantidade</th>
+                                                <th>Valor/Hora</th>
+                                                <th>% Adicional</th>
+                                                <th>Valor Total</th>
+                                                <th>Tipo</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.horas_extras.registros.map(he => `
+                                                <tr>
+                                                    <td>${new Date(he.data_trabalho + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                                                    <td>${parseFloat(he.quantidade_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</td>
+                                                    <td>R$ ${parseFloat(he.valor_hora || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${parseFloat(he.percentual_adicional || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</td>
+                                                    <td class="fw-bold">R$ ${parseFloat(he.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>
+                                                        ${he.tipo_pagamento === 'banco_horas' 
+                                                            ? '<span class="badge badge-light-info">Banco de Horas</span>' 
+                                                            : '<span class="badge badge-light-success">Dinheiro</span>'}
+                                                    </td>
+                                                    <td>${he.observacoes || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste período.</p>'}
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes de Bônus -->
+                        ${d.bonus.lista.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Detalhes de Bônus</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Tipo de Bônus</th>
+                                                <th>Tipo</th>
+                                                <th>Valor Original</th>
+                                                <th>Desconto Ocorrências</th>
+                                                <th>Valor Final</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.bonus.lista.map(b => {
+                                                const tipoValor = b.tipo_valor || 'variavel';
+                                                const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : tipoValor === 'informativo' ? 'Informativo' : 'Variável';
+                                                const tipoBadge = tipoValor === 'fixo' ? 'primary' : tipoValor === 'informativo' ? 'info' : 'success';
+                                                const valorOriginal = parseFloat(b.valor_original || b.valor || 0);
+                                                const descontoOcorrencias = parseFloat(b.desconto_ocorrencias || 0);
+                                                const valorFinal = parseFloat(b.valor || 0);
+                                                
+                                                return `
+                                                    <tr>
+                                                        <td class="fw-bold">${b.tipo_bonus_nome}</td>
+                                                        <td><span class="badge badge-light-${tipoBadge}">${tipoLabel}</span></td>
+                                                        <td>R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        <td class="text-danger">${descontoOcorrencias > 0 ? '-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</td>
+                                                        <td class="fw-bold text-success">R$ ${valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        <td>${b.observacoes || '-'}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                ${d.bonus.lista.some(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0) ? `
+                                <div class="separator separator-dashed my-5"></div>
+                                <h5 class="fw-bold mb-3">Detalhes de Descontos por Ocorrências</h5>
+                                ${d.bonus.lista.filter(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0).map(b => `
+                                    <div class="mb-5">
+                                        <h6 class="fw-bold text-gray-800 mb-3">${b.tipo_bonus_nome}</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-row-bordered">
+                                                <thead>
+                                                    <tr class="fw-bold fs-7">
+                                                        <th>Ocorrência</th>
+                                                        <th>Período Atual</th>
+                                                        <th>Período Anterior</th>
+                                                        <th>Tipo Desconto</th>
+                                                        <th>Desconto Aplicado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    ${b.detalhes_desconto_array.map(det => `
+                                                        <tr>
+                                                            <td>${det.tipo_ocorrencia_nome || det.tipo_ocorrencia_codigo || '-'}</td>
+                                                            <td>${det.total_ocorrencias_periodo_atual || 0} ocorrência(s)</td>
+                                                            <td>${det.total_ocorrencias_periodo_anterior || 0} ocorrência(s)</td>
+                                                            <td>
+                                                                ${det.tipo_desconto === 'total' ? '<span class="badge badge-light-danger">Valor Total</span>' : 
+                                                                  det.tipo_desconto === 'fixo' ? '<span class="badge badge-light-warning">Fixo</span>' :
+                                                                  det.tipo_desconto === 'percentual' ? '<span class="badge badge-light-info">Percentual</span>' :
+                                                                  '<span class="badge badge-light-primary">Proporcional</span>'}
+                                                            </td>
+                                                            <td class="text-danger fw-bold">-R$ ${parseFloat(det.desconto_aplicado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        </tr>
+                                                    `).join('')}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Ocorrências com Desconto -->
+                        ${d.ocorrencias.descontos.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Ocorrências com Desconto em R$</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Data</th>
+                                                <th>Tipo</th>
+                                                <th>Descrição</th>
+                                                <th>Valor Desconto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.ocorrencias.descontos.map(occ => `
+                                                <tr>
+                                                    <td>${new Date(occ.data_ocorrencia + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                                                    <td><span class="badge badge-light-danger">${occ.tipo_ocorrencia_nome || occ.tipo_ocorrencia_codigo || '-'}</span></td>
+                                                    <td>${occ.descricao || '-'}</td>
+                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(occ.valor_desconto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Status do Documento -->
+                        ${d.documento.status ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">Status do Documento</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Status:</strong><br>
+                                        ${d.documento.status === 'aprovado' ? '<span class="badge badge-light-success">Aprovado</span>' :
+                                          d.documento.status === 'enviado' ? '<span class="badge badge-light-warning">Enviado</span>' :
+                                          d.documento.status === 'rejeitado' ? '<span class="badge badge-light-danger">Rejeitado</span>' :
+                                          '<span class="badge badge-light-secondary">Pendente</span>'}
+                                    </div>
+                                    ${d.documento.data_envio ? `
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Envio:</strong><br>
+                                        <span class="text-gray-800">${new Date(d.documento.data_envio).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${d.documento.data_aprovacao ? `
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Aprovação:</strong><br>
+                                        <span class="text-gray-800">${new Date(d.documento.data_aprovacao).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${d.documento.observacoes ? `
+                                    <div class="col-md-12 mb-3">
+                                        <strong>Observações:</strong><br>
+                                        <span class="text-gray-800">${d.documento.observacoes}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                conteudo.innerHTML = html;
+            } else {
+                conteudo.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="ki-duotone ki-information-5 fs-2x me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        ${data.message || 'Erro ao carregar detalhes do pagamento'}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            conteudo.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ki-duotone ki-information-5 fs-2x me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Erro ao carregar detalhes do pagamento
+                </div>
+            `;
+        });
 }
 
 // Ver documento (admin)

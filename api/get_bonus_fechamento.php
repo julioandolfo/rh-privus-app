@@ -24,15 +24,27 @@ if (empty($fechamento_id) || empty($colaborador_id)) {
 try {
     $pdo = getDB();
     
-    // Busca bônus salvos no fechamento
+    // Busca bônus salvos no fechamento (incluindo tipo_valor, valor_fixo e desconto por ocorrências)
     $stmt = $pdo->prepare("
-        SELECT fb.*, tb.nome as tipo_bonus_nome
+        SELECT fb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo,
+               COALESCE(fb.valor_original, fb.valor) as valor_original,
+               COALESCE(fb.desconto_ocorrencias, 0) as desconto_ocorrencias
         FROM fechamentos_pagamento_bonus fb
         INNER JOIN tipos_bonus tb ON fb.tipo_bonus_id = tb.id
         WHERE fb.fechamento_pagamento_id = ? AND fb.colaborador_id = ?
     ");
     $stmt->execute([$fechamento_id, $colaborador_id]);
     $bonus = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Garante que os campos de desconto existam (compatibilidade com registros antigos)
+    foreach ($bonus as &$b) {
+        if (!isset($b['valor_original'])) {
+            $b['valor_original'] = $b['valor'] ?? 0;
+        }
+        if (!isset($b['desconto_ocorrencias'])) {
+            $b['desconto_ocorrencias'] = 0;
+        }
+    }
     
     echo json_encode(['success' => true, 'data' => $bonus]);
     
