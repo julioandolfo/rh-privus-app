@@ -196,9 +196,20 @@ const OneSignalInit = {
                 
                 // Previne que o OneSignal registre automaticamente
                 // Só registra quando explicitamente solicitado via OneSignalInit.subscribe()
-                OneSignal.setNotificationOpened(function(jsonData) {
-                    console.log('📱 Notificação aberta:', jsonData);
-                });
+                // Usa setNotificationOpenedHandler em vez de setNotificationOpened (método correto)
+                if (typeof OneSignal.setNotificationOpenedHandler === 'function') {
+                    OneSignal.setNotificationOpenedHandler(function(event) {
+                        console.log('📱 Notificação aberta:', event);
+                        if (event.notification) {
+                            console.log('📱 Dados da notificação:', event.notification);
+                        }
+                    });
+                } else {
+                    // Fallback: usa evento se o método não estiver disponível
+                    OneSignal.on('notificationClick', function(event) {
+                        console.log('📱 Notificação clicada:', event);
+                    });
+                }
                 
                 // Registra quando usuário se inscreve
                 OneSignal.on('subscriptionChange', function(isSubscribed) {
