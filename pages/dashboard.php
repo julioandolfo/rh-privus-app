@@ -4164,8 +4164,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reinicializa gráficos se o card adicionado contém gráficos
         if (cardInfo.id.includes('grafico')) {
             setTimeout(() => {
+                console.log('🔄 Tentando reinicializar gráficos após adicionar card:', cardInfo.id);
+                console.log('Função reinicializarGraficos existe:', typeof reinicializarGraficos === 'function');
+                console.log('Chart.js disponível:', typeof Chart !== 'undefined');
                 if (typeof reinicializarGraficos === 'function') {
                     reinicializarGraficos();
+                } else {
+                    console.error('❌ Função reinicializarGraficos não encontrada!');
                 }
             }, 500);
         }
@@ -5031,8 +5036,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Reinicializa gráficos após restaurar cards
             setTimeout(() => {
+                console.log('🔄 Tentando reinicializar gráficos após restaurar cards...');
+                console.log('Função reinicializarGraficos existe:', typeof reinicializarGraficos === 'function');
+                console.log('Chart.js disponível:', typeof Chart !== 'undefined');
                 if (typeof reinicializarGraficos === 'function') {
                     reinicializarGraficos();
+                } else {
+                    console.error('❌ Função reinicializarGraficos não encontrada!');
                 }
             }, 800);
         } else if (cardTemplates.size === 0) {
@@ -6513,14 +6523,36 @@ if (ctxOcorrenciasTipo && <?= json_encode(!empty($ocorrencias_por_tipo)) ?>) {
 
 // Função para reinicializar gráficos após cards serem restaurados
 function reinicializarGraficos() {
+    console.log('🔄 Iniciando reinicialização de gráficos...');
+    console.log('Chart.js disponível:', typeof Chart !== 'undefined');
+    
+    // Verifica se Chart.js está disponível
+    if (typeof Chart === 'undefined') {
+        console.error('❌ Chart.js não está disponível! Verifique se o script foi carregado.');
+        return;
+    }
+    
     // Gráfico de Ocorrências por Mês
     const ctxOcorrenciasMes = document.getElementById('kt_chart_ocorrencias_mes');
+    console.log('📊 Canvas Ocorrências por Mês encontrado:', ctxOcorrenciasMes !== null);
+    console.log('📊 Canvas já tem gráfico:', ctxOcorrenciasMes?.chart ? 'Sim' : 'Não');
+    
     if (ctxOcorrenciasMes && !ctxOcorrenciasMes.chart) {
-        const mesesData = <?= json_encode($meses_grafico) ?>;
-        const ocorrenciasData = <?= json_encode($ocorrencias_grafico) ?>;
+        const mesesData = <?= json_encode($meses_grafico ?? []) ?>;
+        const ocorrenciasData = <?= json_encode($ocorrencias_grafico ?? []) ?>;
+        
+        console.log('📊 Dados Ocorrências por Mês:', {
+            meses: mesesData,
+            ocorrencias: ocorrenciasData,
+            mesesLength: mesesData?.length,
+            ocorrenciasLength: ocorrenciasData?.length,
+            mesesType: typeof mesesData,
+            ocorrenciasType: typeof ocorrenciasData
+        });
         
         if (mesesData && ocorrenciasData && mesesData.length > 0) {
-            ctxOcorrenciasMes.chart = new Chart(ctxOcorrenciasMes, {
+            try {
+                ctxOcorrenciasMes.chart = new Chart(ctxOcorrenciasMes, {
                 type: 'line',
                 data: {
                     labels: mesesData,
@@ -6552,18 +6584,39 @@ function reinicializarGraficos() {
                     }
                 }
             });
-            console.log('Gráfico de Ocorrências por Mês reinicializado');
+            console.log('✅ Gráfico de Ocorrências por Mês reinicializado com sucesso');
+            } catch (error) {
+                console.error('❌ Erro ao criar gráfico de Ocorrências por Mês:', error);
+            }
+        } else {
+            console.warn('⚠️ Dados insuficientes para gráfico de Ocorrências por Mês:', {
+                mesesData: mesesData,
+                ocorrenciasData: ocorrenciasData
+            });
         }
+    } else if (ctxOcorrenciasMes && ctxOcorrenciasMes.chart) {
+        console.log('ℹ️ Gráfico de Ocorrências por Mês já existe, pulando...');
+    } else if (!ctxOcorrenciasMes) {
+        console.warn('⚠️ Canvas kt_chart_ocorrencias_mes não encontrado no DOM');
     }
     
     <?php if (!is_colaborador() || empty($colaborador_id)): ?>
     // Gráfico de Colaboradores por Status
     const ctxColaboradoresStatus = document.getElementById('kt_chart_colaboradores_status');
+    console.log('📊 Canvas Colaboradores por Status encontrado:', ctxColaboradoresStatus !== null);
+    console.log('📊 Canvas já tem gráfico:', ctxColaboradoresStatus?.chart ? 'Sim' : 'Não');
+    
     if (ctxColaboradoresStatus && !ctxColaboradoresStatus.chart) {
         const statusData = <?= json_encode($colaboradores_status ?? []) ?>;
         
+        console.log('📊 Dados Colaboradores por Status:', {
+            statusData: statusData,
+            length: statusData?.length
+        });
+        
         if (statusData && statusData.length > 0) {
-            ctxColaboradoresStatus.chart = new Chart(ctxColaboradoresStatus, {
+            try {
+                ctxColaboradoresStatus.chart = new Chart(ctxColaboradoresStatus, {
                 type: 'doughnut',
                 data: {
                     labels: statusData.map(item => item.status.charAt(0).toUpperCase() + item.status.slice(1)),
@@ -6587,17 +6640,35 @@ function reinicializarGraficos() {
                     }
                 }
             });
-            console.log('Gráfico de Colaboradores por Status reinicializado');
+            console.log('✅ Gráfico de Colaboradores por Status reinicializado com sucesso');
+            } catch (error) {
+                console.error('❌ Erro ao criar gráfico de Colaboradores por Status:', error);
+            }
+        } else {
+            console.warn('⚠️ Dados insuficientes para gráfico de Colaboradores por Status:', statusData);
         }
+    } else if (ctxColaboradoresStatus && ctxColaboradoresStatus.chart) {
+        console.log('ℹ️ Gráfico de Colaboradores por Status já existe, pulando...');
+    } else if (!ctxColaboradoresStatus) {
+        console.warn('⚠️ Canvas kt_chart_colaboradores_status não encontrado no DOM');
     }
     
     // Gráfico de Ocorrências por Tipo
     const ctxOcorrenciasTipo = document.getElementById('kt_chart_ocorrencias_tipo');
+    console.log('📊 Canvas Ocorrências por Tipo encontrado:', ctxOcorrenciasTipo !== null);
+    console.log('📊 Canvas já tem gráfico:', ctxOcorrenciasTipo?.chart ? 'Sim' : 'Não');
+    
     if (ctxOcorrenciasTipo && !ctxOcorrenciasTipo.chart) {
         const tipoData = <?= json_encode($ocorrencias_por_tipo ?? []) ?>;
         
+        console.log('📊 Dados Ocorrências por Tipo:', {
+            tipoData: tipoData,
+            length: tipoData?.length
+        });
+        
         if (tipoData && tipoData.length > 0) {
-            ctxOcorrenciasTipo.chart = new Chart(ctxOcorrenciasTipo, {
+            try {
+                ctxOcorrenciasTipo.chart = new Chart(ctxOcorrenciasTipo, {
                 type: 'bar',
                 data: {
                     labels: tipoData.map(item => item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)),
@@ -6627,15 +6698,45 @@ function reinicializarGraficos() {
                     }
                 }
             });
-            console.log('Gráfico de Ocorrências por Tipo reinicializado');
+            console.log('✅ Gráfico de Ocorrências por Tipo reinicializado com sucesso');
+            } catch (error) {
+                console.error('❌ Erro ao criar gráfico de Ocorrências por Tipo:', error);
+            }
+        } else {
+            console.warn('⚠️ Dados insuficientes para gráfico de Ocorrências por Tipo:', tipoData);
         }
+    } else if (ctxOcorrenciasTipo && ctxOcorrenciasTipo.chart) {
+        console.log('ℹ️ Gráfico de Ocorrências por Tipo já existe, pulando...');
+    } else if (!ctxOcorrenciasTipo) {
+        console.warn('⚠️ Canvas kt_chart_ocorrencias_tipo não encontrado no DOM');
     }
     <?php endif; ?>
+    
+    console.log('✅ Reinicialização de gráficos concluída');
 }
 
 // Reinicializa gráficos após um pequeno delay para garantir que o DOM está pronto
 setTimeout(() => {
-    reinicializarGraficos();
+    console.log('🔄 Reinicializando gráficos no carregamento inicial...');
+    console.log('Chart.js disponível:', typeof Chart !== 'undefined');
+    console.log('Função reinicializarGraficos existe:', typeof reinicializarGraficos === 'function');
+    
+    // Verifica se os canvas existem no DOM
+    const canvasOcorrenciasMes = document.getElementById('kt_chart_ocorrencias_mes');
+    const canvasColaboradoresStatus = document.getElementById('kt_chart_colaboradores_status');
+    const canvasOcorrenciasTipo = document.getElementById('kt_chart_ocorrencias_tipo');
+    
+    console.log('Canvas encontrados no DOM:', {
+        ocorrenciasMes: canvasOcorrenciasMes !== null,
+        colaboradoresStatus: canvasColaboradoresStatus !== null,
+        ocorrenciasTipo: canvasOcorrenciasTipo !== null
+    });
+    
+    if (typeof reinicializarGraficos === 'function') {
+        reinicializarGraficos();
+    } else {
+        console.error('❌ Função reinicializarGraficos não encontrada no carregamento inicial!');
+    }
 }, 500);
 </script>
 <!--end::Chart Scripts-->
