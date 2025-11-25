@@ -3,12 +3,46 @@
  * API para listar anotações
  */
 
-header('Content-Type: application/json');
-require_once __DIR__ . '/../../includes/functions.php';
-require_once __DIR__ . '/../../includes/auth.php';
-require_once __DIR__ . '/../../includes/permissions.php';
+// Ativa exibição de erros temporariamente para debug (remover em produção)
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Não exibe no navegador, apenas nos logs
+ini_set('log_errors', 1);
 
-require_login();
+header('Content-Type: application/json');
+
+try {
+    // Carrega includes com tratamento de erro
+    if (!file_exists(__DIR__ . '/../../includes/functions.php')) {
+        throw new Exception('Arquivo functions.php não encontrado');
+    }
+    require_once __DIR__ . '/../../includes/functions.php';
+    
+    if (!file_exists(__DIR__ . '/../../includes/auth.php')) {
+        throw new Exception('Arquivo auth.php não encontrado');
+    }
+    require_once __DIR__ . '/../../includes/auth.php';
+    
+    if (!file_exists(__DIR__ . '/../../includes/permissions.php')) {
+        throw new Exception('Arquivo permissions.php não encontrado');
+    }
+    require_once __DIR__ . '/../../includes/permissions.php';
+    
+    require_login();
+} catch (Exception $e) {
+    http_response_code(500);
+    error_log('Erro ao carregar includes: ' . $e->getMessage());
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    echo json_encode([
+        'success' => false,
+        'message' => 'Erro ao inicializar sistema: ' . $e->getMessage(),
+        'error' => [
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ]
+    ]);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
@@ -25,10 +59,23 @@ if (!has_role(['ADMIN', 'RH', 'GESTOR'])) {
 try {
     $pdo = getDB();
     
-    // Verifica se a tabela existe
-    $stmt_check = $pdo->query("SHOW TABLES LIKE 'anotacoes_sistema'");
-    if ($stmt_check->rowCount() === 0) {
-        throw new Exception('Tabela anotacoes_sistema não existe no banco de dados');
+    // Verifica se as tabelas necessárias existem
+    $tabelas_necessarias = ['anotacoes_sistema', 'usuarios'];
+    foreach ($tabelas_necessarias as $tabela) {
+        $stmt_check = $pdo->query("SHOW TABLES LIKE '$tabela'");
+        if ($stmt_check->rowCount() === 0) {
+            throw new Exception("Tabela $tabela não existe no banco de dados");
+        }
+    }
+    
+    // Verifica se tabelas opcionais existem (para evitar erros nas subqueries)
+    $tabelas_opcionais = ['anotacoes_comentarios', 'anotacoes_visualizacoes'];
+    $tabelas_existentes = [];
+    foreach ($tabelas_opcionais as $tabela) {
+        $stmt_check = $pdo->query("SHOW TABLES LIKE '$tabela'");
+        if ($stmt_check->rowCount() > 0) {
+            $tabelas_existentes[] = $tabela;
+        }
     }
     
     // Verifica se usuário está na sessão
@@ -127,6 +174,18 @@ try {
     
     $where_sql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
     
+    // Monta subqueries de contagem apenas se as tabelas existirem
+    $subquery_comentarios = "0";
+    $subquery_visualizacoes = "0";
+    
+    if (in_array('anotacoes_comentarios', $tabelas_existentes)) {
+        $subquery_comentarios = "(SELECT COUNT(*) FROM anotacoes_comentarios WHERE anotacao_id = a.id)";
+    }
+    
+    if (in_array('anotacoes_visualizacoes', $tabelas_existentes)) {
+        $subquery_visualizacoes = "(SELECT COUNT(*) FROM anotacoes_visualizacoes WHERE anotacao_id = a.id)";
+    }
+    
     $sql = "
         SELECT a.*,
                u.nome as usuario_nome,
@@ -134,8 +193,8 @@ try {
                e.nome_fantasia as empresa_nome,
                s.nome_setor,
                car.nome_cargo,
-               (SELECT COUNT(*) FROM anotacoes_comentarios WHERE anotacao_id = a.id) as total_comentarios,
-               (SELECT COUNT(*) FROM anotacoes_visualizacoes WHERE anotacao_id = a.id) as total_visualizacoes
+               $subquery_comentarios as total_comentarios,
+               $subquery_visualizacoes as total_visualizacoes
         FROM anotacoes_sistema a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
         LEFT JOIN empresas e ON a.empresa_id = e.id
@@ -151,7 +210,7 @@ try {
                 WHEN a.prioridade = 'baixa' THEN 1
                 ELSE 0
             END DESC,
-            a.created_at DESC
+            COALESCE(a.created_at, NOW()) DESC
         LIMIT ?
     ";
     
@@ -196,21 +255,26 @@ try {
             $anotacao['anexos'] = [];
         }
         
-        // Verifica se foi visualizada pelo usuário atual
-        try {
-            $stmt_viz = $pdo->prepare("
-                SELECT COUNT(*) as visualizada
-                FROM anotacoes_visualizacoes
-                WHERE anotacao_id = ? AND (usuario_id = ? OR colaborador_id = ?)
-            ");
-            $colaborador_id = $usuario['colaborador_id'] ?? null;
-            $stmt_viz->execute([$anotacao['id'], $usuario['id'], $colaborador_id]);
-            $viz = $stmt_viz->fetch();
-            $anotacao['visualizada'] = ($viz && $viz['visualizada'] > 0);
-        } catch (Exception $e) {
-            // Se houver erro ao verificar visualização, assume como não visualizada
+        // Verifica se foi visualizada pelo usuário atual (apenas se a tabela existir)
+        if (in_array('anotacoes_visualizacoes', $tabelas_existentes)) {
+            try {
+                $stmt_viz = $pdo->prepare("
+                    SELECT COUNT(*) as visualizada
+                    FROM anotacoes_visualizacoes
+                    WHERE anotacao_id = ? AND (usuario_id = ? OR colaborador_id = ?)
+                ");
+                $colaborador_id = $usuario['colaborador_id'] ?? null;
+                $stmt_viz->execute([$anotacao['id'], $usuario['id'], $colaborador_id]);
+                $viz = $stmt_viz->fetch();
+                $anotacao['visualizada'] = ($viz && $viz['visualizada'] > 0);
+            } catch (Exception $e) {
+                // Se houver erro ao verificar visualização, assume como não visualizada
+                $anotacao['visualizada'] = false;
+                error_log('Erro ao verificar visualização da anotação ' . $anotacao['id'] . ': ' . $e->getMessage());
+            }
+        } else {
+            // Se a tabela não existe, assume como não visualizada
             $anotacao['visualizada'] = false;
-            error_log('Erro ao verificar visualização da anotação ' . $anotacao['id'] . ': ' . $e->getMessage());
         }
         
         // Formata datas
@@ -230,12 +294,38 @@ try {
     
 } catch (PDOException $e) {
     http_response_code(500);
+    $errorInfo = $e->errorInfo ?? [];
     error_log('Erro PDO ao listar anotações: ' . $e->getMessage());
-    error_log('SQL Error Info: ' . print_r($e->errorInfo ?? [], true));
+    error_log('SQL Error Code: ' . ($errorInfo[0] ?? 'N/A'));
+    error_log('SQL Error: ' . ($errorInfo[2] ?? 'N/A'));
+    error_log('SQL Error Info completo: ' . print_r($errorInfo, true));
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    
     echo json_encode([
         'success' => false,
         'message' => 'Erro ao listar anotações. Verifique os logs do servidor.',
-        'error' => (defined('DEBUG') && DEBUG) ? $e->getMessage() : null
+        'error' => [
+            'message' => $e->getMessage(),
+            'code' => $errorInfo[0] ?? null,
+            'sql_error' => $errorInfo[2] ?? null,
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ]
+    ]);
+} catch (Error $e) {
+    // Captura erros fatais do PHP (PHP 7+)
+    http_response_code(500);
+    error_log('Erro fatal ao listar anotações: ' . $e->getMessage());
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    echo json_encode([
+        'success' => false,
+        'message' => 'Erro fatal ao listar anotações: ' . $e->getMessage(),
+        'error' => [
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'type' => get_class($e)
+        ]
     ]);
 } catch (Exception $e) {
     http_response_code(500);
@@ -244,11 +334,12 @@ try {
     echo json_encode([
         'success' => false,
         'message' => 'Erro ao listar anotações: ' . $e->getMessage(),
-        'error' => (defined('DEBUG') && DEBUG) ? [
+        'error' => [
             'message' => $e->getMessage(),
             'file' => $e->getFile(),
-            'line' => $e->getLine()
-        ] : null
+            'line' => $e->getLine(),
+            'type' => get_class($e)
+        ]
     ]);
 }
 

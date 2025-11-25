@@ -6648,6 +6648,16 @@ function reinicializarGraficos() {
         console.log('ℹ️ Gráfico de Ocorrências por Mês já existe, pulando...');
     } else if (!ctxOcorrenciasMes) {
         console.warn('⚠️ Canvas kt_chart_ocorrencias_mes não encontrado no DOM');
+        console.log('ℹ️ Isso é normal se não houver dados ou se o card não foi renderizado ainda');
+        
+        // Verifica se há uma mensagem de "sem dados" no lugar do canvas
+        const cardBody = document.querySelector('[data-card-id="card_grafico_ocorrencias_mes"] .card-body');
+        if (cardBody) {
+            const temMensagem = cardBody.querySelector('.text-center');
+            if (temMensagem) {
+                console.log('ℹ️ Mensagem de "sem dados" encontrada, não é necessário criar gráfico');
+            }
+        }
     }
     
     <?php if (!is_colaborador() || empty($colaborador_id)): ?>
@@ -6718,6 +6728,16 @@ function reinicializarGraficos() {
         console.log('ℹ️ Gráfico de Colaboradores por Status já existe, pulando...');
     } else if (!ctxColaboradoresStatus) {
         console.warn('⚠️ Canvas kt_chart_colaboradores_status não encontrado no DOM');
+        console.log('ℹ️ Isso é normal se não houver dados ou se o card não foi renderizado ainda');
+        
+        // Verifica se há uma mensagem de "sem dados" no lugar do canvas
+        const cardBody = document.querySelector('[data-card-id="card_grafico_colaboradores_status"] .card-body');
+        if (cardBody) {
+            const temMensagem = cardBody.querySelector('.text-center');
+            if (temMensagem) {
+                console.log('ℹ️ Mensagem de "sem dados" encontrada, não é necessário criar gráfico');
+            }
+        }
     }
     
     // Gráfico de Ocorrências por Tipo
@@ -6808,6 +6828,18 @@ function reinicializarGraficos() {
         console.log('ℹ️ Gráfico de Ocorrências por Tipo já existe, pulando...');
     } else if (!ctxOcorrenciasTipo) {
         console.warn('⚠️ Canvas kt_chart_ocorrencias_tipo não encontrado no DOM');
+        console.log('ℹ️ Isso é normal se não houver dados ou se o card não foi renderizado ainda');
+        
+        // Verifica se há uma mensagem de "sem dados" no lugar do canvas
+        const cardBody = document.querySelector('[data-card-id="card_grafico_ocorrencias_tipo"] .card-body');
+        if (cardBody) {
+            const temMensagem = cardBody.querySelector('.text-center');
+            if (temMensagem) {
+                console.log('ℹ️ Mensagem de "sem dados" encontrada, não é necessário criar gráfico');
+            } else {
+                console.log('ℹ️ Card body encontrado mas sem canvas nem mensagem - pode ser que o card ainda não foi renderizado');
+            }
+        }
     }
     <?php endif; ?>
     
