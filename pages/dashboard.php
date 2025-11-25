@@ -1866,7 +1866,18 @@ if (is_colaborador() && !empty($colaborador_id)) {
                     <!--end::Header-->
                     <!--begin::Body-->
                     <div class="card-body pt-5">
-                        <canvas id="kt_chart_ocorrencias_mes" style="height: 350px;"></canvas>
+                        <?php if (empty($meses_grafico) || empty($ocorrencias_grafico) || count($meses_grafico) === 0): ?>
+                            <div class="text-center text-muted py-10">
+                                <i class="ki-duotone ki-chart fs-3x text-muted mb-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <p class="fs-5 mb-0">Nenhuma ocorrência registrada nos últimos 6 meses</p>
+                                <p class="fs-7">Os dados aparecerão aqui quando houver ocorrências</p>
+                            </div>
+                        <?php else: ?>
+                            <canvas id="kt_chart_ocorrencias_mes" style="height: 350px;"></canvas>
+                        <?php endif; ?>
                     </div>
                     <!--end::Body-->
                 </div>
@@ -1887,7 +1898,18 @@ if (is_colaborador() && !empty($colaborador_id)) {
                     <!--end::Header-->
                     <!--begin::Body-->
                     <div class="card-body pt-5">
-                        <canvas id="kt_chart_colaboradores_status" style="height: 350px;"></canvas>
+                        <?php if (empty($colaboradores_status) || count($colaboradores_status) === 0): ?>
+                            <div class="text-center text-muted py-10">
+                                <i class="ki-duotone ki-chart-pie fs-3x text-muted mb-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <p class="fs-5 mb-0">Nenhum colaborador encontrado</p>
+                                <p class="fs-7">Os dados aparecerão aqui quando houver colaboradores cadastrados</p>
+                            </div>
+                        <?php else: ?>
+                            <canvas id="kt_chart_colaboradores_status" style="height: 350px;"></canvas>
+                        <?php endif; ?>
                     </div>
                     <!--end::Body-->
                 </div>
@@ -6604,6 +6626,23 @@ function reinicializarGraficos() {
                 mesesData: mesesData,
                 ocorrenciasData: ocorrenciasData
             });
+            
+            // Mostra mensagem no card se não houver dados
+            const cardBody = ctxOcorrenciasMes.closest('.card-body');
+            if (cardBody && !cardBody.querySelector('.text-center')) {
+                ctxOcorrenciasMes.style.display = 'none';
+                const mensagem = document.createElement('div');
+                mensagem.className = 'text-center text-muted py-10';
+                mensagem.innerHTML = `
+                    <i class="ki-duotone ki-chart fs-3x text-muted mb-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <p class="fs-5 mb-0">Nenhuma ocorrência registrada nos últimos 6 meses</p>
+                    <p class="fs-7">Os dados aparecerão aqui quando houver ocorrências</p>
+                `;
+                cardBody.appendChild(mensagem);
+            }
         }
     } else if (ctxOcorrenciasMes && ctxOcorrenciasMes.chart) {
         console.log('ℹ️ Gráfico de Ocorrências por Mês já existe, pulando...');
@@ -6657,6 +6696,23 @@ function reinicializarGraficos() {
             }
         } else {
             console.warn('⚠️ Dados insuficientes para gráfico de Colaboradores por Status:', statusData);
+            
+            // Mostra mensagem no card se não houver dados
+            const cardBody = ctxColaboradoresStatus.closest('.card-body');
+            if (cardBody && !cardBody.querySelector('.text-center')) {
+                ctxColaboradoresStatus.style.display = 'none';
+                const mensagem = document.createElement('div');
+                mensagem.className = 'text-center text-muted py-10';
+                mensagem.innerHTML = `
+                    <i class="ki-duotone ki-chart-pie fs-3x text-muted mb-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <p class="fs-5 mb-0">Nenhum colaborador encontrado</p>
+                    <p class="fs-7">Os dados aparecerão aqui quando houver colaboradores cadastrados</p>
+                `;
+                cardBody.appendChild(mensagem);
+            }
         }
     } else if (ctxColaboradoresStatus && ctxColaboradoresStatus.chart) {
         console.log('ℹ️ Gráfico de Colaboradores por Status já existe, pulando...');

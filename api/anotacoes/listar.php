@@ -24,7 +24,24 @@ if (!has_role(['ADMIN', 'RH', 'GESTOR'])) {
 
 try {
     $pdo = getDB();
+    
+    // Verifica se a tabela existe
+    $stmt_check = $pdo->query("SHOW TABLES LIKE 'anotacoes_sistema'");
+    if ($stmt_check->rowCount() === 0) {
+        throw new Exception('Tabela anotacoes_sistema não existe no banco de dados');
+    }
+    
+    // Verifica se usuário está na sessão
+    if (!isset($_SESSION['usuario'])) {
+        throw new Exception('Usuário não autenticado');
+    }
+    
     $usuario = $_SESSION['usuario'];
+    
+    // Valida campos obrigatórios do usuário
+    if (!isset($usuario['id']) || !isset($usuario['role'])) {
+        throw new Exception('Dados do usuário incompletos');
+    }
     
     $filtro_status = $_GET['status'] ?? 'ativa';
     $filtro_tipo = $_GET['tipo'] ?? null;
@@ -33,6 +50,11 @@ try {
     $apenas_minhas = isset($_GET['minhas']) ? (int)$_GET['minhas'] : 0;
     $apenas_fixadas = isset($_GET['fixadas']) ? (int)$_GET['fixadas'] : 0;
     $limite = isset($_GET['limite']) ? (int)$_GET['limite'] : 50;
+    
+    // Valida limite
+    if ($limite < 1 || $limite > 1000) {
+        $limite = 50;
+    }
     
     $where = [];
     $params = [];
@@ -76,18 +98,31 @@ try {
     
     // Filtros por permissão
     if ($usuario['role'] === 'RH') {
-        $where[] = "(a.publico_alvo = 'todos' OR (a.publico_alvo = 'empresa' AND a.empresa_id = ?) OR a.usuario_id = ?)";
-        $params[] = $usuario['empresa_id'];
-        $params[] = $usuario['id'];
+        $empresa_id = $usuario['empresa_id'] ?? null;
+        if ($empresa_id) {
+            $where[] = "(a.publico_alvo = 'todos' OR (a.publico_alvo = 'empresa' AND a.empresa_id = ?) OR a.usuario_id = ?)";
+            $params[] = $empresa_id;
+            $params[] = $usuario['id'];
+        } else {
+            // Se não tem empresa_id, mostra apenas todas ou suas próprias
+            $where[] = "(a.publico_alvo = 'todos' OR a.usuario_id = ?)";
+            $params[] = $usuario['id'];
+        }
     } elseif ($usuario['role'] === 'GESTOR') {
         $stmt_setor = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
         $stmt_setor->execute([$usuario['id']]);
         $user_data = $stmt_setor->fetch();
-        $setor_id = $user_data['setor_id'] ?? 0;
+        $setor_id = $user_data['setor_id'] ?? null;
         
-        $where[] = "(a.publico_alvo = 'todos' OR (a.publico_alvo = 'setor' AND a.setor_id = ?) OR a.usuario_id = ?)";
-        $params[] = $setor_id;
-        $params[] = $usuario['id'];
+        if ($setor_id) {
+            $where[] = "(a.publico_alvo = 'todos' OR (a.publico_alvo = 'setor' AND a.setor_id = ?) OR a.usuario_id = ?)";
+            $params[] = $setor_id;
+            $params[] = $usuario['id'];
+        } else {
+            // Se não tem setor_id, mostra apenas todas ou suas próprias
+            $where[] = "(a.publico_alvo = 'todos' OR a.usuario_id = ?)";
+            $params[] = $usuario['id'];
+        }
     }
     
     $where_sql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -107,14 +142,31 @@ try {
         LEFT JOIN setores s ON a.setor_id = s.id
         LEFT JOIN cargos car ON a.cargo_id = car.id
         $where_sql
-        ORDER BY a.fixada DESC, a.prioridade DESC, a.created_at DESC
+        ORDER BY 
+            COALESCE(a.fixada, 0) DESC, 
+            CASE 
+                WHEN a.prioridade = 'urgente' THEN 4
+                WHEN a.prioridade = 'alta' THEN 3
+                WHEN a.prioridade = 'media' THEN 2
+                WHEN a.prioridade = 'baixa' THEN 1
+                ELSE 0
+            END DESC,
+            a.created_at DESC
         LIMIT ?
     ";
     
     $params[] = $limite;
     
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
+    if (!$stmt) {
+        throw new Exception('Erro ao preparar query SQL: ' . implode(', ', $pdo->errorInfo()));
+    }
+    
+    $executed = $stmt->execute($params);
+    if (!$executed) {
+        throw new Exception('Erro ao executar query SQL: ' . implode(', ', $stmt->errorInfo()));
+    }
+    
     $anotacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Processa anotações
@@ -145,15 +197,21 @@ try {
         }
         
         // Verifica se foi visualizada pelo usuário atual
-        $stmt_viz = $pdo->prepare("
-            SELECT COUNT(*) as visualizada
-            FROM anotacoes_visualizacoes
-            WHERE anotacao_id = ? AND (usuario_id = ? OR colaborador_id = ?)
-        ");
-        $colaborador_id = $usuario['colaborador_id'] ?? null;
-        $stmt_viz->execute([$anotacao['id'], $usuario['id'], $colaborador_id]);
-        $viz = $stmt_viz->fetch();
-        $anotacao['visualizada'] = $viz['visualizada'] > 0;
+        try {
+            $stmt_viz = $pdo->prepare("
+                SELECT COUNT(*) as visualizada
+                FROM anotacoes_visualizacoes
+                WHERE anotacao_id = ? AND (usuario_id = ? OR colaborador_id = ?)
+            ");
+            $colaborador_id = $usuario['colaborador_id'] ?? null;
+            $stmt_viz->execute([$anotacao['id'], $usuario['id'], $colaborador_id]);
+            $viz = $stmt_viz->fetch();
+            $anotacao['visualizada'] = ($viz && $viz['visualizada'] > 0);
+        } catch (Exception $e) {
+            // Se houver erro ao verificar visualização, assume como não visualizada
+            $anotacao['visualizada'] = false;
+            error_log('Erro ao verificar visualização da anotação ' . $anotacao['id'] . ': ' . $e->getMessage());
+        }
         
         // Formata datas
         if ($anotacao['data_notificacao']) {
@@ -170,11 +228,27 @@ try {
         'anotacoes' => $anotacoes
     ]);
     
-} catch (Exception $e) {
+} catch (PDOException $e) {
     http_response_code(500);
+    error_log('Erro PDO ao listar anotações: ' . $e->getMessage());
+    error_log('SQL Error Info: ' . print_r($e->errorInfo ?? [], true));
     echo json_encode([
         'success' => false,
-        'message' => 'Erro ao listar anotações: ' . $e->getMessage()
+        'message' => 'Erro ao listar anotações. Verifique os logs do servidor.',
+        'error' => (defined('DEBUG') && DEBUG) ? $e->getMessage() : null
+    ]);
+} catch (Exception $e) {
+    http_response_code(500);
+    error_log('Erro ao listar anotações: ' . $e->getMessage());
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    echo json_encode([
+        'success' => false,
+        'message' => 'Erro ao listar anotações: ' . $e->getMessage(),
+        'error' => (defined('DEBUG') && DEBUG) ? [
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ] : null
     ]);
 }
 
