@@ -6909,18 +6909,19 @@ function reinicializarGraficos() {
     } else if (ctxOcorrenciasTipo && ctxOcorrenciasTipo.chart) {
         console.log('ℹ️ Gráfico de Ocorrências por Tipo já existe, pulando...');
     } else if (!ctxOcorrenciasTipo) {
-        console.warn('⚠️ Canvas kt_chart_ocorrencias_tipo não encontrado no DOM');
-        console.log('ℹ️ Isso é normal se não houver dados ou se o card não foi renderizado ainda');
-        
         // Verifica se há uma mensagem de "sem dados" no lugar do canvas
         const cardBody = document.querySelector('[data-card-id="card_grafico_ocorrencias_tipo"] .card-body');
         if (cardBody) {
             const temMensagem = cardBody.querySelector('.text-center');
             if (temMensagem) {
-                console.log('ℹ️ Mensagem de "sem dados" encontrada, não é necessário criar gráfico');
+                console.log('ℹ️ Canvas não encontrado - mensagem de "sem dados" está sendo exibida (comportamento esperado)');
             } else {
+                console.warn('⚠️ Canvas kt_chart_ocorrencias_tipo não encontrado no DOM');
                 console.log('ℹ️ Card body encontrado mas sem canvas nem mensagem - pode ser que o card ainda não foi renderizado');
             }
+        } else {
+            console.warn('⚠️ Canvas kt_chart_ocorrencias_tipo não encontrado no DOM');
+            console.log('ℹ️ Isso é normal se não houver dados ou se o card não foi renderizado ainda');
         }
     }
     <?php endif; ?>
