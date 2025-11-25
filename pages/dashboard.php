@@ -4860,10 +4860,10 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Templates salvos:', cardTemplates.size);
         console.log('Cards adicionados (salvos):', cardsAdicionados.size, Array.from(cardsAdicionados));
         
-        // Se não há templates salvos mas há cards no DOM, preserva-os
-        // Isso acontece quando não há layout salvo ainda
-        if (cardTemplates.size === 0 && cardsAdicionados.size === 0) {
-            console.log('Nenhum template salvo e nenhum card adicionado - preservando cards do DOM');
+        // Se não há layout salvo (cardsAdicionados vazio), preserva os cards do DOM
+        // Isso acontece quando o usuário entra em modo de edição pela primeira vez
+        if (cardsAdicionados.size === 0) {
+            console.log('Nenhum card adicionado ainda - preservando cards do DOM');
             // Garante que todos os cards têm data-card-id antes de continuar
             garantirCardIdsBase();
             
@@ -4895,7 +4895,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Limpa o container apenas se temos templates para restaurar
+        // Limpa o container apenas se temos layout salvo para restaurar
         container.innerHTML = '';
         
         // Restaura APENAS os cards que estão no cardsAdicionados (layout salvo)
@@ -5018,17 +5018,24 @@ document.addEventListener('DOMContentLoaded', function() {
             // Garante que todos os cards têm data-card-id
             garantirCardIdsBase();
             
-            // Salva templates de todos os cards visíveis no container
-            containerTemp.querySelectorAll('[data-card-id], [data-gs-id], .card, a.card').forEach(cardElement => {
-                // Encontra o elemento pai que contém o card completo
-                let cardContainer = cardElement;
-                if (!cardElement.hasAttribute('data-card-id') && !cardElement.hasAttribute('data-gs-id')) {
-                    // Se o elemento não tem ID, procura pelo pai que tenha
-                    cardContainer = cardElement.closest('[data-card-id], [data-gs-id]') || cardElement.closest('.col-xl-3, .col-xl-4, .col-xl-6, .col-xl-8, .col-xl-12');
-                }
+            // Busca apenas elementos filhos diretos do container que são cards válidos
+            // Evita salvar wrappers e elementos internos
+            const cardsValidos = Array.from(containerTemp.children).filter(el => {
+                // Deve ter data-card-id ou data-gs-id OU ser uma coluna Bootstrap com card dentro
+                const temId = el.hasAttribute('data-card-id') || el.hasAttribute('data-gs-id');
+                const ehColunaComCard = el.classList.toString().match(/col-(xl|md|lg|sm)-/) && el.querySelector('.card, a.card');
+                const temCardDireto = el.classList.contains('card') || el.classList.contains('a.card');
                 
-                if (!cardContainer) return;
+                // Ignora elementos que são wrappers de linha ou outros elementos não-card
+                const ehWrapper = el.classList.contains('row') || el.classList.contains('g-4') || el.id === 'row_stats_cards';
                 
+                return !ehWrapper && (temId || ehColunaComCard || temCardDireto);
+            });
+            
+            console.log('Cards válidos encontrados para salvar templates:', cardsValidos.length);
+            
+            // Salva templates apenas dos cards válidos
+            cardsValidos.forEach(cardContainer => {
                 // Gera ou obtém o ID do card
                 let cardId = cardContainer.getAttribute('data-card-id') || 
                             cardContainer.getAttribute('data-gs-id') ||
@@ -5044,7 +5051,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else if (title) {
                         cardId = 'card_' + slugify(title.textContent.trim());
                     } else {
-                        cardId = 'card_auto_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                        // Se não conseguir gerar ID válido, pula este elemento
+                        console.warn('Não foi possível gerar ID para card, pulando:', cardContainer);
+                        return;
                     }
                     
                     // Atribui o ID gerado
@@ -5052,6 +5061,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!cardContainer.hasAttribute('data-gs-id')) {
                         cardContainer.setAttribute('data-gs-id', cardId);
                     }
+                }
+                
+                // Ignora IDs inválidos (como card_row_stats_cards, card_auto_*, etc.)
+                if (cardId.startsWith('card_row_') || cardId.startsWith('card_auto_') && !cardId.match(/card_auto_\d+$/)) {
+                    console.warn('Ignorando card com ID inválido:', cardId);
+                    return;
                 }
                 
                 // Salva o template se ainda não foi salvo
