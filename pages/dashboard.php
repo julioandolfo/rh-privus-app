@@ -4002,7 +4002,69 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         if (!cardFonte) {
-            return null;
+            console.warn('⚠️ Template não encontrado para card:', cardId);
+            console.log('Templates disponíveis:', Array.from(cardTemplates.keys()));
+            console.log('Tentando buscar no DOM com diferentes seletores...');
+            
+            // Tenta buscar por diferentes formas em todo o documento
+            const selectors = [
+                `[data-card-id="${cardId}"]`,
+                `[data-gs-id="${cardId}"]`,
+                `#${cardId}`,
+                `.${cardId}`
+            ];
+            
+            for (const selector of selectors) {
+                const el = document.querySelector(selector);
+                if (el) {
+                    console.log('✅ Card encontrado com seletor:', selector);
+                    cardFonte = el.cloneNode(true);
+                    // Salva o template para uso futuro
+                    if (!cardTemplates.has(cardId)) {
+                        cardTemplates.set(cardId, cardFonte.cloneNode(true));
+                        console.log('Template salvo após encontrar no DOM:', cardId);
+                    }
+                    break;
+                }
+            }
+            
+            // Se ainda não encontrou, tenta criar um card placeholder baseado no catálogo
+            if (!cardFonte) {
+                console.warn('⚠️ Card não encontrado no DOM nem nos templates. Tentando criar placeholder...');
+                const cardInfo = catalogoBaseCards.find(card => card.id === cardId);
+                
+                if (cardInfo) {
+                    console.log('✅ Informações do card encontradas no catálogo, criando placeholder:', cardId);
+                    // Cria um card placeholder básico
+                    cardFonte = document.createElement('div');
+                    cardFonte.className = 'grid-stack-item';
+                    cardFonte.setAttribute('data-gs-id', cardId);
+                    cardFonte.setAttribute('data-card-id', cardId);
+                    cardFonte.innerHTML = `
+                        <div class="grid-stack-item-content">
+                            <div class="card card-xl-stretch">
+                                <div class="card-header">
+                                    <h3 class="card-title">
+                                        <span class="card-label fw-bold">${cardInfo.nome}</span>
+                                    </h3>
+                                </div>
+                                <div class="card-body text-center py-10">
+                                    <i class="ki-duotone ${cardInfo.icone} fs-3x text-primary mb-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <p class="text-muted">${cardInfo.descricao}</p>
+                                    <p class="text-muted small">Este card será carregado quando a página for recarregada</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    console.log('✅ Placeholder criado para card:', cardId);
+                } else {
+                    console.error('❌ Não foi possível encontrar ou criar o card:', cardId);
+                    return null;
+                }
+            }
         }
         
         // Remove atributos do GridStack
@@ -5785,8 +5847,28 @@ document.addEventListener('DOMContentLoaded', function() {
             dashboardCards.querySelectorAll('[data-card-id]').forEach(cardElement => {
                 const cardId = cardElement.getAttribute('data-card-id');
                 if (cardId && !cardTemplates.has(cardId)) {
-                    cardTemplates.set(cardId, cardElement.cloneNode(true));
+                    const templateClone = cardElement.cloneNode(true);
+                    cardTemplates.set(cardId, templateClone);
                     console.log('Template salvo:', cardId);
+                }
+            });
+            
+            // IMPORTANTE: Também busca cards que podem estar em blocos condicionais PHP
+            // que não foram renderizados no DOM inicial, mas estão no layout salvo
+            const cardsNoLayout = layoutSalvo.map(card => card.id).filter(id => !cardTemplates.has(id));
+            console.log('Cards no layout que não têm template:', cardsNoLayout);
+            
+            // Tenta encontrar esses cards no DOM mesmo que não estejam visíveis
+            cardsNoLayout.forEach(cardId => {
+                // Busca em todo o documento, não apenas no container
+                const cardElement = document.querySelector(`[data-card-id="${cardId}"]`) || 
+                                  document.querySelector(`[data-gs-id="${cardId}"]`);
+                if (cardElement && !cardTemplates.has(cardId)) {
+                    const templateClone = cardElement.cloneNode(true);
+                    cardTemplates.set(cardId, templateClone);
+                    console.log('Template encontrado e salvo (card condicional):', cardId);
+                } else if (!cardElement) {
+                    console.warn('⚠️ Card não encontrado no DOM (pode estar em bloco condicional PHP):', cardId);
                 }
             });
             

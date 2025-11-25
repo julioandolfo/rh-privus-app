@@ -186,6 +186,13 @@ try {
         $subquery_visualizacoes = "(SELECT COUNT(*) FROM anotacoes_visualizacoes WHERE anotacao_id = a.id)";
     }
     
+    // Garante que limite é um inteiro seguro (já validado anteriormente entre 1 e 1000)
+    // Como LIMIT não aceita placeholder em algumas versões do MySQL/MariaDB,
+    // inserimos diretamente após validação rigorosa
+    $limite_int = (int)$limite;
+    if ($limite_int < 1) $limite_int = 50;
+    if ($limite_int > 1000) $limite_int = 1000;
+    
     $sql = "
         SELECT a.*,
                u.nome as usuario_nome,
@@ -211,10 +218,8 @@ try {
                 ELSE 0
             END DESC,
             COALESCE(a.created_at, NOW()) DESC
-        LIMIT ?
+        LIMIT $limite_int
     ";
-    
-    $params[] = $limite;
     
     $stmt = $pdo->prepare($sql);
     if (!$stmt) {
