@@ -240,7 +240,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <!-- Foto do colaborador -->
                                     <div class="flex-shrink-0">
                                         <?php if ($colaborador['foto']): ?>
-                                        <img src="<?= htmlspecialchars($colaborador['foto']) ?>" class="rounded-circle" width="120" height="120" style="object-fit: cover;" alt="<?= htmlspecialchars($colaborador['nome_completo']) ?>">
+                                        <img src="../<?= htmlspecialchars($colaborador['foto']) ?>" class="rounded-circle" width="120" height="120" style="object-fit: cover;" alt="<?= htmlspecialchars($colaborador['nome_completo']) ?>">
                                         <?php else: ?>
                                         <div class="symbol symbol-circle symbol-120px">
                                             <div class="symbol-label bg-primary text-white fs-2x fw-bold">
@@ -271,7 +271,7 @@ require_once __DIR__ . '/../includes/header.php';
                                             <label class="fw-semibold text-gray-700">Liderança:</label>
                                             <div class="d-flex align-items-center gap-2">
                                                 <?php if ($colaborador['lider_foto']): ?>
-                                                <img src="<?= htmlspecialchars($colaborador['lider_foto']) ?>" class="rounded-circle" width="30" height="30" style="object-fit: cover;" alt="">
+                                                <img src="../<?= htmlspecialchars($colaborador['lider_foto']) ?>" class="rounded-circle" width="30" height="30" style="object-fit: cover;" alt="">
                                                 <?php else: ?>
                                                 <div class="symbol symbol-circle symbol-30px">
                                                     <div class="symbol-label bg-info text-white fs-7">
@@ -1211,7 +1211,7 @@ function renderizarFeedbacksRecebidos(feedbacks) {
                     ${feedbacks.map((fb, idx) => `
                         <tr>
                             <td>
-                                ${fb.remetente_foto ? `<img src="${fb.remetente_foto}" class="rounded-circle me-2" width="32" height="32" style="object-fit: cover;">` : ''}
+                                ${fb.remetente_foto ? `<img src="../${fb.remetente_foto}" class="rounded-circle me-2" width="32" height="32" style="object-fit: cover;">` : ''}
                                 ${fb.remetente_nome || 'Anônimo'}
                             </td>
                             <td>

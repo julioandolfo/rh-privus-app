@@ -90,7 +90,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <h4>Colaborador</h4>
                                 <div class="d-flex align-items-center">
                                     <?php if ($pdi['colaborador_foto']): ?>
-                                    <img src="<?= htmlspecialchars($pdi['colaborador_foto']) ?>" class="rounded-circle me-3" width="50" height="50" alt="">
+                                    <img src="../<?= htmlspecialchars($pdi['colaborador_foto']) ?>" class="rounded-circle me-3" width="50" height="50" alt="">
                                     <?php else: ?>
                                     <div class="symbol symbol-circle symbol-50px me-3">
                                         <div class="symbol-label bg-primary text-white">

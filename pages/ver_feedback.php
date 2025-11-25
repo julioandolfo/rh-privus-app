@@ -181,7 +181,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 $inicial = strtoupper(substr($nome, 0, 1));
                                 ?>
                                 <?php if ($foto): ?>
-                                    <img src="../uploads/fotos/<?= htmlspecialchars($foto) ?>" alt="<?= htmlspecialchars($nome) ?>" class="symbol-label" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'symbol-label fs-3 fw-bold bg-primary text-white\'><?= $inicial ?></div>';">
+                                    <img src="../<?= htmlspecialchars($foto) ?>" alt="<?= htmlspecialchars($nome) ?>" class="symbol-label" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'symbol-label fs-3 fw-bold bg-primary text-white\'><?= $inicial ?></div>';">
                                 <?php else: ?>
                                     <div class="symbol-label fs-3 fw-bold bg-primary text-white"><?= $inicial ?></div>
                                 <?php endif; ?>
@@ -282,7 +282,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="timeline">
                                     <?php foreach ($respostas as $resp): ?>
                                         <?php
-                                        $autorFoto = $resp['autor_foto'] ? '../uploads/fotos/' . $resp['autor_foto'] : null;
+                                        $autorFoto = $resp['autor_foto'] ? '../' . $resp['autor_foto'] : null;
                                         $autorNome = $resp['autor_nome'] ?: 'Usuário';
                                         $autorInicial = strtoupper(substr($autorNome, 0, 1));
                                         $isMinhaResposta = $resp['autor_tipo'] === 'eu';

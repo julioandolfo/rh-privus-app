@@ -285,7 +285,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <!--begin::Avatar-->
                                     <div class="symbol symbol-circle symbol-50px me-3">
                                         <?php if (!empty($colab['foto'])): ?>
-                                            <img alt="Pic" src="../uploads/fotos/<?= htmlspecialchars($colab['foto']) ?>" />
+                                            <img alt="Pic" src="../<?= htmlspecialchars($colab['foto']) ?>" />
                                         <?php else: ?>
                                             <div class="symbol-label fs-2 fw-semibold bg-primary text-white">
                                                 <?= strtoupper(substr($colab['nome_completo'], 0, 1)) ?>

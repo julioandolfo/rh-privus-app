@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const autorNome = post.autor_nome || 'Usuário';
-            const autorFoto = post.autor_foto ? `../uploads/fotos/${post.autor_foto}` : null;
+            const autorFoto = post.autor_foto ? `../${post.autor_foto}` : null;
             const inicial = autorNome.charAt(0).toUpperCase();
             const imagemPost = post.imagem ? `../uploads/feed/${post.imagem}` : null;
             
@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const avatares = curtidas.slice(0, 5).map(function(curtida) {
             const autorNome = curtida.autor_nome || 'Usuário';
-            const autorFoto = curtida.autor_foto ? `../uploads/fotos/${curtida.autor_foto}` : null;
+            const autorFoto = curtida.autor_foto ? `../${curtida.autor_foto}` : null;
             const inicial = autorNome.charAt(0).toUpperCase();
             
             return `
@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const autorNome = comentario.autor_nome || 'Usuário';
-            const autorFoto = comentario.autor_foto ? `../uploads/fotos/${comentario.autor_foto}` : null;
+            const autorFoto = comentario.autor_foto ? `../${comentario.autor_foto}` : null;
             const inicial = autorNome.charAt(0).toUpperCase();
             
             return `

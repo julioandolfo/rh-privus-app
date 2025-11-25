@@ -1802,7 +1802,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                                     <!--begin::Avatar-->
                                                     <div class="symbol symbol-circle symbol-40px me-3">
                                                         <?php if (!empty($foto_pessoa)): ?>
-                                                            <img alt="<?= htmlspecialchars($nome_pessoa) ?>" src="../uploads/fotos/<?= htmlspecialchars($foto_pessoa) ?>" />
+                                                            <img alt="<?= htmlspecialchars($nome_pessoa) ?>" src="../<?= htmlspecialchars($foto_pessoa) ?>" />
                                                         <?php else: ?>
                                                             <div class="symbol-label fs-2 fw-semibold bg-primary text-white">
                                                                 <?= $inicial ?>

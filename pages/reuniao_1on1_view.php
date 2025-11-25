@@ -74,7 +74,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <h4>Líder</h4>
                                 <div class="d-flex align-items-center">
                                     <?php if ($reuniao['lider_foto']): ?>
-                                    <img src="<?= htmlspecialchars($reuniao['lider_foto']) ?>" class="rounded-circle me-3" width="50" height="50" alt="">
+                                    <img src="../<?= htmlspecialchars($reuniao['lider_foto']) ?>" class="rounded-circle me-3" width="50" height="50" alt="">
                                     <?php else: ?>
                                     <div class="symbol symbol-circle symbol-50px me-3">
                                         <div class="symbol-label bg-primary text-white">
@@ -92,7 +92,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <h4>Liderado</h4>
                                 <div class="d-flex align-items-center">
                                     <?php if ($reuniao['liderado_foto']): ?>
-                                    <img src="<?= htmlspecialchars($reuniao['liderado_foto']) ?>" class="rounded-circle me-3" width="50" height="50" alt="">
+                                    <img src="../<?= htmlspecialchars($reuniao['liderado_foto']) ?>" class="rounded-circle me-3" width="50" height="50" alt="">
                                     <?php else: ?>
                                     <div class="symbol symbol-circle symbol-50px me-3">
                                         <div class="symbol-label bg-success text-white">
