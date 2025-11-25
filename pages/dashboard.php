@@ -3150,29 +3150,48 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Busca cards de múltiplas formas
+        // PRIMEIRO: Garante que elementos que já têm data-card-id também tenham data-gs-id
+        container.querySelectorAll('[data-card-id]').forEach(elemento => {
+            const cardId = elemento.getAttribute('data-card-id');
+            if (!elemento.hasAttribute('data-gs-id')) {
+                elemento.setAttribute('data-gs-id', cardId);
+            }
+        });
+
+        // SEGUNDO: Busca apenas elementos SEM data-card-id que são cards válidos
+        // Busca por colunas Bootstrap que contêm cards mas não têm data-card-id
         let candidatos = Array.from(container.querySelectorAll('.row > div[class*="col-"]:not([data-card-id])'));
+        
+        // Filtra apenas os que realmente têm cards dentro
+        candidatos = candidatos.filter(el => {
+            const temCard = el.querySelector('.card, a.card');
+            // Ignora wrappers como .row, .g-4, etc.
+            const ehWrapper = el.classList.contains('row') || el.id === 'row_stats_cards';
+            return temCard && !ehWrapper;
+        });
         
         // Se não encontrou em .row > div[class*="col-"], tenta outras estruturas
         if (candidatos.length === 0) {
-            // Busca diretamente por cards sem data-card-id
-            candidatos = Array.from(container.querySelectorAll('.card:not([data-card-id]), a.card:not([data-card-id])'));
-            
-            // Se ainda não encontrou, busca por elementos que contenham cards
-            if (candidatos.length === 0) {
-                const todosElementos = Array.from(container.children);
-                candidatos = todosElementos.filter(el => {
-                    return el.querySelector('.card, a.card') && !el.hasAttribute('data-card-id');
-                });
-            }
+            // Busca diretamente por cards sem data-card-id que não são filhos de outros cards
+            const cardsSemId = Array.from(container.querySelectorAll('.card:not([data-card-id]), a.card:not([data-card-id])'));
+            candidatos = cardsSemId.filter(card => {
+                // Verifica se não é filho de outro elemento com data-card-id
+                const paiComId = card.closest('[data-card-id]');
+                return !paiComId || paiComId === container;
+            });
         }
         
         let autoIndex = 0;
 
         candidatos.forEach(elemento => {
-            // Verifica se tem card dentro
-            const temCard = elemento.querySelector('.card, a.card');
-            if (!temCard && !elemento.classList.contains('card') && !elemento.classList.contains('a.card')) {
+            // Verifica se tem card dentro (se não for o próprio card)
+            const temCard = elemento.querySelector('.card, a.card') || elemento.classList.contains('card') || elemento.classList.contains('a.card');
+            if (!temCard) {
+                return;
+            }
+
+            // Ignora wrappers
+            if (elemento.classList.contains('row') || elemento.id === 'row_stats_cards') {
                 return;
             }
 
@@ -5018,19 +5037,36 @@ document.addEventListener('DOMContentLoaded', function() {
             // Garante que todos os cards têm data-card-id
             garantirCardIdsBase();
             
-            // Busca apenas elementos filhos diretos do container que são cards válidos
-            // Evita salvar wrappers e elementos internos
-            const cardsValidos = Array.from(containerTemp.children).filter(el => {
-                // Deve ter data-card-id ou data-gs-id OU ser uma coluna Bootstrap com card dentro
-                const temId = el.hasAttribute('data-card-id') || el.hasAttribute('data-gs-id');
-                const ehColunaComCard = el.classList.toString().match(/col-(xl|md|lg|sm)-/) && el.querySelector('.card, a.card');
-                const temCardDireto = el.classList.contains('card') || el.classList.contains('a.card');
-                
-                // Ignora elementos que são wrappers de linha ou outros elementos não-card
+            // Busca cards válidos: elementos com data-card-id dentro do container
+            // IMPORTANTE: Busca em toda a estrutura, incluindo dentro de .row
+            let cardsValidos = Array.from(containerTemp.querySelectorAll('[data-card-id]'));
+            
+            // Filtra apenas cards válidos (não wrappers e não filhos de outros cards)
+            cardsValidos = cardsValidos.filter(el => {
+                // Ignora wrappers
                 const ehWrapper = el.classList.contains('row') || el.classList.contains('g-4') || el.id === 'row_stats_cards';
+                if (ehWrapper) return false;
                 
-                return !ehWrapper && (temId || ehColunaComCard || temCardDireto);
+                // Verifica se não é filho de outro elemento com data-card-id (evita duplicatas)
+                const paiComId = el.parentElement?.closest('[data-card-id]');
+                if (paiComId && paiComId !== containerTemp) {
+                    return false; // É filho de outro card, não é um card válido por si só
+                }
+                
+                // Deve ter card dentro ou ser um card
+                const temCard = el.querySelector('.card, a.card') || el.classList.contains('card') || el.classList.contains('a.card');
+                return temCard !== null;
             });
+            
+            // Se ainda não encontrou, busca por colunas Bootstrap com cards (mesmo sem data-card-id)
+            if (cardsValidos.length === 0) {
+                const colunasComCard = Array.from(containerTemp.querySelectorAll('.row > div[class*="col-"]'));
+                cardsValidos = colunasComCard.filter(col => {
+                    const temCard = col.querySelector('.card, a.card');
+                    const ehWrapper = col.classList.contains('row') || col.id === 'row_stats_cards';
+                    return temCard && !ehWrapper;
+                });
+            }
             
             console.log('Cards válidos encontrados para salvar templates:', cardsValidos.length);
             
