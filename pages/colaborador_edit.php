@@ -778,35 +778,65 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Carrega setores quando empresa é selecionada (se admin)
-document.getElementById('empresa_id')?.addEventListener('change', function() {
-    const empresaId = this.value;
-    const setorSelect = document.getElementById('setor_id');
-    const cargoSelect = document.getElementById('cargo_id');
-    
-    setorSelect.innerHTML = '<option value="">Carregando...</option>';
-    cargoSelect.innerHTML = '<option value="">Carregando...</option>';
-    
-    if (empresaId) {
-        fetch(`../api/get_setores.php?empresa_id=${empresaId}`)
-            .then(r => r.json())
-            .then(data => {
-                setorSelect.innerHTML = '<option value="">Selecione...</option>';
-                data.forEach(setor => {
-                    setorSelect.innerHTML += `<option value="${setor.id}">${setor.nome_setor}</option>`;
-                });
-            });
-        
-        fetch(`../api/get_cargos.php?empresa_id=${empresaId}`)
-            .then(r => r.json())
-            .then(data => {
-                cargoSelect.innerHTML = '<option value="">Selecione...</option>';
-                data.forEach(cargo => {
-                    cargoSelect.innerHTML += `<option value="${cargo.id}">${cargo.nome_cargo}</option>`;
-                });
-            });
-        
-        // Recarrega líderes também
-        carregarLideres();
+document.addEventListener('DOMContentLoaded', function() {
+    const empresaSelect = document.getElementById('empresa_id');
+    if (empresaSelect) {
+        empresaSelect.addEventListener('change', function() {
+            const empresaId = this.value;
+            const setorSelect = document.getElementById('setor_id');
+            const cargoSelect = document.getElementById('cargo_id');
+            
+            if (!setorSelect || !cargoSelect) return;
+            
+            setorSelect.innerHTML = '<option value="">Carregando...</option>';
+            cargoSelect.innerHTML = '<option value="">Carregando...</option>';
+            
+            if (empresaId) {
+                // Carrega setores
+                fetch(`../api/get_setores.php?empresa_id=${empresaId}`)
+                    .then(r => {
+                        if (!r.ok) throw new Error('Erro ao carregar setores');
+                        return r.json();
+                    })
+                    .then(data => {
+                        setorSelect.innerHTML = '<option value="">Selecione...</option>';
+                        if (data.success && data.setores && Array.isArray(data.setores)) {
+                            data.setores.forEach(setor => {
+                                setorSelect.innerHTML += `<option value="${setor.id}">${setor.nome_setor}</option>`;
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar setores:', error);
+                        setorSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+                    });
+                
+                // Carrega cargos
+                fetch(`../api/get_cargos.php?empresa_id=${empresaId}`)
+                    .then(r => {
+                        if (!r.ok) throw new Error('Erro ao carregar cargos');
+                        return r.json();
+                    })
+                    .then(data => {
+                        cargoSelect.innerHTML = '<option value="">Selecione...</option>';
+                        if (data.success && data.cargos && Array.isArray(data.cargos)) {
+                            data.cargos.forEach(cargo => {
+                                cargoSelect.innerHTML += `<option value="${cargo.id}">${cargo.nome_cargo}</option>`;
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar cargos:', error);
+                        cargoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+                    });
+                
+                // Recarrega líderes também
+                carregarLideres();
+            } else {
+                setorSelect.innerHTML = '<option value="">Selecione uma empresa primeiro</option>';
+                cargoSelect.innerHTML = '<option value="">Selecione uma empresa primeiro</option>';
+            }
+        });
     }
 });
 

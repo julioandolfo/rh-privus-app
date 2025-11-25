@@ -13,14 +13,14 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 if (!isset($_SESSION['usuario'])) {
-    echo json_encode([]);
+    echo json_encode(['success' => false, 'setores' => []]);
     exit;
 }
 
 $empresa_id = $_GET['empresa_id'] ?? null;
 
 if (!$empresa_id) {
-    echo json_encode([]);
+    echo json_encode(['success' => false, 'setores' => []]);
     exit;
 }
 
