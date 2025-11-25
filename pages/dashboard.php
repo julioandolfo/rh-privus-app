@@ -3736,13 +3736,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
                 })
                 .filter(card => {
-                    // Verifica se o elemento existe no DOM
-                    const el = document.querySelector(`[data-gs-id="${card.id}"]`) || 
-                               document.querySelector(`[data-card-id="${card.id}"]`);
-                    if (!el) {
-                        console.warn('Card não encontrado no DOM:', card.id);
+                    // IMPORTANTE: Confia no grid.save() - se está no grid, deve ser salvo
+                    // Não filtra por existência no DOM porque alguns cards podem não estar
+                    // renderizados por condições PHP, mas ainda devem ser salvos
+                    
+                    // Valida apenas se o ID é válido
+                    if (!card.id || card.id.trim() === '') {
+                        console.warn('Card sem ID válido, ignorando:', card);
+                        return false;
                     }
-                    return el !== null;
+                    
+                    // Verifica se o ID não é temporário inválido
+                    if (card.id.startsWith('card_temp_') && !card.id.match(/card_temp_\d+_\d+$/)) {
+                        console.warn('Card com ID temporário inválido, ignorando:', card.id);
+                        return false;
+                    }
+                    
+                    // Se chegou aqui, o card é válido para salvar
+                    console.log('Card válido para salvar:', card.id);
+                    return true;
                 });
             
             console.log('Cards válidos para salvar:', cards);
@@ -4125,6 +4137,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // Garante que o card tem os atributos corretos antes de adicionar ao grid
+        novoCard.setAttribute('data-gs-id', cardInfo.id);
+        novoCard.setAttribute('data-card-id', cardInfo.id);
+        novoCard.setAttribute('gs-id', cardInfo.id);
+        
         // Adiciona o card ao grid
         grid.addWidget(novoCard, {
             id: cardInfo.id,
@@ -4134,7 +4151,24 @@ document.addEventListener('DOMContentLoaded', function() {
             h: cardInfo.h
         });
         
+        // Adiciona ao conjunto de cards adicionados
+        cardsAdicionados.add(cardInfo.id);
+        
         console.log('Card adicionado ao grid com ID:', cardInfo.id);
+        console.log('Atributos do card:', {
+            'data-gs-id': novoCard.getAttribute('data-gs-id'),
+            'data-card-id': novoCard.getAttribute('data-card-id'),
+            'gs-id': novoCard.getAttribute('gs-id')
+        });
+        
+        // Reinicializa gráficos se o card adicionado contém gráficos
+        if (cardInfo.id.includes('grafico')) {
+            setTimeout(() => {
+                if (typeof reinicializarGraficos === 'function') {
+                    reinicializarGraficos();
+                }
+            }, 500);
+        }
         
         cardsAdicionados.add(cardInfo.id);
         
@@ -4949,6 +4983,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     cardClone.setAttribute('data-gs-id', cardId);
                 }
             
+            // Garante que os canvas dentro do card têm IDs únicos
+                const canvasElements = cardClone.querySelectorAll('canvas[id]');
+                canvasElements.forEach(canvas => {
+                    const originalId = canvas.getAttribute('id');
+                    // Mantém o ID original se não houver conflito, senão adiciona sufixo
+                    const existingCanvas = document.getElementById(originalId);
+                    if (existingCanvas && existingCanvas !== canvas) {
+                        // Se já existe um canvas com esse ID, cria um novo ID único
+                        canvas.setAttribute('id', originalId + '_' + Date.now());
+                    }
+                });
+            
             // Remove classes do GridStack
                 cardClone.classList.remove('grid-stack-item', 'ui-draggable', 'ui-resizable', 'ui-draggable-dragging', 'ui-resizable-resizing');
                 
@@ -4982,6 +5028,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 500);
                 }
             });
+            
+            // Reinicializa gráficos após restaurar cards
+            setTimeout(() => {
+                if (typeof reinicializarGraficos === 'function') {
+                    reinicializarGraficos();
+                }
+            }, 800);
         } else if (cardTemplates.size === 0) {
             console.warn('Nenhum template disponível - cards serão preservados do DOM');
         } else if (cardsAdicionados.size === 0) {
@@ -6457,6 +6510,133 @@ if (ctxOcorrenciasTipo && <?= json_encode(!empty($ocorrencias_por_tipo)) ?>) {
     });
 }
 <?php endif; ?>
+
+// Função para reinicializar gráficos após cards serem restaurados
+function reinicializarGraficos() {
+    // Gráfico de Ocorrências por Mês
+    const ctxOcorrenciasMes = document.getElementById('kt_chart_ocorrencias_mes');
+    if (ctxOcorrenciasMes && !ctxOcorrenciasMes.chart) {
+        const mesesData = <?= json_encode($meses_grafico) ?>;
+        const ocorrenciasData = <?= json_encode($ocorrencias_grafico) ?>;
+        
+        if (mesesData && ocorrenciasData && mesesData.length > 0) {
+            ctxOcorrenciasMes.chart = new Chart(ctxOcorrenciasMes, {
+                type: 'line',
+                data: {
+                    labels: mesesData,
+                    datasets: [{
+                        label: 'Ocorrências',
+                        data: ocorrenciasData,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+            console.log('Gráfico de Ocorrências por Mês reinicializado');
+        }
+    }
+    
+    <?php if (!is_colaborador() || empty($colaborador_id)): ?>
+    // Gráfico de Colaboradores por Status
+    const ctxColaboradoresStatus = document.getElementById('kt_chart_colaboradores_status');
+    if (ctxColaboradoresStatus && !ctxColaboradoresStatus.chart) {
+        const statusData = <?= json_encode($colaboradores_status ?? []) ?>;
+        
+        if (statusData && statusData.length > 0) {
+            ctxColaboradoresStatus.chart = new Chart(ctxColaboradoresStatus, {
+                type: 'doughnut',
+                data: {
+                    labels: statusData.map(item => item.status.charAt(0).toUpperCase() + item.status.slice(1)),
+                    datasets: [{
+                        data: statusData.map(item => item.total),
+                        backgroundColor: [
+                            'rgb(40, 167, 69)',
+                            'rgb(220, 53, 69)',
+                            'rgb(255, 193, 7)',
+                            'rgb(108, 117, 125)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            console.log('Gráfico de Colaboradores por Status reinicializado');
+        }
+    }
+    
+    // Gráfico de Ocorrências por Tipo
+    const ctxOcorrenciasTipo = document.getElementById('kt_chart_ocorrencias_tipo');
+    if (ctxOcorrenciasTipo && !ctxOcorrenciasTipo.chart) {
+        const tipoData = <?= json_encode($ocorrencias_por_tipo ?? []) ?>;
+        
+        if (tipoData && tipoData.length > 0) {
+            ctxOcorrenciasTipo.chart = new Chart(ctxOcorrenciasTipo, {
+                type: 'bar',
+                data: {
+                    labels: tipoData.map(item => item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)),
+                    datasets: [{
+                        label: 'Quantidade',
+                        data: tipoData.map(item => item.total),
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+            console.log('Gráfico de Ocorrências por Tipo reinicializado');
+        }
+    }
+    <?php endif; ?>
+}
+
+// Reinicializa gráficos após um pequeno delay para garantir que o DOM está pronto
+setTimeout(() => {
+    reinicializarGraficos();
+}, 500);
 </script>
 <!--end::Chart Scripts-->
 
