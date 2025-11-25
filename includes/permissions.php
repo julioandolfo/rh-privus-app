@@ -97,6 +97,9 @@ function get_page_permissions() {
         
         // Relatórios - ADMIN, RH e GESTOR
         'relatorio_ocorrencias.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'relatorios_fechamentos_extras.php' => ['ADMIN', 'RH'],
+        'relatorio_adiantamentos_pendentes.php' => ['ADMIN', 'RH'],
+        'templates_fechamento_extra.php' => ['ADMIN', 'RH'],
         
         // Gerenciamento de Permissões - apenas ADMIN
         'permissoes.php' => ['ADMIN'],

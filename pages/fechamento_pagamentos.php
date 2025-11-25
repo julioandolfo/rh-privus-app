@@ -10,6 +10,27 @@ require_once __DIR__ . '/../includes/permissions.php';
 require_page_permission('fechamento_pagamentos.php');
 
 /**
+ * Verifica se um bônus já foi pago em fechamento extra no mesmo mês
+ * Retorna array com IDs dos fechamentos extras que pagaram este bônus
+ */
+function verificar_bonus_ja_pago_extra($pdo, $tipo_bonus_id, $colaborador_id, $mes_referencia) {
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT fp.id as fechamento_id, fp.mes_referencia, fp.data_pagamento, fp.referencia_externa,
+               tb.nome as tipo_bonus_nome, fb.valor as valor_pago
+        FROM fechamentos_pagamento_bonus fb
+        INNER JOIN fechamentos_pagamento fp ON fb.fechamento_pagamento_id = fp.id
+        INNER JOIN tipos_bonus tb ON fb.tipo_bonus_id = tb.id
+        WHERE fb.tipo_bonus_id = ?
+        AND fb.colaborador_id = ?
+        AND fp.tipo_fechamento = 'extra'
+        AND fp.mes_referencia = ?
+        AND fp.status != 'cancelado'
+    ");
+    $stmt->execute([$tipo_bonus_id, $colaborador_id, $mes_referencia]);
+    return $stmt->fetchAll();
+}
+
+/**
  * Calcula desconto de bônus baseado nas ocorrências configuradas
  */
 function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_id, $valor_bonus, $data_inicio, $data_fim) {
@@ -197,17 +218,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         try {
-            // Verifica se já existe fechamento para este mês
-            $stmt = $pdo->prepare("SELECT id FROM fechamentos_pagamento WHERE empresa_id = ? AND mes_referencia = ?");
+            // Verifica se já existe fechamento REGULAR para este mês (permite múltiplos extras)
+            $stmt = $pdo->prepare("SELECT id FROM fechamentos_pagamento WHERE empresa_id = ? AND mes_referencia = ? AND tipo_fechamento = 'regular'");
             $stmt->execute([$empresa_id, $mes_referencia]);
             if ($stmt->fetch()) {
-                redirect('fechamento_pagamentos.php', 'Já existe um fechamento para este mês!', 'error');
+                redirect('fechamento_pagamentos.php', 'Já existe um fechamento regular para este mês!', 'error');
             }
             
-            // Cria fechamento
+            // Cria fechamento regular
             $stmt = $pdo->prepare("
-                INSERT INTO fechamentos_pagamento (empresa_id, mes_referencia, data_fechamento, total_colaboradores, usuario_id, status)
-                VALUES (?, ?, CURDATE(), ?, ?, 'aberto')
+                INSERT INTO fechamentos_pagamento (empresa_id, tipo_fechamento, mes_referencia, data_fechamento, total_colaboradores, usuario_id, status)
+                VALUES (?, 'regular', ?, CURDATE(), ?, ?, 'aberto')
             ");
             $stmt->execute([$empresa_id, $mes_referencia, count($colaboradores_ids), $usuario['id']]);
             $fechamento_id = $pdo->lastInsertId();
@@ -219,6 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $total_pagamento = 0;
             $total_horas_extras = 0;
+            $bonus_excluidos_geral = []; // Armazena informações sobre bônus excluídos para mensagem
             
             // Adiciona colaboradores ao fechamento
             foreach ($colaboradores_ids as $colab_id) {
@@ -275,6 +297,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$colab_id, $data_fim, $data_inicio]);
                 $bonus_list_calc = $stmt->fetchAll();
                 
+                // Se deve excluir bônus já pagos em extras, verifica cada bônus
+                $bonus_ja_pagos_info = [];
+                $bonus_excluidos_colab = [];
+                if ($excluir_bonus_ja_pagos) {
+                    // Busca nome do colaborador para mensagem
+                    $stmt_colab_nome = $pdo->prepare("SELECT nome_completo FROM colaboradores WHERE id = ?");
+                    $stmt_colab_nome->execute([$colab_id]);
+                    $colab_nome_data = $stmt_colab_nome->fetch();
+                    $colab_nome = $colab_nome_data['nome_completo'] ?? 'Colaborador #' . $colab_id;
+                    
+                    foreach ($bonus_list_calc as $idx => $bonus_calc) {
+                        $bonus_pagos = verificar_bonus_ja_pago_extra($pdo, $bonus_calc['tipo_bonus_id'], $colab_id, $mes_referencia);
+                        if (!empty($bonus_pagos)) {
+                            $bonus_ja_pagos_info[$bonus_calc['tipo_bonus_id']] = $bonus_pagos;
+                            $valor_bonus = 0;
+                            if ($bonus_calc['tipo_valor'] === 'fixo') {
+                                $valor_bonus = (float)($bonus_calc['valor_fixo'] ?? 0);
+                            } else {
+                                $valor_bonus = (float)($bonus_calc['valor'] ?? 0);
+                            }
+                            
+                            $bonus_excluidos_colab[] = [
+                                'tipo_bonus_nome' => $bonus_calc['tipo_bonus_nome'],
+                                'valor' => $valor_bonus,
+                                'fechamentos' => $bonus_pagos
+                            ];
+                            
+                            // Adiciona à lista geral para mensagem
+                            $bonus_excluidos_geral[] = [
+                                'colaborador' => $colab_nome,
+                                'tipo_bonus' => $bonus_calc['tipo_bonus_nome'],
+                                'valor' => $valor_bonus,
+                                'fechamento_id' => $bonus_pagos[0]['fechamento_id'] ?? null
+                            ];
+                            
+                            // Remove da lista de cálculo
+                            unset($bonus_list_calc[$idx]);
+                        }
+                    }
+                    // Reindexa array
+                    $bonus_list_calc = array_values($bonus_list_calc);
+                }
+                
                 // Calcula total de bônus considerando o tipo e desconto por ocorrências configuradas
                 $total_bonus = 0;
                 foreach ($bonus_list_calc as $bonus_calc) {
@@ -325,6 +390,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$colab_id, $data_inicio, $data_fim]);
                 $ocorrencias_data = $stmt->fetch();
                 $total_descontos_ocorrencias = $ocorrencias_data['total_descontos'] ?? 0;
+                
+                // Busca adiantamentos não descontados para este colaborador no mês de referência
+                $adiantamentos_ids = [];
+                $stmt = $pdo->prepare("
+                    SELECT id, valor_descontar, observacoes
+                    FROM fechamentos_pagamento_adiantamentos
+                    WHERE colaborador_id = ?
+                    AND mes_desconto = ?
+                    AND descontado = 0
+                ");
+                $stmt->execute([$colab_id, $mes_referencia]);
+                $adiantamentos = $stmt->fetchAll();
+                
+                $total_adiantamentos = 0;
+                $adiantamentos_ids = [];
+                foreach ($adiantamentos as $adiantamento) {
+                    $total_adiantamentos += (float)$adiantamento['valor_descontar'];
+                    $adiantamentos_ids[] = $adiantamento['id'];
+                }
+                
+                // Adiciona adiantamentos aos descontos
+                $total_descontos_ocorrencias += $total_adiantamentos;
                 
                 // Insere bônus no fechamento (incluindo informativos para registro)
                 foreach ($bonus_list_calc as $bonus) {
@@ -511,6 +598,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Salva detalhes das horas extras (para exibição)
                 $item_id = $pdo->lastInsertId();
+                
+                // Marca adiantamentos como descontados
+                if (!empty($adiantamentos_ids)) {
+                    $placeholders = implode(',', array_fill(0, count($adiantamentos_ids), '?'));
+                    $stmt = $pdo->prepare("
+                        UPDATE fechamentos_pagamento_adiantamentos 
+                        SET descontado = 1, fechamento_desconto_id = ?
+                        WHERE id IN ($placeholders)
+                    ");
+                    $params = array_merge([$fechamento_id], $adiantamentos_ids);
+                    $stmt->execute($params);
+                }
                 if ($horas_extras > 0) {
                     // Busca detalhes das horas extras para salvar em JSON (se necessário no futuro)
                     $stmt_he_detalhes = $pdo->prepare("
@@ -535,7 +634,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $stmt->execute([$total_pagamento, $total_horas_extras, $fechamento_id]);
             
-            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento criado com sucesso!');
+            // Monta mensagem de sucesso
+            $mensagem_sucesso = 'Fechamento criado com sucesso!';
+            if ($excluir_bonus_ja_pagos && !empty($bonus_excluidos_geral)) {
+                $total_excluidos = count($bonus_excluidos_geral);
+                $mensagem_sucesso .= " {$total_excluidos} bônus já pagos em fechamentos extras foram excluídos automaticamente.";
+            }
+            
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, $mensagem_sucesso);
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao criar fechamento: ' . $e->getMessage(), 'error');
         }
@@ -654,34 +760,479 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao excluir: ' . $e->getMessage(), 'error');
         }
+    } elseif ($action === 'criar_fechamento_extra') {
+        $empresa_id = (int)($_POST['empresa_id'] ?? 0);
+        $tipo_fechamento = 'extra';
+        $subtipo_fechamento = $_POST['subtipo_fechamento'] ?? '';
+        $data_pagamento = $_POST['data_pagamento'] ?? '';
+        $descricao = $_POST['descricao'] ?? '';
+        $referencia_externa = $_POST['referencia_externa'] ?? '';
+        $mes_referencia = $_POST['mes_referencia'] ?? date('Y-m');
+        
+        // Validações básicas
+        if (empty($empresa_id) || empty($subtipo_fechamento) || empty($data_pagamento)) {
+            redirect('fechamento_pagamentos.php', 'Preencha todos os campos obrigatórios!', 'error');
+        }
+        
+        // Valida subtipo
+        $subtipos_validos = ['bonus_especifico', 'individual', 'grupal', 'adiantamento'];
+        if (!in_array($subtipo_fechamento, $subtipos_validos)) {
+            redirect('fechamento_pagamentos.php', 'Subtipo de fechamento inválido!', 'error');
+        }
+        
+        try {
+            // Cria fechamento extra
+            $stmt = $pdo->prepare("
+                INSERT INTO fechamentos_pagamento 
+                (empresa_id, tipo_fechamento, subtipo_fechamento, mes_referencia, data_fechamento, data_pagamento, descricao, referencia_externa, total_colaboradores, usuario_id, status)
+                VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, 0, ?, 'aberto')
+            ");
+            $stmt->execute([
+                $empresa_id, 
+                $tipo_fechamento, 
+                $subtipo_fechamento, 
+                $mes_referencia,
+                $data_pagamento,
+                $descricao,
+                $referencia_externa,
+                $usuario['id']
+            ]);
+            $fechamento_id = $pdo->lastInsertId();
+            
+            $total_pagamento = 0;
+            $colaboradores_ids = [];
+            
+            // Processa conforme o subtipo
+            if ($subtipo_fechamento === 'bonus_especifico') {
+                // Bônus Específico: múltiplos colaboradores, um tipo de bônus
+                $tipo_bonus_id = (int)($_POST['tipo_bonus_id'] ?? 0);
+                $colaboradores_ids = $_POST['colaboradores'] ?? [];
+                $aplicar_descontos = isset($_POST['aplicar_descontos']) && $_POST['aplicar_descontos'] == '1';
+                
+                if (empty($tipo_bonus_id) || empty($colaboradores_ids)) {
+                    // Rollback
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'Selecione o tipo de bônus e pelo menos um colaborador!', 'error');
+                }
+                
+                // Busca informações do tipo de bônus
+                $stmt = $pdo->prepare("SELECT tipo_valor, valor_fixo, nome FROM tipos_bonus WHERE id = ?");
+                $stmt->execute([$tipo_bonus_id]);
+                $tipo_bonus = $stmt->fetch();
+                
+                if (!$tipo_bonus) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'Tipo de bônus não encontrado!', 'error');
+                }
+                
+                // Calcula período (mês de referência)
+                $ano_mes = explode('-', $mes_referencia);
+                $data_inicio = $ano_mes[0] . '-' . $ano_mes[1] . '-01';
+                $data_fim = date('Y-m-t', strtotime($data_inicio));
+                
+                foreach ($colaboradores_ids as $colab_id) {
+                    $colab_id = (int)$colab_id;
+                    
+                    // Busca dados do colaborador
+                    $stmt = $pdo->prepare("SELECT salario FROM colaboradores WHERE id = ?");
+                    $stmt->execute([$colab_id]);
+                    $colab = $stmt->fetch();
+                    
+                    if (!$colab) continue;
+                    
+                    // Determina valor do bônus
+                    $valor_bonus = 0;
+                    if ($tipo_bonus['tipo_valor'] === 'fixo') {
+                        $valor_bonus = (float)($tipo_bonus['valor_fixo'] ?? 0);
+                    } else {
+                        // Busca valor do colaborador
+                        $stmt = $pdo->prepare("SELECT valor FROM colaboradores_bonus WHERE colaborador_id = ? AND tipo_bonus_id = ? AND (data_inicio IS NULL OR data_inicio <= ?) AND (data_fim IS NULL OR data_fim >= ?) LIMIT 1");
+                        $stmt->execute([$colab_id, $tipo_bonus_id, $data_fim, $data_inicio]);
+                        $colab_bonus = $stmt->fetch();
+                        $valor_bonus = $colab_bonus ? (float)$colab_bonus['valor'] : 0;
+                    }
+                    
+                    // Calcula desconto por ocorrências se solicitado
+                    $desconto_ocorrencias = 0;
+                    $detalhes_desconto = [];
+                    if ($aplicar_descontos && $valor_bonus > 0) {
+                        $desconto_ocorrencias = calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colab_id, $valor_bonus, $data_inicio, $data_fim);
+                        if ($desconto_ocorrencias > $valor_bonus) {
+                            $desconto_ocorrencias = $valor_bonus;
+                        }
+                    }
+                    
+                    $valor_final = $valor_bonus - $desconto_ocorrencias;
+                    
+                    // Insere item (sem salário, sem horas extras, apenas bônus)
+                    $stmt = $pdo->prepare("
+                        INSERT INTO fechamentos_pagamento_itens 
+                        (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total, inclui_salario, inclui_horas_extras, inclui_bonus_automaticos, motivo)
+                        VALUES (?, ?, 0, 0, 0, 0, ?, 0, 0, 0, ?)
+                    ");
+                    $stmt->execute([
+                        $fechamento_id,
+                        $colab_id,
+                        $valor_final,
+                        $descricao ?: 'Bônus específico: ' . $tipo_bonus['nome']
+                    ]);
+                    
+                    // Insere bônus
+                    $stmt = $pdo->prepare("
+                        INSERT INTO fechamentos_pagamento_bonus 
+                        (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, valor_original, desconto_ocorrencias, observacoes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $obs = 'Bônus específico - Fechamento extra';
+                    if ($desconto_ocorrencias > 0) {
+                        $obs .= ' | Desconto por ocorrências: R$ ' . number_format($desconto_ocorrencias, 2, ',', '.');
+                    }
+                    $stmt->execute([
+                        $fechamento_id,
+                        $colab_id,
+                        $tipo_bonus_id,
+                        $valor_final,
+                        $valor_bonus,
+                        $desconto_ocorrencias,
+                        $obs
+                    ]);
+                    
+                    $total_pagamento += $valor_final;
+                }
+                
+            } elseif ($subtipo_fechamento === 'individual') {
+                // Individual: um colaborador, valor livre ou tipo de bônus
+                $colab_id = (int)($_POST['colaborador_id'] ?? 0);
+                $tipo_bonus_id = !empty($_POST['tipo_bonus_id']) ? (int)$_POST['tipo_bonus_id'] : null;
+                $valor_manual = str_replace(['.', ','], ['', '.'], $_POST['valor_manual'] ?? '0');
+                $motivo = $_POST['motivo'] ?? '';
+                
+                if (empty($colab_id) || (empty($tipo_bonus_id) && empty($valor_manual))) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'Preencha colaborador e valor ou tipo de bônus!', 'error');
+                }
+                
+                if (empty($motivo)) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'O campo motivo é obrigatório para fechamentos individuais!', 'error');
+                }
+                
+                $colaboradores_ids = [$colab_id];
+                
+                // Busca dados do colaborador
+                $stmt = $pdo->prepare("SELECT salario FROM colaboradores WHERE id = ?");
+                $stmt->execute([$colab_id]);
+                $colab = $stmt->fetch();
+                
+                if (!$colab) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'Colaborador não encontrado!', 'error');
+                }
+                
+                $valor_final = 0;
+                
+                if ($tipo_bonus_id) {
+                    // Usa tipo de bônus
+                    $stmt = $pdo->prepare("SELECT tipo_valor, valor_fixo, nome FROM tipos_bonus WHERE id = ?");
+                    $stmt->execute([$tipo_bonus_id]);
+                    $tipo_bonus = $stmt->fetch();
+                    
+                    if ($tipo_bonus) {
+                        if ($tipo_bonus['tipo_valor'] === 'fixo') {
+                            $valor_final = (float)($tipo_bonus['valor_fixo'] ?? 0);
+                        } else {
+                            // Busca valor do colaborador ou usa valor manual se fornecido
+                            if ($valor_manual > 0) {
+                                $valor_final = (float)$valor_manual;
+                            } else {
+                                $ano_mes = explode('-', $mes_referencia);
+                                $data_inicio = $ano_mes[0] . '-' . $ano_mes[1] . '-01';
+                                $data_fim = date('Y-m-t', strtotime($data_inicio));
+                                $stmt = $pdo->prepare("SELECT valor FROM colaboradores_bonus WHERE colaborador_id = ? AND tipo_bonus_id = ? AND (data_inicio IS NULL OR data_inicio <= ?) AND (data_fim IS NULL OR data_fim >= ?) LIMIT 1");
+                                $stmt->execute([$colab_id, $tipo_bonus_id, $data_fim, $data_inicio]);
+                                $colab_bonus = $stmt->fetch();
+                                $valor_final = $colab_bonus ? (float)$colab_bonus['valor'] : 0;
+                            }
+                        }
+                    }
+                } else {
+                    // Valor livre
+                    $valor_final = (float)$valor_manual;
+                }
+                
+                // Insere item
+                $stmt = $pdo->prepare("
+                    INSERT INTO fechamentos_pagamento_itens 
+                    (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total, valor_manual, inclui_salario, inclui_horas_extras, inclui_bonus_automaticos, motivo)
+                    VALUES (?, ?, 0, 0, 0, 0, ?, ?, 0, 0, 0, ?)
+                ");
+                $stmt->execute([
+                    $fechamento_id,
+                    $colab_id,
+                    $valor_final,
+                    $valor_final,
+                    $motivo
+                ]);
+                
+                // Insere bônus se tiver tipo
+                if ($tipo_bonus_id) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO fechamentos_pagamento_bonus 
+                        (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, observacoes)
+                        VALUES (?, ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $fechamento_id,
+                        $colab_id,
+                        $tipo_bonus_id,
+                        $valor_final,
+                        $motivo
+                    ]);
+                }
+                
+                $total_pagamento = $valor_final;
+                
+            } elseif ($subtipo_fechamento === 'grupal') {
+                // Grupal: múltiplos colaboradores, mesmo valor
+                $colaboradores_ids = $_POST['colaboradores'] ?? [];
+                $tipo_bonus_id = !empty($_POST['tipo_bonus_id']) ? (int)$_POST['tipo_bonus_id'] : null;
+                $valor_manual = str_replace(['.', ','], ['', '.'], $_POST['valor_manual'] ?? '0');
+                $motivo = $_POST['motivo'] ?? '';
+                
+                if (empty($colaboradores_ids) || (empty($tipo_bonus_id) && empty($valor_manual))) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'Selecione colaboradores e informe valor ou tipo de bônus!', 'error');
+                }
+                
+                if (empty($motivo)) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'O campo motivo é obrigatório para fechamentos grupais!', 'error');
+                }
+                
+                $valor_final = 0;
+                
+                if ($tipo_bonus_id) {
+                    // Usa tipo de bônus (mesmo valor para todos)
+                    $stmt = $pdo->prepare("SELECT tipo_valor, valor_fixo, nome FROM tipos_bonus WHERE id = ?");
+                    $stmt->execute([$tipo_bonus_id]);
+                    $tipo_bonus = $stmt->fetch();
+                    
+                    if ($tipo_bonus) {
+                        if ($tipo_bonus['tipo_valor'] === 'fixo') {
+                            $valor_final = (float)($tipo_bonus['valor_fixo'] ?? 0);
+                        } else {
+                            $valor_final = (float)$valor_manual; // Valor manual fornecido
+                        }
+                    }
+                } else {
+                    // Valor livre (mesmo para todos)
+                    $valor_final = (float)$valor_manual;
+                }
+                
+                foreach ($colaboradores_ids as $colab_id) {
+                    $colab_id = (int)$colab_id;
+                    
+                    // Busca dados do colaborador
+                    $stmt = $pdo->prepare("SELECT salario FROM colaboradores WHERE id = ?");
+                    $stmt->execute([$colab_id]);
+                    $colab = $stmt->fetch();
+                    
+                    if (!$colab) continue;
+                    
+                    // Insere item
+                    $stmt = $pdo->prepare("
+                        INSERT INTO fechamentos_pagamento_itens 
+                        (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total, valor_manual, inclui_salario, inclui_horas_extras, inclui_bonus_automaticos, motivo)
+                        VALUES (?, ?, 0, 0, 0, 0, ?, ?, 0, 0, 0, ?)
+                    ");
+                    $stmt->execute([
+                        $fechamento_id,
+                        $colab_id,
+                        $valor_final,
+                        $valor_final,
+                        $motivo
+                    ]);
+                    
+                    // Insere bônus se tiver tipo
+                    if ($tipo_bonus_id) {
+                        $stmt = $pdo->prepare("
+                            INSERT INTO fechamentos_pagamento_bonus 
+                            (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, observacoes)
+                            VALUES (?, ?, ?, ?, ?)
+                        ");
+                        $stmt->execute([
+                            $fechamento_id,
+                            $colab_id,
+                            $tipo_bonus_id,
+                            $valor_final,
+                            $motivo
+                        ]);
+                    }
+                    
+                    $total_pagamento += $valor_final;
+                }
+                
+            } elseif ($subtipo_fechamento === 'adiantamento') {
+                // Adiantamento: um colaborador, valor livre, mês de desconto
+                $colab_id = (int)($_POST['colaborador_id'] ?? 0);
+                $valor_adiantamento = str_replace(['.', ','], ['', '.'], $_POST['valor_adiantamento'] ?? '0');
+                $mes_desconto = $_POST['mes_desconto'] ?? '';
+                $motivo = $_POST['motivo'] ?? '';
+                
+                if (empty($colab_id) || empty($valor_adiantamento) || empty($mes_desconto)) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'Preencha colaborador, valor e mês de desconto!', 'error');
+                }
+                
+                if (empty($motivo)) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'O campo motivo é obrigatório para adiantamentos!', 'error');
+                }
+                
+                $valor_adiantamento = (float)$valor_adiantamento;
+                $colaboradores_ids = [$colab_id];
+                
+                // Busca dados do colaborador
+                $stmt = $pdo->prepare("SELECT salario FROM colaboradores WHERE id = ?");
+                $stmt->execute([$colab_id]);
+                $colab = $stmt->fetch();
+                
+                if (!$colab) {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                    redirect('fechamento_pagamentos.php', 'Colaborador não encontrado!', 'error');
+                }
+                
+                // Insere item
+                $stmt = $pdo->prepare("
+                    INSERT INTO fechamentos_pagamento_itens 
+                    (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total, valor_manual, inclui_salario, inclui_horas_extras, inclui_bonus_automaticos, motivo)
+                    VALUES (?, ?, 0, 0, 0, 0, ?, ?, 0, 0, 0, ?)
+                ");
+                $stmt->execute([
+                    $fechamento_id,
+                    $colab_id,
+                    $valor_adiantamento,
+                    $valor_adiantamento,
+                    $motivo
+                ]);
+                
+                // Registra adiantamento para desconto futuro
+                $stmt = $pdo->prepare("
+                    INSERT INTO fechamentos_pagamento_adiantamentos 
+                    (fechamento_pagamento_id, colaborador_id, valor_adiantamento, valor_descontar, mes_desconto, observacoes)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $fechamento_id,
+                    $colab_id,
+                    $valor_adiantamento,
+                    $valor_adiantamento, // Por padrão desconta o valor total
+                    $mes_desconto,
+                    $motivo
+                ]);
+                
+                $total_pagamento = $valor_adiantamento;
+            }
+            
+            // Atualiza fechamento com totais
+            $stmt = $pdo->prepare("
+                UPDATE fechamentos_pagamento 
+                SET total_colaboradores = ?, total_pagamento = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([count($colaboradores_ids), $total_pagamento, $fechamento_id]);
+            
+            // Envia notificações para colaboradores
+            require_once __DIR__ . '/../includes/notificacoes.php';
+            $subtipo_labels = [
+                'bonus_especifico' => 'Bônus Específico',
+                'individual' => 'Bônus Individual',
+                'grupal' => 'Bônus Grupal',
+                'adiantamento' => 'Adiantamento'
+            ];
+            $subtipo_label = $subtipo_labels[$subtipo_fechamento] ?? 'Pagamento Extra';
+            
+            foreach ($colaboradores_ids as $colab_id) {
+                try {
+                    criar_notificacao(
+                        null, // usuario_id será buscado internamente
+                        $colab_id,
+                        'fechamento_pagamento_extra',
+                        'Novo Pagamento Extra',
+                        "Você recebeu um {$subtipo_label} no valor de R$ " . number_format($total_pagamento / count($colaboradores_ids), 2, ',', '.'),
+                        '../pages/meus_pagamentos.php',
+                        $fechamento_id,
+                        'pagamento'
+                    );
+                } catch (Exception $e) {
+                    // Log erro mas não bloqueia criação do fechamento
+                    error_log("Erro ao criar notificação de pagamento extra: " . $e->getMessage());
+                }
+            }
+            
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento extra criado com sucesso!');
+            
+        } catch (PDOException $e) {
+            // Tenta fazer rollback se possível
+            if (isset($fechamento_id)) {
+                try {
+                    $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?")->execute([$fechamento_id]);
+                } catch (Exception $e2) {}
+            }
+            redirect('fechamento_pagamentos.php', 'Erro ao criar fechamento extra: ' . $e->getMessage(), 'error');
+        }
     }
 }
 
 // Busca fechamentos
-$where = '';
+$where = [];
 $params = [];
+
+// Filtros
+$filtro_tipo = $_GET['filtro_tipo'] ?? '';
+$filtro_subtipo = $_GET['filtro_subtipo'] ?? '';
+$filtro_data_pagamento = $_GET['filtro_data_pagamento'] ?? '';
+
 if ($usuario['role'] === 'RH') {
     // RH pode ter múltiplas empresas
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where = "WHERE f.empresa_id IN ($placeholders)";
-        $params = $usuario['empresas_ids'];
+        $where[] = "f.empresa_id IN ($placeholders)";
+        $params = array_merge($params, $usuario['empresas_ids']);
     } else {
-        $where = "WHERE f.empresa_id = ?";
+        $where[] = "f.empresa_id = ?";
         $params[] = $usuario['empresa_id'] ?? 0;
     }
 } elseif ($usuario['role'] !== 'ADMIN') {
-    $where = "WHERE f.empresa_id = ?";
+    $where[] = "f.empresa_id = ?";
     $params[] = $usuario['empresa_id'] ?? 0;
 }
+
+// Aplica filtros
+if ($filtro_tipo) {
+    $where[] = "f.tipo_fechamento = ?";
+    $params[] = $filtro_tipo;
+}
+
+if ($filtro_subtipo) {
+    $where[] = "f.subtipo_fechamento = ?";
+    $params[] = $filtro_subtipo;
+}
+
+if ($filtro_data_pagamento) {
+    $where[] = "f.data_pagamento = ?";
+    $params[] = $filtro_data_pagamento;
+}
+
+$where_sql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
 $stmt = $pdo->prepare("
     SELECT f.*, e.nome_fantasia as empresa_nome, u.nome as usuario_nome
     FROM fechamentos_pagamento f
     LEFT JOIN empresas e ON f.empresa_id = e.id
     LEFT JOIN usuarios u ON f.usuario_id = u.id
-    $where
-    ORDER BY f.mes_referencia DESC, f.created_at DESC
+    $where_sql
+    ORDER BY f.data_pagamento DESC, f.mes_referencia DESC, f.created_at DESC
 ");
 $stmt->execute($params);
 $fechamentos = $stmt->fetchAll();
@@ -779,7 +1330,9 @@ if (isset($_GET['view'])) {
             $bonus_salvos = $stmt->fetchAll();
             
             // Se não encontrou bônus salvos no fechamento, busca bônus ativos do colaborador
-            if (empty($bonus_salvos)) {
+            // Mas apenas se o fechamento inclui bônus automáticos (fechamentos extras podem não incluir)
+            $inclui_bonus_automaticos_item = $item['inclui_bonus_automaticos'] ?? true;
+            if (empty($bonus_salvos) && $inclui_bonus_automaticos_item) {
                 $stmt = $pdo->prepare("
                     SELECT cb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo
                     FROM colaboradores_bonus cb
@@ -916,6 +1469,47 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
                 
+                <?php 
+                $tipo_fechamento_view = $fechamento_view['tipo_fechamento'] ?? 'regular';
+                $subtipo_fechamento_view = $fechamento_view['subtipo_fechamento'] ?? '';
+                $data_pagamento_view = $fechamento_view['data_pagamento'] ?? null;
+                $referencia_externa_view = $fechamento_view['referencia_externa'] ?? '';
+                $descricao_view = $fechamento_view['descricao'] ?? '';
+                
+                if ($tipo_fechamento_view === 'extra'): 
+                ?>
+                <div class="alert alert-primary d-flex align-items-center mb-7">
+                    <i class="ki-duotone ki-information-5 fs-2x text-primary me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold mb-1">
+                            <span class="badge badge-primary me-2">FECHAMENTO EXTRA</span>
+                            <?php
+                            $subtipo_labels = [
+                                'bonus_especifico' => 'Bônus Específico',
+                                'individual' => 'Bônus Individual',
+                                'grupal' => 'Bônus Grupal',
+                                'adiantamento' => 'Adiantamento'
+                            ];
+                            echo '<span class="badge badge-light-primary">' . htmlspecialchars($subtipo_labels[$subtipo_fechamento_view] ?? $subtipo_fechamento_view) . '</span>';
+                            ?>
+                        </div>
+                        <?php if ($data_pagamento_view): ?>
+                            <div class="text-gray-700"><strong>Data de Pagamento:</strong> <?= date('d/m/Y', strtotime($data_pagamento_view)) ?></div>
+                        <?php endif; ?>
+                        <?php if ($referencia_externa_view): ?>
+                            <div class="text-gray-700"><strong>Referência:</strong> <?= htmlspecialchars($referencia_externa_view) ?></div>
+                        <?php endif; ?>
+                        <?php if ($descricao_view): ?>
+                            <div class="text-gray-700 mt-2"><strong>Descrição:</strong> <?= nl2br(htmlspecialchars($descricao_view)) ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
                 <?php if ($fechamento_view['status'] === 'fechado'): ?>
                 <!--begin::Estatísticas de Documentos-->
                 <div class="row g-3 mb-7">
@@ -987,18 +1581,34 @@ require_once __DIR__ . '/../includes/header.php';
                 <!--end::Estatísticas de Documentos-->
                 <?php endif; ?>
                 
+                <?php 
+                $is_fechamento_extra = ($tipo_fechamento_view === 'extra');
+                // Determina quais colunas mostrar baseado no primeiro item (todos têm mesma configuração)
+                $primeiro_item = !empty($itens_fechamento) ? $itens_fechamento[0] : null;
+                $inclui_salario = !$is_fechamento_extra || ($primeiro_item && ($primeiro_item['inclui_salario'] ?? true));
+                $inclui_horas_extras = !$is_fechamento_extra || ($primeiro_item && ($primeiro_item['inclui_horas_extras'] ?? true));
+                ?>
                 <table class="table table-bordered">
                     <thead>
                         <tr>
                             <th>Colaborador</th>
+                            <?php if ($inclui_salario): ?>
                             <th>Salário Base</th>
+                            <?php endif; ?>
+                            <?php if ($inclui_horas_extras): ?>
                             <th>Horas Extras</th>
                             <th>Valor H.E.</th>
+                            <?php endif; ?>
                             <th>Bônus</th>
+                            <?php if ($inclui_salario): ?>
                             <th>Descontos</th>
                             <th>Adicionais</th>
+                            <?php endif; ?>
+                            <?php if ($is_fechamento_extra): ?>
+                            <th>Motivo</th>
+                            <?php endif; ?>
                             <th>Total</th>
-                            <?php if ($fechamento_view['status'] === 'fechado'): ?>
+                            <?php if ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
                             <th>Documento</th>
                             <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'aberto'): ?>
@@ -1020,23 +1630,36 @@ require_once __DIR__ . '/../includes/header.php';
                                 }
                             }
                             
-                            // Busca detalhes das horas extras para mostrar tipo de pagamento
-                            // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
-                            $stmt_he = $pdo->prepare("
-                                SELECT 
-                                    COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN quantidade_horas ELSE 0 END), 0) as horas_dinheiro,
-                                    COALESCE(SUM(CASE WHEN tipo_pagamento = 'banco_horas' THEN quantidade_horas ELSE 0 END), 0) as horas_banco,
-                                    COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN valor_total ELSE 0 END), 0) as valor_dinheiro
-                                FROM horas_extras
-                                WHERE colaborador_id = ? AND data_trabalho >= ? AND data_trabalho <= ?
-                            ");
-                            $stmt_he->execute([$item['colaborador_id'], $data_inicio_periodo, $data_fim_periodo]);
-                            $he_detalhes = $stmt_he->fetch();
-                            $horas_dinheiro = (float)($he_detalhes['horas_dinheiro'] ?? 0);
-                            $horas_banco = (float)($he_detalhes['horas_banco'] ?? 0);
-                            $valor_dinheiro = (float)($he_detalhes['valor_dinheiro'] ?? 0);
+                            // Busca detalhes das horas extras apenas se for fechamento regular ou se incluir horas extras
+                            $horas_dinheiro = 0;
+                            $horas_banco = 0;
+                            $valor_dinheiro = 0;
                             
-                            $valor_total_com_bonus = $item['salario_base'] + $item['valor_horas_extras'] + $total_bonus + ($item['adicionais'] ?? 0) - ($item['descontos'] ?? 0);
+                            if ($inclui_horas_extras && !$is_fechamento_extra) {
+                                // Busca detalhes das horas extras para mostrar tipo de pagamento
+                                // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
+                                $stmt_he = $pdo->prepare("
+                                    SELECT 
+                                        COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN quantidade_horas ELSE 0 END), 0) as horas_dinheiro,
+                                        COALESCE(SUM(CASE WHEN tipo_pagamento = 'banco_horas' THEN quantidade_horas ELSE 0 END), 0) as horas_banco,
+                                        COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN valor_total ELSE 0 END), 0) as valor_dinheiro
+                                    FROM horas_extras
+                                    WHERE colaborador_id = ? AND data_trabalho >= ? AND data_trabalho <= ?
+                                ");
+                                $stmt_he->execute([$item['colaborador_id'], $data_inicio_periodo, $data_fim_periodo]);
+                                $he_detalhes = $stmt_he->fetch();
+                                $horas_dinheiro = (float)($he_detalhes['horas_dinheiro'] ?? 0);
+                                $horas_banco = (float)($he_detalhes['horas_banco'] ?? 0);
+                                $valor_dinheiro = (float)($he_detalhes['valor_dinheiro'] ?? 0);
+                            }
+                            
+                            // Calcula valor total
+                            if ($is_fechamento_extra) {
+                                // Para fechamentos extras, usa valor_total diretamente (já calculado)
+                                $valor_total_com_bonus = $item['valor_total'];
+                            } else {
+                                $valor_total_com_bonus = $item['salario_base'] + $item['valor_horas_extras'] + $total_bonus + ($item['adicionais'] ?? 0) - ($item['descontos'] ?? 0);
+                            }
                         ?>
                         <tr>
                             <td>
@@ -1048,8 +1671,14 @@ require_once __DIR__ . '/../includes/header.php';
                                     <?php endforeach; ?>
                                 </small>
                                 <?php endif; ?>
+                                <?php if ($is_fechamento_extra && isset($item['valor_manual']) && $item['valor_manual'] > 0): ?>
+                                <br><small class="text-info">Valor Manual: R$ <?= number_format($item['valor_manual'], 2, ',', '.') ?></small>
+                                <?php endif; ?>
                             </td>
+                            <?php if ($inclui_salario): ?>
                             <td>R$ <?= number_format($item['salario_base'], 2, ',', '.') ?></td>
+                            <?php endif; ?>
+                            <?php if ($inclui_horas_extras): ?>
                             <td>
                                 <?php if ($horas_dinheiro > 0 || $horas_banco > 0): ?>
                                     <div class="d-flex flex-column">
@@ -1091,6 +1720,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="text-muted">R$ 0,00</span>
                                 <?php endif; ?>
                             </td>
+                            <?php endif; ?>
                             <td>
                                 <?php 
                                 // Separa bônus informativos dos que somam
@@ -1141,10 +1771,50 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="text-muted">R$ 0,00</span>
                                 <?php endif; ?>
                             </td>
+                            <?php if ($inclui_salario): ?>
                             <td class="text-danger fw-bold">R$ <?= number_format($item['descontos'] ?? 0, 2, ',', '.') ?></td>
                             <td>R$ <?= number_format($item['adicionais'] ?? 0, 2, ',', '.') ?></td>
+                            <?php endif; ?>
+                            <?php if ($is_fechamento_extra): ?>
+                            <td>
+                                <?php if (!empty($item['motivo'])): ?>
+                                    <small><?= nl2br(htmlspecialchars($item['motivo'])) ?></small>
+                                <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                <?php endif; ?>
+                            </td>
+                            <?php endif; ?>
                             <td><strong>R$ <?= number_format($valor_total_com_bonus, 2, ',', '.') ?></strong></td>
-                            <?php if ($fechamento_view['status'] === 'fechado'): ?>
+                            <?php if ($fechamento_view['status'] === 'aberto'): ?>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-light-primary dropdown-toggle" type="button" id="dropdownAcoes_<?= $item['id'] ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Ações
+                                    </button>
+                                    <ul class="dropdown-menu" aria-labelledby="dropdownAcoes_<?= $item['id'] ?>">
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="editarItem(<?= htmlspecialchars(json_encode($item)) ?>); return false;">
+                                                <i class="ki-duotone ki-pencil fs-6 me-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Editar
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="verDetalhesPagamento(<?= $fechamento_view['id'] ?>, <?= $item['colaborador_id'] ?>); return false;">
+                                                <i class="ki-duotone ki-eye fs-6 me-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                </i>
+                                                Ver Detalhes
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <?php elseif ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
                             <td>
                                 <?php
                                 $status_doc = $item['documento_status'] ?? 'pendente';
@@ -1192,37 +1862,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     </small>
                                 <?php endif; ?>
                             </td>
-                            <?php endif; ?>
-                            <?php if ($fechamento_view['status'] === 'aberto'): ?>
-                            <td>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-light-primary dropdown-toggle" type="button" id="dropdownAcoes_<?= $item['id'] ?>" data-bs-toggle="dropdown" aria-expanded="false">
-                                        Ações
-                                    </button>
-                                    <ul class="dropdown-menu" aria-labelledby="dropdownAcoes_<?= $item['id'] ?>">
-                                        <li>
-                                            <a class="dropdown-item" href="#" onclick="editarItem(<?= htmlspecialchars(json_encode($item)) ?>); return false;">
-                                                <i class="ki-duotone ki-pencil fs-6 me-2">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                Editar
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="#" onclick="verDetalhesPagamento(<?= $fechamento_view['id'] ?>, <?= $item['colaborador_id'] ?>); return false;">
-                                                <i class="ki-duotone ki-eye fs-6 me-2">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                    <span class="path3"></span>
-                                                </i>
-                                                Ver Detalhes
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </td>
-                            <?php else: ?>
+                            <?php elseif ($fechamento_view['status'] === 'fechado' && $is_fechamento_extra): ?>
                             <td>
                                 <button type="button" class="btn btn-sm btn-light-info" onclick="verDetalhesPagamento(<?= $fechamento_view['id'] ?>, <?= $item['colaborador_id'] ?>)">
                                     <i class="ki-duotone ki-eye fs-5">
@@ -1246,19 +1886,70 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="card">
             <div class="card-header border-0 pt-6">
                 <div class="card-title">
-                    <div class="d-flex align-items-center position-relative my-1">
-                        <i class="ki-duotone ki-magnifier fs-3 position-absolute ms-5">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        <input type="text" data-kt-fechamento-table-filter="search" class="form-control form-control-solid w-250px ps-12" placeholder="Buscar fechamentos" />
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center position-relative my-1">
+                            <i class="ki-duotone ki-magnifier fs-3 position-absolute ms-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <input type="text" data-kt-fechamento-table-filter="search" class="form-control form-control-solid w-250px ps-12" placeholder="Buscar fechamentos" />
+                        </div>
+                        <select class="form-select form-select-solid w-150px" id="filtro_tipo" onchange="aplicarFiltros()">
+                            <option value="">Todos os Tipos</option>
+                            <option value="regular" <?= ($filtro_tipo ?? '') === 'regular' ? 'selected' : '' ?>>Regular</option>
+                            <option value="extra" <?= ($filtro_tipo ?? '') === 'extra' ? 'selected' : '' ?>>Extra</option>
+                        </select>
+                        <select class="form-select form-select-solid w-180px" id="filtro_subtipo" onchange="aplicarFiltros()">
+                            <option value="">Todos os Subtipos</option>
+                            <option value="bonus_especifico" <?= ($filtro_subtipo ?? '') === 'bonus_especifico' ? 'selected' : '' ?>>Bônus Específico</option>
+                            <option value="individual" <?= ($filtro_subtipo ?? '') === 'individual' ? 'selected' : '' ?>>Individual</option>
+                            <option value="grupal" <?= ($filtro_subtipo ?? '') === 'grupal' ? 'selected' : '' ?>>Grupal</option>
+                            <option value="adiantamento" <?= ($filtro_subtipo ?? '') === 'adiantamento' ? 'selected' : '' ?>>Adiantamento</option>
+                        </select>
+                        <input type="date" class="form-control form-control-solid w-180px" id="filtro_data_pagamento" value="<?= htmlspecialchars($filtro_data_pagamento ?? '') ?>" onchange="aplicarFiltros()" placeholder="Data Pagamento" />
                     </div>
                 </div>
                 <div class="card-toolbar">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_fechamento">
-                        <i class="ki-duotone ki-plus fs-2"></i>
-                        Novo Fechamento
-                    </button>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_fechamento">
+                            <i class="ki-duotone ki-plus fs-2"></i>
+                            Novo Fechamento Regular
+                        </button>
+                        <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="visually-hidden">Toggle Dropdown</span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="abrirModalFechamentoExtra('bonus_especifico'); return false;">
+                                <i class="ki-duotone ki-gift fs-5 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Bônus Específico
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="abrirModalFechamentoExtra('individual'); return false;">
+                                <i class="ki-duotone ki-user fs-5 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Bônus Individual
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="abrirModalFechamentoExtra('grupal'); return false;">
+                                <i class="ki-duotone ki-people fs-5 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Bônus Grupal
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="abrirModalFechamentoExtra('adiantamento'); return false;">
+                                <i class="ki-duotone ki-wallet fs-5 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Adiantamento
+                            </a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
             <div class="card-body pt-0">
@@ -1266,9 +1957,10 @@ require_once __DIR__ . '/../includes/header.php';
                     <thead>
                         <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
                             <th class="min-w-50px">ID</th>
+                            <th class="min-w-150px">Tipo</th>
                             <th class="min-w-150px">Empresa</th>
                             <th class="min-w-100px">Mês/Ano</th>
-                            <th class="min-w-100px">Data Fechamento</th>
+                            <th class="min-w-100px">Data Pagamento</th>
                             <th class="min-w-100px">Colaboradores</th>
                             <th class="min-w-120px">Total Pagamento</th>
                             <th class="min-w-120px">Total H.E.</th>
@@ -1277,15 +1969,55 @@ require_once __DIR__ . '/../includes/header.php';
                         </tr>
                     </thead>
                     <tbody class="fw-semibold text-gray-600">
-                        <?php foreach ($fechamentos as $fechamento): ?>
+                        <?php foreach ($fechamentos as $fechamento): 
+                            $tipo_fechamento = $fechamento['tipo_fechamento'] ?? 'regular';
+                            $subtipo_fechamento = $fechamento['subtipo_fechamento'] ?? '';
+                            $data_pagamento = $fechamento['data_pagamento'] ?? null;
+                            $referencia_externa = $fechamento['referencia_externa'] ?? '';
+                        ?>
                         <tr>
                             <td><?= $fechamento['id'] ?></td>
+                            <td>
+                                <?php if ($tipo_fechamento === 'extra'): ?>
+                                    <span class="badge badge-light-primary">EXTRA</span>
+                                    <?php if ($subtipo_fechamento): ?>
+                                        <br><small class="text-muted">
+                                            <?php
+                                            $subtipo_labels = [
+                                                'bonus_especifico' => 'Bônus Específico',
+                                                'individual' => 'Individual',
+                                                'grupal' => 'Grupal',
+                                                'adiantamento' => 'Adiantamento'
+                                            ];
+                                            echo htmlspecialchars($subtipo_labels[$subtipo_fechamento] ?? $subtipo_fechamento);
+                                            ?>
+                                        </small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="badge badge-light-secondary">REGULAR</span>
+                                <?php endif; ?>
+                                <?php if ($referencia_externa): ?>
+                                    <br><small class="text-info"><?= htmlspecialchars($referencia_externa) ?></small>
+                                <?php endif; ?>
+                            </td>
                             <td><?= htmlspecialchars($fechamento['empresa_nome']) ?></td>
                             <td><?= date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')) ?></td>
-                            <td><?= date('d/m/Y', strtotime($fechamento['data_fechamento'])) ?></td>
+                            <td>
+                                <?php if ($data_pagamento): ?>
+                                    <strong><?= date('d/m/Y', strtotime($data_pagamento)) ?></strong>
+                                <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?= $fechamento['total_colaboradores'] ?></td>
                             <td><strong>R$ <?= number_format($fechamento['total_pagamento'], 2, ',', '.') ?></strong></td>
-                            <td>R$ <?= number_format($fechamento['total_horas_extras'], 2, ',', '.') ?></td>
+                            <td>
+                                <?php if ($tipo_fechamento === 'regular'): ?>
+                                    R$ <?= number_format($fechamento['total_horas_extras'], 2, ',', '.') ?>
+                                <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <?php if ($fechamento['status'] === 'aberto'): ?>
                                     <span class="badge badge-light-warning">Aberto</span>
@@ -1418,6 +2150,25 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     
+                    <div class="row mb-7">
+                        <div class="col-md-12">
+                            <div class="form-check form-check-custom form-check-solid">
+                                <input class="form-check-input" type="checkbox" name="excluir_bonus_ja_pagos" id="excluir_bonus_ja_pagos" value="1" />
+                                <label class="form-check-label fw-semibold fs-6" for="excluir_bonus_ja_pagos">
+                                    Excluir bônus já pagos em fechamentos extras deste mês
+                                </label>
+                            </div>
+                            <div class="form-text text-muted mt-2">
+                                <i class="ki-duotone ki-information-5 fs-6 me-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Se marcado, bônus que já foram pagos em fechamentos extras do mesmo mês serão automaticamente excluídos deste fechamento regular, evitando pagamento duplicado.
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="text-center pt-5">
                         <button type="reset" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">
@@ -1506,6 +2257,235 @@ require_once __DIR__ . '/../includes/header.php';
                         <button type="reset" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">
                             <span class="indicator-label">Salvar</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal-->
+
+<!--begin::Modal - Criar Fechamento Extra-->
+<div class="modal fade" id="kt_modal_fechamento_extra" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-750px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold" id="extra_titulo">Novo Fechamento Extra</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <form id="kt_modal_fechamento_extra_form" method="POST" class="form">
+                    <input type="hidden" name="action" value="criar_fechamento_extra">
+                    <input type="hidden" name="subtipo_fechamento" id="extra_subtipo" value="">
+                    <input type="hidden" name="template_id" id="extra_template_id" value="">
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-12">
+                            <label class="fw-semibold fs-6 mb-2">Usar Template (Opcional)</label>
+                            <select id="extra_template_select" class="form-select form-select-solid">
+                                <option value="">Nenhum - Criar manualmente</option>
+                                <?php
+                                // Busca templates ativos
+                                $stmt_templates = $pdo->prepare("
+                                    SELECT t.*, tb.nome as tipo_bonus_nome, e.nome_fantasia as empresa_nome
+                                    FROM fechamentos_pagamento_extras_config t
+                                    LEFT JOIN tipos_bonus tb ON t.tipo_bonus_id = tb.id
+                                    LEFT JOIN empresas e ON t.empresa_id = e.id
+                                    WHERE t.ativo = 1
+                                    ORDER BY t.nome
+                                ");
+                                $stmt_templates->execute();
+                                $templates_disponiveis = $stmt_templates->fetchAll();
+                                foreach ($templates_disponiveis as $tmpl): 
+                                ?>
+                                <option value="<?= $tmpl['id'] ?>" 
+                                        data-subtipo="<?= htmlspecialchars($tmpl['subtipo']) ?>"
+                                        data-empresa-id="<?= $tmpl['empresa_id'] ?>"
+                                        data-tipo-bonus-id="<?= $tmpl['tipo_bonus_id'] ?>"
+                                        data-valor-padrao="<?= $tmpl['valor_padrao'] ?>"
+                                        data-observacoes="<?= htmlspecialchars($tmpl['observacoes'] ?? '') ?>">
+                                    <?= htmlspecialchars($tmpl['nome']) ?>
+                                    <?php if ($tmpl['empresa_nome']): ?>
+                                        (<?= htmlspecialchars($tmpl['empresa_nome']) ?>)
+                                    <?php endif; ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-muted">Selecione um template para preencher automaticamente os campos</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-6">
+                            <label class="required fw-semibold fs-6 mb-2">Empresa</label>
+                            <select name="empresa_id" id="extra_empresa_id" class="form-select form-select-solid" required>
+                                <option value="">Selecione...</option>
+                                <?php foreach ($empresas as $emp): ?>
+                                <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['nome_fantasia']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="required fw-semibold fs-6 mb-2">Mês/Ano de Referência</label>
+                            <input type="month" name="mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m') ?>" required />
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-6">
+                            <label class="required fw-semibold fs-6 mb-2">Data de Pagamento</label>
+                            <input type="date" name="data_pagamento" class="form-control form-control-solid" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-semibold fs-6 mb-2">Referência Externa</label>
+                            <input type="text" name="referencia_externa" class="form-control form-control-solid" placeholder="Ex: Meta Q1 2024, Adiantamento Dezembro" />
+                        </div>
+                    </div>
+                    
+                    <!-- Campos Bônus Específico -->
+                    <div class="campo-bonus-especifico" style="display: none;">
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Tipo de Bônus</label>
+                                <select name="tipo_bonus_id" class="form-select form-select-solid" required>
+                                    <option value="">Selecione...</option>
+                                    <?php foreach ($tipos_bonus as $tipo): ?>
+                                    <option value="<?= $tipo['id'] ?>"><?= htmlspecialchars($tipo['nome']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Colaboradores</label>
+                                <div id="extra_colaboradores_container" class="border rounded p-4" style="max-height: 300px; overflow-y: auto;">
+                                    <p class="text-muted">Selecione uma empresa primeiro</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="aplicar_descontos" value="1" id="aplicar_descontos" checked>
+                                    <label class="form-check-label" for="aplicar_descontos">
+                                        Aplicar descontos por ocorrências configuradas
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Campos Individual -->
+                    <div class="campo-individual" style="display: none;">
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Colaborador</label>
+                                <div id="extra_colaboradores_container" class="border rounded p-4">
+                                    <p class="text-muted">Selecione uma empresa primeiro</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Tipo de Bônus (opcional)</label>
+                                <select name="tipo_bonus_id" class="form-select form-select-solid">
+                                    <option value="">Valor Livre</option>
+                                    <?php foreach ($tipos_bonus as $tipo): ?>
+                                    <option value="<?= $tipo['id'] ?>"><?= htmlspecialchars($tipo['nome']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="required fw-semibold fs-6 mb-2">Valor</label>
+                                <input type="text" name="valor_manual" class="form-control form-control-solid" placeholder="0,00" required />
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Motivo</label>
+                                <textarea name="motivo" class="form-control form-control-solid" rows="3" required></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Campos Grupal -->
+                    <div class="campo-grupal" style="display: none;">
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Colaboradores</label>
+                                <div id="extra_colaboradores_container" class="border rounded p-4" style="max-height: 300px; overflow-y: auto;">
+                                    <p class="text-muted">Selecione uma empresa primeiro</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Tipo de Bônus (opcional)</label>
+                                <select name="tipo_bonus_id" class="form-select form-select-solid">
+                                    <option value="">Valor Livre</option>
+                                    <?php foreach ($tipos_bonus as $tipo): ?>
+                                    <option value="<?= $tipo['id'] ?>"><?= htmlspecialchars($tipo['nome']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="required fw-semibold fs-6 mb-2">Valor (mesmo para todos)</label>
+                                <input type="text" name="valor_manual" class="form-control form-control-solid" placeholder="0,00" required />
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Motivo</label>
+                                <textarea name="motivo" class="form-control form-control-solid" rows="3" required></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Campos Adiantamento -->
+                    <div class="campo-adiantamento" style="display: none;">
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Colaborador</label>
+                                <div id="extra_colaboradores_container" class="border rounded p-4">
+                                    <p class="text-muted">Selecione uma empresa primeiro</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-6">
+                                <label class="required fw-semibold fs-6 mb-2">Valor do Adiantamento</label>
+                                <input type="text" name="valor_adiantamento" class="form-control form-control-solid" placeholder="0,00" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="required fw-semibold fs-6 mb-2">Descontar em (Mês/Ano)</label>
+                                <input type="month" name="mes_desconto" class="form-control form-control-solid" required />
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Motivo</label>
+                                <textarea name="motivo" class="form-control form-control-solid" rows="3" required></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-12">
+                            <label class="fw-semibold fs-6 mb-2">Descrição/Observações</label>
+                            <textarea name="descricao" class="form-control form-control-solid" rows="3"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center pt-5">
+                        <button type="reset" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="indicator-label">Criar Fechamento Extra</span>
                         </button>
                     </div>
                 </form>
@@ -1738,6 +2718,303 @@ document.getElementById('kt_modal_item_form')?.addEventListener('submit', functi
         inputObs.value = bonus.observacoes || '';
         this.appendChild(inputObs);
     });
+});
+
+// Aplicar filtros
+function aplicarFiltros() {
+    const tipo = document.getElementById('filtro_tipo')?.value || '';
+    const subtipo = document.getElementById('filtro_subtipo')?.value || '';
+    const dataPagamento = document.getElementById('filtro_data_pagamento')?.value || '';
+    
+    const params = new URLSearchParams();
+    if (tipo) params.append('filtro_tipo', tipo);
+    if (subtipo) params.append('filtro_subtipo', subtipo);
+    if (dataPagamento) params.append('filtro_data_pagamento', dataPagamento);
+    
+    window.location.href = 'fechamento_pagamentos.php' + (params.toString() ? '?' + params.toString() : '');
+}
+
+// Abrir modal de fechamento extra
+function abrirModalFechamentoExtra(subtipo) {
+    // Esconde todos os campos específicos
+    document.querySelectorAll('.campo-bonus-especifico, .campo-individual, .campo-grupal, .campo-adiantamento').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Mostra campos conforme subtipo
+    if (subtipo === 'bonus_especifico') {
+        document.querySelectorAll('.campo-bonus-especifico').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Bônus Específico';
+    } else if (subtipo === 'individual') {
+        document.querySelectorAll('.campo-individual').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Individual';
+    } else if (subtipo === 'grupal') {
+        document.querySelectorAll('.campo-grupal').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Grupal';
+    } else if (subtipo === 'adiantamento') {
+        document.querySelectorAll('.campo-adiantamento').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Adiantamento';
+    }
+    
+    // Limpa formulário
+    document.getElementById('kt_modal_fechamento_extra_form').reset();
+    
+    // Define o subtipo novamente após o reset (para não perder o valor)
+    document.getElementById('extra_subtipo').value = subtipo;
+    document.getElementById('extra_template_id').value = '';
+    document.getElementById('extra_template_select').value = '';
+    
+    // Limpa todos os containers de colaboradores (existem múltiplos)
+    document.querySelectorAll('#extra_colaboradores_container').forEach(container => {
+        container.innerHTML = '<p class="text-muted">Selecione uma empresa primeiro</p>';
+    });
+    
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_fechamento_extra'));
+    modal.show();
+}
+
+// Quando template é selecionado, preenche campos automaticamente
+document.getElementById('extra_template_select')?.addEventListener('change', function() {
+    const templateId = this.value;
+    const option = this.options[this.selectedIndex];
+    
+    if (!templateId) {
+        // Limpa campos se nenhum template selecionado
+        return;
+    }
+    
+    const subtipo = option.getAttribute('data-subtipo');
+    const empresaId = option.getAttribute('data-empresa-id');
+    const tipoBonusId = option.getAttribute('data-tipo-bonus-id');
+    const valorPadrao = option.getAttribute('data-valor-padrao');
+    const observacoes = option.getAttribute('data-observacoes');
+    
+    // Define subtipo e mostra campos correspondentes
+    document.getElementById('extra_subtipo').value = subtipo;
+    document.getElementById('extra_template_id').value = templateId;
+    
+    // Esconde todos os campos específicos
+    document.querySelectorAll('.campo-bonus-especifico, .campo-individual, .campo-grupal, .campo-adiantamento').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Mostra campos conforme subtipo do template
+    if (subtipo === 'bonus_especifico') {
+        document.querySelectorAll('.campo-bonus-especifico').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Bônus Específico';
+    } else if (subtipo === 'individual') {
+        document.querySelectorAll('.campo-individual').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Individual';
+    } else if (subtipo === 'grupal') {
+        document.querySelectorAll('.campo-grupal').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Grupal';
+    } else if (subtipo === 'adiantamento') {
+        document.querySelectorAll('.campo-adiantamento').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Adiantamento';
+    }
+    
+    // Preenche empresa se definida no template
+    if (empresaId) {
+        document.getElementById('extra_empresa_id').value = empresaId;
+        // Dispara evento change para carregar colaboradores
+        document.getElementById('extra_empresa_id').dispatchEvent(new Event('change'));
+    }
+    
+    // Preenche tipo de bônus se definido
+    if (tipoBonusId) {
+        const tipoBonusSelects = document.querySelectorAll('select[name="tipo_bonus_id"]');
+        tipoBonusSelects.forEach(select => {
+            select.value = tipoBonusId;
+        });
+    }
+    
+    // Preenche valor padrão se definido
+    if (valorPadrao) {
+        const valorInputs = document.querySelectorAll('input[name="valor_manual"], input[name="valor_adiantamento"]');
+        valorInputs.forEach(input => {
+            const valorFormatado = parseFloat(valorPadrao).toFixed(2).replace('.', ',');
+            input.value = valorFormatado;
+            // Aplica máscara se disponível
+            if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
+                jQuery(input).mask('#.##0,00', {reverse: true});
+            }
+        });
+    }
+    
+    // Preenche observações/descrição se definida
+    if (observacoes) {
+        const descricaoInput = document.querySelector('textarea[name="descricao"]');
+        if (descricaoInput) {
+            descricaoInput.value = observacoes;
+        }
+    }
+});
+
+// Aplicar máscaras nos campos de valor do modal extra
+function aplicarMascarasExtra() {
+    if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
+        jQuery('input[name="valor_manual"]').mask('#.##0,00', {reverse: true});
+        jQuery('input[name="valor_adiantamento"]').mask('#.##0,00', {reverse: true});
+    }
+}
+
+// Aplicar máscaras quando o modal for aberto
+document.getElementById('kt_modal_fechamento_extra')?.addEventListener('shown.bs.modal', function() {
+    setTimeout(aplicarMascarasExtra, 300);
+});
+
+// Carrega colaboradores para fechamento extra
+document.getElementById('extra_empresa_id')?.addEventListener('change', function() {
+    const empresaId = this.value;
+    const subtipo = document.getElementById('extra_subtipo').value;
+    
+    if (!empresaId) {
+        // Limpa todos os containers visíveis
+        document.querySelectorAll('#extra_colaboradores_container').forEach(container => {
+            if (container.closest('.campo-individual, .campo-adiantamento, .campo-bonus-especifico, .campo-grupal').style.display !== 'none') {
+                container.innerHTML = '<p class="text-muted">Selecione uma empresa primeiro</p>';
+            }
+        });
+        return;
+    }
+    
+    // Encontra o container correto baseado no subtipo e campo visível
+    let container = null;
+    if (subtipo === 'individual') {
+        container = document.querySelector('.campo-individual #extra_colaboradores_container');
+    } else if (subtipo === 'adiantamento') {
+        container = document.querySelector('.campo-adiantamento #extra_colaboradores_container');
+    } else if (subtipo === 'bonus_especifico' || subtipo === 'grupal') {
+        container = document.querySelector(`.campo-${subtipo === 'bonus_especifico' ? 'bonus-especifico' : 'grupal'} #extra_colaboradores_container`);
+    }
+    
+    // Fallback: pega o primeiro container visível
+    if (!container) {
+        const containers = document.querySelectorAll('#extra_colaboradores_container');
+        for (let c of containers) {
+            if (c.closest('.campo-individual, .campo-adiantamento, .campo-bonus-especifico, .campo-grupal')?.style.display !== 'none') {
+                container = c;
+                break;
+            }
+        }
+    }
+    
+    if (!container) {
+        console.error('Container de colaboradores não encontrado');
+        return;
+    }
+    
+    container.innerHTML = '<p class="text-muted">Carregando...</p>';
+    
+    fetch(`../api/get_colaboradores.php?empresa_id=${empresaId}&status=ativo`)
+        .then(r => r.json())
+        .then(data => {
+            let html = '';
+            if (subtipo === 'individual' || subtipo === 'adiantamento') {
+                // Select único
+                html = '<select name="colaborador_id" id="extra_colaborador_id" class="form-select form-select-solid" required>';
+                html += '<option value="">Selecione...</option>';
+                data.forEach(colab => {
+                    html += `<option value="${colab.id}">${colab.nome_completo}</option>`;
+                });
+                html += '</select>';
+            } else {
+                // Checkboxes múltiplos
+                data.forEach(colab => {
+                    html += `
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="colaboradores[]" value="${colab.id}" id="extra_colab_${colab.id}">
+                            <label class="form-check-label" for="extra_colab_${colab.id}">
+                                ${colab.nome_completo}
+                            </label>
+                        </div>
+                    `;
+                });
+            }
+            container.innerHTML = html || '<p class="text-muted">Nenhum colaborador encontrado</p>';
+            
+            // Verifica duplicações após carregar colaboradores
+            verificarDuplicacoes();
+        })
+        .catch((error) => {
+            console.error('Erro ao carregar colaboradores:', error);
+            container.innerHTML = '<p class="text-danger">Erro ao carregar colaboradores</p>';
+        });
+});
+
+// Função para verificar duplicações de bônus
+function verificarDuplicacoes() {
+    const mesReferencia = document.querySelector('input[name="mes_referencia"]')?.value;
+    const subtipo = document.getElementById('extra_subtipo')?.value;
+    const tipoBonusId = document.querySelector('select[name="tipo_bonus_id"]')?.value;
+    const colaboradores = [];
+    
+    // Coleta colaboradores selecionados
+    if (subtipo === 'individual' || subtipo === 'adiantamento') {
+        const colabId = document.getElementById('extra_colaborador_id')?.value;
+        if (colabId) colaboradores.push(colabId);
+    } else {
+        document.querySelectorAll('input[name="colaboradores[]"]:checked').forEach(cb => {
+            colaboradores.push(cb.value);
+        });
+    }
+    
+    if (!mesReferencia || !subtipo || colaboradores.length === 0) {
+        return;
+    }
+    
+    // Busca fechamentos extras existentes
+    fetch(`../api/verificar_duplicacao_bonus.php?mes=${mesReferencia}&subtipo=${subtipo}&tipo_bonus_id=${tipoBonusId || ''}&colaboradores=${colaboradores.join(',')}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.duplicacoes && data.duplicacoes.length > 0) {
+                let mensagem = '⚠️ Atenção: Foram encontrados fechamentos extras similares neste mês:\n\n';
+                data.duplicacoes.forEach(dup => {
+                    mensagem += `• ${dup.tipo_bonus_nome || 'Bônus'} - ${dup.colaborador_nome}\n`;
+                    mensagem += `  Fechamento #${dup.fechamento_id} - R$ ${parseFloat(dup.valor).toFixed(2).replace('.', ',')}\n\n`;
+                });
+                mensagem += 'Deseja continuar mesmo assim?';
+                
+                Swal.fire({
+                    title: 'Possível Duplicação',
+                    text: mensagem,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sim, continuar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33'
+                }).then((result) => {
+                    if (!result.isConfirmed) {
+                        // Usuário cancelou, pode limpar campos ou manter
+                    }
+                });
+            }
+        })
+        .catch(() => {
+            // Erro silencioso - não bloqueia criação
+        });
+}
+
+// Adiciona listener para verificar duplicações quando campos mudam
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('kt_modal_fechamento_extra_form');
+    if (form) {
+        // Verifica ao mudar mês de referência
+        form.querySelector('input[name="mes_referencia"]')?.addEventListener('change', verificarDuplicacoes);
+        
+        // Verifica ao mudar tipo de bônus
+        form.querySelectorAll('select[name="tipo_bonus_id"]').forEach(select => {
+            select.addEventListener('change', verificarDuplicacoes);
+        });
+        
+        // Verifica ao selecionar/desselecionar colaboradores
+        form.addEventListener('change', function(e) {
+            if (e.target.matches('input[name="colaboradores[]"], #extra_colaborador_id')) {
+                setTimeout(verificarDuplicacoes, 500); // Delay para evitar muitas requisições
+            }
+        });
+    }
 });
 
 // DataTables

@@ -253,6 +253,22 @@ if (is_colaborador() && !empty($colaborador_id)) {
         
         $ocorrencias_mes = $stmt->fetch()['total'];
         
+        // Busca última execução do cron de fechamentos recorrentes
+        $ultima_execucao_cron = null;
+        try {
+            $stmt = $pdo->prepare("
+                SELECT data_execucao, processados, erros, status, TIMESTAMPDIFF(HOUR, data_execucao, NOW()) as horas_atras
+                FROM cron_execucoes 
+                WHERE nome_cron = 'processar_fechamentos_recorrentes'
+                ORDER BY data_execucao DESC 
+                LIMIT 1
+            ");
+            $stmt->execute();
+            $ultima_execucao_cron = $stmt->fetch();
+        } catch (PDOException $e) {
+            // Tabela pode não existir ainda, ignora erro
+        }
+        
         // Dados para gráfico de ocorrências por mês (últimos 6 meses)
         $meses_grafico = [];
         $ocorrencias_grafico = [];
@@ -1286,6 +1302,99 @@ if (is_colaborador() && !empty($colaborador_id)) {
                     <!--end::Statistics Widget 5-->
             </div>
             <!--end::Col-->
+        </div>
+        <!--end::Row-->
+        <?php endif; ?>
+        
+        <?php if (has_role(['ADMIN', 'RH'])): ?>
+        <!--begin::Row - Status Cron Fechamentos Recorrentes -->
+        <div class="row g-5 g-xl-8 mb-5">
+            <div class="col-xl-12" data-card-id="card_status_cron_fechamentos" data-card-title="Status do Cron - Fechamentos Recorrentes" data-card-w="12" data-card-h="3">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Status do Cron - Fechamentos Recorrentes</h3>
+                    </div>
+                    <div class="card-body">
+                        <?php if ($ultima_execucao_cron): ?>
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-3">
+                                    <i class="ki-duotone ki-time fs-2x text-primary me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <div>
+                                        <div class="fw-bold fs-4">
+                                            Última Execução: 
+                                            <?php
+                                            $data_execucao = new DateTime($ultima_execucao_cron['data_execucao']);
+                                            echo $data_execucao->format('d/m/Y H:i:s');
+                                            ?>
+                                        </div>
+                                        <div class="text-muted fs-6 mt-1">
+                                            <?php
+                                            $horas_atras = (int)$ultima_execucao_cron['horas_atras'];
+                                            if ($horas_atras < 1) {
+                                                echo 'Executado há menos de 1 hora';
+                                            } elseif ($horas_atras < 24) {
+                                                echo "Executado há {$horas_atras} hora(s)";
+                                            } else {
+                                                $dias_atras = floor($horas_atras / 24);
+                                                echo "Executado há {$dias_atras} dia(s)";
+                                            }
+                                            ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge badge-<?= $ultima_execucao_cron['status'] === 'sucesso' ? 'success' : 'danger' ?> me-2">
+                                                <?= strtoupper($ultima_execucao_cron['status']) ?>
+                                            </span>
+                                            <span class="text-muted">Status</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex align-items-center">
+                                            <span class="fw-bold text-success me-2"><?= $ultima_execucao_cron['processados'] ?></span>
+                                            <span class="text-muted">Processados</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="d-flex align-items-center">
+                                            <span class="fw-bold text-danger me-2"><?= $ultima_execucao_cron['erros'] ?></span>
+                                            <span class="text-muted">Erros</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <?php if ($horas_atras > 25): ?>
+                                        <div class="alert alert-warning d-flex align-items-center p-2 mb-0">
+                                            <i class="ki-duotone ki-warning-2 fs-5 me-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                            <small class="fw-bold">Cron pode estar parado</small>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php else: ?>
+                        <div class="text-center py-5">
+                            <i class="ki-duotone ki-time fs-3x text-muted mb-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <p class="text-muted fs-5">Nenhuma execução registrada ainda</p>
+                            <p class="text-muted fs-7">O cron ainda não foi executado ou a tabela de execuções não foi criada.</p>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
         </div>
         <!--end::Row-->
         <?php endif; ?>
@@ -3156,6 +3265,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'card_colaboradores_ativos',
             'card_ocorrencias_mes',
             'card_colaboradores_inativos',
+            'card_status_cron_fechamentos',
             'card_proximos_aniversarios',
             'card_ranking_ocorrencias',
             'card_grafico_ocorrencias_mes',
@@ -3185,6 +3295,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'card_colaboradores_ativos', nome: 'Colaboradores Ativos', descricao: 'Mostra colaboradores ativos', icone: 'ki-check-circle', w: 3, h: 3 },
             { id: 'card_ocorrencias_mes', nome: 'Ocorrências no Mês', descricao: 'Ocorrências registradas no mês', icone: 'ki-notepad', w: 3, h: 3 },
             { id: 'card_colaboradores_inativos', nome: 'Colaboradores Inativos', descricao: 'Mostra colaboradores inativos', icone: 'ki-cross-circle', w: 3, h: 3 },
+            { id: 'card_status_cron_fechamentos', nome: 'Status Cron - Fechamentos Recorrentes', descricao: 'Última execução do cron de fechamentos recorrentes', icone: 'ki-time', w: 12, h: 3 },
             { id: 'card_proximos_aniversarios', nome: 'Próximos Aniversários', descricao: 'Aniversários dos próximos 30 dias', icone: 'ki-cake', w: 6, h: 5 },
             { id: 'card_ranking_ocorrencias', nome: 'Ranking de Ocorrências', descricao: 'Ranking de colaboradores por ocorrências', icone: 'ki-chart-simple', w: 6, h: 5 },
             { id: 'card_grafico_ocorrencias_mes', nome: 'Gráfico de Ocorrências', descricao: 'Gráfico de ocorrências por mês', icone: 'ki-chart', w: 8, h: 4 },

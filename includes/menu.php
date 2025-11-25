@@ -568,7 +568,7 @@ function getIcon($name) {
                 
                 <?php if (can_access_colaboradores_menu()): ?>
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('colaboradores.php') || isActive('emocoes_analise.php') || isActive('promocoes.php') || isActive('horas_extras.php') || isActive('fechamento_pagamentos.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('colaboradores.php') || isActive('emocoes_analise.php') || isActive('promocoes.php') || isActive('horas_extras.php') || isActive('fechamento_pagamentos.php') || isActive('relatorios_fechamentos_extras.php') || isActive('relatorio_adiantamentos_pendentes.php') || isActive('templates_fechamento_extra.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -639,6 +639,42 @@ function getIcon($name) {
                                         <span class="bullet bullet-dot"></span>
                                     </span>
                                     <span class="menu-title">Fechamento de Pagamentos</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('relatorios_fechamentos_extras.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('relatorios_fechamentos_extras.php') ?>" href="relatorios_fechamentos_extras.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Relatório Fechamentos Extras</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('relatorio_adiantamentos_pendentes.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('relatorio_adiantamentos_pendentes.php') ?>" href="relatorio_adiantamentos_pendentes.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Adiantamentos Pendentes</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('templates_fechamento_extra.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('templates_fechamento_extra.php') ?>" href="templates_fechamento_extra.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Templates Fechamento Extra</span>
                                 </a>
                             </div>
                             <!--end:Menu item-->

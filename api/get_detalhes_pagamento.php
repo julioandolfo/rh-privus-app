@@ -42,7 +42,7 @@ try {
         }
     }
     
-    // Busca dados do fechamento
+    // Busca dados do fechamento (incluindo campos de fechamento extra)
     $stmt = $pdo->prepare("
         SELECT f.*, e.nome_fantasia as empresa_nome
         FROM fechamentos_pagamento f
@@ -51,6 +51,42 @@ try {
     ");
     $stmt->execute([$fechamento_id]);
     $fechamento = $stmt->fetch();
+    
+    // Busca adiantamentos relacionados (se houver)
+    $adiantamentos_info = [];
+    if ($fechamento['tipo_fechamento'] === 'extra' && $fechamento['subtipo_fechamento'] === 'adiantamento') {
+        $stmt = $pdo->prepare("
+            SELECT * FROM fechamentos_pagamento_adiantamentos
+            WHERE fechamento_pagamento_id = ? AND colaborador_id = ?
+        ");
+        $stmt->execute([$fechamento_id, $colaborador_id]);
+        $adiantamento = $stmt->fetch();
+        if ($adiantamento) {
+            $adiantamentos_info = [
+                'valor_adiantamento' => (float)$adiantamento['valor_adiantamento'],
+                'valor_descontar' => (float)$adiantamento['valor_descontar'],
+                'mes_desconto' => $adiantamento['mes_desconto'],
+                'descontado' => (bool)$adiantamento['descontado'],
+                'fechamento_desconto_id' => $adiantamento['fechamento_desconto_id'],
+                'observacoes' => $adiantamento['observacoes']
+            ];
+        }
+    }
+    
+    // Busca adiantamentos pendentes do colaborador (para mostrar em fechamentos regulares)
+    $adiantamentos_pendentes = [];
+    if ($fechamento['tipo_fechamento'] === 'regular') {
+        $stmt = $pdo->prepare("
+            SELECT fa.*, f.mes_referencia as fechamento_mes_referencia
+            FROM fechamentos_pagamento_adiantamentos fa
+            INNER JOIN fechamentos_pagamento f ON fa.fechamento_pagamento_id = f.id
+            WHERE fa.colaborador_id = ?
+            AND fa.mes_desconto = ?
+            AND fa.descontado = 0
+        ");
+        $stmt->execute([$colaborador_id, $fechamento['mes_referencia']]);
+        $adiantamentos_pendentes = $stmt->fetchAll();
+    }
     
     if (!$fechamento) {
         echo json_encode(['success' => false, 'message' => 'Fechamento não encontrado']);
@@ -165,10 +201,16 @@ try {
         'data' => [
             'fechamento' => [
                 'id' => $fechamento['id'],
+                'tipo_fechamento' => $fechamento['tipo_fechamento'] ?? 'regular',
+                'subtipo_fechamento' => $fechamento['subtipo_fechamento'] ?? null,
                 'mes_referencia' => $fechamento['mes_referencia'],
                 'mes_referencia_formatado' => date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')),
                 'data_fechamento' => $fechamento['data_fechamento'],
                 'data_fechamento_formatada' => date('d/m/Y', strtotime($fechamento['data_fechamento'])),
+                'data_pagamento' => $fechamento['data_pagamento'] ?? null,
+                'data_pagamento_formatada' => $fechamento['data_pagamento'] ? date('d/m/Y', strtotime($fechamento['data_pagamento'])) : null,
+                'referencia_externa' => $fechamento['referencia_externa'] ?? null,
+                'descricao' => $fechamento['descricao'] ?? null,
                 'empresa_nome' => $fechamento['empresa_nome'],
                 'status' => $fechamento['status']
             ],
@@ -190,7 +232,12 @@ try {
                 'valor_horas_extras' => (float)$item['valor_horas_extras'],
                 'descontos' => (float)($item['descontos'] ?? 0),
                 'adicionais' => (float)($item['adicionais'] ?? 0),
-                'valor_total' => (float)$item['valor_total']
+                'valor_total' => (float)$item['valor_total'],
+                'valor_manual' => isset($item['valor_manual']) ? (float)$item['valor_manual'] : null,
+                'motivo' => $item['motivo'] ?? null,
+                'inclui_salario' => isset($item['inclui_salario']) ? (bool)$item['inclui_salario'] : true,
+                'inclui_horas_extras' => isset($item['inclui_horas_extras']) ? (bool)$item['inclui_horas_extras'] : true,
+                'inclui_bonus_automaticos' => isset($item['inclui_bonus_automaticos']) ? (bool)$item['inclui_bonus_automaticos'] : true
             ],
             'horas_extras' => [
                 'total_horas' => (float)$item['horas_extras'],
@@ -222,7 +269,18 @@ try {
                 'data_envio' => $item['documento_data_envio'] ?? null,
                 'data_aprovacao' => $item['documento_data_aprovacao'] ?? null,
                 'observacoes' => $item['documento_observacoes'] ?? null
-            ]
+            ],
+            'adiantamento' => $adiantamentos_info,
+            'adiantamentos_pendentes' => array_map(function($a) {
+                return [
+                    'id' => $a['id'],
+                    'valor_adiantamento' => (float)$a['valor_adiantamento'],
+                    'valor_descontar' => (float)$a['valor_descontar'],
+                    'mes_desconto' => $a['mes_desconto'],
+                    'fechamento_mes_referencia' => $a['fechamento_mes_referencia'],
+                    'observacoes' => $a['observacoes']
+                ];
+            }, $adiantamentos_pendentes)
         ]
     ];
     
