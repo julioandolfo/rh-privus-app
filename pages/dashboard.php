@@ -1913,7 +1913,18 @@ if (is_colaborador() && !empty($colaborador_id)) {
                     <!--end::Header-->
                     <!--begin::Body-->
                     <div class="card-body pt-5">
-                        <canvas id="kt_chart_ocorrencias_tipo" style="height: 300px;"></canvas>
+                        <?php if (empty($ocorrencias_por_tipo)): ?>
+                            <div class="text-center text-muted py-10">
+                                <i class="ki-duotone ki-chart-bar fs-3x text-muted mb-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <p class="fs-5 mb-0">Nenhuma ocorrência registrada nos últimos 30 dias</p>
+                                <p class="fs-7">Os dados aparecerão aqui quando houver ocorrências</p>
+                            </div>
+                        <?php else: ?>
+                            <canvas id="kt_chart_ocorrencias_tipo" style="height: 300px;"></canvas>
+                        <?php endif; ?>
                     </div>
                     <!--end::Body-->
                 </div>
@@ -6663,18 +6674,32 @@ function reinicializarGraficos() {
         
         console.log('📊 Dados Ocorrências por Tipo:', {
             tipoData: tipoData,
-            length: tipoData?.length
+            length: tipoData?.length,
+            tipoDataRaw: JSON.stringify(tipoData)
         });
         
-        if (tipoData && tipoData.length > 0) {
+        if (tipoData && Array.isArray(tipoData) && tipoData.length > 0) {
             try {
+                // Verifica se os dados têm a estrutura esperada
+                const dadosValidos = tipoData.every(item => item && (item.tipo || item.tipo_ocorrencia_id) && typeof item.total !== 'undefined');
+                console.log('📊 Dados têm estrutura válida:', dadosValidos);
+                
+                if (!dadosValidos) {
+                    console.warn('⚠️ Estrutura de dados inválida. Esperado: [{tipo: string, total: number}]');
+                    console.warn('⚠️ Dados recebidos:', tipoData);
+                }
+                
                 ctxOcorrenciasTipo.chart = new Chart(ctxOcorrenciasTipo, {
                 type: 'bar',
                 data: {
-                    labels: tipoData.map(item => item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)),
+                    labels: tipoData.map(item => {
+                        // Tenta diferentes campos possíveis
+                        const tipoNome = item.tipo || item.nome || item.tipo_ocorrencia || 'Sem nome';
+                        return tipoNome.charAt(0).toUpperCase() + tipoNome.slice(1);
+                    }),
                     datasets: [{
                         label: 'Quantidade',
-                        data: tipoData.map(item => item.total),
+                        data: tipoData.map(item => parseInt(item.total) || 0),
                         backgroundColor: 'rgba(54, 162, 235, 0.5)',
                         borderColor: 'rgba(54, 162, 235, 1)',
                         borderWidth: 1
@@ -6704,6 +6729,24 @@ function reinicializarGraficos() {
             }
         } else {
             console.warn('⚠️ Dados insuficientes para gráfico de Ocorrências por Tipo:', tipoData);
+            console.warn('⚠️ Isso pode significar que não há ocorrências nos últimos 30 dias ou a query não retornou dados');
+            
+            // Mostra mensagem no card se não houver dados
+            const cardBody = ctxOcorrenciasTipo.closest('.card-body');
+            if (cardBody && !cardBody.querySelector('.text-center')) {
+                ctxOcorrenciasTipo.style.display = 'none';
+                const mensagem = document.createElement('div');
+                mensagem.className = 'text-center text-muted py-10';
+                mensagem.innerHTML = `
+                    <i class="ki-duotone ki-chart-bar fs-3x text-muted mb-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <p class="fs-5 mb-0">Nenhuma ocorrência registrada nos últimos 30 dias</p>
+                    <p class="fs-7">Os dados aparecerão aqui quando houver ocorrências</p>
+                `;
+                cardBody.appendChild(mensagem);
+            }
         }
     } else if (ctxOcorrenciasTipo && ctxOcorrenciasTipo.chart) {
         console.log('ℹ️ Gráfico de Ocorrências por Tipo já existe, pulando...');
