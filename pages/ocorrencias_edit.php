@@ -486,7 +486,14 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="col-md-6">
                             <label class="fw-semibold fs-6 mb-2">Tempo de Atraso (minutos)</label>
                             <input type="number" name="tempo_atraso_minutos" id="tempo_atraso_minutos" class="form-control form-control-solid" min="1" placeholder="Ex: 15" value="<?= $ocorrencia_existente['tempo_atraso_minutos'] ?? '' ?>" />
-                            <small class="text-muted">Informe quantos minutos de atraso</small>
+                            <small class="text-muted d-block mt-1">Informe quantos minutos de atraso</small>
+                            <small class="text-primary fw-semibold d-block mt-1" id="tempo_convertido">
+                                <i class="ki-duotone ki-time fs-6 me-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <span id="tempo_convertido_texto">-</span>
+                            </small>
                         </div>
                     </div>
                     
@@ -680,6 +687,12 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php if (!empty($ocorrencia_existente['tipo_ocorrencia_id'])): ?>
                 setTimeout(function() {
                     carregarCamposDinamicosFormulario(<?= $ocorrencia_existente['tipo_ocorrencia_id'] ?>);
+                    // Atualiza valores após carregar campos
+                    setTimeout(function() {
+                        atualizarConversaoTempo();
+                        atualizarInfoDescontoBanco();
+                        atualizarValorDescontoDinheiro();
+                    }, 200);
                 }, 300);
                 <?php endif; ?>
             }
@@ -831,7 +844,10 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     
     // Re-adiciona listener após mudança de tipo de ocorrência (quando campo é habilitado)
     if (permiteTempo && (!permiteDiaInteiro || !consideraDiaInteiro)) {
-        setTimeout(adicionarListenerTempoAtraso, 100);
+        setTimeout(function() {
+            adicionarListenerTempoAtraso();
+            atualizarConversaoTempo();
+        }, 100);
     }
     
     // Mostra/esconde campo de tipo de ponto
@@ -869,6 +885,7 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     document.getElementById('tipo').value = option.text.trim();
     
     // Atualiza valores quando tipo de ocorrência muda
+    atualizarConversaoTempo();
     atualizarInfoDescontoBanco();
     atualizarValorDescontoDinheiro();
     
@@ -912,6 +929,40 @@ document.getElementById('apenas_informativa')?.addEventListener('change', functi
     atualizarCamposApenasInformativa();
 });
 
+// Função para converter minutos em horas:minutos
+function converterMinutosParaHorasMinutos(minutos) {
+    if (!minutos || minutos <= 0) {
+        return '-';
+    }
+    const horas = Math.floor(minutos / 60);
+    const mins = minutos % 60;
+    if (horas > 0 && mins > 0) {
+        return `${horas}h ${mins}min`;
+    } else if (horas > 0) {
+        return `${horas}h`;
+    } else {
+        return `${mins}min`;
+    }
+}
+
+// Função para atualizar conversão de tempo
+function atualizarConversaoTempo() {
+    const tempoAtraso = parseInt(document.getElementById('tempo_atraso_minutos')?.value || 0);
+    const tempoConvertidoTexto = document.getElementById('tempo_convertido_texto');
+    const tempoConvertidoContainer = document.getElementById('tempo_convertido');
+    
+    if (tempoConvertidoTexto && tempoConvertidoContainer) {
+        if (tempoAtraso > 0) {
+            const tempoFormatado = converterMinutosParaHorasMinutos(tempoAtraso);
+            tempoConvertidoTexto.textContent = `Equivale a: ${tempoFormatado}`;
+            tempoConvertidoContainer.style.display = 'block';
+        } else {
+            tempoConvertidoTexto.textContent = '-';
+            tempoConvertidoContainer.style.display = 'none';
+        }
+    }
+}
+
 // Função para atualizar valores quando tempo de atraso muda
 function atualizarValoresTempoAtraso() {
     console.log('atualizarValoresTempoAtraso chamada');
@@ -919,6 +970,9 @@ function atualizarValoresTempoAtraso() {
     const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
     console.log('Tempo atraso:', tempoAtraso);
     console.log('Considera dia inteiro:', consideraDiaInteiro);
+    
+    // Atualiza conversão de tempo
+    atualizarConversaoTempo();
     
     // Pequeno delay para garantir que o valor foi atualizado
     setTimeout(function() {
@@ -959,21 +1013,21 @@ function adicionarListenerTempoAtraso() {
 // Usa delegação de eventos para garantir que funcione mesmo quando campo é criado dinamicamente
 document.addEventListener('input', function(e) {
     if (e.target && e.target.id === 'tempo_atraso_minutos') {
-        console.log('Evento input capturado no campo tempo_atraso_minutos, valor:', e.target.value);
+        console.log('[HORADESCONTA] Evento input capturado no campo tempo_atraso_minutos, valor:', e.target.value);
         atualizarValoresTempoAtraso();
     }
 });
 
 document.addEventListener('change', function(e) {
     if (e.target && e.target.id === 'tempo_atraso_minutos') {
-        console.log('Evento change capturado no campo tempo_atraso_minutos, valor:', e.target.value);
+        console.log('[HORADESCONTA] Evento change capturado no campo tempo_atraso_minutos, valor:', e.target.value);
         atualizarValoresTempoAtraso();
     }
 });
 
 document.addEventListener('keyup', function(e) {
     if (e.target && e.target.id === 'tempo_atraso_minutos') {
-        console.log('Evento keyup capturado no campo tempo_atraso_minutos, valor:', e.target.value);
+        console.log('[HORADESCONTA] Evento keyup capturado no campo tempo_atraso_minutos, valor:', e.target.value);
         atualizarValoresTempoAtraso();
     }
 });
@@ -981,19 +1035,37 @@ document.addEventListener('keyup', function(e) {
 // Adiciona listener quando a página carrega (para garantir que funcione se campo já existir)
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(adicionarListenerTempoAtraso, 200);
+        setTimeout(function() {
+            adicionarListenerTempoAtraso();
+            atualizarConversaoTempo();
+        }, 200);
     });
 } else {
-    setTimeout(adicionarListenerTempoAtraso, 200);
+    setTimeout(function() {
+        adicionarListenerTempoAtraso();
+        atualizarConversaoTempo();
+    }, 200);
 }
 
 // Função para atualizar informações de desconto do banco de horas
 function atualizarInfoDescontoBanco() {
-    const colaboradorId = document.getElementById('colaborador_id')?.value;
+    // Busca colaborador_id de diferentes formas (select ou input hidden)
+    let colaboradorId = null;
+    const colaboradorSelect = document.getElementById('colaborador_id');
+    const colaboradorHidden = document.querySelector('input[name="colaborador_id"]');
+    
+    if (colaboradorSelect) {
+        colaboradorId = colaboradorSelect.value;
+    } else if (colaboradorHidden) {
+        colaboradorId = colaboradorHidden.value;
+    }
+    
     const tipoOcorrencia = document.getElementById('tipo_ocorrencia_id');
     const option = tipoOcorrencia?.options[tipoOcorrencia.selectedIndex];
     const codigoTipo = option?.getAttribute('data-codigo') || '';
     const tempoAtraso = parseFloat(document.getElementById('tempo_atraso_minutos')?.value || 0);
+    
+    console.log('[HORADESCONTA] atualizarInfoDescontoBanco - colaboradorId:', colaboradorId);
     
     if (!colaboradorId || !codigoTipo) {
         document.getElementById('info_desconto_banco').style.display = 'none';
@@ -1054,40 +1126,54 @@ function atualizarInfoDescontoBanco() {
 
 // Função para calcular e atualizar valor do desconto em R$
 function atualizarValorDescontoDinheiro() {
-    console.log('=== atualizarValorDescontoDinheiro chamada ===');
-    const colaboradorId = document.getElementById('colaborador_id')?.value;
+    console.log('[HORADESCONTA] === atualizarValorDescontoDinheiro chamada ===');
+    
+    // Busca colaborador_id de diferentes formas (select ou input hidden)
+    let colaboradorId = null;
+    const colaboradorSelect = document.getElementById('colaborador_id');
+    const colaboradorHidden = document.querySelector('input[name="colaborador_id"]');
+    
+    if (colaboradorSelect) {
+        colaboradorId = colaboradorSelect.value;
+    } else if (colaboradorHidden) {
+        colaboradorId = colaboradorHidden.value;
+    }
+    
     const tipoOcorrencia = document.getElementById('tipo_ocorrencia_id');
     const option = tipoOcorrencia?.options[tipoOcorrencia.selectedIndex];
     
-    console.log('colaboradorId:', colaboradorId);
-    console.log('option:', option);
+    console.log('[HORADESCONTA] colaboradorId:', colaboradorId);
+    console.log('[HORADESCONTA] colaboradorSelect encontrado:', colaboradorSelect);
+    console.log('[HORADESCONTA] colaboradorHidden encontrado:', colaboradorHidden);
+    console.log('[HORADESCONTA] option:', option);
     
     // Verifica se o tipo de desconto é dinheiro ou se não há seleção (padrão)
     const tipoDesconto = document.querySelector('input[name="tipo_desconto"]:checked')?.value;
     const apenasInformativa = document.getElementById('apenas_informativa')?.checked;
+    const containerInfo = document.getElementById('info_desconto_dinheiro');
+    
+    console.log('[HORADESCONTA] Tipo de desconto:', tipoDesconto);
+    console.log('[HORADESCONTA] Container encontrado:', containerInfo);
+    console.log('[HORADESCONTA] Apenas informativa:', apenasInformativa);
     
     // Se for apenas informativa, não mostra desconto
     if (apenasInformativa) {
-        const containerInfo = document.getElementById('info_desconto_dinheiro');
         if (containerInfo) {
             containerInfo.style.display = 'none';
         }
+        console.log('[HORADESCONTA] Ocorrência é apenas informativa, não calcula desconto');
         return;
     }
     
     // Garante que o container está visível ANTES de calcular se for desconto em dinheiro
-    const containerInfo = document.getElementById('info_desconto_dinheiro');
-    console.log('Tipo de desconto:', tipoDesconto);
-    console.log('Container encontrado:', containerInfo);
-    
     // Mostra container se for desconto em dinheiro OU se não houver seleção (padrão dinheiro)
     if (containerInfo && (tipoDesconto === 'dinheiro' || !tipoDesconto)) {
         containerInfo.style.display = 'block';
-        console.log('Container info_desconto_dinheiro FORÇADO a exibir');
+        console.log('[HORADESCONTA] Container info_desconto_dinheiro FORÇADO a exibir');
     }
     
     if (!colaboradorId || !option) {
-        console.log('Sem colaborador ou tipo de ocorrência');
+        console.log('[HORADESCONTA] Sem colaborador ou tipo de ocorrência');
         const elementoValor = document.getElementById('valor_desconto_ocorrencia');
         if (elementoValor) {
             elementoValor.textContent = '-';
@@ -1101,17 +1187,17 @@ function atualizarValorDescontoDinheiro() {
     const tempoAtraso = parseFloat(tempoAtrasoInput?.value || 0);
     const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
     
-    console.log('valorFixo:', valorFixo);
-    console.log('codigoTipo:', codigoTipo);
-    console.log('tempoAtraso:', tempoAtraso);
-    console.log('consideraDiaInteiro:', consideraDiaInteiro);
+    console.log('[HORADESCONTA] valorFixo:', valorFixo);
+    console.log('[HORADESCONTA] codigoTipo:', codigoTipo);
+    console.log('[HORADESCONTA] tempoAtraso:', tempoAtraso);
+    console.log('[HORADESCONTA] consideraDiaInteiro:', consideraDiaInteiro);
     
     // Se tem valor fixo, usa ele
     if (valorFixo > 0) {
         const elementoValor = document.getElementById('valor_desconto_ocorrencia');
         if (elementoValor) {
             elementoValor.textContent = 'R$ ' + valorFixo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            console.log('Valor fixo atualizado:', elementoValor.textContent);
+            console.log('[HORADESCONTA] Valor fixo atualizado:', elementoValor.textContent);
         }
         return;
     }
@@ -1122,13 +1208,13 @@ function atualizarValorDescontoDinheiro() {
         .then(data => {
             if (!data.success) {
                 document.getElementById('valor_desconto_ocorrencia').textContent = 'Erro ao buscar dados do colaborador';
-                console.error('Erro na API:', data.error);
+                console.error('[HORADESCONTA] Erro na API:', data.error);
                 return;
             }
             
             if (!data.data.salario || data.data.salario <= 0) {
                 document.getElementById('valor_desconto_ocorrencia').textContent = 'Salário não informado';
-                console.warn('Salário não encontrado para colaborador:', colaboradorId, data);
+                console.warn('[HORADESCONTA] Salário não encontrado para colaborador:', colaboradorId, data);
                 return;
             }
             
@@ -1138,43 +1224,51 @@ function atualizarValorDescontoDinheiro() {
             const valorHora = salario / horasMes;
             let valorDesconto = 0;
             
-            console.log('salario:', salario);
-            console.log('jornadaDiaria:', jornadaDiaria);
-            console.log('valorHora:', valorHora);
+            console.log('[HORADESCONTA] salario:', salario);
+            console.log('[HORADESCONTA] jornadaDiaria:', jornadaDiaria);
+            console.log('[HORADESCONTA] valorHora:', valorHora);
             
             // Calcula desconto baseado no tipo
             if (codigoTipo === 'falta' || codigoTipo === 'ausencia_injustificada') {
                 // Para falta: se considerar dia inteiro OU não tem tempo de atraso informado, calcula como dia inteiro
-                if (consideraDiaInteiro || tempoAtraso === 0) {
+                if (consideraDiaInteiro || (tempoAtraso === 0 && !document.getElementById('tempo_atraso_minutos')?.value)) {
                     // Falta completa = jornada diária
                     valorDesconto = valorHora * jornadaDiaria;
-                    console.log('Calculado como falta completa (dia inteiro):', valorDesconto);
-                } else {
+                    console.log('[HORADESCONTA] Calculado como falta completa (dia inteiro):', valorDesconto, '(jornada:', jornadaDiaria, 'h, valor/hora:', valorHora, ')');
+                } else if (tempoAtraso > 0) {
                     // Se tem tempo de atraso informado e não está marcado como dia inteiro, calcula proporcional
                     const valorMinuto = valorHora / 60;
                     valorDesconto = valorMinuto * tempoAtraso;
-                    console.log('Calculado proporcional aos minutos (falta com tempo):', valorDesconto, '(minutos:', tempoAtraso, ')');
+                    console.log('[HORADESCONTA] Calculado proporcional aos minutos (falta com tempo):', valorDesconto, '(minutos:', tempoAtraso, ', valor/minuto:', valorMinuto, ')');
+                } else {
+                    // Se não tem tempo informado e não está marcado como dia inteiro, mostra 0
+                    valorDesconto = 0;
+                    console.log('[HORADESCONTA] Sem tempo informado e não é dia inteiro, valor:', valorDesconto);
                 }
             } else if (['atraso_entrada', 'atraso_almoco', 'atraso_cafe', 'saida_antecipada'].includes(codigoTipo)) {
                 if (consideraDiaInteiro) {
                     // Considera como falta do dia inteiro
                     valorDesconto = valorHora * jornadaDiaria;
-                    console.log('Calculado como dia inteiro:', valorDesconto);
-                } else {
-                    // Calcula proporcional aos minutos (mesmo que seja 0, mostra 0)
+                    console.log('[HORADESCONTA] Calculado como dia inteiro:', valorDesconto, '(jornada:', jornadaDiaria, 'h, valor/hora:', valorHora, ')');
+                } else if (tempoAtraso > 0) {
+                    // Calcula proporcional aos minutos
                     const valorMinuto = valorHora / 60;
                     valorDesconto = valorMinuto * tempoAtraso;
-                    console.log('Calculado proporcional aos minutos:', valorDesconto, '(minutos:', tempoAtraso, ')');
+                    console.log('[HORADESCONTA] Calculado proporcional aos minutos:', valorDesconto, '(minutos:', tempoAtraso, ', valor/minuto:', valorMinuto, ')');
+                } else {
+                    // Se não tem tempo informado, mostra 0
+                    valorDesconto = 0;
+                    console.log('[HORADESCONTA] Sem tempo informado, valor:', valorDesconto);
                 }
             }
             
             const elementoValor = document.getElementById('valor_desconto_ocorrencia');
             const tipoDescontoAtual = document.querySelector('input[name="tipo_desconto"]:checked')?.value;
             
-            console.log('Elemento valor_desconto_ocorrencia encontrado:', elementoValor);
-            console.log('Container info_desconto_dinheiro encontrado:', containerInfo);
-            console.log('Tipo de desconto selecionado:', tipoDescontoAtual);
-            console.log('Valor calculado:', valorDesconto);
+            console.log('[HORADESCONTA] Elemento valor_desconto_ocorrencia encontrado:', elementoValor);
+            console.log('[HORADESCONTA] Container info_desconto_dinheiro encontrado:', containerInfo);
+            console.log('[HORADESCONTA] Tipo de desconto selecionado:', tipoDescontoAtual);
+            console.log('[HORADESCONTA] Valor calculado:', valorDesconto);
             
             if (elementoValor) {
                 const valorFormatado = valorDesconto > 0 
@@ -1182,20 +1276,24 @@ function atualizarValorDescontoDinheiro() {
                     : 'R$ 0,00';
                 
                 elementoValor.textContent = valorFormatado;
-                console.log('Valor atualizado para:', valorFormatado);
-                console.log('Elemento após atualização:', elementoValor.textContent);
+                console.log('[HORADESCONTA] Valor atualizado para:', valorFormatado);
+                console.log('[HORADESCONTA] Elemento após atualização:', elementoValor.textContent);
                 
                 // Garante que o container está visível se o tipo de desconto for dinheiro ou se não houver seleção
-                if (containerInfo && (tipoDescontoAtual === 'dinheiro' || !tipoDescontoAtual)) {
+                const apenasInformativaAtual = document.getElementById('apenas_informativa')?.checked;
+                if (containerInfo && (tipoDescontoAtual === 'dinheiro' || !tipoDescontoAtual) && !apenasInformativaAtual) {
                     containerInfo.style.display = 'block';
-                    console.log('Container info_desconto_dinheiro exibido');
+                    console.log('[HORADESCONTA] Container info_desconto_dinheiro exibido');
+                } else if (containerInfo && apenasInformativaAtual) {
+                    containerInfo.style.display = 'none';
+                    console.log('[HORADESCONTA] Container info_desconto_dinheiro oculto (apenas informativa)');
                 }
             } else {
-                console.error('Elemento valor_desconto_ocorrencia não encontrado!');
+                console.error('[HORADESCONTA] Elemento valor_desconto_ocorrencia não encontrado!');
             }
         })
         .catch(error => {
-            console.error('Erro ao calcular desconto:', error);
+            console.error('[HORADESCONTA] Erro ao calcular desconto:', error);
             document.getElementById('valor_desconto_ocorrencia').textContent = 'Erro ao calcular';
         });
 }
@@ -1219,11 +1317,14 @@ document.getElementById('tipo_desconto_banco_horas')?.addEventListener('change',
     }
 });
 
-// Atualiza quando colaborador muda
-document.getElementById('colaborador_id')?.addEventListener('change', function() {
-    atualizarInfoDescontoBanco();
-    atualizarValorDescontoDinheiro();
-});
+// Atualiza quando colaborador muda (se for um select - na edição é hidden, então não precisa de listener)
+const colaboradorSelect = document.getElementById('colaborador_id');
+if (colaboradorSelect && colaboradorSelect.tagName === 'SELECT') {
+    colaboradorSelect.addEventListener('change', function() {
+        atualizarInfoDescontoBanco();
+        atualizarValorDescontoDinheiro();
+    });
+}
 
 // Atualiza quando considera dia inteiro muda
 document.getElementById('considera_dia_inteiro')?.addEventListener('change', function() {
@@ -1243,6 +1344,11 @@ document.getElementById('considera_dia_inteiro')?.addEventListener('change', fun
             tempoInput.disabled = true;
             tempoInput.value = '';
         }
+        // Esconde conversão de tempo
+        const tempoConvertidoContainer = document.getElementById('tempo_convertido');
+        if (tempoConvertidoContainer) {
+            tempoConvertidoContainer.style.display = 'none';
+        }
         // Atualiza valores imediatamente (considera como dia inteiro)
         setTimeout(function() {
             atualizarInfoDescontoBanco();
@@ -1259,10 +1365,14 @@ document.getElementById('considera_dia_inteiro')?.addEventListener('change', fun
                 tempoInput.required = true;
             }
             // Re-adiciona listener quando campo é habilitado
-            setTimeout(adicionarListenerTempoAtraso, 50);
+            setTimeout(function() {
+                adicionarListenerTempoAtraso();
+                atualizarConversaoTempo();
+            }, 50);
         }
         // Atualiza valores imediatamente
         setTimeout(function() {
+            atualizarConversaoTempo();
             atualizarInfoDescontoBanco();
             atualizarValorDescontoDinheiro();
         }, 100);
