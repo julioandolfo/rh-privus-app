@@ -975,6 +975,9 @@ require_once __DIR__ . '/../includes/header.php';
                                                     <th class="min-w-200px">Descrição</th>
                                                     <th class="min-w-150px">Registrado por</th>
                                                     <th class="min-w-150px">Data Registro</th>
+                                                    <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                                                    <th class="text-end min-w-150px">Ações</th>
+                                                    <?php endif; ?>
                                                 </tr>
                                             </thead>
                                             <tbody class="fw-semibold text-gray-600">
@@ -989,6 +992,36 @@ require_once __DIR__ . '/../includes/header.php';
                                                     <td><?= nl2br(htmlspecialchars($ocorrencia['descricao'])) ?></td>
                                                     <td><?= htmlspecialchars($ocorrencia['usuario_nome']) ?></td>
                                                     <td><?= formatar_data($ocorrencia['created_at'], 'd/m/Y H:i') ?></td>
+                                                    <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                                                    <td class="text-end">
+                                                        <div class="d-flex gap-2 justify-content-end">
+                                                            <a href="ocorrencia_view.php?id=<?= $ocorrencia['id'] ?>" class="btn btn-sm btn-light btn-active-light-primary" title="Ver Detalhes">
+                                                                <i class="ki-duotone ki-eye fs-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                    <span class="path3"></span>
+                                                                </i>
+                                                            </a>
+                                                            <?php if (has_role(['ADMIN', 'RH'])): ?>
+                                                            <a href="ocorrencias_edit.php?id=<?= $ocorrencia['id'] ?>" class="btn btn-sm btn-light btn-active-light-warning" title="Editar">
+                                                                <i class="ki-duotone ki-pencil fs-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                </i>
+                                                            </a>
+                                                            <a href="#" onclick="deletarOcorrencia(<?= $ocorrencia['id'] ?>); return false;" class="btn btn-sm btn-light btn-active-light-danger" title="Deletar">
+                                                                <i class="ki-duotone ki-trash fs-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                    <span class="path3"></span>
+                                                                    <span class="path4"></span>
+                                                                    <span class="path5"></span>
+                                                                </i>
+                                                            </a>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </td>
+                                                    <?php endif; ?>
                                                 </tr>
                                                 <?php endforeach; ?>
                                             </tbody>
@@ -2140,6 +2173,76 @@ function abrirModalFeedback(feedbackId, index) {
     // Implementar modal de feedback
     alert('Modal de feedback será implementado');
 }
+
+<?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+// Função para deletar ocorrência
+function deletarOcorrencia(ocorrenciaId) {
+    Swal.fire({
+        title: 'Tem certeza?',
+        text: 'Esta ação não pode ser desfeita! A ocorrência será permanentemente deletada.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, deletar!',
+        cancelButtonText: 'Cancelar',
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: 'btn fw-bold btn-danger',
+            cancelButton: 'btn fw-bold btn-light'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Envia requisição para deletar
+            fetch('../api/ocorrencias/delete.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ocorrencia_id: ocorrenciaId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        text: data.message,
+                        icon: 'success',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        text: data.message || 'Erro ao deletar ocorrência',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    text: 'Erro ao conectar com o servidor',
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        confirmButton: 'btn fw-bold btn-primary'
+                    }
+                });
+            });
+        }
+    });
+}
+<?php endif; ?>
 </script>
 
 <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
