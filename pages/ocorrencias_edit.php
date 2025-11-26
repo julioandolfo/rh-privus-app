@@ -256,7 +256,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Processa anexos
         if (!empty($_FILES['anexos']['name'][0])) {
             foreach ($_FILES['anexos']['name'] as $key => $name) {
-                if (!empty($name)) {
+                if (!empty($name) && $_FILES['anexos']['error'][$key] === UPLOAD_ERR_OK) {
                     $file = [
                         'name' => $name,
                         'type' => $_FILES['anexos']['type'][$key],
@@ -267,19 +267,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $upload_result = upload_anexo_ocorrencia($file, $ocorrencia_id);
                     if ($upload_result['success']) {
-                        $stmt = $pdo->prepare("
-                            INSERT INTO ocorrencias_anexos 
-                            (ocorrencia_id, nome_arquivo, caminho_arquivo, tipo_mime, tamanho_bytes, uploaded_by)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        ");
-                        $stmt->execute([
-                            $ocorrencia_id,
-                            $upload_result['filename'],
-                            $upload_result['path'],
-                            $upload_result['mime_type'],
-                            $upload_result['size'],
-                            $usuario['id']
-                        ]);
+                        try {
+                            $stmt = $pdo->prepare("
+                                INSERT INTO ocorrencias_anexos 
+                                (ocorrencia_id, nome_arquivo, caminho_arquivo, tipo_mime, tamanho_bytes, uploaded_by)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            ");
+                            $stmt->execute([
+                                $ocorrencia_id,
+                                $upload_result['filename'],
+                                $upload_result['path'],
+                                $upload_result['mime_type'],
+                                $upload_result['size'],
+                                $usuario['id']
+                            ]);
+                        } catch (PDOException $e) {
+                            error_log("Erro ao salvar anexo no banco: " . $e->getMessage());
+                            // Não interrompe o processo, apenas loga o erro
+                        }
+                    } else {
+                        error_log("Erro no upload do anexo: " . ($upload_result['error'] ?? 'Erro desconhecido'));
+                    }
+                } else {
+                    if ($_FILES['anexos']['error'][$key] !== UPLOAD_ERR_OK) {
+                        error_log("Erro no upload do arquivo (código: " . $_FILES['anexos']['error'][$key] . "): " . $name);
                     }
                 }
             }
@@ -387,7 +398,7 @@ require_once __DIR__ . '/../includes/header.php';
             
             <!--begin::Card body-->
             <div class="card-body pt-0">
-                <form id="kt_form_ocorrencia" method="POST" class="form">
+                <form id="kt_form_ocorrencia" method="POST" enctype="multipart/form-data" class="form">
                     <input type="hidden" name="ocorrencia_id" value="<?= $ocorrencia_id ?>" />
                     <input type="hidden" name="tipo_ocorrencia_id" value="<?= $ocorrencia_existente['tipo_ocorrencia_id'] ?>" />
                     

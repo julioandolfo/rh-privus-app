@@ -592,8 +592,12 @@ require_once __DIR__ . '/../includes/header.php';
                                         <?php endif; ?>
                                     </div>
                                 </div>
-                                <a href="../<?= htmlspecialchars($anexo['caminho_arquivo']) ?>" target="_blank" class="btn btn-sm btn-light">
-                                    <i class="ki-duotone ki-download fs-2"></i>
+                                <a href="../<?= htmlspecialchars($anexo['caminho_arquivo']) ?>" target="_blank" class="btn btn-sm btn-light" title="Ver Anexo">
+                                    <i class="ki-duotone ki-eye fs-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
                                 </a>
                             </div>
                             <?php endforeach; ?>
