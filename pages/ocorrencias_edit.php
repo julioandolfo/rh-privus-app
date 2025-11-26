@@ -671,27 +671,7 @@ require_once __DIR__ . '/../includes/header.php';
     function inicializarCampos() {
         const tipoOcorrenciaId = document.getElementById('tipo_ocorrencia_id');
         if (tipoOcorrenciaId) {
-            // Bloqueia mudança do tipo de ocorrência (campo está disabled, mas adiciona proteção extra)
-            const tipoOriginal = tipoOcorrenciaId.value;
-            tipoOcorrenciaId.addEventListener('change', function(e) {
-                e.preventDefault();
-                this.value = tipoOriginal;
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        text: 'O tipo de ocorrência não pode ser alterado!',
-                        icon: 'warning',
-                        buttonsStyling: false,
-                        confirmButtonText: 'Ok, entendi!',
-                        customClass: {
-                            confirmButton: 'btn fw-bold btn-primary'
-                        }
-                    });
-                } else {
-                    alert('O tipo de ocorrência não pode ser alterado!');
-                }
-                return false;
-            });
-            
+            // Campo já está disabled, não precisa de proteção extra
             if (tipoOcorrenciaId.value) {
                 // Simula mudança de tipo para carregar campos dinâmicos
                 tipoOcorrenciaId.dispatchEvent(new Event('change'));
@@ -935,8 +915,16 @@ document.getElementById('apenas_informativa')?.addEventListener('change', functi
 // Função para atualizar valores quando tempo de atraso muda
 function atualizarValoresTempoAtraso() {
     console.log('atualizarValoresTempoAtraso chamada');
-    atualizarInfoDescontoBanco();
-    atualizarValorDescontoDinheiro();
+    const tempoAtraso = document.getElementById('tempo_atraso_minutos')?.value;
+    const consideraDiaInteiro = document.getElementById('considera_dia_inteiro')?.checked;
+    console.log('Tempo atraso:', tempoAtraso);
+    console.log('Considera dia inteiro:', consideraDiaInteiro);
+    
+    // Pequeno delay para garantir que o valor foi atualizado
+    setTimeout(function() {
+        atualizarInfoDescontoBanco();
+        atualizarValorDescontoDinheiro();
+    }, 50);
 }
 
 // Listener global para campo de tempo de atraso (atualiza em tempo real)
@@ -1074,12 +1062,25 @@ function atualizarValorDescontoDinheiro() {
     console.log('colaboradorId:', colaboradorId);
     console.log('option:', option);
     
-    // Garante que o container está visível ANTES de calcular
-    const containerInfo = document.getElementById('info_desconto_dinheiro');
+    // Verifica se o tipo de desconto é dinheiro ou se não há seleção (padrão)
     const tipoDesconto = document.querySelector('input[name="tipo_desconto"]:checked')?.value;
+    const apenasInformativa = document.getElementById('apenas_informativa')?.checked;
+    
+    // Se for apenas informativa, não mostra desconto
+    if (apenasInformativa) {
+        const containerInfo = document.getElementById('info_desconto_dinheiro');
+        if (containerInfo) {
+            containerInfo.style.display = 'none';
+        }
+        return;
+    }
+    
+    // Garante que o container está visível ANTES de calcular se for desconto em dinheiro
+    const containerInfo = document.getElementById('info_desconto_dinheiro');
     console.log('Tipo de desconto:', tipoDesconto);
     console.log('Container encontrado:', containerInfo);
     
+    // Mostra container se for desconto em dinheiro OU se não houver seleção (padrão dinheiro)
     if (containerInfo && (tipoDesconto === 'dinheiro' || !tipoDesconto)) {
         containerInfo.style.display = 'block';
         console.log('Container info_desconto_dinheiro FORÇADO a exibir');
@@ -1168,11 +1169,12 @@ function atualizarValorDescontoDinheiro() {
             }
             
             const elementoValor = document.getElementById('valor_desconto_ocorrencia');
-            // containerInfo e tipoDesconto já foram declarados no início da função
+            const tipoDescontoAtual = document.querySelector('input[name="tipo_desconto"]:checked')?.value;
             
             console.log('Elemento valor_desconto_ocorrencia encontrado:', elementoValor);
             console.log('Container info_desconto_dinheiro encontrado:', containerInfo);
-            console.log('Tipo de desconto selecionado:', tipoDesconto);
+            console.log('Tipo de desconto selecionado:', tipoDescontoAtual);
+            console.log('Valor calculado:', valorDesconto);
             
             if (elementoValor) {
                 const valorFormatado = valorDesconto > 0 
@@ -1183,8 +1185,8 @@ function atualizarValorDescontoDinheiro() {
                 console.log('Valor atualizado para:', valorFormatado);
                 console.log('Elemento após atualização:', elementoValor.textContent);
                 
-                // Garante que o container está visível se o tipo de desconto for dinheiro
-                if (containerInfo && tipoDesconto === 'dinheiro') {
+                // Garante que o container está visível se o tipo de desconto for dinheiro ou se não houver seleção
+                if (containerInfo && (tipoDescontoAtual === 'dinheiro' || !tipoDescontoAtual)) {
                     containerInfo.style.display = 'block';
                     console.log('Container info_desconto_dinheiro exibido');
                 }
@@ -1242,8 +1244,10 @@ document.getElementById('considera_dia_inteiro')?.addEventListener('change', fun
             tempoInput.value = '';
         }
         // Atualiza valores imediatamente (considera como dia inteiro)
-        atualizarInfoDescontoBanco();
-        atualizarValorDescontoDinheiro();
+        setTimeout(function() {
+            atualizarInfoDescontoBanco();
+            atualizarValorDescontoDinheiro();
+        }, 100);
     } else {
         // Se desmarcou, mostra e habilita campo de minutos
         if (permiteTempo && campoTempo) {
@@ -1258,8 +1262,10 @@ document.getElementById('considera_dia_inteiro')?.addEventListener('change', fun
             setTimeout(adicionarListenerTempoAtraso, 50);
         }
         // Atualiza valores imediatamente
-        atualizarInfoDescontoBanco();
-        atualizarValorDescontoDinheiro();
+        setTimeout(function() {
+            atualizarInfoDescontoBanco();
+            atualizarValorDescontoDinheiro();
+        }, 100);
     }
 });
 
