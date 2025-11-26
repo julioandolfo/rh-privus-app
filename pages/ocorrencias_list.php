@@ -24,6 +24,7 @@ $filtro_status_aprovacao = $_GET['status_aprovacao'] ?? '';
 $filtro_data_inicio = $_GET['data_inicio'] ?? '';
 $filtro_data_fim = $_GET['data_fim'] ?? '';
 $filtro_tag = $_GET['tag'] ?? '';
+$filtro_apenas_informativa = $_GET['apenas_informativa'] ?? '';
 
 // Monta query com filtros
 $where = [];
@@ -90,6 +91,14 @@ if ($filtro_tag) {
     $params[] = json_encode([(int)$filtro_tag]);
 }
 
+if ($filtro_apenas_informativa !== '') {
+    if ($filtro_apenas_informativa == '1') {
+        $where[] = "o.apenas_informativa = 1";
+    } else {
+        $where[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
+    }
+}
+
 $where_sql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
 $sql = "
@@ -99,7 +108,8 @@ $sql = "
            t.nome as tipo_ocorrencia_nome,
            t.categoria as tipo_categoria,
            COUNT(DISTINCT a.id) as total_anexos,
-           COUNT(DISTINCT com.id) as total_comentarios
+           COUNT(DISTINCT com.id) as total_comentarios,
+           o.apenas_informativa
     FROM ocorrencias o
     INNER JOIN colaboradores c ON o.colaborador_id = c.id
     LEFT JOIN usuarios u ON o.usuario_id = u.id
@@ -269,6 +279,15 @@ $tipos_ocorrencias = [
                     </div>
                     
                     <div class="col-md-2">
+                        <label class="form-label">Tipo</label>
+                        <select name="apenas_informativa" class="form-select form-select-solid">
+                            <option value="">Todas</option>
+                            <option value="1" <?= $filtro_apenas_informativa === '1' ? 'selected' : '' ?>>Apenas Informativas</option>
+                            <option value="0" <?= $filtro_apenas_informativa === '0' ? 'selected' : '' ?>>Com Impacto</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2">
                         <label class="form-label">Data Início</label>
                         <input type="date" name="data_inicio" class="form-control form-control-solid" value="<?= $filtro_data_inicio ?>">
                     </div>
@@ -382,6 +401,18 @@ $tipos_ocorrencias = [
                                         <?= mb_strlen($descricao) > 100 ? '...' : '' ?>
                                     </span>
                                     <?php
+                                    // Mostra badge de "Apenas Informativa" se aplicável
+                                    if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1) {
+                                        echo '<div class="mt-2">';
+                                        echo '<span class="badge badge-light-success" title="Esta ocorrência é apenas informativa e não gera impacto financeiro">';
+                                        echo '<i class="ki-duotone ki-information-5 fs-2 me-1">';
+                                        echo '<span class="path1"></span><span class="path2"></span><span class="path3"></span>';
+                                        echo '</i>';
+                                        echo 'Apenas Informativa';
+                                        echo '</span>';
+                                        echo '</div>';
+                                    }
+                                    
                                     // Mostra tags
                                     if (!empty($ocorrencia['tags'])) {
                                         $tags_array = json_decode($ocorrencia['tags'], true);

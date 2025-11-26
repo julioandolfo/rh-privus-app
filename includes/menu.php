@@ -101,6 +101,23 @@ function getIcon($name) {
                 <div class="menu-content px-3 pb-2">
                     <span class="text-muted text-uppercase fw-bold fs-7">Menu</span>
                 </div>
+                
+                <?php 
+                // Verifica se é ADMIN/RH para mostrar separações
+                $is_admin_rh = can_show_menu(['ADMIN', 'RH']) && !is_colaborador();
+                
+                if ($is_admin_rh): ?>
+                <!--begin:Seção Principal-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Principal</span>
+                </div>
+                <?php elseif (is_colaborador()): ?>
+                <!--begin:Seção Principal-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Principal</span>
+                </div>
+                <?php endif; ?>
+                
                 <!--begin:Menu item-->
                 <div class="menu-item">
                     <!--begin:Menu link-->
@@ -118,6 +135,26 @@ function getIcon($name) {
                     <!--end:Menu link-->
                 </div>
                 <!--end:Menu item-->
+                
+                <?php 
+                // Verifica se há menus de comunicação para ADMIN/RH
+                $tem_comunicacao_admin = false;
+                if ($is_admin_rh) {
+                    $tem_comunicacao_admin = (can_show_menu(['ADMIN', 'RH'])) || can_access_feed_menu() || 
+                                             (can_access_page('comunicados.php') || can_access_page('comunicado_add.php'));
+                }
+                
+                if ($tem_comunicacao_admin): ?>
+                <!--begin:Seção Comunicação-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Comunicação</span>
+                </div>
+                <?php elseif (is_colaborador()): ?>
+                <!--begin:Seção Comunicação-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Comunicação</span>
+                </div>
+                <?php endif; ?>
                 
                 <!--begin:Menu item - Chat-->
                 <?php if (can_show_menu(['ADMIN', 'RH']) || is_colaborador()): ?>
@@ -158,6 +195,28 @@ function getIcon($name) {
                     <!--end:Menu link-->
                 </div>
                 <!--end:Menu item-->
+                <?php endif; ?>
+                
+                <?php 
+                // Verifica se há menus de desenvolvimento para ADMIN/RH
+                $tem_desenvolvimento_admin = false;
+                if ($is_admin_rh) {
+                    $tem_desenvolvimento_admin = can_access_feedbacks_menu() || can_access_endomarketing_menu() || 
+                                                 (can_show_menu(['ADMIN', 'RH']) && 
+                                                  (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') || 
+                                                   can_access_page('lms_cursos_obrigatorios.php') || can_access_page('lms_relatorios.php')));
+                }
+                
+                if ($tem_desenvolvimento_admin): ?>
+                <!--begin:Seção Desenvolvimento-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Desenvolvimento</span>
+                </div>
+                <?php elseif (is_colaborador() && !can_access_page('lms_meus_cursos.php')): ?>
+                <!--begin:Seção Desenvolvimento-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Desenvolvimento</span>
+                </div>
                 <?php endif; ?>
                 
                 <!--begin:Menu item-->
@@ -266,6 +325,36 @@ function getIcon($name) {
                     <!--end:Menu sub-->
                 </div>
                 <!--end:Menu item-->
+                <?php endif; ?>
+                
+                <?php 
+                // Inicializa variável para evitar erro
+                $mostrar_separacao_gestao_escola = false;
+                
+                // Verifica se há menus de gestão para ADMIN/RH
+                $tem_gestao_admin = false;
+                if ($is_admin_rh) {
+                    $tem_gestao_admin = can_access_recrutamento() || can_access_colaboradores_menu() || 
+                                       can_access_ocorrencias_menu() || can_access_engajamento_menu() || 
+                                       can_access_notificacoes_push_menu();
+                    
+                    // Verifica se Escola Privus vai mostrar separação de gestão
+                    if (can_show_menu(['ADMIN', 'RH']) && 
+                        (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') || 
+                         can_access_page('lms_cursos_obrigatorios.php') || can_access_page('lms_relatorios.php'))) {
+                        $tem_outros_menus_gestao = can_access_engajamento_menu() || can_access_colaboradores_menu() || 
+                                                   can_access_ocorrencias_menu() || can_access_notificacoes_push_menu();
+                        if (!$tem_outros_menus_gestao) {
+                            $mostrar_separacao_gestao_escola = true;
+                        }
+                    }
+                }
+                
+                if ($tem_gestao_admin && !$mostrar_separacao_gestao_escola): ?>
+                <!--begin:Seção Gestão-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Gestão</span>
+                </div>
                 <?php endif; ?>
                 
                 <?php if (can_access_recrutamento()): ?>
@@ -410,7 +499,22 @@ function getIcon($name) {
                     </div>
                     <!--end:Menu item-->
                     <?php endif; ?>
-                    
+                
+                <?php 
+                // Verifica se há menus de estrutura para ADMIN/RH
+                $tem_estrutura_admin = false;
+                if ($is_admin_rh) {
+                    $tem_estrutura_admin = can_access_estrutura();
+                }
+                
+                if ($tem_estrutura_admin): ?>
+                <!--begin:Seção Estrutura-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Estrutura</span>
+                </div>
+                <?php endif; ?>
+                
+                <?php if (can_access_estrutura()): ?>
                     <?php if (can_access_estrutura()): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('empresas.php') || isActive('setores.php') || isActive('cargos.php')) ? 'here show' : '' ?>">
@@ -517,6 +621,195 @@ function getIcon($name) {
                     <!--end:Menu item-->
                     <?php endif; ?>
                     <?php endif; ?>
+                <?php endif; ?>
+                
+                <?php 
+                // Verifica se deve mostrar menu Escola Privus
+                $mostrar_escola_privus = false;
+                $tem_itens_portal = false;
+                $tem_itens_gestao = false;
+                $mostrar_separacao_gestao_escola = false;
+                
+                // Verifica itens do portal (colaboradores)
+                if (can_access_page('lms_meus_cursos.php') || can_access_page('lms_meu_progresso.php') || 
+                    can_access_page('lms_meus_certificados.php') || can_access_page('lms_minhas_conquistas.php')) {
+                    $tem_itens_portal = true;
+                    $mostrar_escola_privus = true;
+                }
+                
+                // Verifica itens de gestão (ADMIN/RH)
+                if (can_show_menu(['ADMIN', 'RH']) && 
+                    (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') || 
+                     can_access_page('lms_cursos_obrigatorios.php') || can_access_page('lms_relatorios.php'))) {
+                    $tem_itens_gestao = true;
+                    $mostrar_escola_privus = true;
+                    
+                    // Verifica se há outros menus de gestão depois para não duplicar separação
+                    $tem_outros_menus_gestao = can_access_engajamento_menu() || can_access_colaboradores_menu() || 
+                                               can_access_ocorrencias_menu() || can_access_notificacoes_push_menu();
+                    if (!$tem_outros_menus_gestao) {
+                        $mostrar_separacao_gestao_escola = true;
+                    }
+                }
+                
+                if ($mostrar_escola_privus):
+                    if ($mostrar_separacao_gestao_escola): ?>
+                    <!--begin:Seção Gestão-->
+                    <div class="menu-content px-3 pb-2 pt-5">
+                        <span class="menu-heading fw-bold text-uppercase fs-7">Gestão</span>
+                    </div>
+                    <?php elseif ($tem_itens_portal && is_colaborador()): ?>
+                    <!--begin:Seção Desenvolvimento-->
+                    <div class="menu-content px-3 pb-2 pt-5">
+                        <span class="menu-heading fw-bold text-uppercase fs-7">Desenvolvimento</span>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!--begin:Menu item - Escola Privus (LMS)-->
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (strpos($current_page, 'lms_') !== false) ? 'here show' : '' ?>">
+                        <!--begin:Menu link-->
+                        <span class="menu-link">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-book fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Escola Privus</span>
+                            <?php
+                            // Conta cursos obrigatórios pendentes/vencidos (apenas para colaboradores)
+                            if (is_colaborador() && !empty($usuario['colaborador_id'])) {
+                                try {
+                                    $stmt_lms = $pdo->prepare("
+                                        SELECT COUNT(*) as total 
+                                        FROM cursos_obrigatorios_colaboradores coc
+                                        WHERE coc.colaborador_id = ? 
+                                        AND coc.status IN ('pendente', 'em_andamento', 'vencido')
+                                    ");
+                                    $stmt_lms->execute([$usuario['colaborador_id']]);
+                                    $total_obrigatorios = $stmt_lms->fetch()['total'] ?? 0;
+                                    
+                                    if ($total_obrigatorios > 0) {
+                                        echo '<span class="badge badge-circle badge-danger ms-auto">' . ($total_obrigatorios > 99 ? '99+' : $total_obrigatorios) . '</span>';
+                                    }
+                                } catch (Exception $e) {
+                                    // Ignora erros
+                                }
+                            }
+                            ?>
+                            <span class="menu-arrow"></span>
+                        </span>
+                        <!--end:Menu link-->
+                        <!--begin:Menu sub-->
+                        <div class="menu-sub menu-sub-accordion">
+                            <?php if (is_colaborador()): ?>
+                                <!-- Itens do Portal para Colaboradores -->
+                                <?php if (can_access_page('lms_meus_cursos.php')): ?>
+                                <!--begin:Menu item-->
+                                <div class="menu-item">
+                                    <a class="menu-link <?= isActive('lms_meus_cursos.php') ?>" href="lms_meus_cursos.php">
+                                        <span class="menu-bullet">
+                                            <span class="bullet bullet-dot"></span>
+                                        </span>
+                                        <span class="menu-title">Meus Cursos</span>
+                                    </a>
+                                </div>
+                                <!--end:Menu item-->
+                                <?php endif; ?>
+                                <?php if (can_access_page('lms_meu_progresso.php')): ?>
+                                <!--begin:Menu item-->
+                                <div class="menu-item">
+                                    <a class="menu-link <?= isActive('lms_meu_progresso.php') ?>" href="lms_meu_progresso.php">
+                                        <span class="menu-bullet">
+                                            <span class="bullet bullet-dot"></span>
+                                        </span>
+                                        <span class="menu-title">Meu Progresso</span>
+                                    </a>
+                                </div>
+                                <!--end:Menu item-->
+                                <?php endif; ?>
+                                <?php if (can_access_page('lms_meus_certificados.php')): ?>
+                                <!--begin:Menu item-->
+                                <div class="menu-item">
+                                    <a class="menu-link <?= isActive('lms_meus_certificados.php') ?>" href="lms_meus_certificados.php">
+                                        <span class="menu-bullet">
+                                            <span class="bullet bullet-dot"></span>
+                                        </span>
+                                        <span class="menu-title">Meus Certificados</span>
+                                    </a>
+                                </div>
+                                <!--end:Menu item-->
+                                <?php endif; ?>
+                                <?php if (can_access_page('lms_minhas_conquistas.php')): ?>
+                                <!--begin:Menu item-->
+                                <div class="menu-item">
+                                    <a class="menu-link <?= isActive('lms_minhas_conquistas.php') ?>" href="lms_minhas_conquistas.php">
+                                        <span class="menu-bullet">
+                                            <span class="bullet bullet-dot"></span>
+                                        </span>
+                                        <span class="menu-title">Minhas Conquistas</span>
+                                    </a>
+                                </div>
+                                <!--end:Menu item-->
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <!-- Itens de Gestão para ADMIN/RH -->
+                                <?php if (can_access_page('lms_cursos.php')): ?>
+                                <!--begin:Menu item-->
+                                <div class="menu-item">
+                                    <a class="menu-link <?= isActive('lms_cursos.php') ?>" href="lms_cursos.php">
+                                        <span class="menu-bullet">
+                                            <span class="bullet bullet-dot"></span>
+                                        </span>
+                                        <span class="menu-title">Gestão de Cursos</span>
+                                    </a>
+                                </div>
+                                <!--end:Menu item-->
+                                <?php endif; ?>
+                                <?php if (can_access_page('lms_categorias_cursos.php')): ?>
+                                <!--begin:Menu item-->
+                                <div class="menu-item">
+                                    <a class="menu-link <?= isActive('lms_categorias_cursos.php') ?>" href="lms_categorias_cursos.php">
+                                        <span class="menu-bullet">
+                                            <span class="bullet bullet-dot"></span>
+                                        </span>
+                                        <span class="menu-title">Categorias</span>
+                                    </a>
+                                </div>
+                                <!--end:Menu item-->
+                                <?php endif; ?>
+                                <?php if (can_access_page('lms_cursos_obrigatorios.php')): ?>
+                                <!--begin:Menu item-->
+                                <div class="menu-item">
+                                    <a class="menu-link <?= isActive('lms_cursos_obrigatorios.php') ?>" href="lms_cursos_obrigatorios.php">
+                                        <span class="menu-bullet">
+                                            <span class="bullet bullet-dot"></span>
+                                        </span>
+                                        <span class="menu-title">Cursos Obrigatórios</span>
+                                    </a>
+                                </div>
+                                <!--end:Menu item-->
+                                <?php endif; ?>
+                                <?php if (can_access_page('lms_relatorios.php')): ?>
+                                <!--begin:Menu item-->
+                                <div class="menu-item">
+                                    <a class="menu-link <?= isActive('lms_relatorios.php') ?>" href="lms_relatorios.php">
+                                        <span class="menu-bullet">
+                                            <span class="bullet bullet-dot"></span>
+                                        </span>
+                                        <span class="menu-title">Relatórios</span>
+                                    </a>
+                                </div>
+                                <!--end:Menu item-->
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                        <!--end:Menu sub-->
+                    </div>
+                    <!--end:Menu item-->
+                <?php endif; ?>
                 
                 <?php if (can_access_page('comunicados.php') || can_access_page('comunicado_add.php')): ?>
                     <!--begin:Menu item - Comunicados-->
@@ -871,15 +1164,6 @@ function getIcon($name) {
                     <?php endif; ?>
                 <?php endif; ?>
                 
-                <?php if (can_access_engajamento_menu() || can_access_colaboradores_menu() || can_access_ocorrencias_menu() || can_access_notificacoes_push_menu()): ?>
-                    <!--begin:Menu separator-->
-                    <div class="menu-item pt-5">
-                        <div class="menu-content">
-                            <span class="menu-heading fw-bold text-uppercase fs-7">Gestão</span>
-                        </div>
-                    </div>
-                    <!--end:Menu separator-->
-                <?php endif; ?>
                 
                 <?php if (can_access_engajamento_menu()): ?>
                     <!--begin:Menu item-->
@@ -1108,6 +1392,13 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
+                <?php if (is_colaborador()): ?>
+                <!--begin:Seção Financeiro-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Financeiro</span>
+                </div>
+                <?php endif; ?>
+                
                 <!--begin:Menu item - Meus Pagamentos (apenas para colaboradores)-->
                 <?php if (can_access_page('meus_pagamentos.php')): ?>
                 <div class="menu-item">
@@ -1122,6 +1413,13 @@ function getIcon($name) {
                     </a>
                 </div>
                 <!--end:Menu item-->
+                <?php endif; ?>
+                
+                <?php if (is_colaborador()): ?>
+                <!--begin:Seção Conta-->
+                <div class="menu-content px-3 pb-2 pt-5">
+                    <span class="menu-heading fw-bold text-uppercase fs-7">Conta</span>
+                </div>
                 <?php endif; ?>
                 
                 <!--begin:Menu item-->

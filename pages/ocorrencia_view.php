@@ -314,7 +314,20 @@ require_once __DIR__ . '/../includes/header.php';
                         <h4 class="fw-bold mb-5">Impacto da Ocorrência</h4>
                         <div class="row mb-7">
                             <div class="col-md-12">
-                                <?php if ($ocorrencia['desconta_banco_horas']): ?>
+                                <?php if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1): ?>
+                                    <!-- Ocorrência Apenas Informativa -->
+                                    <div class="alert alert-success d-flex align-items-center p-5">
+                                        <i class="ki-duotone ki-information-5 fs-2x text-success me-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div class="d-flex flex-column">
+                                            <h4 class="mb-1 text-dark">Ocorrência Apenas Informativa</h4>
+                                            <span>Esta ocorrência foi marcada como <strong>apenas informativa</strong> e não gera impacto financeiro nem afeta o banco de horas do colaborador. É apenas para fins de registro e documentação.</span>
+                                        </div>
+                                    </div>
+                                <?php elseif ($ocorrencia['desconta_banco_horas']): ?>
                                     <!-- Desconto em Banco de Horas -->
                                     <div class="card card-flush bg-light-warning">
                                         <div class="card-body">

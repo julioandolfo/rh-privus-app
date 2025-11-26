@@ -1653,5 +1653,83 @@ document.getElementById('kt_modal_tipo_ocorrencia').addEventListener('shown.bs.m
 });
 </script>
 
+<!--begin::Tutorial System-->
+<link href="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/introjs.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/intro.min.js"></script>
+<script src="../assets/js/tutorial-system.js"></script>
+<script>
+// Configuração do tutorial para esta página
+window.pageTutorial = {
+    pageId: 'tipos_ocorrencias',
+    steps: [
+        {
+            title: 'Bem-vindo à Gestão de Tipos de Ocorrências',
+            intro: 'Este tutorial vai te guiar pelas funcionalidades de gerenciamento de tipos de ocorrências. Vamos começar!'
+        },
+        {
+            element: 'button[data-bs-target="#kt_modal_tipo_ocorrencia"]',
+            title: 'Criar Novo Tipo',
+            intro: 'Clique neste botão para criar um novo tipo de ocorrência. O formulário possui várias abas com diferentes configurações.'
+        },
+        {
+            element: '#kt_tipos_ocorrencias_table',
+            title: 'Lista de Tipos',
+            intro: 'Aqui você vê todos os tipos de ocorrências cadastrados, organizados por categoria. Use a busca para filtrar rapidamente.'
+        },
+        {
+            element: '#kt_modal_tipo_ocorrencia',
+            title: 'Formulário de Cadastro',
+            intro: 'O formulário possui 4 abas principais: Básico, Configurações, Campos Dinâmicos e Notificações. Vamos explorar cada uma.'
+        },
+        {
+            element: '#tab_basico',
+            title: 'Aba Básico',
+            intro: 'Na aba Básico, você define: Nome, Categoria, Severidade, Status e opções básicas como permitir tempo de atraso ou tipo de ponto.'
+        },
+        {
+            element: '#permite_considerar_dia_inteiro',
+            title: 'Considerar Dia Inteiro',
+            intro: 'Quando marcado, permite que ao criar uma ocorrência deste tipo, o usuário possa marcar como "falta do dia inteiro" (8 horas) ao invés de apenas minutos.'
+        },
+        {
+            element: '#tab_configuracoes',
+            title: 'Aba Configurações',
+            intro: 'Na aba Configurações, você define comportamentos avançados: aprovação, advertências progressivas, cálculo de desconto e validações customizadas.'
+        },
+        {
+            element: '#calcula_desconto',
+            title: 'Calcula Desconto',
+            intro: 'Quando marcado, o sistema calcula automaticamente um desconto no salário. Você pode definir um valor fixo ou deixar calcular proporcionalmente.'
+        },
+        {
+            element: '#permite_desconto_banco_horas',
+            title: 'Desconto Banco de Horas',
+            intro: 'Quando marcado junto com "Calcula Desconto", o usuário poderá escolher entre descontar em R$ ou em horas do banco de horas ao criar a ocorrência.'
+        },
+        {
+            element: '#tab_campos',
+            title: 'Aba Campos Dinâmicos',
+            intro: 'Adicione campos personalizados que aparecerão no formulário de ocorrências deste tipo. Exemplos: horário esperado, local, testemunhas, etc.'
+        },
+        {
+            element: 'button[onclick="adicionarCampoDinamico()"]',
+            title: 'Adicionar Campo',
+            intro: 'Clique aqui para adicionar um novo campo dinâmico. Você pode criar campos de texto, número, data, hora, seleção, checkbox, etc.'
+        },
+        {
+            element: '#tab_notificacoes',
+            title: 'Aba Notificações',
+            intro: 'Configure quem será notificado quando uma ocorrência deste tipo for criada. Você pode escolher entre notificação interna, email e push notification.'
+        },
+        {
+            element: '#kt_tipos_ocorrencias_table',
+            title: 'Editar Tipo',
+            intro: 'Clique no menu de ações (botão "Ações") em qualquer linha da tabela e depois em "Editar" para modificar um tipo de ocorrência existente. Todas as configurações podem ser alteradas.'
+        }
+    ]
+};
+</script>
+<!--end::Tutorial System-->
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

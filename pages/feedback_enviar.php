@@ -572,5 +572,63 @@ document.addEventListener('DOMContentLoaded', function() {
 </style>
 <!--end::Scripts-->
 
+<!--begin::Tutorial System-->
+<link href="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/introjs.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/intro.min.js"></script>
+<script src="../assets/js/tutorial-system.js"></script>
+<script>
+// Configuração do tutorial para esta página
+window.pageTutorial = {
+    pageId: 'feedback_enviar',
+    steps: [
+        {
+            title: 'Bem-vindo ao Envio de Feedback',
+            intro: 'Este tutorial vai te guiar pelas principais funcionalidades do formulário de feedback. Vamos começar!'
+        },
+        {
+            element: '#destinatario_colaborador_id',
+            title: 'Seleção de Colaborador',
+            intro: 'Comece selecionando o colaborador que receberá o feedback. Use a busca para encontrar rapidamente pelo nome ou CPF.'
+        },
+        {
+            element: '#anonimo_checkbox',
+            title: 'Feedback Anônimo',
+            intro: 'Marque esta opção se desejar que o feedback seja anônimo. O colaborador receberá o feedback mas não saberá quem enviou.'
+        },
+        {
+            element: '.rating-stars:first-of-type',
+            title: 'Itens de Avaliação',
+            intro: 'Avalie o colaborador nos itens da empresa usando as estrelas. Clique nas estrelas para atribuir uma nota de 1 a 5. Clique novamente na mesma estrela para remover a avaliação.'
+        },
+        {
+            element: '#template_select',
+            title: 'Modelo de Feedback',
+            intro: 'Escolha um modelo de feedback para te ajudar a estruturar sua mensagem. Os modelos incluem formatos como "Parar/Continuar/Começar", SCI, Comunicação Não Violenta, etc.'
+        },
+        {
+            element: '#feedback_conteudo',
+            title: 'Conteúdo do Feedback',
+            intro: 'Descreva seu feedback aqui. Se você selecionou um modelo, o texto será preenchido automaticamente. Você pode editar livremente o conteúdo.'
+        },
+        {
+            element: '#presencial_checkbox',
+            title: 'Feedback Presencial',
+            intro: 'Marque esta opção se o feedback foi dado presencialmente (em uma conversa face a face). Isso ajuda a rastrear diferentes tipos de feedback.'
+        },
+        {
+            element: '#anotacoes_internas',
+            title: 'Anotações Internas',
+            intro: 'Use este campo para fazer anotações privadas sobre o feedback. Essas anotações são apenas suas e não serão visíveis para o colaborador.'
+        },
+        {
+            element: '#kt_submit_feedback',
+            title: 'Enviar Feedback',
+            intro: 'Após preencher todos os campos desejados, clique em "Enviar Feedback" para enviar. O colaborador receberá uma notificação sobre o novo feedback.'
+        }
+    ]
+};
+</script>
+<!--end::Tutorial System-->
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

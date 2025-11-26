@@ -59,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tipo_ponto = null;
     }
     $considera_dia_inteiro = isset($_POST['considera_dia_inteiro']) && $_POST['considera_dia_inteiro'] == '1';
+    $apenas_informativa = isset($_POST['apenas_informativa']) && $_POST['apenas_informativa'] == '1';
     $severidade = $_POST['severidade'] ?? null;
     $tags = !empty($_POST['tags']) ? json_encode($_POST['tags']) : null;
     $campos_dinamicos_valores = !empty($_POST['campos_dinamicos']) ? json_encode($_POST['campos_dinamicos']) : null;
@@ -175,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 tipo_ponto = ?, 
                 severidade = ?,
                 considera_dia_inteiro = ?,
+                apenas_informativa = ?,
                 tags = ?, 
                 campos_dinamicos = ?,
                 valor_desconto = NULL,
@@ -191,6 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tipo_ponto,
             $severidade,
             $considera_dia_inteiro ? 1 : 0,
+            $apenas_informativa ? 1 : 0,
             $tags,
             $campos_dinamicos_valores,
             $ocorrencia_id_edit
@@ -220,27 +223,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        // Verifica tipo de desconto escolhido
-        $tipo_desconto = $_POST['tipo_desconto'] ?? 'dinheiro';
-        $desconta_banco_horas = ($tipo_desconto === 'banco_horas') ? true : false;
-        
-        if ($desconta_banco_horas && $tipo_ocorrencia_data && $tipo_ocorrencia_data['permite_desconto_banco_horas']) {
-            // Desconta do banco de horas
-            $resultado = descontar_horas_banco_ocorrencia($ocorrencia_id, $usuario['id']);
+        // Se for apenas informativa, não calcula desconto nem banco de horas
+        if (!$apenas_informativa) {
+            // Verifica tipo de desconto escolhido
+            $tipo_desconto = $_POST['tipo_desconto'] ?? 'dinheiro';
+            $desconta_banco_horas = ($tipo_desconto === 'banco_horas') ? true : false;
             
-            if (!$resultado['success']) {
-                // Log erro mas não impede edição da ocorrência
-                error_log('Erro ao descontar banco de horas: ' . $resultado['error']);
-            }
-        } else {
-            // Comportamento atual: calcula desconto em dinheiro
-            if ($tipo_ocorrencia_data && $tipo_ocorrencia_data['calcula_desconto']) {
-                $valor_desconto = calcular_desconto_ocorrencia($ocorrencia_id);
-                if ($valor_desconto > 0) {
-                    $stmt = $pdo->prepare("UPDATE ocorrencias SET valor_desconto = ? WHERE id = ?");
-                    $stmt->execute([$valor_desconto, $ocorrencia_id]);
+            if ($desconta_banco_horas && $tipo_ocorrencia_data && $tipo_ocorrencia_data['permite_desconto_banco_horas']) {
+                // Desconta do banco de horas
+                $resultado = descontar_horas_banco_ocorrencia($ocorrencia_id, $usuario['id']);
+                
+                if (!$resultado['success']) {
+                    // Log erro mas não impede edição da ocorrência
+                    error_log('Erro ao descontar banco de horas: ' . $resultado['error']);
+                }
+            } else {
+                // Comportamento atual: calcula desconto em dinheiro
+                if ($tipo_ocorrencia_data && $tipo_ocorrencia_data['calcula_desconto']) {
+                    $valor_desconto = calcular_desconto_ocorrencia($ocorrencia_id);
+                    if ($valor_desconto > 0) {
+                        $stmt = $pdo->prepare("UPDATE ocorrencias SET valor_desconto = ? WHERE id = ?");
+                        $stmt->execute([$valor_desconto, $ocorrencia_id]);
+                    }
                 }
             }
+        } else {
+            // Se for apenas informativa, garante que não há desconto
+            $stmt = $pdo->prepare("UPDATE ocorrencias SET valor_desconto = NULL, desconta_banco_horas = 0, horas_descontadas = NULL WHERE id = ?");
+            $stmt->execute([$ocorrencia_id]);
         }
         
         // Processa anexos
@@ -513,6 +523,32 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     
+                    <!-- Campo: Apenas Informativa -->
+                    <div class="row mb-7" id="campo_apenas_informativa" style="display: none;">
+                        <div class="col-md-12">
+                            <div class="card card-flush bg-light-success">
+                                <div class="card-body">
+                                    <div class="form-check form-check-custom form-check-solid">
+                                        <input class="form-check-input" type="checkbox" name="apenas_informativa" id="apenas_informativa" value="1" <?= (!empty($ocorrencia_existente['apenas_informativa']) && $ocorrencia_existente['apenas_informativa'] == 1) ? 'checked' : '' ?> />
+                                        <label class="form-check-label fw-bold" for="apenas_informativa">
+                                            <i class="ki-duotone ki-information-5 fs-2 text-success me-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                            Marcar como Apenas Informativa (Sem Impacto Financeiro)
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">
+                                        Quando marcado, esta ocorrência será registrada apenas para fins de registro/documentação. 
+                                        <strong>Não será descontado do pagamento nem do banco de horas.</strong>
+                                        <br>Use esta opção quando houver atestado médico, justificativa aceita ou outros casos onde a falta não deve gerar desconto.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Campo: Tipo de Desconto (R$ ou Banco de Horas) -->
                     <div class="row mb-7" id="campo_tipo_desconto" style="display: none;">
                         <div class="col-md-12">
@@ -694,6 +730,19 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     // Atualiza severidade
     document.getElementById('severidade').value = severidade;
     
+    // Mostra/esconde campo "Apenas Informativa" (só aparece se o tipo permite desconto)
+    const campoApenasInformativa = document.getElementById('campo_apenas_informativa');
+    if (permiteDescontoBanco || calculaDesconto) {
+        if (campoApenasInformativa) {
+            campoApenasInformativa.style.display = 'block';
+        }
+    } else {
+        if (campoApenasInformativa) {
+            campoApenasInformativa.style.display = 'none';
+            document.getElementById('apenas_informativa').checked = false;
+        }
+    }
+    
     // Mostra/esconde campo de tipo de desconto (R$ ou Banco de Horas)
     const campoTipoDesconto = document.getElementById('campo_tipo_desconto');
     const opcaoBancoHoras = document.getElementById('opcao_banco_horas_container');
@@ -842,6 +891,45 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     // Atualiza valores quando tipo de ocorrência muda
     atualizarInfoDescontoBanco();
     atualizarValorDescontoDinheiro();
+    
+    // Atualiza visibilidade dos campos baseado em "apenas informativa"
+    atualizarCamposApenasInformativa();
+});
+
+// Função para atualizar visibilidade dos campos quando "apenas informativa" muda
+function atualizarCamposApenasInformativa() {
+    const apenasInformativa = document.getElementById('apenas_informativa')?.checked;
+    const campoTipoDesconto = document.getElementById('campo_tipo_desconto');
+    
+    if (apenasInformativa) {
+        // Se marcado como informativa, esconde campos de desconto
+        if (campoTipoDesconto) {
+            campoTipoDesconto.style.display = 'none';
+        }
+        // Desmarca opções de desconto
+        document.getElementById('tipo_desconto_dinheiro').checked = false;
+        document.getElementById('tipo_desconto_banco_horas').checked = false;
+        document.getElementById('desconta_banco_horas').value = '0';
+        document.getElementById('info_desconto_banco').style.display = 'none';
+        document.getElementById('info_desconto_dinheiro').style.display = 'none';
+    } else {
+        // Se desmarcado, mostra campos de desconto se o tipo permitir
+        const tipoOcorrencia = document.getElementById('tipo_ocorrencia_id');
+        const option = tipoOcorrencia?.options[tipoOcorrencia.selectedIndex];
+        const permiteDescontoBanco = option?.getAttribute('data-permite-desconto-banco') === '1';
+        const calculaDesconto = option?.getAttribute('data-calcula-desconto') === '1';
+        
+        if ((permiteDescontoBanco || calculaDesconto) && campoTipoDesconto) {
+            campoTipoDesconto.style.display = 'block';
+            // Reativa os listeners do tipo de ocorrência para atualizar campos
+            tipoOcorrencia.dispatchEvent(new Event('change'));
+        }
+    }
+}
+
+// Listener para checkbox "Apenas Informativa"
+document.getElementById('apenas_informativa')?.addEventListener('change', function() {
+    atualizarCamposApenasInformativa();
 });
 
 // Função para atualizar valores quando tempo de atraso muda

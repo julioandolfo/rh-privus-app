@@ -723,3 +723,71 @@ KTUtil.onDOMContentLoaded(function() {
 });
 </script>
 
+<!--begin::Tutorial System-->
+<link href="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/introjs.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/intro.min.js"></script>
+<script src="../assets/js/tutorial-system.js"></script>
+<script>
+// Configuração do tutorial para esta página
+window.pageTutorial = {
+    pageId: 'tipos_bonus',
+    steps: [
+        {
+            title: 'Bem-vindo à Gestão de Tipos de Bônus',
+            intro: 'Este tutorial vai te guiar pelas funcionalidades de gerenciamento de tipos de bônus. Vamos começar!'
+        },
+        {
+            element: 'button[data-bs-target="#kt_modal_tipo_bonus"]',
+            title: 'Criar Novo Tipo de Bônus',
+            intro: 'Clique neste botão para criar um novo tipo de bônus. Você poderá configurar nome, descrição, tipo de valor e regras de desconto.'
+        },
+        {
+            element: '#kt_tipos_bonus_table',
+            title: 'Lista de Tipos de Bônus',
+            intro: 'Aqui você vê todos os tipos de bônus cadastrados. Use a busca para filtrar rapidamente. Cada tipo mostra suas configurações principais.'
+        },
+        {
+            element: '#kt_tipos_bonus_table',
+            title: 'Tipo de Valor',
+            intro: 'Os tipos de bônus podem ser: Variável (valor definido por colaborador), Valor Fixo (mesmo valor para todos) ou Informativo (não soma no pagamento).'
+        },
+        {
+            element: '#kt_tipos_bonus_table',
+            title: 'Desconto por Ocorrências',
+            intro: 'Você pode configurar quais tipos de ocorrências descontam deste bônus e como será calculado o desconto (proporcional, fixo, percentual ou total).'
+        },
+        {
+            element: '#kt_tipos_bonus_table',
+            title: 'Editar Tipo de Bônus',
+            intro: 'Clique no ícone de lápis na linha de um tipo de bônus para editá-lo. Você pode alterar todas as configurações, incluindo regras de desconto.'
+        },
+        {
+            element: '#kt_modal_tipo_bonus',
+            title: 'Modal de Cadastro/Edição',
+            intro: 'No modal, você pode configurar: Nome, Descrição, Tipo de Valor, Valor Fixo (se aplicável) e regras de desconto por ocorrências.'
+        },
+        {
+            element: '#tipo_valor_bonus',
+            title: 'Tipo de Valor',
+            intro: 'Escolha como o valor será definido: Variável (individual), Fixo (mesmo para todos) ou Informativo (apenas informação).'
+        },
+        {
+            element: '#campo_valor_fixo',
+            title: 'Valor Fixo',
+            intro: 'Se você escolher "Valor Fixo", este campo aparecerá para você informar o valor que será aplicado a todos os colaboradores com este tipo de bônus.'
+        },
+        {
+            element: '#ocorrencias_desconto_container',
+            title: 'Desconto por Ocorrências',
+            intro: 'Configure quais tipos de ocorrências descontam deste bônus. Você pode definir o tipo de desconto (proporcional, fixo, percentual ou total) e outras regras.'
+        },
+        {
+            element: 'button[onclick="adicionarOcorrenciaDesconto()"]',
+            title: 'Adicionar Regra de Desconto',
+            intro: 'Clique aqui para adicionar uma nova regra de desconto por ocorrência. Você pode adicionar múltiplas regras para diferentes tipos de ocorrências.'
+        }
+    ]
+};
+</script>
+<!--end::Tutorial System-->
+

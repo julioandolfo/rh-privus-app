@@ -1032,5 +1032,103 @@ function removerFormacao(id) {
 }
 </script>
 
+<!--begin::Tutorial System-->
+<link href="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/introjs.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/intro.min.js"></script>
+<script src="../assets/js/tutorial-system.js"></script>
+<script>
+// Configuração do tutorial para esta página
+window.pageTutorial = {
+    pageId: 'colaborador_add',
+    steps: [
+        {
+            title: 'Bem-vindo ao Cadastro de Colaborador',
+            intro: 'Este tutorial vai te guiar pelas principais seções do formulário de cadastro de colaborador. Vamos começar!'
+        },
+        {
+            element: '#empresa_id',
+            title: 'Empresa',
+            intro: 'Selecione a empresa do colaborador. Se você tiver acesso a apenas uma empresa, este campo estará oculto e será preenchido automaticamente.'
+        },
+        {
+            element: '#setor_id',
+            title: 'Setor e Cargo',
+            intro: 'Selecione o setor e cargo do colaborador. Os setores e cargos são carregados automaticamente conforme a empresa selecionada.'
+        },
+        {
+            element: '#nivel_hierarquico_id',
+            title: 'Nível Hierárquico',
+            intro: 'Opcionalmente, você pode definir o nível hierárquico do colaborador. Isso ajuda na organização da estrutura organizacional.'
+        },
+        {
+            element: '#lider_id',
+            title: 'Líder',
+            intro: 'Selecione o líder direto deste colaborador. A lista de líderes é filtrada conforme o setor e nível hierárquico selecionados.'
+        },
+        {
+            element: '#foto',
+            title: 'Foto de Perfil',
+            intro: 'Faça upload da foto do colaborador. Formatos aceitos: JPG, PNG, GIF, WEBP. Tamanho máximo: 5MB. Uma prévia será exibida após selecionar.'
+        },
+        {
+            element: 'input[name="nome_completo"]',
+            title: 'Dados Pessoais',
+            intro: 'Preencha os dados pessoais do colaborador. Campos marcados com * são obrigatórios. O CPF será validado automaticamente.'
+        },
+        {
+            element: '#filhos_container',
+            title: 'Filhos',
+            intro: 'Você pode adicionar informações sobre os filhos do colaborador clicando em "Adicionar Filho". A idade é calculada automaticamente se você informar a data de nascimento.'
+        },
+        {
+            element: '#formacoes_container',
+            title: 'Formações',
+            intro: 'Registre cursos e formações do colaborador. Você pode adicionar múltiplas formações, incluindo graduação, pós-graduação, cursos técnicos, etc.'
+        },
+        {
+            element: '#data_inicio',
+            title: 'Data de Início',
+            intro: 'Informe a data de início do colaborador na empresa. Este campo é obrigatório e é usado para cálculos de tempo de serviço.'
+        },
+        {
+            element: '#tipo_contrato',
+            title: 'Tipo de Contrato',
+            intro: 'Selecione o tipo de contrato: CLT, PJ, Estágio ou Terceirizado. Se for PJ, o campo CNPJ aparecerá automaticamente.'
+        },
+        {
+            element: '#salario',
+            title: 'Salário',
+            intro: 'Informe o salário do colaborador. Use o formato brasileiro (ex: 5.000,00). O sistema aplica máscara automaticamente.'
+        },
+        {
+            element: '#campo_endereco',
+            title: 'Endereço',
+            intro: 'Preencha o endereço completo do colaborador. Se o colaborador for PJ, você pode usar o botão "Sincronizar" para buscar dados do CNPJ automaticamente.'
+        },
+        {
+            element: 'input[name="pix"]',
+            title: 'Dados Bancários',
+            intro: 'Informe os dados bancários para pagamento: PIX, banco, agência, conta e tipo de conta. Esses dados são importantes para o processamento de pagamentos.'
+        },
+        {
+            element: '#senha',
+            title: 'Senha de Acesso',
+            intro: 'Opcionalmente, você pode definir uma senha para o colaborador acessar o sistema. Se não informar, o colaborador precisará criar a senha no primeiro acesso.'
+        },
+        {
+            element: '#enviar_email_boas_vindas',
+            title: 'Email de Boas-vindas',
+            intro: 'Marque esta opção para enviar automaticamente um email de boas-vindas ao colaborador com seus dados de acesso ao sistema.'
+        },
+        {
+            element: 'form button[type="submit"]',
+            title: 'Finalizar',
+            intro: 'Após preencher todos os campos obrigatórios, clique em "Salvar" para cadastrar o colaborador. O sistema validará os dados antes de salvar.'
+        }
+    ]
+};
+</script>
+<!--end::Tutorial System-->
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

@@ -27,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tempo_atraso_minutos = !empty($_POST['tempo_atraso_minutos']) ? (int)$_POST['tempo_atraso_minutos'] : null;
     $tipo_ponto = $_POST['tipo_ponto'] ?? null;
     $considera_dia_inteiro = isset($_POST['considera_dia_inteiro']) && $_POST['considera_dia_inteiro'] == '1';
+    $apenas_informativa = isset($_POST['apenas_informativa']) && $_POST['apenas_informativa'] == '1';
     $desconta_banco_horas = isset($_POST['desconta_banco_horas']) && $_POST['desconta_banco_horas'] == '1';
     
     if (empty($colaborador_id) || empty($motivo) || empty($tipo_ocorrencia_id)) {
@@ -73,8 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             INSERT INTO ocorrencias (
                 colaborador_id, usuario_id, tipo, tipo_ocorrencia_id, 
                 descricao, data_ocorrencia, severidade, status_aprovacao,
-                tempo_atraso_minutos, tipo_ponto, considera_dia_inteiro, desconta_banco_horas
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tempo_atraso_minutos, tipo_ponto, considera_dia_inteiro, apenas_informativa, desconta_banco_horas
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $colaborador_id, 
@@ -88,13 +89,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tempo_atraso_minutos,
             $tipo_ponto,
             $considera_dia_inteiro ? 1 : 0,
+            $apenas_informativa ? 1 : 0,
             $desconta_banco_horas ? 1 : 0
         ]);
         
         $ocorrencia_id = $pdo->lastInsertId();
         
-        // Verifica se deve descontar do banco de horas
-        if ($desconta_banco_horas && $tipo_ocorrencia['permite_desconto_banco_horas']) {
+        // Se for apenas informativa, não desconta nada
+        if ($apenas_informativa) {
+            $stmt = $pdo->prepare("UPDATE ocorrencias SET valor_desconto = NULL, desconta_banco_horas = 0, horas_descontadas = NULL WHERE id = ?");
+            $stmt->execute([$ocorrencia_id]);
+        } elseif ($desconta_banco_horas && $tipo_ocorrencia['permite_desconto_banco_horas']) {
+            // Verifica se deve descontar do banco de horas
             try {
                 $resultado = descontar_horas_banco_ocorrencia($ocorrencia_id, $usuario['id']);
                 
@@ -310,6 +316,32 @@ include __DIR__ . '/../includes/header.php';
                                 </div>
                             </div>
                             
+                            <!-- Campo: Apenas Informativa -->
+                            <div class="row mb-7" id="campo_apenas_informativa" style="display: none;">
+                                <div class="col-md-12">
+                                    <div class="card card-flush bg-light-success">
+                                        <div class="card-body">
+                                            <div class="form-check form-check-custom form-check-solid">
+                                                <input class="form-check-input" type="checkbox" name="apenas_informativa" id="apenas_informativa" value="1" />
+                                                <label class="form-check-label fw-bold" for="apenas_informativa">
+                                                    <i class="ki-duotone ki-information-5 fs-2 text-success me-2">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                        <span class="path3"></span>
+                                                    </i>
+                                                    Marcar como Apenas Informativa (Sem Impacto Financeiro)
+                                                </label>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">
+                                                Quando marcado, esta ocorrência será registrada apenas para fins de registro/documentação. 
+                                                <strong>Não será descontado do pagamento nem do banco de horas.</strong>
+                                                <br>Use esta opção quando houver atestado médico, justificativa aceita ou outros casos onde a falta não deve gerar desconto.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- Campo: Desconto Banco de Horas -->
                             <div class="row mb-7" id="campo_desconto_banco_horas" style="display: none;">
                                 <div class="col-md-12">
@@ -443,6 +475,15 @@ $(document).ready(function() {
             $('#severidade').val(severidadePadrao);
         }
         
+        // Mostra/esconde campo "Apenas Informativa" (só aparece se o tipo permite desconto)
+        const campoApenasInformativa = $('#campo_apenas_informativa');
+        if (permiteDescontoBanco) {
+            campoApenasInformativa.show();
+        } else {
+            campoApenasInformativa.hide();
+            $('#apenas_informativa').prop('checked', false);
+        }
+        
         // Mostra/esconde campo de considerar dia inteiro primeiro
         const campoDiaInteiro = $('#campo_considera_dia_inteiro');
         if (permiteDiaInteiro) {
@@ -481,9 +522,10 @@ $(document).ready(function() {
             $('#tipo_ponto').val('').prop('required', false);
         }
         
-        // Mostra/esconde campo de desconto banco de horas
+        // Mostra/esconde campo de desconto banco de horas (só se não for apenas informativa)
         const campoDescontoBanco = $('#campo_desconto_banco_horas');
-        if (permiteDescontoBanco) {
+        const apenasInformativa = $('#apenas_informativa').is(':checked');
+        if (permiteDescontoBanco && !apenasInformativa) {
             campoDescontoBanco.show();
             atualizarInfoDescontoBanco();
         } else {
@@ -598,6 +640,29 @@ $(document).ready(function() {
     $('#motivo').on('keydown', function(e) {
         if (e.key === 'Enter' && e.ctrlKey) {
             $('#form_ocorrencia_rapida').submit();
+        }
+    });
+    
+    // Listener para checkbox "Apenas Informativa"
+    $('#apenas_informativa').on('change', function() {
+        const apenasInformativa = $(this).is(':checked');
+        const campoDescontoBanco = $('#campo_desconto_banco_horas');
+        
+        if (apenasInformativa) {
+            // Se marcado como informativa, esconde campo de desconto banco de horas
+            campoDescontoBanco.hide();
+            $('#desconta_banco_horas').prop('checked', false);
+            $('#info_desconto_banco').hide();
+        } else {
+            // Se desmarcado, mostra campo de desconto se o tipo permitir
+            const tipoOcorrencia = $('#tipo_ocorrencia_id');
+            const option = tipoOcorrencia.find('option:selected');
+            const permiteDescontoBanco = option.data('permite-desconto-banco') === '1' || option.data('permite-desconto-banco') === 1;
+            
+            if (permiteDescontoBanco) {
+                campoDescontoBanco.show();
+                atualizarInfoDescontoBanco();
+            }
         }
     });
 });

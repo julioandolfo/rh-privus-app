@@ -98,6 +98,51 @@ function get_page_permissions() {
         // Relatórios - ADMIN, RH e GESTOR
         'relatorio_ocorrencias.php' => ['ADMIN', 'RH', 'GESTOR'],
         'relatorios_fechamentos_extras.php' => ['ADMIN', 'RH'],
+        
+        // LMS - Escola Privus
+        // LMS - Antigo (compatibilidade)
+        'lms/cursos.php' => ['ADMIN', 'RH'],
+        'lms/curso_add.php' => ['ADMIN', 'RH'],
+        'lms/curso_edit.php' => ['ADMIN', 'RH'],
+        'lms/curso_view.php' => ['ADMIN', 'RH'],
+        'lms/aulas.php' => ['ADMIN', 'RH'],
+        'lms/aula_add.php' => ['ADMIN', 'RH'],
+        'lms/aula_edit.php' => ['ADMIN', 'RH'],
+        'lms/categorias_cursos.php' => ['ADMIN', 'RH'],
+        'lms/avaliacoes.php' => ['ADMIN', 'RH'],
+        'lms/avaliacao_add.php' => ['ADMIN', 'RH'],
+        'lms/relatorios_lms.php' => ['ADMIN', 'RH'],
+        'lms/certificados_gerenciar.php' => ['ADMIN', 'RH'],
+        'lms/badges.php' => ['ADMIN', 'RH'],
+        'lms/cursos_obrigatorios.php' => ['ADMIN', 'RH'],
+        'lms/portal/meus_cursos.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms/portal/curso_detalhes.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms/portal/player_aula.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms/portal/meu_progresso.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms/portal/meus_certificados.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms/portal/minhas_conquistas.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        
+        // LMS - Novo (pages direto com prefixo lms_)
+        'lms_cursos.php' => ['ADMIN', 'RH'],
+        'lms_curso_add.php' => ['ADMIN', 'RH'],
+        'lms_curso_edit.php' => ['ADMIN', 'RH'],
+        'lms_curso_view.php' => ['ADMIN', 'RH'],
+        'lms_aulas.php' => ['ADMIN', 'RH'],
+        'lms_aula_add.php' => ['ADMIN', 'RH'],
+        'lms_aula_edit.php' => ['ADMIN', 'RH'],
+        'lms_categorias_cursos.php' => ['ADMIN', 'RH'],
+        'lms_avaliacoes.php' => ['ADMIN', 'RH'],
+        'lms_avaliacao_add.php' => ['ADMIN', 'RH'],
+        'lms_relatorios.php' => ['ADMIN', 'RH'],
+        'lms_certificados_gerenciar.php' => ['ADMIN', 'RH'],
+        'lms_badges.php' => ['ADMIN', 'RH'],
+        'lms_cursos_obrigatorios.php' => ['ADMIN', 'RH'],
+        'lms_meus_cursos.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms_curso_detalhes.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms_player_aula.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms_meu_progresso.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms_meus_certificados.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'lms_minhas_conquistas.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         'relatorio_adiantamentos_pendentes.php' => ['ADMIN', 'RH'],
         'templates_fechamento_extra.php' => ['ADMIN', 'RH'],
         
@@ -384,6 +429,61 @@ function can_access_estrutura() {
     ];
     
     return can_access_any_page($estrutura_pages);
+}
+
+/**
+ * Verifica se o usuário tem acesso ao LMS (Escola Privus)
+ * 
+ * @return bool True se tem acesso a pelo menos uma página do LMS
+ */
+function can_access_lms_menu() {
+    $lms_pages = [
+        // LMS - Antigo (compatibilidade)
+        'lms/cursos.php',
+        'lms/curso_add.php',
+        'lms/curso_edit.php',
+        'lms/curso_view.php',
+        'lms/aulas.php',
+        'lms/aula_add.php',
+        'lms/aula_edit.php',
+        'lms/categorias_cursos.php',
+        'lms/avaliacoes.php',
+        'lms/avaliacao_add.php',
+        'lms/relatorios_lms.php',
+        'lms/certificados_gerenciar.php',
+        'lms/badges.php',
+        'lms/cursos_obrigatorios.php',
+        'lms/portal/meus_cursos.php',
+        'lms/portal/curso_detalhes.php',
+        'lms/portal/player_aula.php',
+        'lms/portal/meu_progresso.php',
+        'lms/portal/meus_certificados.php',
+        'lms/portal/minhas_conquistas.php',
+        
+        // LMS - Novo (pages direto com prefixo lms_)
+        'lms_cursos.php',
+        'lms_curso_add.php',
+        'lms_curso_edit.php',
+        'lms_curso_view.php',
+        'lms_aulas.php',
+        'lms_aula_add.php',
+        'lms_aula_edit.php',
+        'lms_categorias_cursos.php',
+        'lms_avaliacoes.php',
+        'lms_avaliacao_add.php',
+        'lms_relatorios.php',
+        'lms_certificados_gerenciar.php',
+        'lms_badges.php',
+        'lms_cursos_obrigatorios.php',
+        'lms_meus_cursos.php',
+        'lms_curso_detalhes.php',
+        'lms_player_aula.php',
+        'lms_meu_progresso.php',
+        'lms_meus_certificados.php',
+        'lms_minhas_conquistas.php'
+    ];
+    
+    return can_access_any_page($lms_pages);
 }
 
 /**

@@ -178,6 +178,7 @@ try {
     }
     
     // Busca ocorrências com desconto em dinheiro do período
+    // Ignora ocorrências apenas informativas
     $stmt = $pdo->prepare("
         SELECT 
             o.*,
@@ -190,6 +191,7 @@ try {
         AND o.data_ocorrencia <= ?
         AND o.valor_desconto > 0
         AND (o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)
+        AND (o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)
         ORDER BY o.data_ocorrencia DESC
     ");
     $stmt->execute([$colaborador_id, $data_inicio_periodo, $data_fim_periodo]);

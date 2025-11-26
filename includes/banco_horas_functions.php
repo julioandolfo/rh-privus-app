@@ -234,6 +234,11 @@ function calcular_horas_desconto_ocorrencia($ocorrencia_id) {
         return 0;
     }
     
+    // Se for apenas informativa, retorna 0 horas
+    if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1) {
+        return 0;
+    }
+    
     $tipo_codigo = $ocorrencia['tipo_codigo'];
     $jornada_diaria = $ocorrencia['jornada_diaria_horas'] ?? 8; // Padrão 8h
     
@@ -282,6 +287,14 @@ function descontar_horas_banco_ocorrencia($ocorrencia_id, $usuario_id = null) {
     
     if (!$ocorrencia) {
         return ['success' => false, 'error' => 'Ocorrência não encontrada'];
+    }
+    
+    // Se for apenas informativa, não desconta nada
+    if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1) {
+        return [
+            'success' => false,
+            'error' => 'Ocorrência é apenas informativa e não pode gerar desconto no banco de horas'
+        ];
     }
     
     // Calcula horas a descontar

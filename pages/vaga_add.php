@@ -485,5 +485,83 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!--begin::Tutorial System-->
+<link href="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/introjs.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/intro.min.js"></script>
+<script src="../assets/js/tutorial-system.js"></script>
+<script>
+// Configuração do tutorial para esta página
+window.pageTutorial = {
+    pageId: 'vaga_add',
+    steps: [
+        {
+            title: 'Bem-vindo ao Cadastro de Vaga',
+            intro: 'Este tutorial vai te guiar pelas principais seções do formulário de cadastro de vaga. Vamos começar!'
+        },
+        {
+            element: '#empresaSelect',
+            title: 'Informações Básicas',
+            intro: 'Comece selecionando a empresa e preenchendo as informações básicas da vaga: título, setor, cargo e quantidade de vagas disponíveis.'
+        },
+        {
+            element: 'textarea[name="descricao"]',
+            title: 'Descrição da Vaga',
+            intro: 'Descreva detalhadamente a vaga, incluindo responsabilidades principais, objetivos do cargo e contexto da posição. Este campo é obrigatório.'
+        },
+        {
+            element: '#salario_min',
+            title: 'Remuneração',
+            intro: 'Informe a faixa salarial da vaga (mínimo e máximo). Use o formato brasileiro (ex: 5.000,00). O sistema aplica máscara automaticamente.'
+        },
+        {
+            element: '#tipo_contrato',
+            title: 'Tipo de Contrato',
+            intro: 'Selecione o tipo de contrato oferecido: CLT, PJ, Estágio, Temporário ou Freelance.'
+        },
+        {
+            element: 'input[name="beneficios[]"]:first-of-type',
+            title: 'Benefícios',
+            intro: 'Marque os benefícios oferecidos pela vaga. Você pode selecionar múltiplos benefícios padrão ou adicionar benefícios customizados no campo abaixo.'
+        },
+        {
+            element: '#beneficioCustom',
+            title: 'Benefícios Customizados',
+            intro: 'Digite um benefício personalizado e pressione Enter para adicioná-lo à lista. Isso é útil para benefícios específicos da empresa.'
+        },
+        {
+            element: 'textarea[name="requisitos_obrigatorios"]',
+            title: 'Requisitos',
+            intro: 'Preencha os requisitos obrigatórios e desejáveis para a vaga. Seja específico sobre formação, experiência, conhecimentos técnicos, etc.'
+        },
+        {
+            element: 'textarea[name="competencias_tecnicas"]',
+            title: 'Competências',
+            intro: 'Descreva as competências técnicas e comportamentais necessárias para o cargo. Isso ajuda os candidatos a entenderem o perfil procurado.'
+        },
+        {
+            element: 'select[name="modalidade"]',
+            title: 'Modalidade e Localização',
+            intro: 'Informe a modalidade de trabalho (Presencial, Remoto ou Híbrido), localização e horário de trabalho.'
+        },
+        {
+            element: 'input[name="etapas[]"]:first-of-type',
+            title: 'Etapas do Processo',
+            intro: 'Selecione as etapas que farão parte do processo seletivo desta vaga. Se não selecionar nenhuma, serão usadas as etapas padrão do sistema.'
+        },
+        {
+            element: '#publicar_portal',
+            title: 'Publicação',
+            intro: 'Marque "Publicar no Portal" para que a vaga apareça no portal de vagas. Você também pode optar por usar uma landing page customizada.'
+        },
+        {
+            element: '#formVaga button[type="submit"]',
+            title: 'Salvar Vaga',
+            intro: 'Após preencher todas as informações, clique em "Salvar Vaga" para criar a vaga. O sistema validará os dados antes de salvar.'
+        }
+    ]
+};
+</script>
+<!--end::Tutorial System-->
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

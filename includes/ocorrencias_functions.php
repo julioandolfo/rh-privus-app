@@ -239,6 +239,11 @@ function calcular_desconto_ocorrencia($ocorrencia_id) {
         return 0;
     }
     
+    // Se for apenas informativa, retorna 0 (sem desconto)
+    if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1) {
+        return 0;
+    }
+    
     // Se tem valor fixo, usa ele
     if ($ocorrencia['valor_desconto']) {
         return (float)$ocorrencia['valor_desconto'];

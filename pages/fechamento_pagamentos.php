@@ -82,6 +82,9 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
                 $where_conditions_anterior[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
             }
             
+            // Ignora ocorrências apenas informativas
+            $where_conditions_anterior[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
+            
             $sql_anterior = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_conditions_anterior);
             $stmt_anterior = $pdo->prepare($sql_anterior);
             $stmt_anterior->execute($params_anterior);
@@ -121,6 +124,9 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
         if (!$config['desconta_banco_horas']) {
             $where_conditions[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
         }
+        
+        // Ignora ocorrências apenas informativas
+        $where_conditions[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
         
         // Busca ocorrências do tipo configurado no período atual
         $sql = "
@@ -378,6 +384,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Busca ocorrências com desconto em R$ do período
                 // Apenas ocorrências que têm valor_desconto > 0 e não desconta do banco de horas
+                // Ignora ocorrências apenas informativas
                 $stmt = $pdo->prepare("
                     SELECT SUM(valor_desconto) as total_descontos
                     FROM ocorrencias
@@ -386,6 +393,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     AND data_ocorrencia <= ?
                     AND valor_desconto > 0
                     AND (desconta_banco_horas = 0 OR desconta_banco_horas IS NULL)
+                    AND (apenas_informativa = 0 OR apenas_informativa IS NULL)
                 ");
                 $stmt->execute([$colab_id, $data_inicio, $data_fim]);
                 $ocorrencias_data = $stmt->fetch();
@@ -486,6 +494,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $where_anterior[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
                             }
                             
+                            // Ignora ocorrências apenas informativas
+                            $where_anterior[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
+                            
                             $sql_anterior = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_anterior);
                             $stmt_anterior = $pdo->prepare($sql_anterior);
                             $stmt_anterior->execute($params_anterior);
@@ -509,6 +520,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (!$config_det['desconta_banco_horas']) {
                             $where_atual[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
                         }
+                        
+                        // Ignora ocorrências apenas informativas
+                        $where_atual[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
                         
                         $sql_atual = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_atual);
                         $stmt_atual = $pdo->prepare($sql_atual);
