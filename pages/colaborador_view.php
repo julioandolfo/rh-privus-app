@@ -85,6 +85,130 @@ $historico_banco_horas = get_historico_banco_horas($id, [
 ]);
 $dados_grafico = get_dados_grafico_banco_horas($id, 30); // Últimos 30 dias
 
+// =====================================================
+// DADOS DO LMS - ESCOLA PRIVUS
+// =====================================================
+
+// Busca estatísticas gerais do LMS
+$stmt = $pdo->prepare("
+    SELECT 
+        COUNT(DISTINCT c.id) as total_cursos,
+        COUNT(DISTINCT CASE WHEN pc.status = 'concluido' THEN c.id END) as cursos_concluidos,
+        COUNT(DISTINCT CASE WHEN pc.status = 'em_andamento' OR (pc.status != 'concluido' AND pc.data_inicio IS NOT NULL) THEN c.id END) as cursos_em_andamento,
+        COUNT(DISTINCT cert.id) as total_certificados,
+        SUM(pc.tempo_assistido) as tempo_total_assistido_segundos,
+        COUNT(DISTINCT pc.aula_id) as total_aulas_concluidas,
+        COUNT(DISTINCT a.id) as total_aulas_disponiveis
+    FROM cursos c
+    LEFT JOIN aulas a ON a.curso_id = c.id AND a.status = 'publicado'
+    LEFT JOIN progresso_colaborador pc ON pc.curso_id = c.id AND pc.colaborador_id = ?
+    LEFT JOIN certificados cert ON cert.curso_id = c.id AND cert.colaborador_id = ? AND cert.status = 'ativo'
+    WHERE c.status = 'publicado'
+");
+$stmt->execute([$id, $id]);
+$lms_stats = $stmt->fetch();
+
+// Busca cursos com progresso detalhado
+$stmt = $pdo->prepare("
+    SELECT 
+        c.id,
+        c.titulo,
+        c.descricao,
+        c.imagem_capa,
+        c.duracao_estimada,
+        cat.nome as categoria_nome,
+        cat.cor as categoria_cor,
+        COUNT(DISTINCT a.id) as total_aulas,
+        COUNT(DISTINCT CASE WHEN pc.status = 'concluido' THEN pc.aula_id END) as aulas_concluidas,
+        SUM(pc.tempo_assistido) as tempo_assistido_segundos,
+        MAX(pc.data_ultimo_acesso) as ultimo_acesso,
+        MAX(pc.data_conclusao) as data_conclusao_curso,
+        CASE 
+            WHEN COUNT(DISTINCT CASE WHEN pc.status = 'concluido' THEN pc.aula_id END) = COUNT(DISTINCT a.id) AND COUNT(DISTINCT a.id) > 0 THEN 'concluido'
+            WHEN COUNT(DISTINCT CASE WHEN pc.status IN ('em_andamento', 'concluido') THEN pc.aula_id END) > 0 THEN 'em_andamento'
+            ELSE 'nao_iniciado'
+        END as status_curso
+    FROM cursos c
+    LEFT JOIN categorias_cursos cat ON cat.id = c.categoria_id
+    LEFT JOIN aulas a ON a.curso_id = c.id AND a.status = 'publicado'
+    LEFT JOIN progresso_colaborador pc ON pc.curso_id = c.id AND pc.colaborador_id = ?
+    WHERE c.status = 'publicado'
+    GROUP BY c.id
+    HAVING total_aulas > 0
+    ORDER BY ultimo_acesso DESC, c.titulo ASC
+");
+$stmt->execute([$id]);
+$lms_cursos = $stmt->fetchAll();
+
+// Busca certificados
+$stmt = $pdo->prepare("
+    SELECT 
+        cert.*,
+        c.titulo as curso_titulo,
+        c.imagem_capa
+    FROM certificados cert
+    INNER JOIN cursos c ON c.id = cert.curso_id
+    WHERE cert.colaborador_id = ? AND cert.status = 'ativo'
+    ORDER BY cert.data_emissao DESC
+");
+$stmt->execute([$id]);
+$lms_certificados = $stmt->fetchAll();
+
+// Busca badges/conquistas
+$stmt = $pdo->prepare("
+    SELECT 
+        cb.*,
+        b.nome as badge_nome,
+        b.descricao as badge_descricao,
+        b.icone as badge_icone,
+        b.cor as badge_cor
+    FROM colaborador_badges cb
+    INNER JOIN badges_conquistas b ON b.id = cb.badge_id
+    WHERE cb.colaborador_id = ?
+    ORDER BY cb.data_conquista DESC
+");
+$stmt->execute([$id]);
+$lms_badges = $stmt->fetchAll();
+
+// Busca cursos obrigatórios
+$stmt = $pdo->prepare("
+    SELECT 
+        coc.*,
+        c.titulo as curso_titulo,
+        c.imagem_capa,
+        c.duracao_estimada
+    FROM cursos_obrigatorios_colaboradores coc
+    INNER JOIN cursos c ON c.id = coc.curso_id
+    WHERE coc.colaborador_id = ?
+    ORDER BY coc.data_limite ASC, coc.status ASC
+");
+$stmt->execute([$id]);
+$lms_cursos_obrigatorios = $stmt->fetchAll();
+
+// Busca evolução de progresso (últimos 30 dias)
+$stmt = $pdo->prepare("
+    SELECT 
+        DATE(pc.data_conclusao) as data,
+        COUNT(DISTINCT pc.aula_id) as aulas_concluidas
+    FROM progresso_colaborador pc
+    WHERE pc.colaborador_id = ? 
+    AND pc.status = 'concluido'
+    AND pc.data_conclusao >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+    GROUP BY DATE(pc.data_conclusao)
+    ORDER BY data ASC
+");
+$stmt->execute([$id]);
+$lms_evolucao = $stmt->fetchAll();
+
+// Calcula percentual geral de conclusão
+$lms_percentual_geral = 0;
+if ($lms_stats['total_aulas_disponiveis'] > 0) {
+    $lms_percentual_geral = round(($lms_stats['total_aulas_concluidas'] / $lms_stats['total_aulas_disponiveis']) * 100, 1);
+}
+
+// Formata tempo total assistido
+$lms_tempo_total_horas = round($lms_stats['tempo_total_assistido_segundos'] / 3600, 1);
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -146,9 +270,10 @@ require_once __DIR__ . '/../includes/header.php';
             <!--begin::Card header-->
             <div class="card-header border-0 pt-6">
                 <!--begin::Card title-->
-                <div class="card-title">
+                <div class="card-title w-100">
                     <!--begin::Tabs-->
-                    <ul class="nav nav-stretch nav-line-tabs nav-line-tabs-2x border-transparent fs-5 fw-bold overflow-auto flex-nowrap" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                    <div style="overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; width: 100%;">
+                        <ul class="nav nav-stretch nav-line-tabs nav-line-tabs-2x border-transparent fs-5 fw-bold flex-nowrap" style="white-space: nowrap; min-width: max-content;">
                         <li class="nav-item mt-2 flex-shrink-0">
                             <a class="nav-link text-active-primary ms-0 me-5 me-md-10 py-5 active" data-bs-toggle="tab" href="#kt_tab_pane_jornada">
                                 <i class="ki-duotone ki-chart-simple fs-2 me-2">
@@ -220,7 +345,20 @@ require_once __DIR__ . '/../includes/header.php';
                                 <?php endif; ?>
                             </a>
                         </li>
+                        <li class="nav-item mt-2 flex-shrink-0">
+                            <a class="nav-link text-active-primary py-5" data-bs-toggle="tab" href="#kt_tab_pane_escola_privus">
+                                <i class="ki-duotone ki-book fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                <span class="d-none d-md-inline">Escola Privus</span>
+                                <span class="d-md-none">LMS</span>
+                            </a>
+                        </li>
                     </ul>
+                    </div>
                     <!--end::Tabs-->
                 </div>
                 <!--begin::Card title-->
@@ -861,6 +999,380 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php endif; ?>
                     </div>
                     <!--end::Tab Pane - Ocorrências-->
+                    
+                    <!--begin::Tab Pane - Escola Privus-->
+                    <div class="tab-pane fade" id="kt_tab_pane_escola_privus" role="tabpanel">
+                        <!-- Estatísticas Gerais -->
+                        <div class="row g-4 mb-7">
+                            <div class="col-md-3">
+                                <div class="card card-flush h-100">
+                                    <div class="card-body text-center p-5">
+                                        <div class="text-gray-400 fw-bold fs-6 mb-2">Total de Cursos</div>
+                                        <div class="text-gray-900 fw-bold fs-2x"><?= $lms_stats['total_cursos'] ?? 0 ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card card-flush h-100">
+                                    <div class="card-body text-center p-5">
+                                        <div class="text-gray-400 fw-bold fs-6 mb-2">Concluídos</div>
+                                        <div class="text-success fw-bold fs-2x"><?= $lms_stats['cursos_concluidos'] ?? 0 ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card card-flush h-100">
+                                    <div class="card-body text-center p-5">
+                                        <div class="text-gray-400 fw-bold fs-6 mb-2">Certificados</div>
+                                        <div class="text-primary fw-bold fs-2x"><?= $lms_stats['total_certificados'] ?? 0 ?></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card card-flush h-100">
+                                    <div class="card-body text-center p-5">
+                                        <div class="text-gray-400 fw-bold fs-6 mb-2">Progresso Geral</div>
+                                        <div class="text-gray-900 fw-bold fs-2x"><?= $lms_percentual_geral ?>%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tempo de Estudo e Conquistas -->
+                        <div class="row g-4 mb-7">
+                            <div class="col-md-6">
+                                <div class="card card-flush h-100">
+                                    <div class="card-header pt-7">
+                                        <h3 class="card-title align-items-start flex-column">
+                                            <span class="card-label fw-bold text-gray-800">Tempo de Estudo</span>
+                                            <span class="text-muted mt-1 fw-semibold fs-7">Total de horas assistidas</span>
+                                        </h3>
+                                    </div>
+                                    <div class="card-body pt-6">
+                                        <div class="text-center py-5">
+                                            <div class="symbol symbol-circle symbol-100px mb-5">
+                                                <div class="symbol-label bg-light-primary">
+                                                    <i class="ki-duotone ki-time fs-2x text-primary">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                </div>
+                                            </div>
+                                            <h1 class="fw-bold text-gray-900 mb-2">
+                                                <span class="text-primary"><?= $lms_tempo_total_horas ?></span>
+                                                <span class="fs-3 text-gray-600"> horas</span>
+                                            </h1>
+                                            <p class="text-gray-500 mb-0">
+                                                <?= $lms_stats['total_aulas_concluidas'] ?? 0 ?> aulas concluídas
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card card-flush h-100">
+                                    <div class="card-header pt-7">
+                                        <h3 class="card-title align-items-start flex-column">
+                                            <span class="card-label fw-bold text-gray-800">Conquistas</span>
+                                            <span class="text-muted mt-1 fw-semibold fs-7"><?= count($lms_badges) ?> badge(s) conquistado(s)</span>
+                                        </h3>
+                                    </div>
+                                    <div class="card-body pt-6">
+                                        <?php if (empty($lms_badges)): ?>
+                                            <div class="text-center py-10">
+                                                <i class="ki-duotone ki-medal fs-3x text-gray-300 mb-4">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <p class="text-gray-500">Nenhuma conquista ainda</p>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="row g-3">
+                                                <?php foreach ($lms_badges as $badge): ?>
+                                                <div class="col-md-6">
+                                                    <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                        <?php if ($badge['badge_icone']): ?>
+                                                        <i class="<?= htmlspecialchars($badge['badge_icone']) ?> fs-2x me-3" style="color: <?= htmlspecialchars($badge['badge_cor'] ?? '#ffc700') ?>"></i>
+                                                        <?php else: ?>
+                                                        <div class="symbol symbol-circle symbol-40px me-3" style="background-color: <?= htmlspecialchars($badge['badge_cor'] ?? '#ffc700') ?>20">
+                                                            <div class="symbol-label" style="color: <?= htmlspecialchars($badge['badge_cor'] ?? '#ffc700') ?>">
+                                                                <i class="ki-duotone ki-medal fs-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                </i>
+                                                            </div>
+                                                        </div>
+                                                        <?php endif; ?>
+                                                        <div class="flex-grow-1">
+                                                            <div class="fw-bold text-gray-800"><?= htmlspecialchars($badge['badge_nome']) ?></div>
+                                                            <small class="text-gray-500"><?= formatar_data($badge['data_conquista']) ?></small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Gráfico de Evolução -->
+                        <?php if (!empty($lms_evolucao)): ?>
+                        <div class="card mb-7">
+                            <div class="card-header border-0 pt-6">
+                                <h3 class="card-title align-items-start flex-column">
+                                    <span class="card-label fw-bold fs-3 mb-1">Evolução de Conclusões</span>
+                                    <span class="text-muted fw-semibold fs-7">Últimos 30 dias</span>
+                                </h3>
+                            </div>
+                            <div class="card-body pt-0">
+                                <canvas id="lms_evolucao_chart" style="height: 300px;"></canvas>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- Cursos Obrigatórios -->
+                        <?php if (!empty($lms_cursos_obrigatorios)): ?>
+                        <div class="card mb-7">
+                            <div class="card-header border-0 pt-6">
+                                <h3 class="card-title align-items-start flex-column">
+                                    <span class="card-label fw-bold fs-3 mb-1">Cursos Obrigatórios</span>
+                                    <span class="text-muted fw-semibold fs-7"><?= count($lms_cursos_obrigatorios) ?> curso(s) obrigatório(s)</span>
+                                </h3>
+                            </div>
+                            <div class="card-body pt-0">
+                                <div class="table-responsive">
+                                    <table class="table align-middle table-row-dashed fs-6 gy-5">
+                                        <thead>
+                                            <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
+                                                <th class="min-w-200px">Curso</th>
+                                                <th class="min-w-100px">Status</th>
+                                                <th class="min-w-100px">Data Limite</th>
+                                                <th class="min-w-100px">Progresso</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="fw-semibold text-gray-600">
+                                            <?php foreach ($lms_cursos_obrigatorios as $curso_obr): ?>
+                                            <?php
+                                            // Busca progresso do curso obrigatório
+                                            $stmt_prog = $pdo->prepare("
+                                                SELECT 
+                                                    COUNT(DISTINCT a.id) as total_aulas,
+                                                    COUNT(DISTINCT CASE WHEN pc.status = 'concluido' THEN pc.aula_id END) as aulas_concluidas
+                                                FROM cursos c
+                                                LEFT JOIN aulas a ON a.curso_id = c.id AND a.status = 'publicado'
+                                                LEFT JOIN progresso_colaborador pc ON pc.curso_id = c.id AND pc.colaborador_id = ?
+                                                WHERE c.id = ?
+                                            ");
+                                            $stmt_prog->execute([$id, $curso_obr['curso_id']]);
+                                            $prog_obr = $stmt_prog->fetch();
+                                            $percentual_obr = $prog_obr['total_aulas'] > 0 
+                                                ? round(($prog_obr['aulas_concluidas'] / $prog_obr['total_aulas']) * 100, 0)
+                                                : 0;
+                                            ?>
+                                            <tr>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <?php if ($curso_obr['imagem_capa']): ?>
+                                                        <img src="../<?= htmlspecialchars($curso_obr['imagem_capa']) ?>" class="rounded me-3" width="50" height="50" style="object-fit: cover;">
+                                                        <?php endif; ?>
+                                                        <div>
+                                                            <div class="fw-bold text-gray-800"><?= htmlspecialchars($curso_obr['curso_titulo']) ?></div>
+                                                            <?php if ($curso_obr['duracao_estimada']): ?>
+                                                            <small class="text-gray-500"><?= $curso_obr['duracao_estimada'] ?> min</small>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <?php
+                                                    $status_class = 'secondary';
+                                                    $status_text = ucfirst($curso_obr['status']);
+                                                    if ($curso_obr['status'] === 'concluido') {
+                                                        $status_class = 'success';
+                                                    } elseif ($curso_obr['status'] === 'vencido') {
+                                                        $status_class = 'danger';
+                                                    } elseif (in_array($curso_obr['status'], ['pendente', 'em_andamento'])) {
+                                                        $status_class = 'warning';
+                                                    }
+                                                    ?>
+                                                    <span class="badge badge-light-<?= $status_class ?>"><?= $status_text ?></span>
+                                                </td>
+                                                <td>
+                                                    <?= $curso_obr['data_limite'] ? formatar_data($curso_obr['data_limite']) : '-' ?>
+                                                </td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="progress w-100 me-2" style="height: 20px;">
+                                                            <div class="progress-bar bg-<?= $percentual_obr == 100 ? 'success' : ($percentual_obr > 0 ? 'primary' : 'secondary') ?>" 
+                                                                 role="progressbar" 
+                                                                 style="width: <?= $percentual_obr ?>%">
+                                                            </div>
+                                                        </div>
+                                                        <span class="fw-bold text-gray-800 min-w-50px text-end"><?= $percentual_obr ?>%</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- Lista de Cursos -->
+                        <div class="card mb-7">
+                            <div class="card-header border-0 pt-6">
+                                <h3 class="card-title align-items-start flex-column">
+                                    <span class="card-label fw-bold fs-3 mb-1">Todos os Cursos</span>
+                                    <span class="text-muted fw-semibold fs-7"><?= count($lms_cursos) ?> curso(s) disponível(is)</span>
+                                </h3>
+                            </div>
+                            <div class="card-body pt-0">
+                                <?php if (empty($lms_cursos)): ?>
+                                    <div class="alert alert-info d-flex align-items-center p-5">
+                                        <i class="ki-duotone ki-information fs-2hx text-info me-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div class="d-flex flex-column">
+                                            <h4 class="mb-1 text-info">Nenhum curso disponível</h4>
+                                            <span>Nenhum curso foi encontrado para este colaborador.</span>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="table-responsive">
+                                        <table class="table align-middle table-row-dashed fs-6 gy-5">
+                                            <thead>
+                                                <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
+                                                    <th class="min-w-200px">Curso</th>
+                                                    <th class="min-w-100px">Categoria</th>
+                                                    <th class="min-w-100px">Status</th>
+                                                    <th class="min-w-150px">Progresso</th>
+                                                    <th class="min-w-100px">Último Acesso</th>
+                                                    <th class="text-end min-w-100px">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="fw-semibold text-gray-600">
+                                                <?php foreach ($lms_cursos as $curso): ?>
+                                                <?php
+                                                $percentual_curso = $curso['total_aulas'] > 0 
+                                                    ? round(($curso['aulas_concluidas'] / $curso['total_aulas']) * 100, 0)
+                                                    : 0;
+                                                $tempo_horas = round($curso['tempo_assistido_segundos'] / 3600, 1);
+                                                ?>
+                                                <tr>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <?php if ($curso['imagem_capa']): ?>
+                                                            <img src="../<?= htmlspecialchars($curso['imagem_capa']) ?>" class="rounded me-3" width="50" height="50" style="object-fit: cover;">
+                                                            <?php endif; ?>
+                                                            <div>
+                                                                <div class="fw-bold text-gray-800"><?= htmlspecialchars($curso['titulo']) ?></div>
+                                                                <?php if ($curso['duracao_estimada']): ?>
+                                                                <small class="text-gray-500"><?= $curso['duracao_estimada'] ?> min</small>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($curso['categoria_nome']): ?>
+                                                        <span class="badge badge-light" style="background-color: <?= htmlspecialchars($curso['categoria_cor'] ?? '#009ef7') ?>20; color: <?= htmlspecialchars($curso['categoria_cor'] ?? '#009ef7') ?>">
+                                                            <?= htmlspecialchars($curso['categoria_nome']) ?>
+                                                        </span>
+                                                        <?php else: ?>
+                                                        <span class="text-gray-400">-</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php
+                                                        $status_class = 'secondary';
+                                                        if ($curso['status_curso'] === 'concluido') {
+                                                            $status_class = 'success';
+                                                        } elseif ($curso['status_curso'] === 'em_andamento') {
+                                                            $status_class = 'primary';
+                                                        }
+                                                        ?>
+                                                        <span class="badge badge-light-<?= $status_class ?>">
+                                                            <?= ucfirst(str_replace('_', ' ', $curso['status_curso'])) ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="progress w-100 me-2" style="height: 20px;">
+                                                                <div class="progress-bar bg-<?= $percentual_curso == 100 ? 'success' : ($percentual_curso > 0 ? 'primary' : 'secondary') ?>" 
+                                                                     role="progressbar" 
+                                                                     style="width: <?= $percentual_curso ?>%">
+                                                                </div>
+                                                            </div>
+                                                            <span class="fw-bold text-gray-800 min-w-50px text-end"><?= $percentual_curso ?>%</span>
+                                                        </div>
+                                                        <small class="text-gray-500"><?= $curso['aulas_concluidas'] ?>/<?= $curso['total_aulas'] ?> aulas</small>
+                                                    </td>
+                                                    <td>
+                                                        <?= $curso['ultimo_acesso'] ? formatar_data($curso['ultimo_acesso'], 'd/m/Y H:i') : '-' ?>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <a href="lms_curso_detalhes.php?id=<?= $curso['id'] ?>" class="btn btn-sm btn-light" target="_blank">
+                                                            Ver Detalhes
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        
+                        <!-- Certificados -->
+                        <?php if (!empty($lms_certificados)): ?>
+                        <div class="card">
+                            <div class="card-header border-0 pt-6">
+                                <h3 class="card-title align-items-start flex-column">
+                                    <span class="card-label fw-bold fs-3 mb-1">Certificados</span>
+                                    <span class="text-muted fw-semibold fs-7"><?= count($lms_certificados) ?> certificado(s) emitido(s)</span>
+                                </h3>
+                            </div>
+                            <div class="card-body pt-0">
+                                <div class="row g-4">
+                                    <?php foreach ($lms_certificados as $cert): ?>
+                                    <div class="col-md-6">
+                                        <div class="card card-flush border border-gray-300">
+                                            <div class="card-body p-5">
+                                                <div class="d-flex align-items-center mb-4">
+                                                    <?php if ($cert['imagem_capa']): ?>
+                                                    <img src="../<?= htmlspecialchars($cert['imagem_capa']) ?>" class="rounded me-3" width="60" height="60" style="object-fit: cover;">
+                                                    <?php endif; ?>
+                                                    <div class="flex-grow-1">
+                                                        <h4 class="fw-bold text-gray-800 mb-1"><?= htmlspecialchars($cert['curso_titulo']) ?></h4>
+                                                        <small class="text-gray-500">Emitido em <?= formatar_data($cert['data_emissao']) ?></small>
+                                                    </div>
+                                                    <i class="ki-duotone ki-verified fs-2x text-success">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                </div>
+                                                <?php if ($cert['codigo_unico']): ?>
+                                                <div class="d-flex align-items-center justify-content-between pt-4 border-top">
+                                                    <span class="text-gray-600 fw-semibold">Código:</span>
+                                                    <span class="text-gray-800 fw-bold"><?= htmlspecialchars($cert['codigo_unico']) ?></span>
+                                                </div>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <!--end::Tab Pane - Escola Privus-->
                 </div>
                 <!--end::Tab Content-->
             </div>
@@ -1501,12 +2013,87 @@ function inicializarGraficoBancoHoras() {
     });
 }
 
+// Gráfico de evolução do LMS
+let lmsEvolucaoChart = null;
+
+function inicializarGraficoLMS() {
+    const ctx = document.getElementById('lms_evolucao_chart');
+    if (!ctx) return;
+    
+    const dadosEvolucao = <?= json_encode($lms_evolucao) ?>;
+    
+    if (!dadosEvolucao || dadosEvolucao.length === 0) return;
+    
+    // Prepara dados para o gráfico
+    const labels = [];
+    const dados = [];
+    
+    // Cria array dos últimos 30 dias
+    const hoje = new Date();
+    const dadosPorData = {};
+    dadosEvolucao.forEach(item => {
+        dadosPorData[item.data] = parseInt(item.aulas_concluidas || 0);
+    });
+    
+    for (let i = 29; i >= 0; i--) {
+        const data = new Date(hoje);
+        data.setDate(data.getDate() - i);
+        const dataStr = data.toISOString().split('T')[0];
+        labels.push(new Date(dataStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+        dados.push(dadosPorData[dataStr] || 0);
+    }
+    
+    // Destrói gráfico anterior se existir
+    if (lmsEvolucaoChart) {
+        lmsEvolucaoChart.destroy();
+    }
+    
+    lmsEvolucaoChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Aulas Concluídas',
+                data: dados,
+                backgroundColor: 'rgba(0, 158, 247, 0.5)',
+                borderColor: 'rgb(0, 158, 247)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
 // Inicializa gráfico quando a aba for ativada
 document.addEventListener('DOMContentLoaded', function() {
     const tabBancoHoras = document.querySelector('[href="#kt_tab_pane_banco_horas"]');
     if (tabBancoHoras) {
         tabBancoHoras.addEventListener('shown.bs.tab', function() {
             setTimeout(inicializarGraficoBancoHoras, 100);
+        });
+    }
+    
+    const tabEscolaPrivus = document.querySelector('[href="#kt_tab_pane_escola_privus"]');
+    if (tabEscolaPrivus) {
+        tabEscolaPrivus.addEventListener('shown.bs.tab', function() {
+            setTimeout(inicializarGraficoLMS, 100);
         });
     }
     
