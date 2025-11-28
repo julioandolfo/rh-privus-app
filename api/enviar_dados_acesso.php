@@ -117,6 +117,7 @@ try {
         'usuario_login' => $usuario_login,
         'senha' => $senha_temporaria ?? '[Sua senha cadastrada]',
         'url_login' => $url_login,
+        'ano_atual' => date('Y'),
         'dados_acesso_html' => ''
     ];
     
@@ -139,33 +140,39 @@ try {
         }
     }
     
-    // Se tem senha temporária, prepara HTML com dados de acesso
+    // Se tem senha temporária, prepara HTML e texto com dados de acesso
     if (!empty($senha_temporaria)) {
         $variaveis['dados_acesso_html'] = '
-            <div style="background-color: #f8f9fa; border-left: 4px solid #0d6efd; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                <h3 style="margin-top: 0; color: #0d6efd;">Dados de Acesso ao Sistema</h3>
-                <p style="margin-bottom: 10px;"><strong>Usuário/Login:</strong> <code style="background-color: #e9ecef; padding: 4px 8px; border-radius: 3px;">' . htmlspecialchars($usuario_login) . '</code></p>
-                <p style="margin-bottom: 10px;"><strong>Senha Temporária:</strong> <code style="background-color: #e9ecef; padding: 4px 8px; border-radius: 3px; font-weight: bold;">' . htmlspecialchars($senha_temporaria) . '</code></p>
-                <p style="margin-bottom: 10px;"><strong>Link de Acesso:</strong> <a href="' . htmlspecialchars($url_login) . '" style="color: #0d6efd;">' . htmlspecialchars($url_login) . '</a></p>
-                <p style="margin-bottom: 0; color: #6c757d; font-size: 14px;"><em>⚠️ Importante: Guarde estas informações com segurança. Você pode alterar sua senha após o primeiro acesso.</em></p>
+            <div class="dados-acesso-box">
+                <h3>Dados de Acesso ao Sistema</h3>
+                <p><strong>Usuário/Login:</strong> <code>' . htmlspecialchars($usuario_login) . '</code></p>
+                <p><strong>Senha Temporária:</strong> <code class="senha-code">' . htmlspecialchars($senha_temporaria) . '</code></p>
+                <p><strong>Link de Acesso:</strong> <a href="' . htmlspecialchars($url_login) . '" style="color: #009ef7;">' . htmlspecialchars($url_login) . '</a></p>
             </div>
         ';
+        $variaveis['dados_acesso_texto'] = "\n\nDADOS DE ACESSO AO SISTEMA:\nUsuário/Login: " . $usuario_login . "\nSenha Temporária: " . $senha_temporaria . "\nLink de Acesso: " . $url_login . "\n\n⚠️ Importante: Guarde estas informações com segurança. Você pode alterar sua senha após o primeiro acesso.";
     } else {
         // Se já tem senha, apenas informa login e link
         $variaveis['dados_acesso_html'] = '
-            <div style="background-color: #f8f9fa; border-left: 4px solid #0d6efd; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                <h3 style="margin-top: 0; color: #0d6efd;">Dados de Acesso ao Sistema</h3>
-                <p style="margin-bottom: 10px;"><strong>Usuário/Login:</strong> <code style="background-color: #e9ecef; padding: 4px 8px; border-radius: 3px;">' . htmlspecialchars($usuario_login) . '</code></p>
-                <p style="margin-bottom: 10px;"><strong>Link de Acesso:</strong> <a href="' . htmlspecialchars($url_login) . '" style="color: #0d6efd;">' . htmlspecialchars($url_login) . '</a></p>
-                <p style="margin-bottom: 0; color: #6c757d; font-size: 14px;"><em>Use sua senha cadastrada para acessar o sistema. Se esqueceu sua senha, use a opção "Esqueci minha senha" na página de login.</em></p>
+            <div class="dados-acesso-box">
+                <h3>Dados de Acesso ao Sistema</h3>
+                <p><strong>Usuário/Login:</strong> <code>' . htmlspecialchars($usuario_login) . '</code></p>
+                <p><strong>Link de Acesso:</strong> <a href="' . htmlspecialchars($url_login) . '" style="color: #009ef7;">' . htmlspecialchars($url_login) . '</a></p>
+                <p style="margin-top: 15px; color: #6c757d; font-size: 13px;"><em>Use sua senha cadastrada para acessar o sistema. Se esqueceu sua senha, use a opção "Esqueci minha senha" na página de login.</em></p>
             </div>
         ';
+        $variaveis['dados_acesso_texto'] = "\n\nDADOS DE ACESSO AO SISTEMA:\nUsuário/Login: " . $usuario_login . "\nLink de Acesso: " . $url_login . "\n\nUse sua senha cadastrada para acessar o sistema. Se esqueceu sua senha, use a opção 'Esqueci minha senha' na página de login.";
     }
     
-    // Tenta usar template de email, senão cria email customizado
-    $resultado = enviar_email_template('novo_colaborador', $email_destino, $variaveis);
+    // Tenta usar template de email específico para dados de acesso
+    $resultado = enviar_email_template('dados_acesso', $email_destino, $variaveis);
     
-    // Se template não existe ou falhou, cria email customizado
+    // Se template não existe ou falhou, tenta usar template de novo colaborador
+    if (!$resultado || (isset($resultado['success']) && !$resultado['success'])) {
+        $resultado = enviar_email_template('novo_colaborador', $email_destino, $variaveis);
+    }
+    
+    // Se ainda não funcionou, cria email customizado
     if (!$resultado || (isset($resultado['success']) && !$resultado['success'])) {
         $assunto = 'Dados de Acesso ao Sistema - RH Privus';
         
