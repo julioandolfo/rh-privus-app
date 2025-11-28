@@ -243,6 +243,16 @@ require_once __DIR__ . '/../includes/header.php';
                     <span class="d-md-none">Editar</span>
                     <span class="d-none d-md-inline">Editar</span>
                 </a>
+                <?php if (!empty($colaborador['email_pessoal'])): ?>
+                <button type="button" class="btn btn-sm btn-primary" onclick="enviarDadosAcesso(<?= $id ?>)">
+                    <i class="ki-duotone ki-send fs-2 d-none d-md-inline">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <span class="d-md-none">Enviar Acesso</span>
+                    <span class="d-none d-md-inline">Enviar Dados de Acesso</span>
+                </button>
+                <?php endif; ?>
             <?php endif; ?>
             <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
                 <a href="colaboradores.php" class="btn btn-sm btn-light">
@@ -2387,5 +2397,83 @@ document.getElementById('kt_modal_bonus_form')?.addEventListener('submit', funct
         });
     });
 });
+</script>
+<?php endif; ?>
+
+<?php if ($usuario['role'] !== 'COLABORADOR' && $usuario['role'] !== 'GESTOR'): ?>
+<script>
+function enviarDadosAcesso(colaboradorId) {
+    Swal.fire({
+        title: 'Enviar Dados de Acesso?',
+        text: 'Os dados de acesso (login e senha) serão enviados por email para o colaborador.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, enviar!',
+        cancelButtonText: 'Cancelar',
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: 'btn fw-bold btn-primary',
+            cancelButton: 'btn fw-bold btn-light'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Mostra loading
+            Swal.fire({
+                title: 'Enviando...',
+                text: 'Por favor, aguarde.',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            // Envia requisição
+            const formData = new FormData();
+            formData.append('colaborador_id', colaboradorId);
+            
+            fetch('../api/enviar_dados_acesso.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        text: data.message,
+                        icon: 'success',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    });
+                } else {
+                    Swal.fire({
+                        text: data.message || 'Erro ao enviar dados de acesso',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    text: 'Erro ao conectar com o servidor',
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        confirmButton: 'btn fw-bold btn-primary'
+                    }
+                });
+            });
+        }
+    });
+}
 </script>
 <?php endif; ?>
