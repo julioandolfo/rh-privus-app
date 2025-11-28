@@ -1697,16 +1697,26 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                     <div class="fs-2 fw-bold text-gray-800 mb-2">
                                         <?= number_format($media_emocao, 2) ?> / 5.0
                                     </div>
-                                    <div class="badge badge-<?= $cor_media ?> fs-6 mb-3">
+                                    <div class="badge badge-<?= $cor_media ?> fs-6 mb-8">
                                         <?= $total_registros ?> registro(s)
                                     </div>
-                                    <div class="progress h-10px w-100" style="max-width: 200px;">
-                                        <div class="progress-bar bg-<?= $cor_media ?>" 
-                                             role="progressbar" 
-                                             style="width: <?= ($media_emocao / 5) * 100 ?>%"
-                                             aria-valuenow="<?= $media_emocao ?>" 
-                                             aria-valuemin="0" 
-                                             aria-valuemax="5">
+                                    <div class="w-100 mt-4" style="max-width: 250px;">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-gray-600 fs-7 fw-semibold">Nível Médio</span>
+                                            <span class="text-gray-800 fs-7 fw-bold"><?= number_format(($media_emocao / 5) * 100, 0) ?>%</span>
+                                        </div>
+                                        <div class="progress h-15px w-100" style="border-radius: 10px; overflow: hidden;">
+                                            <div class="progress-bar bg-<?= $cor_media ?>" 
+                                                 role="progressbar" 
+                                                 style="width: <?= ($media_emocao / 5) * 100 ?>%"
+                                                 aria-valuenow="<?= $media_emocao ?>" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="5"
+                                                 title="Média de <?= number_format($media_emocao, 2) ?> em uma escala de 0 a 5">
+                                            </div>
+                                        </div>
+                                        <div class="text-muted fs-8 mt-2">
+                                            Representação visual da sua média em relação ao máximo (5.0)
                                         </div>
                                     </div>
                                 </div>
