@@ -31,38 +31,11 @@ $filtros['limit'] = 50;
 // - ADMIN: vê todas as conversas
 // - RH: vê apenas conversas atribuídas a ele + não atribuídas
 
-// Debug: Verifica conversas no banco antes do filtro
-$stmt_debug = $pdo->query("SELECT COUNT(*) as total FROM chat_conversas");
-$total_geral = $stmt_debug->fetch()['total'];
-
-$stmt_debug2 = $pdo->query("SELECT id, titulo, status FROM chat_conversas LIMIT 5");
-$conversas_debug = $stmt_debug2->fetchAll();
-
 // Carrega função de log do chat
 require_once __DIR__ . '/../includes/chat_functions.php';
 
-chat_log("Chat Gestao - Total de conversas no banco: " . $total_geral);
-chat_log("Chat Gestao - Primeiras 5 conversas", $conversas_debug);
-chat_log("Chat Gestao - Filtros aplicados", $filtros);
-chat_log("Chat Gestao - Usuario role: " . ($usuario['role'] ?? 'N/A'));
-chat_log("Chat Gestao - Usuario ID: " . ($usuario['id'] ?? 'N/A'));
-
 // Busca conversas (passa informações do usuário para filtro automático)
 $conversas = buscar_conversas_rh($filtros, $usuario);
-
-// Debug: Log para verificar conversas encontradas
-chat_log("Chat Gestao - Total de conversas encontradas após filtro: " . count($conversas));
-if (!empty($conversas)) {
-    chat_log("Chat Gestao - Primeira conversa", $conversas[0]);
-} else {
-    // Testa query direta sem filtros
-    $stmt_teste = $pdo->query("SELECT c.*, col.nome_completo as colaborador_nome FROM chat_conversas c INNER JOIN colaboradores col ON c.colaborador_id = col.id WHERE c.status NOT IN ('fechada', 'arquivada', 'resolvida') LIMIT 5");
-    $teste = $stmt_teste->fetchAll();
-    chat_log("Chat Gestao - Teste direto SQL: " . count($teste) . " conversas encontradas");
-    if (!empty($teste)) {
-        chat_log("Chat Gestao - Primeira conversa do teste", $teste[0]);
-    }
-}
 
 // Busca categorias
 $stmt = $pdo->query("SELECT id, nome, cor FROM chat_categorias WHERE ativo = TRUE ORDER BY ordem, nome");
@@ -236,20 +209,6 @@ if ($conversa_id > 0) {
                                     <?php if (empty($conversas)): ?>
                                         <div class="text-center text-muted py-10">
                                             <p>Nenhuma conversa encontrada</p>
-                                            <p class="small">Filtros aplicados: <?= htmlspecialchars(json_encode($filtros)) ?></p>
-                                            <?php if (isset($total_geral)): ?>
-                                            <p class="small">Total no banco: <?= $total_geral ?></p>
-                                            <?php endif; ?>
-                                            <?php if (!empty($conversas_debug)): ?>
-                                            <div class="mt-3 p-3 bg-light rounded">
-                                                <p class="small fw-bold">Status das primeiras conversas:</p>
-                                                <ul class="small text-start">
-                                                    <?php foreach ($conversas_debug as $c): ?>
-                                                    <li>ID: <?= $c['id'] ?> - Status: <strong><?= $c['status'] ?></strong> - Título: <?= htmlspecialchars($c['titulo']) ?></li>
-                                                    <?php endforeach; ?>
-                                                </ul>
-                                            </div>
-                                            <?php endif; ?>
                                         </div>
                                     <?php else: ?>
                                         <?php foreach ($conversas as $conv): 

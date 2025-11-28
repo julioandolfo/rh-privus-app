@@ -527,10 +527,14 @@ function fechar_conversa($conversa_id, $usuario_id, $motivo = null) {
         if ($conversa['sla_resolucao_vencimento']) {
             $vencimento = new DateTime($conversa['sla_resolucao_vencimento']);
             $agora = new DateTime();
-            $sla_cumprido = $agora <= $vencimento;
+            $sla_cumprido = $agora <= $vencimento ? 1 : 0;
         }
         
         // Atualiza conversa
+        // Converte null para NULL do SQL e boolean para inteiro
+        $sla_cumprido_sql = $sla_cumprido === null ? null : ($sla_cumprido ? 1 : 0);
+        $tempo_resolucao_sql = $tempo_resolucao === null ? null : (int)$tempo_resolucao;
+        
         $stmt = $pdo->prepare("
             UPDATE chat_conversas SET
                 status = 'fechada',
@@ -541,7 +545,7 @@ function fechar_conversa($conversa_id, $usuario_id, $motivo = null) {
                 updated_at = NOW()
             WHERE id = ?
         ");
-        $stmt->execute([$tempo_resolucao, $sla_cumprido, $usuario_id, $conversa_id]);
+        $stmt->execute([$tempo_resolucao_sql, $sla_cumprido_sql, $usuario_id, $conversa_id]);
         
         // Registra histórico
         $stmt = $pdo->prepare("
