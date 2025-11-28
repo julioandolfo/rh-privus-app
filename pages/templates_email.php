@@ -367,6 +367,58 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+let editorInstance = null;
+
+// Inicializa TinyMCE
+function initTinyMCE() {
+    // Verifica se TinyMCE está disponível
+    if (typeof tinymce === 'undefined') {
+        console.warn('TinyMCE não está carregado. Tentando novamente...');
+        setTimeout(initTinyMCE, 200);
+        return;
+    }
+    
+    // Remove editor existente se houver
+    const editorId = 'template_corpo_html';
+    if (tinymce.get(editorId)) {
+        tinymce.get(editorId).remove();
+    }
+    
+    // Configura base_url e suffix para usar os arquivos diretamente
+    const baseUrl = '../assets/plugins/custom/tinymce';
+    
+    // Inicializa TinyMCE
+    tinymce.init({
+        selector: '#' + editorId,
+        height: 500,
+        menubar: true,
+        base_url: baseUrl,
+        suffix: '.min',
+        license_key: 'gpl',
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+        ],
+        toolbar: 'undo redo | blocks | ' +
+            'bold italic forecolor | alignleft aligncenter ' +
+            'alignright alignjustify | bullist numlist outdent indent | ' +
+            'link image | removeformat | help | code',
+        content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; }',
+        language: 'pt_BR',
+        promotion: false,
+        branding: false,
+        skin: 'oxide',
+        content_css: baseUrl + '/skins/ui/oxide/content.min.css',
+        setup: function(editor) {
+            editorInstance = editor;
+            editor.on('change', function() {
+                editor.save();
+            });
+        }
+    });
+}
+
 function editarTemplate(template) {
     document.getElementById('template_modal_title').textContent = 'Editar Template: ' + template.nome;
     document.getElementById('template_id').value = template.id;
@@ -374,12 +426,26 @@ function editarTemplate(template) {
     document.getElementById('template_nome').value = template.nome || '';
     document.getElementById('template_descricao').value = template.descricao || '';
     document.getElementById('template_assunto').value = template.assunto || '';
-    document.getElementById('template_corpo_html').value = template.corpo_html || '';
     document.getElementById('template_corpo_texto').value = template.corpo_texto || '';
     document.getElementById('template_ativo').checked = template.ativo == 1;
     
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_template'));
     modal.show();
+    
+    // Aguarda o modal abrir completamente antes de inicializar TinyMCE
+    const modalElement = document.getElementById('kt_modal_template');
+    modalElement.addEventListener('shown.bs.modal', function() {
+        // Remove listener após primeira execução
+        modalElement.removeEventListener('shown.bs.modal', arguments.callee);
+        
+        // Define o conteúdo HTML antes de inicializar
+        document.getElementById('template_corpo_html').value = template.corpo_html || '';
+        
+        // Inicializa TinyMCE após um pequeno delay para garantir que o textarea está visível
+        setTimeout(function() {
+            initTinyMCE();
+        }, 300);
+    }, { once: true });
 }
 
 // Toggle ativo/inativo
@@ -414,11 +480,28 @@ document.querySelectorAll('.toggle-template').forEach(toggle => {
 
 // Loading no formulário
 document.getElementById('kt_template_form').addEventListener('submit', function(e) {
+    // Salva conteúdo do TinyMCE antes de submeter
+    if (editorInstance) {
+        editorInstance.save();
+    }
+    
     const submitBtn = this.querySelector('button[type="submit"]');
     submitBtn.setAttribute('data-kt-indicator', 'on');
     submitBtn.disabled = true;
 });
+
+// Limpa TinyMCE quando o modal é fechado
+document.getElementById('kt_modal_template').addEventListener('hidden.bs.modal', function() {
+    if (editorInstance) {
+        editorInstance.remove();
+        editorInstance = null;
+    }
+});
 </script>
+
+<!--begin::TinyMCE-->
+<script src="../assets/plugins/custom/tinymce/tinymce.bundle.js"></script>
+<!--end::TinyMCE-->
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
