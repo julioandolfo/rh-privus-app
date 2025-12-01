@@ -1873,7 +1873,7 @@ $stmt->execute($params_colaboradores);
 $result_folha = $stmt->fetch();
 $total_folha = (float)($result_folha['total_folha'] ?? 0);
 
-// Busca total de bônus dos fechamentos (apenas fechamentos fechados ou pagos)
+// Busca total de bônus cadastrados nos colaboradores (ativos e não informativos)
 $where_bonus = [];
 $params_bonus = [];
 
@@ -1882,33 +1882,42 @@ if ($usuario['role'] === 'ADMIN') {
 } elseif ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where_bonus[] = "fp.empresa_id IN ($placeholders)";
+        $where_bonus[] = "c.empresa_id IN ($placeholders)";
         $params_bonus = array_merge($params_bonus, $usuario['empresas_ids']);
     } else {
-        $where_bonus[] = "fp.empresa_id = ?";
+        $where_bonus[] = "c.empresa_id = ?";
         $params_bonus[] = $usuario['empresa_id'] ?? 0;
     }
 } else {
-    $where_bonus[] = "fp.empresa_id = ?";
+    $where_bonus[] = "c.empresa_id = ?";
     $params_bonus[] = $usuario['empresa_id'] ?? 0;
 }
 
-$where_bonus[] = "fp.status IN ('fechado', 'pago')";
+$where_bonus[] = "c.status = 'ativo'";
+$where_bonus[] = "tb.tipo_valor != 'informativo'";
+// Verifica se o bônus está ativo (data_inicio e data_fim válidas ou NULL)
+$where_bonus[] = "(cb.data_inicio IS NULL OR cb.data_inicio <= CURDATE())";
+$where_bonus[] = "(cb.data_fim IS NULL OR cb.data_fim >= CURDATE())";
 $where_bonus_sql = !empty($where_bonus) ? 'WHERE ' . implode(' AND ', $where_bonus) : '';
 
 $stmt = $pdo->prepare("
-    SELECT COALESCE(SUM(fpb.valor), 0) as total_bonus
-    FROM fechamentos_pagamento_bonus fpb
-    INNER JOIN fechamentos_pagamento fp ON fpb.fechamento_pagamento_id = fp.id
-    INNER JOIN tipos_bonus tb ON fpb.tipo_bonus_id = tb.id
+    SELECT COALESCE(SUM(
+        CASE 
+            WHEN tb.tipo_valor = 'fixo' THEN COALESCE(tb.valor_fixo, 0)
+            ELSE COALESCE(cb.valor, 0)
+        END
+    ), 0) as total_bonus
+    FROM colaboradores_bonus cb
+    INNER JOIN colaboradores c ON cb.colaborador_id = c.id
+    INNER JOIN tipos_bonus tb ON cb.tipo_bonus_id = tb.id
     $where_bonus_sql
-    AND tb.tipo_valor != 'informativo'
 ");
 $stmt->execute($params_bonus);
 $result_bonus = $stmt->fetch();
 $total_bonus = (float)($result_bonus['total_bonus'] ?? 0);
 
-// Busca total de horas extras dos fechamentos (apenas fechamentos fechados ou pagos)
+// Busca total de horas extras cadastradas que ainda não foram pagas
+// Horas extras não pagas são aquelas cuja data_trabalho não está dentro do período de nenhum fechamento fechado/pago
 $where_extras = [];
 $params_extras = [];
 
@@ -1917,28 +1926,58 @@ if ($usuario['role'] === 'ADMIN') {
 } elseif ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where_extras[] = "fp.empresa_id IN ($placeholders)";
+        $where_extras[] = "c.empresa_id IN ($placeholders)";
         $params_extras = array_merge($params_extras, $usuario['empresas_ids']);
     } else {
-        $where_extras[] = "fp.empresa_id = ?";
+        $where_extras[] = "c.empresa_id = ?";
         $params_extras[] = $usuario['empresa_id'] ?? 0;
     }
 } else {
-    $where_extras[] = "fp.empresa_id = ?";
+    $where_extras[] = "c.empresa_id = ?";
     $params_extras[] = $usuario['empresa_id'] ?? 0;
 }
 
-$where_extras[] = "fp.status IN ('fechado', 'pago')";
-$where_extras[] = "fp.tipo_fechamento = 'regular'";
+$where_extras[] = "c.status = 'ativo'";
+$where_extras[] = "(he.tipo_pagamento = 'dinheiro' OR he.tipo_pagamento IS NULL)"; // Apenas horas extras pagas em dinheiro
+
+// Monta subquery para verificar fechamentos fechados/pagos
+$where_fechamentos = ["fp.status IN ('fechado', 'pago')", "fp.tipo_fechamento = 'regular'"];
+$params_fechamentos = [];
+
+if ($usuario['role'] === 'ADMIN') {
+    // ADMIN vê todos
+} elseif ($usuario['role'] === 'RH') {
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders_fp = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where_fechamentos[] = "fp.empresa_id IN ($placeholders_fp)";
+        $params_fechamentos = array_merge($params_fechamentos, $usuario['empresas_ids']);
+    } else {
+        $where_fechamentos[] = "fp.empresa_id = ?";
+        $params_fechamentos[] = $usuario['empresa_id'] ?? 0;
+    }
+} else {
+    $where_fechamentos[] = "fp.empresa_id = ?";
+    $params_fechamentos[] = $usuario['empresa_id'] ?? 0;
+}
+
 $where_extras_sql = !empty($where_extras) ? 'WHERE ' . implode(' AND ', $where_extras) : '';
+$where_fechamentos_sql = 'WHERE ' . implode(' AND ', $where_fechamentos);
 
 $stmt = $pdo->prepare("
-    SELECT COALESCE(SUM(fpi.valor_horas_extras), 0) as total_extras
-    FROM fechamentos_pagamento_itens fpi
-    INNER JOIN fechamentos_pagamento fp ON fpi.fechamento_id = fp.id
+    SELECT COALESCE(SUM(he.valor_total), 0) as total_extras
+    FROM horas_extras he
+    INNER JOIN colaboradores c ON he.colaborador_id = c.id
     $where_extras_sql
+    AND NOT EXISTS (
+        SELECT 1 
+        FROM fechamentos_pagamento fp
+        $where_fechamentos_sql
+        AND he.data_trabalho >= DATE_FORMAT(fp.mes_referencia, '%Y-%m-01')
+        AND he.data_trabalho <= LAST_DAY(fp.mes_referencia)
+    )
 ");
-$stmt->execute($params_extras);
+$params_extras_exec = array_merge($params_extras, $params_fechamentos);
+$stmt->execute($params_extras_exec);
 $result_extras = $stmt->fetch();
 $total_extras = (float)($result_extras['total_extras'] ?? 0);
 
