@@ -3310,7 +3310,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <div class="col-md-6">
                             <label class="required fw-semibold fs-6 mb-2">Mês/Ano de Referência</label>
-                            <input type="month" name="mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m') ?>" required />
+                            <input type="month" name="mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m', strtotime('first day of last month')) ?>" required />
                         </div>
                     </div>
                     
@@ -3877,7 +3877,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <div class="col-md-6">
                             <label class="required fw-semibold fs-6 mb-2">Mês/Ano de Referência</label>
-                            <input type="month" name="mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m') ?>" required />
+                            <input type="month" name="mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m', strtotime('first day of last month')) ?>" required />
                         </div>
                     </div>
                     
