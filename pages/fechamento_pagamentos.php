@@ -297,6 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Busca horas extras do período (separando por tipo de pagamento)
                 // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
+                // Busca apenas horas extras NÃO PAGAS (fechamento_pagamento_id IS NULL)
                 $stmt = $pdo->prepare("
                     SELECT 
                         COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN quantidade_horas ELSE 0 END), 0) as total_horas_dinheiro,
@@ -305,7 +306,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         COALESCE(SUM(quantidade_horas), 0) as total_horas,
                         COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN valor_total ELSE 0 END), 0) as total_valor
                     FROM horas_extras
-                    WHERE colaborador_id = ? AND data_trabalho >= ? AND data_trabalho <= ?
+                    WHERE colaborador_id = ? 
+                    AND data_trabalho >= ? 
+                    AND data_trabalho <= ?
+                    AND fechamento_pagamento_id IS NULL
                 ");
                 $stmt->execute([$colab_id, $data_inicio, $data_fim]);
                 $he_data = $stmt->fetch();
@@ -658,15 +662,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $params = array_merge([$fechamento_id], $adiantamentos_ids);
                     $stmt->execute($params);
                 }
+                
+                // Marca horas extras como pagas neste fechamento
                 if ($horas_extras > 0) {
+                    $stmt = $pdo->prepare("
+                        UPDATE horas_extras 
+                        SET fechamento_pagamento_id = ?
+                        WHERE colaborador_id = ? 
+                        AND data_trabalho >= ? 
+                        AND data_trabalho <= ?
+                        AND fechamento_pagamento_id IS NULL
+                    ");
+                    $stmt->execute([$fechamento_id, $colab_id, $data_inicio, $data_fim]);
+                    
                     // Busca detalhes das horas extras para salvar em JSON (se necessário no futuro)
                     $stmt_he_detalhes = $pdo->prepare("
                         SELECT tipo_pagamento, SUM(quantidade_horas) as total_horas, SUM(valor_total) as total_valor
                         FROM horas_extras
                         WHERE colaborador_id = ? AND data_trabalho >= ? AND data_trabalho <= ?
+                        AND fechamento_pagamento_id = ?
                         GROUP BY tipo_pagamento
                     ");
-                    $stmt_he_detalhes->execute([$colab_id, $data_inicio, $data_fim]);
+                    $stmt_he_detalhes->execute([$colab_id, $data_inicio, $data_fim, $fechamento_id]);
                     $he_detalhes = $stmt_he_detalhes->fetchAll();
                 }
                 
@@ -1963,21 +1980,16 @@ if ($usuario['role'] === 'ADMIN') {
 $where_extras_sql = !empty($where_extras) ? 'WHERE ' . implode(' AND ', $where_extras) : '';
 $where_fechamentos_sql = 'WHERE ' . implode(' AND ', $where_fechamentos);
 
+// Busca horas extras não pagas (tipo dinheiro e não incluídas em nenhum fechamento)
 $stmt = $pdo->prepare("
     SELECT COALESCE(SUM(he.valor_total), 0) as total_extras
     FROM horas_extras he
     INNER JOIN colaboradores c ON he.colaborador_id = c.id
     $where_extras_sql
-    AND NOT EXISTS (
-        SELECT 1 
-        FROM fechamentos_pagamento fp
-        $where_fechamentos_sql
-        AND he.data_trabalho >= DATE_FORMAT(fp.mes_referencia, '%Y-%m-01')
-        AND he.data_trabalho <= LAST_DAY(fp.mes_referencia)
-    )
+    " . (!empty($where_extras) ? 'AND' : 'WHERE') . " he.fechamento_pagamento_id IS NULL
+    AND (he.tipo_pagamento = 'dinheiro' OR he.tipo_pagamento IS NULL)
 ");
-$params_extras_exec = array_merge($params_extras, $params_fechamentos);
-$stmt->execute($params_extras_exec);
+$stmt->execute($params_extras);
 $result_extras = $stmt->fetch();
 $total_extras = (float)($result_extras['total_extras'] ?? 0);
 
@@ -2386,15 +2398,19 @@ require_once __DIR__ . '/../includes/header.php';
                             if ($inclui_horas_extras && !$is_fechamento_extra) {
                                 // Busca detalhes das horas extras para mostrar tipo de pagamento
                                 // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
+                                // Busca apenas as horas extras incluídas NESTE fechamento específico
                                 $stmt_he = $pdo->prepare("
                                     SELECT 
                                         COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN quantidade_horas ELSE 0 END), 0) as horas_dinheiro,
                                         COALESCE(SUM(CASE WHEN tipo_pagamento = 'banco_horas' THEN quantidade_horas ELSE 0 END), 0) as horas_banco,
                                         COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN valor_total ELSE 0 END), 0) as valor_dinheiro
                                     FROM horas_extras
-                                    WHERE colaborador_id = ? AND data_trabalho >= ? AND data_trabalho <= ?
+                                    WHERE colaborador_id = ? 
+                                    AND data_trabalho >= ? 
+                                    AND data_trabalho <= ?
+                                    AND fechamento_pagamento_id = ?
                                 ");
-                                $stmt_he->execute([$item['colaborador_id'], $data_inicio_periodo, $data_fim_periodo]);
+                                $stmt_he->execute([$item['colaborador_id'], $data_inicio_periodo, $data_fim_periodo, $fechamento_id]);
                                 $he_detalhes = $stmt_he->fetch();
                                 $horas_dinheiro = (float)($he_detalhes['horas_dinheiro'] ?? 0);
                                 $horas_banco = (float)($he_detalhes['horas_banco'] ?? 0);

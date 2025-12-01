@@ -210,7 +210,8 @@ try {
     
     // 3. Total de Extras (horas extras não pagas)
     $where_extras = array_merge($where_base, [
-        "(he.tipo_pagamento = 'dinheiro' OR he.tipo_pagamento IS NULL)"
+        "(he.tipo_pagamento = 'dinheiro' OR he.tipo_pagamento IS NULL)",
+        "he.fechamento_pagamento_id IS NULL"
     ]);
     if ($filtro_tipo === 'empresa') {
         $where_extras[] = "e.id IS NOT NULL";
@@ -239,17 +240,9 @@ try {
         INNER JOIN colaboradores c ON he.colaborador_id = c.id
         $join_extras
         $where_extras_sql
-        AND NOT EXISTS (
-            SELECT 1 
-            FROM fechamentos_pagamento fp
-            $where_fechamentos_sql
-            AND he.data_trabalho >= DATE_FORMAT(fp.mes_referencia, '%Y-%m-01')
-            AND he.data_trabalho <= LAST_DAY(fp.mes_referencia)
-        )
         $group_by
     ");
-    $params_extras_exec = array_merge($params_extras, $params_fechamentos);
-    $stmt->execute($params_extras_exec);
+    $stmt->execute($params_extras);
     
     if ($filtro_tipo === 'total') {
         $result_extras = $stmt->fetch();
