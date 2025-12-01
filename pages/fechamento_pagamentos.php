@@ -1833,6 +1833,118 @@ $stmt = $pdo->prepare("
 $stmt->execute($params);
 $fechamentos = $stmt->fetchAll();
 
+// Calcula totais de pagamento para o card de informações
+$total_folha = 0;
+$total_bonus = 0;
+$total_extras = 0;
+$total_folha_bonus = 0;
+
+// Busca total de folha (soma de salários de todos os colaboradores ativos)
+$where_colaboradores = [];
+$params_colaboradores = [];
+
+if ($usuario['role'] === 'ADMIN') {
+    // ADMIN vê todos
+} elseif ($usuario['role'] === 'RH') {
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where_colaboradores[] = "c.empresa_id IN ($placeholders)";
+        $params_colaboradores = array_merge($params_colaboradores, $usuario['empresas_ids']);
+    } else {
+        $where_colaboradores[] = "c.empresa_id = ?";
+        $params_colaboradores[] = $usuario['empresa_id'] ?? 0;
+    }
+} else {
+    $where_colaboradores[] = "c.empresa_id = ?";
+    $params_colaboradores[] = $usuario['empresa_id'] ?? 0;
+}
+
+$where_colaboradores[] = "c.status = 'ativo'";
+$where_colaboradores[] = "c.salario IS NOT NULL AND c.salario > 0";
+
+$where_colab_sql = !empty($where_colaboradores) ? 'WHERE ' . implode(' AND ', $where_colaboradores) : '';
+
+$stmt = $pdo->prepare("
+    SELECT COALESCE(SUM(c.salario), 0) as total_folha
+    FROM colaboradores c
+    $where_colab_sql
+");
+$stmt->execute($params_colaboradores);
+$result_folha = $stmt->fetch();
+$total_folha = (float)($result_folha['total_folha'] ?? 0);
+
+// Busca total de bônus dos fechamentos (apenas fechamentos fechados ou pagos)
+$where_bonus = [];
+$params_bonus = [];
+
+if ($usuario['role'] === 'ADMIN') {
+    // ADMIN vê todos
+} elseif ($usuario['role'] === 'RH') {
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where_bonus[] = "fp.empresa_id IN ($placeholders)";
+        $params_bonus = array_merge($params_bonus, $usuario['empresas_ids']);
+    } else {
+        $where_bonus[] = "fp.empresa_id = ?";
+        $params_bonus[] = $usuario['empresa_id'] ?? 0;
+    }
+} else {
+    $where_bonus[] = "fp.empresa_id = ?";
+    $params_bonus[] = $usuario['empresa_id'] ?? 0;
+}
+
+$where_bonus[] = "fp.status IN ('fechado', 'pago')";
+$where_bonus_sql = !empty($where_bonus) ? 'WHERE ' . implode(' AND ', $where_bonus) : '';
+
+$stmt = $pdo->prepare("
+    SELECT COALESCE(SUM(fpb.valor), 0) as total_bonus
+    FROM fechamentos_pagamento_bonus fpb
+    INNER JOIN fechamentos_pagamento fp ON fpb.fechamento_pagamento_id = fp.id
+    INNER JOIN tipos_bonus tb ON fpb.tipo_bonus_id = tb.id
+    $where_bonus_sql
+    AND tb.tipo_valor != 'informativo'
+");
+$stmt->execute($params_bonus);
+$result_bonus = $stmt->fetch();
+$total_bonus = (float)($result_bonus['total_bonus'] ?? 0);
+
+// Busca total de horas extras dos fechamentos (apenas fechamentos fechados ou pagos)
+$where_extras = [];
+$params_extras = [];
+
+if ($usuario['role'] === 'ADMIN') {
+    // ADMIN vê todos
+} elseif ($usuario['role'] === 'RH') {
+    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+        $where_extras[] = "fp.empresa_id IN ($placeholders)";
+        $params_extras = array_merge($params_extras, $usuario['empresas_ids']);
+    } else {
+        $where_extras[] = "fp.empresa_id = ?";
+        $params_extras[] = $usuario['empresa_id'] ?? 0;
+    }
+} else {
+    $where_extras[] = "fp.empresa_id = ?";
+    $params_extras[] = $usuario['empresa_id'] ?? 0;
+}
+
+$where_extras[] = "fp.status IN ('fechado', 'pago')";
+$where_extras[] = "fp.tipo_fechamento = 'regular'";
+$where_extras_sql = !empty($where_extras) ? 'WHERE ' . implode(' AND ', $where_extras) : '';
+
+$stmt = $pdo->prepare("
+    SELECT COALESCE(SUM(fpi.valor_horas_extras), 0) as total_extras
+    FROM fechamentos_pagamento_itens fpi
+    INNER JOIN fechamentos_pagamento fp ON fpi.fechamento_id = fp.id
+    $where_extras_sql
+");
+$stmt->execute($params_extras);
+$result_extras = $stmt->fetch();
+$total_extras = (float)($result_extras['total_extras'] ?? 0);
+
+// Calcula folha + bônus
+$total_folha_bonus = $total_folha + $total_bonus;
+
 // Busca empresas para o select
 if ($usuario['role'] === 'ADMIN') {
     $stmt = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
@@ -2686,6 +2798,100 @@ require_once __DIR__ . '/../includes/header.php';
                 </table>
             </div>
         </div>
+        
+        <!-- Card de Informações de Pagamento -->
+        <div class="card mt-5">
+            <div class="card-header">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Informações de Pagamento</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Resumo financeiro dos pagamentos</span>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-5 g-xl-8">
+                    <!-- Total de Folha -->
+                    <div class="col-xl-3">
+                        <div class="card bg-light-primary h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Total de Folha</span>
+                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_folha, 2, ',', '.') ?></span>
+                                </div>
+                                <div class="mt-3">
+                                    <span class="text-gray-500 fs-7">Soma de todos os salários</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Apenas Bônus -->
+                    <div class="col-xl-3">
+                        <div class="card bg-light-success h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Apenas Bônus</span>
+                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_bonus, 2, ',', '.') ?></span>
+                                </div>
+                                <div class="mt-3">
+                                    <span class="text-gray-500 fs-7">Total de bônus pagos</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Extras Somados -->
+                    <div class="col-xl-3">
+                        <div class="card bg-light-info h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Extras Somados</span>
+                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_extras, 2, ',', '.') ?></span>
+                                </div>
+                                <div class="mt-3">
+                                    <span class="text-gray-500 fs-7">Total de horas extras pagas</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Folha + Bônus -->
+                    <div class="col-xl-3">
+                        <div class="card bg-light-warning h-100">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Folha + Bônus</span>
+                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_folha_bonus, 2, ',', '.') ?></span>
+                                </div>
+                                <div class="mt-3">
+                                    <span class="text-gray-500 fs-7">Total de folha com bônus</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Total Geral -->
+                <div class="row mt-5">
+                    <div class="col-12">
+                        <div class="card bg-light-dark h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="text-white fw-semibold fs-6 d-block mb-1">Total Geral</span>
+                                        <span class="text-white-50 fs-7">Folha + Bônus + Extras</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="text-white fw-bold fs-2x">R$ <?= number_format($total_folha_bonus + $total_extras, 2, ',', '.') ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- End Card de Informações de Pagamento -->
+        
         <?php endif; ?>
         
     </div>
