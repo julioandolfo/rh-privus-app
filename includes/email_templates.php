@@ -344,3 +344,150 @@ function enviar_email_ocorrencia($ocorrencia_id) {
     return enviar_email_template('ocorrencia', $ocorrencia['email_pessoal'], $variaveis);
 }
 
+/**
+ * Envia email de horas extras
+ */
+function enviar_email_horas_extras($hora_extra_id) {
+    $pdo = getDB();
+    
+    // Busca dados da hora extra
+    $stmt = $pdo->prepare("
+        SELECT h.*, 
+               c.nome_completo, c.email_pessoal, c.setor_id,
+               e.nome_fantasia as empresa_nome,
+               s.nome_setor,
+               car.nome_cargo,
+               u.nome as usuario_nome
+        FROM horas_extras h
+        INNER JOIN colaboradores c ON h.colaborador_id = c.id
+        LEFT JOIN empresas e ON c.empresa_id = e.id
+        LEFT JOIN setores s ON c.setor_id = s.id
+        LEFT JOIN cargos car ON c.cargo_id = car.id
+        LEFT JOIN usuarios u ON h.usuario_id = u.id
+        WHERE h.id = ?
+    ");
+    $stmt->execute([$hora_extra_id]);
+    $hora_extra = $stmt->fetch();
+    
+    if (!$hora_extra) {
+        return ['success' => false, 'message' => 'Hora extra não encontrada.'];
+    }
+    
+    // Verifica se colaborador tem email
+    if (empty($hora_extra['email_pessoal'])) {
+        return ['success' => false, 'message' => 'Colaborador sem email cadastrado.'];
+    }
+    
+    // Verifica se template está ativo
+    $template = buscar_template_email('horas_extras');
+    if (!$template || !$template['ativo']) {
+        return ['success' => false, 'message' => 'Template de email não encontrado ou inativo.'];
+    }
+    
+    // Prepara variáveis HTML condicionais
+    $tipo_pagamento_html = '';
+    $valor_hora_html = '';
+    $percentual_adicional_html = '';
+    $valor_total_html = '';
+    $saldo_banco_html = '';
+    $observacoes_html = '';
+    
+    $tipo_pagamento = $hora_extra['tipo_pagamento'] ?? 'dinheiro';
+    
+    if ($tipo_pagamento === 'banco_horas') {
+        $tipo_pagamento_html = '<li><strong>Tipo de Pagamento:</strong> Banco de Horas</li>';
+        
+        // Busca saldo atual do banco de horas
+        require_once __DIR__ . '/banco_horas_functions.php';
+        $saldo = get_or_create_saldo_banco_horas($hora_extra['colaborador_id']);
+        $saldo_total = (float)$saldo['saldo_horas'] + ($saldo['saldo_minutos'] / 60);
+        $saldo_banco_html = '<li><strong>Saldo Atual no Banco:</strong> ' . number_format($saldo_total, 2, ',', '.') . ' horas</li>';
+    } else {
+        $tipo_pagamento_html = '<li><strong>Tipo de Pagamento:</strong> Pagamento em Dinheiro</li>';
+        
+        if (!empty($hora_extra['valor_hora']) && $hora_extra['valor_hora'] > 0) {
+            $valor_hora_html = '<li><strong>Valor da Hora:</strong> R$ ' . number_format($hora_extra['valor_hora'], 2, ',', '.') . '</li>';
+        }
+        
+        if (!empty($hora_extra['percentual_adicional']) && $hora_extra['percentual_adicional'] > 0) {
+            $percentual_adicional_html = '<li><strong>Percentual Adicional:</strong> ' . number_format($hora_extra['percentual_adicional'], 2, ',', '.') . '%</li>';
+        }
+        
+        if (!empty($hora_extra['valor_total']) && $hora_extra['valor_total'] > 0) {
+            $valor_total_html = '<li><strong>Valor Total:</strong> R$ ' . number_format($hora_extra['valor_total'], 2, ',', '.') . '</li>';
+        }
+    }
+    
+    if (!empty($hora_extra['observacoes'])) {
+        $observacoes_html = '<li><strong>Observações:</strong> ' . nl2br(htmlspecialchars($hora_extra['observacoes'])) . '</li>';
+    }
+    
+    // Prepara variáveis texto alternativo
+    $tipo_pagamento_texto = '';
+    $valor_hora_texto = '';
+    $percentual_adicional_texto = '';
+    $valor_total_texto = '';
+    $saldo_banco_texto = '';
+    $observacoes_texto = '';
+    
+    if ($tipo_pagamento === 'banco_horas') {
+        $tipo_pagamento_texto = '- Tipo de Pagamento: Banco de Horas';
+        if (!empty($saldo_banco_html)) {
+            $saldo_banco_texto = '- ' . strip_tags($saldo_banco_html);
+        }
+    } else {
+        $tipo_pagamento_texto = '- Tipo de Pagamento: Pagamento em Dinheiro';
+        if (!empty($valor_hora_html)) {
+            $valor_hora_texto = '- ' . strip_tags($valor_hora_html);
+        }
+        if (!empty($percentual_adicional_html)) {
+            $percentual_adicional_texto = '- ' . strip_tags($percentual_adicional_html);
+        }
+        if (!empty($valor_total_html)) {
+            $valor_total_texto = '- ' . strip_tags($valor_total_html);
+        }
+    }
+    
+    if (!empty($hora_extra['observacoes'])) {
+        $observacoes_texto = '- Observações: ' . strip_tags($hora_extra['observacoes']);
+    }
+    
+    // Formata quantidade de horas
+    $quantidade_horas_formatada = number_format($hora_extra['quantidade_horas'], 2, ',', '.') . ' horas';
+    $horas_inteiras = floor($hora_extra['quantidade_horas']);
+    $minutos = round(($hora_extra['quantidade_horas'] - $horas_inteiras) * 60);
+    if ($horas_inteiras > 0 && $minutos > 0) {
+        $quantidade_horas_formatada = $horas_inteiras . 'h ' . $minutos . 'min';
+    } elseif ($horas_inteiras > 0) {
+        $quantidade_horas_formatada = $horas_inteiras . 'h';
+    } elseif ($minutos > 0) {
+        $quantidade_horas_formatada = $minutos . 'min';
+    }
+    
+    $variaveis = [
+        'nome_completo' => $hora_extra['nome_completo'] ?? '',
+        'data_trabalho' => formatar_data($hora_extra['data_trabalho'] ?? ''),
+        'quantidade_horas' => $quantidade_horas_formatada,
+        'tipo_pagamento_html' => $tipo_pagamento_html,
+        'valor_hora_html' => $valor_hora_html,
+        'percentual_adicional_html' => $percentual_adicional_html,
+        'valor_total_html' => $valor_total_html,
+        'saldo_banco_html' => $saldo_banco_html,
+        'observacoes_html' => $observacoes_html,
+        'tipo_pagamento_texto' => $tipo_pagamento_texto,
+        'valor_hora_texto' => $valor_hora_texto,
+        'percentual_adicional_texto' => $percentual_adicional_texto,
+        'valor_total_texto' => $valor_total_texto,
+        'saldo_banco_texto' => $saldo_banco_texto,
+        'observacoes_texto' => $observacoes_texto,
+        'usuario_registro' => $hora_extra['usuario_nome'] ?? '',
+        'data_registro' => formatar_data($hora_extra['created_at'] ?? '', 'd/m/Y H:i'),
+        'empresa_nome' => $hora_extra['empresa_nome'] ?? '',
+        'setor_nome' => $hora_extra['nome_setor'] ?? '',
+        'cargo_nome' => $hora_extra['nome_cargo'] ?? '',
+        'ano_atual' => date('Y')
+    ];
+    
+    return enviar_email_template('horas_extras', $hora_extra['email_pessoal'], $variaveis);
+}
+

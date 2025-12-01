@@ -280,6 +280,32 @@ require_once __DIR__ . '/../includes/header.php';
                             <li><code>{cargo_nome}</code> - Nome do cargo</li>
                         </ul>
                     </div>
+                    <div class="col-md-6 mt-4">
+                        <h5 class="mb-3">Horas Extras</h5>
+                        <ul class="list-unstyled">
+                            <li><code>{nome_completo}</code> - Nome do colaborador</li>
+                            <li><code>{data_trabalho}</code> - Data do trabalho</li>
+                            <li><code>{quantidade_horas}</code> - Quantidade de horas</li>
+                            <li><code>{tipo_pagamento_html}</code> - Tipo de pagamento (HTML)</li>
+                            <li><code>{tipo_pagamento_texto}</code> - Tipo de pagamento (texto)</li>
+                            <li><code>{valor_hora_html}</code> - Valor da hora (HTML)</li>
+                            <li><code>{valor_hora_texto}</code> - Valor da hora (texto)</li>
+                            <li><code>{percentual_adicional_html}</code> - Percentual adicional (HTML)</li>
+                            <li><code>{percentual_adicional_texto}</code> - Percentual adicional (texto)</li>
+                            <li><code>{valor_total_html}</code> - Valor total (HTML)</li>
+                            <li><code>{valor_total_texto}</code> - Valor total (texto)</li>
+                            <li><code>{saldo_banco_html}</code> - Saldo no banco (HTML)</li>
+                            <li><code>{saldo_banco_texto}</code> - Saldo no banco (texto)</li>
+                            <li><code>{observacoes_html}</code> - Observações (HTML)</li>
+                            <li><code>{observacoes_texto}</code> - Observações (texto)</li>
+                            <li><code>{usuario_registro}</code> - Usuário que registrou</li>
+                            <li><code>{data_registro}</code> - Data/hora do registro</li>
+                            <li><code>{empresa_nome}</code> - Nome da empresa</li>
+                            <li><code>{setor_nome}</code> - Nome do setor</li>
+                            <li><code>{cargo_nome}</code> - Nome do cargo</li>
+                            <li><code>{ano_atual}</code> - Ano atual</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>

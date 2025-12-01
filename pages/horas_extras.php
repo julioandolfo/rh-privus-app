@@ -70,6 +70,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $resultado['movimentacao_id']
                 ]);
                 
+                $hora_extra_id = $pdo->lastInsertId();
+                
+                // Envia email de notificação se template estiver ativo
+                require_once __DIR__ . '/../includes/email_templates.php';
+                enviar_email_horas_extras($hora_extra_id);
+                
                 redirect('horas_extras.php', 'Hora extra adicionada ao banco de horas com sucesso!');
                 
             } else {
@@ -105,6 +111,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $colaborador_id, $data_trabalho, $quantidade_horas, $valor_hora, 
                     $percentual_adicional, $valor_total, $observacoes, $usuario['id']
                 ]);
+                
+                $hora_extra_id = $pdo->lastInsertId();
+                
+                // Envia email de notificação se template estiver ativo
+                require_once __DIR__ . '/../includes/email_templates.php';
+                enviar_email_horas_extras($hora_extra_id);
                 
                 redirect('horas_extras.php', 'Hora extra cadastrada com sucesso!');
             }
