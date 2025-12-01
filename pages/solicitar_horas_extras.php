@@ -39,8 +39,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($action === 'solicitar') {
         $data_trabalho = $_POST['data_trabalho'] ?? '';
-        $quantidade_horas = str_replace(',', '.', $_POST['quantidade_horas'] ?? '0');
+        $quantidade_horas_input = $_POST['quantidade_horas'] ?? '0:00';
         $motivo = sanitize($_POST['motivo'] ?? '');
+        
+        // Converte formato HH:MM para horas decimais
+        $quantidade_horas = 0;
+        if (preg_match('/^(\d{1,2}):(\d{2})$/', $quantidade_horas_input, $matches)) {
+            $horas = intval($matches[1]);
+            $minutos = intval($matches[2]);
+            if ($minutos >= 60) {
+                redirect('solicitar_horas_extras.php', 'Os minutos devem ser menores que 60!', 'error');
+            }
+            $quantidade_horas = $horas + ($minutos / 60);
+        } else {
+            // Tenta converter formato decimal antigo (para compatibilidade)
+            $quantidade_horas = floatval(str_replace(',', '.', $quantidade_horas_input));
+        }
         
         // Validações
         if (empty($data_trabalho)) {
@@ -148,18 +162,16 @@ include __DIR__ . '/../includes/header.php';
                             <div class="col-md-6">
                                 <label class="form-label required">Quantidade de Horas</label>
                                 <div class="input-group">
-                                    <input type="number" 
+                                    <input type="text" 
                                            name="quantidade_horas" 
                                            id="quantidade_horas"
                                            class="form-control" 
-                                           step="0.01"
-                                           min="0.01"
-                                           max="8"
-                                           placeholder="0.00"
+                                           placeholder="00:00"
+                                           value=""
                                            required>
-                                    <span class="input-group-text">horas</span>
+                                    <span class="input-group-text">HH:MM</span>
                                 </div>
-                                <div class="form-text">Máximo de 8 horas por solicitação</div>
+                                <div class="form-text">Digite até 4 números. Ex: 230 = 02:30 ou 0830 = 08:30. Máximo: 8 horas</div>
                             </div>
                         </div>
                         
@@ -281,7 +293,12 @@ include __DIR__ . '/../includes/header.php';
                                     <?php foreach ($solicitacoes as $solicitacao): ?>
                                         <tr>
                                             <td><?= formatar_data($solicitacao['data_trabalho']) ?></td>
-                                            <td><?= number_format($solicitacao['quantidade_horas'], 2, ',', '.') ?>h</td>
+                                            <td><?php
+                                                $horas_decimais = floatval($solicitacao['quantidade_horas']);
+                                                $horas = floor($horas_decimais);
+                                                $minutos = round(($horas_decimais - $horas) * 60);
+                                                echo sprintf('%02d:%02d', $horas, $minutos);
+                                            ?></td>
                                             <td>
                                                 <div class="text-truncate" style="max-width: 200px;" title="<?= htmlspecialchars($solicitacao['motivo']) ?>">
                                                     <?= htmlspecialchars($solicitacao['motivo']) ?>
@@ -336,12 +353,18 @@ function formatHours(seconds) {
     return (seconds / 3600).toFixed(2);
 }
 
+function formatHoursMinutes(seconds) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
+
 function updateDisplay() {
     document.getElementById('timer_display').textContent = formatTime(timerSeconds);
     document.getElementById('timer_horas_display').textContent = formatHours(timerSeconds) + ' horas';
     
-    // Atualiza campo de quantidade de horas
-    document.getElementById('quantidade_horas').value = formatHours(timerSeconds);
+    // Atualiza campo de quantidade de horas no formato HH:MM
+    document.getElementById('quantidade_horas').value = formatHoursMinutes(timerSeconds);
     
     // Verifica limite de 8 horas
     if (timerSeconds >= MAX_SECONDS) {
@@ -395,9 +418,135 @@ function resetTimer() {
     updateDisplay();
 }
 
+// Máscara HH:MM simplificada com placeholder
+const quantidadeHorasInput = document.getElementById('quantidade_horas');
+let digitosDigitados = '';
+
+// Intercepta teclas para construir a máscara
+quantidadeHorasInput.addEventListener('keydown', function(e) {
+    // Se pressionou Delete ou Backspace, remove o último dígito
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        digitosDigitados = digitosDigitados.slice(0, -1);
+        formatarCampo();
+        return;
+    }
+    
+    // Se pressionou uma tecla numérica
+    if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        
+        // Se já tem 4 dígitos, não adiciona mais
+        if (digitosDigitados.length >= 4) {
+            return;
+        }
+        
+        digitosDigitados += e.key;
+        formatarCampo();
+    }
+});
+
+// Ao colar texto, processa apenas os números
+quantidadeHorasInput.addEventListener('paste', function(e) {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('text').replace(/\D/g, '');
+    digitosDigitados = pasteData.substring(0, 4);
+    formatarCampo();
+});
+
+function formatarCampo() {
+    if (digitosDigitados.length === 0) {
+        quantidadeHorasInput.value = '';
+        return;
+    }
+    
+    let horas = '00';
+    let minutos = '00';
+    
+    // Interpreta os dígitos conforme a quantidade
+    if (digitosDigitados.length === 1) {
+        // "2" → "2_:__" (mostra apenas o que foi digitado)
+        quantidadeHorasInput.value = digitosDigitados;
+        return;
+    } else if (digitosDigitados.length === 2) {
+        // "23" → "23:__"
+        quantidadeHorasInput.value = digitosDigitados + ':';
+        return;
+    } else if (digitosDigitados.length === 3) {
+        // "230" → "23:0_"
+        horas = digitosDigitados.substring(0, 2);
+        minutos = digitosDigitados[2];
+        quantidadeHorasInput.value = horas + ':' + minutos;
+        return;
+    } else {
+        // "2305" → "23:05"
+        horas = digitosDigitados.substring(0, 2);
+        minutos = digitosDigitados.substring(2, 4);
+    }
+    
+    // Valida limites
+    if (parseInt(horas) > 8) {
+        horas = '08';
+        minutos = '00';
+        digitosDigitados = '0800';
+    }
+    
+    if (parseInt(minutos) > 59) {
+        minutos = '59';
+        digitosDigitados = horas + '59';
+    }
+    
+    quantidadeHorasInput.value = horas + ':' + minutos;
+}
+
+// Validação do formato HH:MM
+document.getElementById('quantidade_horas').addEventListener('blur', function(e) {
+    const value = e.target.value;
+    const pattern = /^([0-7]?[0-9]):([0-5][0-9])$/;
+    
+    if (!pattern.test(value)) {
+        e.target.value = '00:00';
+        Swal.fire({
+            icon: 'warning',
+            title: 'Formato Inválido',
+            text: 'Use o formato HH:MM (ex: 02:30 para 2 horas e 30 minutos)',
+            confirmButtonText: 'OK'
+        });
+    } else {
+        // Valida se não ultrapassa 8 horas
+        const [horas, minutos] = value.split(':').map(Number);
+        const totalHoras = horas + (minutos / 60);
+        
+        if (totalHoras > 8) {
+            e.target.value = '08:00';
+            Swal.fire({
+                icon: 'warning',
+                title: 'Limite Excedido',
+                text: 'Máximo de 8 horas por solicitação. Valor ajustado para 08:00',
+                confirmButtonText: 'OK'
+            });
+        }
+    }
+});
+
 // Validação do formulário
 document.getElementById('form_solicitar').addEventListener('submit', function(e) {
-    const quantidade = parseFloat(document.getElementById('quantidade_horas').value);
+    const quantidadeInput = document.getElementById('quantidade_horas').value;
+    const pattern = /^([0-7]?[0-9]):([0-5][0-9])$/;
+    
+    if (!pattern.test(quantidadeInput)) {
+        e.preventDefault();
+        Swal.fire({
+            icon: 'error',
+            title: 'Formato Inválido',
+            text: 'Use o formato HH:MM (ex: 02:30 para 2 horas e 30 minutos)',
+            confirmButtonText: 'OK'
+        });
+        return false;
+    }
+    
+    const [horas, minutos] = quantidadeInput.split(':').map(Number);
+    const quantidade = horas + (minutos / 60);
     
     if (quantidade <= 0) {
         e.preventDefault();
