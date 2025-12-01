@@ -377,10 +377,15 @@ $tipos_ocorrencias = [
                              style="object-fit: cover;"
                              onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
                         <?php endif; ?>
-                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center" 
-                             style="<?= $colab_data['foto'] ? 'display: none;' : '' ?>">
+                        <?php if (!$colab_data['foto']): ?>
+                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center">
                             <?= htmlspecialchars($colab_data['inicial']) ?>
                         </div>
+                        <?php else: ?>
+                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center" style="display: none;">
+                            <?= htmlspecialchars($colab_data['inicial']) ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     
                     <!-- Informações do Colaborador -->

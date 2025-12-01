@@ -249,16 +249,22 @@ $horas_extras = $stmt->fetchAll();
 // Busca colaboradores para o select usando função padronizada
 $colaboradores_raw = get_colaboradores_disponiveis($pdo, $usuario);
 
-// Filtra apenas colaboradores com salário e adiciona dados extras necessários
+// Adiciona dados extras necessários (salário e empresa_id) para todos os colaboradores
 $colaboradores = [];
 foreach ($colaboradores_raw as $colab) {
-    $stmt = $pdo->prepare("SELECT salario, empresa_id FROM colaboradores WHERE id = ? AND salario IS NOT NULL");
+    $stmt = $pdo->prepare("SELECT salario, empresa_id FROM colaboradores WHERE id = ?");
     $stmt->execute([$colab['id']]);
     $colab_data = $stmt->fetch();
     if ($colab_data) {
         $colaboradores[] = array_merge($colab, [
-            'salario' => $colab_data['salario'],
-            'empresa_id' => $colab_data['empresa_id']
+            'salario' => $colab_data['salario'] ?? null,
+            'empresa_id' => $colab_data['empresa_id'] ?? null
+        ]);
+    } else {
+        // Se não encontrou dados, adiciona mesmo assim (pode ser colaborador sem salário)
+        $colaboradores[] = array_merge($colab, [
+            'salario' => null,
+            'empresa_id' => null
         ]);
     }
 }
@@ -483,10 +489,14 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="path2"></span>
                                     <span class="path3"></span>
                                 </i>
-                                <strong>Atenção:</strong> Nenhum colaborador com salário cadastrado encontrado.
+                                <strong>Atenção:</strong> Nenhum colaborador disponível encontrado.
                             </div>
                             <?php else: ?>
-                            <small class="text-muted"><?= count($colaboradores) ?> colaborador(es) disponível(is)</small>
+                            <small class="text-muted">
+                                <?= count($colaboradores) ?> colaborador(es) disponível(is)
+                                <br>
+                                <span class="text-warning">Nota: Para pagamento em dinheiro, o colaborador precisa ter salário cadastrado.</span>
+                            </small>
                             <?php endif; ?>
                         </div>
                     </div>
