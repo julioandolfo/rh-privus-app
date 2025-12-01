@@ -86,6 +86,7 @@ function getIcon($name) {
         'notification' => 'notification-status',
         'shield' => 'shield-check',
         'wallet' => 'wallet',
+        'clock' => 'clock',
     ];
     return $icons[$name] ?? 'element-11';
 }
@@ -1416,7 +1417,7 @@ function getIcon($name) {
                 <div class="menu-item">
                     <a class="menu-link <?= isActive('solicitar_horas_extras.php') ?>" href="solicitar_horas_extras.php">
                         <span class="menu-icon">
-                            <i class="ki-duotone ki-clock fs-2">
+                            <i class="ki-duotone ki-<?= getIcon('clock') ?> fs-2">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                                 <span class="path3"></span>
