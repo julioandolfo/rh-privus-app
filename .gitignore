@@ -1,0 +1,37 @@
+# Arquivos de configuração local
+config/db.php
+
+# Logs
+logs/*.log
+logs/*.txt
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Cache
+cache/*
+!cache/.gitkeep
+
+# Vendor (Composer)
+vendor/
+
+# Node modules
+node_modules/
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ambiente
+.env
+.env.local
+
