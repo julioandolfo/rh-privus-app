@@ -61,6 +61,8 @@ function get_page_permissions() {
         'colaborador_edit.php' => ['ADMIN', 'RH'],
         'promocoes.php' => ['ADMIN', 'RH'],
         'horas_extras.php' => ['ADMIN', 'RH'],
+        'solicitar_horas_extras.php' => ['COLABORADOR'],
+        'aprovar_horas_extras.php' => ['ADMIN', 'RH'],
         'fechamento_pagamentos.php' => ['ADMIN', 'RH'],
         'tipos_bonus.php' => ['ADMIN', 'RH'],
         
@@ -505,6 +507,7 @@ function can_access_colaboradores_menu() {
         'emocoes_analise.php',
         'promocoes.php',
         'horas_extras.php',
+        'aprovar_horas_extras.php',
         'fechamento_pagamentos.php',
         'tipos_bonus.php'
     ];

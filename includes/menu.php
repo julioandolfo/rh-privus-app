@@ -924,6 +924,18 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('aprovar_horas_extras.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('aprovar_horas_extras.php') ?>" href="aprovar_horas_extras.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Aprovar Horas Extras</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
                             <?php if (can_access_page('fechamento_pagamentos.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
@@ -1397,6 +1409,24 @@ function getIcon($name) {
                 <div class="menu-content px-3 pb-2 pt-5">
                     <span class="menu-heading fw-bold text-uppercase fs-7">Financeiro</span>
                 </div>
+                <?php endif; ?>
+                
+                <!--begin:Menu item - Solicitar Horas Extras (apenas para colaboradores)-->
+                <?php if (can_access_page('solicitar_horas_extras.php')): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('solicitar_horas_extras.php') ?>" href="solicitar_horas_extras.php">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-clock fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Solicitar Horas Extras</span>
+                    </a>
+                </div>
+                <!--end:Menu item-->
                 <?php endif; ?>
                 
                 <!--begin:Menu item - Meus Pagamentos (apenas para colaboradores)-->
