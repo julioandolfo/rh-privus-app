@@ -2841,12 +2841,24 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- Card de Informações de Pagamento -->
         <div class="card mt-5">
             <div class="card-header">
-                <h3 class="card-title align-items-start flex-column">
-                    <span class="card-label fw-bold fs-3 mb-1">Informações de Pagamento</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7">Resumo financeiro dos pagamentos</span>
-                </h3>
+                <div class="card-title d-flex justify-content-between align-items-center flex-wrap">
+                    <div class="align-items-start flex-column">
+                        <span class="card-label fw-bold fs-3 mb-1">Informações de Pagamento</span>
+                        <span class="text-muted mt-1 fw-semibold fs-7">Resumo financeiro dos pagamentos</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <select id="filtro_resumo_tipo" class="form-select form-select-sm w-auto">
+                            <option value="total">Total</option>
+                            <option value="empresa">Por Empresa</option>
+                            <option value="setor">Por Setor</option>
+                        </select>
+                        <select id="filtro_resumo_id" class="form-select form-select-sm w-auto" style="display: none;">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="resumo_pagamentos_body">
                 <div class="row g-5 g-xl-8">
                     <!-- Total de Folha -->
                     <div class="col-xl-3">
@@ -2932,6 +2944,265 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- End Card de Informações de Pagamento -->
         
         <?php endif; ?>
+        
+        <script>
+        // Dados para filtros
+        const empresasData = <?= json_encode($empresas ?? []) ?>;
+        let setoresData = [];
+        
+        // Busca setores quando necessário
+        function buscarSetores(empresaId = null) {
+            const url = empresaId 
+                ? `../api/get_setores.php?empresa_id=${empresaId}`
+                : '../api/get_setores.php';
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        setoresData = data.data || [];
+                        if (document.getElementById('filtro_resumo_tipo').value === 'setor') {
+                            atualizarSelectFiltro();
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar setores:', error);
+                });
+        }
+        
+        // Atualiza o select de filtro baseado no tipo selecionado
+        function atualizarSelectFiltro() {
+            const tipoFiltro = document.getElementById('filtro_resumo_tipo').value;
+            const selectId = document.getElementById('filtro_resumo_id');
+            
+            selectId.innerHTML = '<option value="">Selecione...</option>';
+            
+            if (tipoFiltro === 'total') {
+                selectId.style.display = 'none';
+                carregarResumo('total', null);
+            } else if (tipoFiltro === 'empresa') {
+                selectId.style.display = 'block';
+                empresasData.forEach(empresa => {
+                    const option = document.createElement('option');
+                    option.value = empresa.id;
+                    option.textContent = empresa.nome_fantasia;
+                    selectId.appendChild(option);
+                });
+                carregarResumo('empresa', null);
+            } else if (tipoFiltro === 'setor') {
+                selectId.style.display = 'block';
+                if (setoresData.length === 0) {
+                    buscarSetores();
+                } else {
+                    setoresData.forEach(setor => {
+                        const option = document.createElement('option');
+                        option.value = setor.id;
+                        option.textContent = `${setor.nome_setor}${setor.empresa_nome ? ' - ' + setor.empresa_nome : ''}`;
+                        selectId.appendChild(option);
+                    });
+                }
+                carregarResumo('setor', null);
+            }
+        }
+        
+        // Carrega o resumo de pagamentos
+        function carregarResumo(tipo, filtroId) {
+            const url = `../api/get_resumo_pagamentos.php?filtro_tipo=${tipo}${filtroId ? '&filtro_id=' + filtroId : ''}`;
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        atualizarCards(data.data, tipo);
+                    } else {
+                        console.error('Erro ao carregar resumo:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar resumo:', error);
+                });
+        }
+        
+        // Atualiza os cards com os dados recebidos
+        function atualizarCards(dados, tipo) {
+            const container = document.getElementById('resumo_pagamentos_body');
+            
+            if (tipo === 'total') {
+                // Exibe valores totais simples
+                container.innerHTML = `
+                    <div class="row g-5 g-xl-8">
+                        <div class="col-xl-3">
+                            <div class="card bg-light-primary h-100">
+                                <div class="card-body d-flex flex-column justify-content-between">
+                                    <div>
+                                        <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Total de Folha</span>
+                                        <span class="text-gray-800 fw-bold fs-2x">R$ ${formatarMoeda(dados.total_folha)}</span>
+                                    </div>
+                                    <div class="mt-3">
+                                        <span class="text-gray-500 fs-7">Soma de todos os salários</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3">
+                            <div class="card bg-light-success h-100">
+                                <div class="card-body d-flex flex-column justify-content-between">
+                                    <div>
+                                        <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Apenas Bônus</span>
+                                        <span class="text-gray-800 fw-bold fs-2x">R$ ${formatarMoeda(dados.total_bonus)}</span>
+                                    </div>
+                                    <div class="mt-3">
+                                        <span class="text-gray-500 fs-7">Total de bônus cadastrados</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3">
+                            <div class="card bg-light-info h-100">
+                                <div class="card-body d-flex flex-column justify-content-between">
+                                    <div>
+                                        <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Extras Somados</span>
+                                        <span class="text-gray-800 fw-bold fs-2x">R$ ${formatarMoeda(dados.total_extras)}</span>
+                                    </div>
+                                    <div class="mt-3">
+                                        <span class="text-gray-500 fs-7">Total de horas extras não pagas</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3">
+                            <div class="card bg-light-warning h-100">
+                                <div class="card-body d-flex flex-column justify-content-between">
+                                    <div>
+                                        <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Folha + Bônus</span>
+                                        <span class="text-gray-800 fw-bold fs-2x">R$ ${formatarMoeda(dados.total_folha_bonus)}</span>
+                                    </div>
+                                    <div class="mt-3">
+                                        <span class="text-gray-500 fs-7">Total de folha com bônus</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-5">
+                        <div class="col-12">
+                            <div class="card bg-light-dark h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-white fw-semibold fs-6 d-block mb-1">Total Geral</span>
+                                            <span class="text-white-50 fs-7">Folha + Bônus + Extras</span>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="text-white fw-bold fs-2x">R$ ${formatarMoeda(dados.total_geral)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Exibe valores agrupados por empresa ou setor
+                const items = dados.total_folha_bonus || [];
+                const titulo = tipo === 'empresa' ? 'Empresa' : 'Setor';
+                
+                let html = '<div class="row g-5 g-xl-8">';
+                
+                // Cards individuais para cada item
+                items.forEach((item, index) => {
+                    const folha = dados.total_folha.find(d => d.id === item.id)?.valor || 0;
+                    const bonus = dados.total_bonus.find(d => d.id === item.id)?.valor || 0;
+                    const extras = dados.total_extras.find(d => d.id === item.id)?.valor || 0;
+                    const geral = dados.total_geral.find(d => d.id === item.id)?.valor || 0;
+                    
+                    html += `
+                        <div class="col-xl-6 mb-5">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h4 class="card-title">${item.nome}${item.empresa ? ' - ' + item.empresa : ''}</h4>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-6">
+                                            <div class="card bg-light-primary">
+                                                <div class="card-body p-3">
+                                                    <span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Total de Folha</span>
+                                                    <span class="text-gray-800 fw-bold fs-3">R$ ${formatarMoeda(folha)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="card bg-light-success">
+                                                <div class="card-body p-3">
+                                                    <span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Apenas Bônus</span>
+                                                    <span class="text-gray-800 fw-bold fs-3">R$ ${formatarMoeda(bonus)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="card bg-light-info">
+                                                <div class="card-body p-3">
+                                                    <span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Extras Somados</span>
+                                                    <span class="text-gray-800 fw-bold fs-3">R$ ${formatarMoeda(extras)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="card bg-light-warning">
+                                                <div class="card-body p-3">
+                                                    <span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Folha + Bônus</span>
+                                                    <span class="text-gray-800 fw-bold fs-3">R$ ${formatarMoeda(item.valor)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="card bg-light-dark">
+                                                <div class="card-body p-3">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span class="text-white fw-semibold fs-6">Total Geral</span>
+                                                        <span class="text-white fw-bold fs-2x">R$ ${formatarMoeda(geral)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }
+        }
+        
+        // Formata valor monetário
+        function formatarMoeda(valor) {
+            return parseFloat(valor || 0).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        // Event listeners
+        document.getElementById('filtro_resumo_tipo').addEventListener('change', function() {
+            atualizarSelectFiltro();
+        });
+        
+        document.getElementById('filtro_resumo_id').addEventListener('change', function() {
+            const tipo = document.getElementById('filtro_resumo_tipo').value;
+            const filtroId = this.value || null;
+            carregarResumo(tipo, filtroId);
+        });
+        
+        // Inicializa ao carregar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            atualizarSelectFiltro();
+        });
+        </script>
         
     </div>
 </div>

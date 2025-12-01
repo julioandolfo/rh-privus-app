@@ -17,20 +17,51 @@ if (!isset($_SESSION['usuario'])) {
     exit;
 }
 
-$empresa_id = $_GET['empresa_id'] ?? null;
+require_once __DIR__ . '/../includes/permissions.php';
 
-if (!$empresa_id) {
-    echo json_encode(['success' => false, 'setores' => []]);
-    exit;
-}
+$usuario = $_SESSION['usuario'];
+$empresa_id = isset($_GET['empresa_id']) ? (int)$_GET['empresa_id'] : null;
 
 try {
     $pdo = getDB();
-    $stmt = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_setor");
-    $stmt->execute([$empresa_id]);
+    $where = ["s.status = 'ativo'"];
+    $params = [];
+    
+    if ($empresa_id) {
+        $where[] = "s.empresa_id = ?";
+        $params[] = $empresa_id;
+    } else {
+        // Aplica filtros de permissão
+        if ($usuario['role'] === 'ADMIN') {
+            // ADMIN vê todos
+        } elseif ($usuario['role'] === 'RH') {
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+                $where[] = "s.empresa_id IN ($placeholders)";
+                $params = array_merge($params, $usuario['empresas_ids']);
+            } else {
+                $where[] = "s.empresa_id = ?";
+                $params[] = $usuario['empresa_id'] ?? 0;
+            }
+        } else {
+            $where[] = "s.empresa_id = ?";
+            $params[] = $usuario['empresa_id'] ?? 0;
+        }
+    }
+    
+    $where_sql = 'WHERE ' . implode(' AND ', $where);
+    
+    $stmt = $pdo->prepare("
+        SELECT s.id, s.nome_setor, e.nome_fantasia as empresa_nome
+        FROM setores s
+        LEFT JOIN empresas e ON s.empresa_id = e.id
+        $where_sql
+        ORDER BY e.nome_fantasia, s.nome_setor
+    ");
+    $stmt->execute($params);
     $setores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    echo json_encode(['success' => true, 'setores' => $setores]);
+    echo json_encode(['success' => true, 'data' => $setores]);
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'setores' => [], 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'data' => [], 'error' => $e->getMessage()]);
 }
 
