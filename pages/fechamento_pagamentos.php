@@ -44,6 +44,34 @@ function log_fechamento_individual($mensagem, $contexto = []) {
 }
 
 /**
+ * Verifica se o usuário tem permissão para acessar uma empresa específica
+ * Considera tanto empresa_id quanto empresas_ids (para RH com múltiplas empresas)
+ * 
+ * @param array $usuario Array com dados do usuário
+ * @param int $empresa_id ID da empresa a verificar
+ * @return bool True se tem permissão, False caso contrário
+ */
+function usuario_tem_permissao_empresa($usuario, $empresa_id) {
+    // ADMIN sempre tem permissão
+    if ($usuario['role'] === 'ADMIN') {
+        return true;
+    }
+    
+    // RH pode ter múltiplas empresas
+    if ($usuario['role'] === 'RH') {
+        // Verifica empresas_ids (array de empresas)
+        if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+            return in_array($empresa_id, $usuario['empresas_ids']);
+        }
+        // Fallback para empresa_id único
+        return ($usuario['empresa_id'] ?? 0) == $empresa_id;
+    }
+    
+    // Outros roles: apenas sua própria empresa
+    return ($usuario['empresa_id'] ?? 0) == $empresa_id;
+}
+
+/**
  * Verifica se um bônus já foi pago em fechamento extra no mesmo mês
  * Retorna array com IDs dos fechamentos extras que pagaram este bônus
  */
@@ -719,13 +747,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bonus_editados = $_POST['bonus_editados'] ?? [];
         
         try {
-            // Busca item atual
-            $stmt = $pdo->prepare("SELECT * FROM fechamentos_pagamento_itens WHERE id = ?");
+            // Busca item atual e verifica permissão
+            $stmt = $pdo->prepare("
+                SELECT i.*, f.empresa_id 
+                FROM fechamentos_pagamento_itens i
+                INNER JOIN fechamentos_pagamento f ON i.fechamento_id = f.id
+                WHERE i.id = ?
+            ");
             $stmt->execute([$item_id]);
             $item = $stmt->fetch();
             
             if (!$item) {
                 redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
             // Processa bônus editados
@@ -788,13 +825,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $motivo = trim($_POST['motivo'] ?? '');
         
         try {
-            // Busca item atual
-            $stmt = $pdo->prepare("SELECT * FROM fechamentos_pagamento_itens WHERE id = ?");
+            // Busca item atual e verifica permissão
+            $stmt = $pdo->prepare("
+                SELECT i.*, f.empresa_id 
+                FROM fechamentos_pagamento_itens i
+                INNER JOIN fechamentos_pagamento f ON i.fechamento_id = f.id
+                WHERE i.id = ?
+            ");
             $stmt->execute([$item_id]);
             $item = $stmt->fetch();
             
             if (!$item) {
                 redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
             if (!$tipo_bonus_id) {
@@ -872,13 +918,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $motivo = trim($_POST['motivo'] ?? '');
         
         try {
-            // Busca item atual
-            $stmt = $pdo->prepare("SELECT * FROM fechamentos_pagamento_itens WHERE id = ?");
+            // Busca item atual e verifica permissão
+            $stmt = $pdo->prepare("
+                SELECT i.*, f.empresa_id 
+                FROM fechamentos_pagamento_itens i
+                INNER JOIN fechamentos_pagamento f ON i.fechamento_id = f.id
+                WHERE i.id = ?
+            ");
             $stmt->execute([$item_id]);
             $item = $stmt->fetch();
             
             if (!$item) {
                 redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
             if (empty($valor_manual) || (float)$valor_manual <= 0) {
@@ -942,13 +997,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $motivo = trim($_POST['motivo'] ?? '');
         
         try {
-            // Busca item atual
-            $stmt = $pdo->prepare("SELECT * FROM fechamentos_pagamento_itens WHERE id = ?");
+            // Busca item atual e verifica permissão
+            $stmt = $pdo->prepare("
+                SELECT i.*, f.empresa_id 
+                FROM fechamentos_pagamento_itens i
+                INNER JOIN fechamentos_pagamento f ON i.fechamento_id = f.id
+                WHERE i.id = ?
+            ");
             $stmt->execute([$item_id]);
             $item = $stmt->fetch();
             
             if (!$item) {
                 redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
             if (empty($valor_adiantamento) || (float)$valor_adiantamento <= 0) {
@@ -1022,6 +1086,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'fechar') {
         $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
         try {
+            // Verifica permissão
+            $stmt = $pdo->prepare("SELECT empresa_id FROM fechamentos_pagamento WHERE id = ?");
+            $stmt->execute([$fechamento_id]);
+            $fechamento = $stmt->fetch();
+            
+            if (!$fechamento) {
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para fechar este fechamento!', 'error');
+            }
+            
             $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'fechado' WHERE id = ?");
             $stmt->execute([$fechamento_id]);
             
@@ -1051,7 +1128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
             }
             
-            if ($usuario['role'] !== 'ADMIN' && $fechamento['empresa_id'] != $usuario['empresa_id']) {
+            if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
                 redirect('fechamento_pagamentos.php', 'Você não tem permissão para excluir este fechamento!', 'error');
             }
             
@@ -2036,7 +2113,7 @@ if (isset($_GET['view'])) {
     
     if ($fechamento_view) {
         // Verifica permissão
-        if ($usuario['role'] !== 'ADMIN' && $fechamento_view['empresa_id'] != $usuario['empresa_id']) {
+        if (!usuario_tem_permissao_empresa($usuario, $fechamento_view['empresa_id'])) {
             redirect('fechamento_pagamentos.php', 'Você não tem permissão para visualizar este fechamento!', 'error');
         }
         
