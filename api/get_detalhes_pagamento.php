@@ -426,17 +426,30 @@ try {
         ]
     ];
     
-    // Recalcula o valor total se houver bônus virtuais (fechamentos extras)
-    // Para fechamentos regulares, o valor total deve incluir os bônus extras
+    // Recalcula o valor total se houver bônus virtuais (fechamentos extras) ou adiantamentos
+    // Para fechamentos regulares, o valor total deve incluir os bônus extras e descontos de adiantamentos
     if ($fechamento['tipo_fechamento'] === 'regular') {
         $total_bonus_calculado = $response['data']['bonus']['total'];
+        
+        // Soma o valor dos adiantamentos descontados ao campo de descontos
+        $total_adiantamentos_descontados = 0;
+        if (!empty($response['data']['adiantamentos_descontados'])) {
+            foreach ($response['data']['adiantamentos_descontados'] as $ad) {
+                $total_adiantamentos_descontados += (float)$ad['valor_descontar'];
+            }
+        }
+        
+        // Atualiza o campo de descontos para incluir adiantamentos
+        $descontos_totais = $response['data']['item']['descontos'] + $total_adiantamentos_descontados;
+        $response['data']['item']['descontos'] = $descontos_totais;
+        
         // Recalcula: salario_base + horas_extras + bonus + adicionais - descontos
         $valor_total_recalculado = 
             $response['data']['item']['salario_base'] + 
             $response['data']['item']['valor_horas_extras'] + 
             $total_bonus_calculado + 
             $response['data']['item']['adicionais'] - 
-            $response['data']['item']['descontos'];
+            $descontos_totais;
         
         $response['data']['item']['valor_total'] = $valor_total_recalculado;
     }
