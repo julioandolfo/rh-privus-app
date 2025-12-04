@@ -4162,10 +4162,23 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
         .then(r => r.json())
         .then(data => {
             let html = '';
+            
+            // Adiciona checkbox "Selecionar Todos"
+            if (data.length > 0) {
+                html += `
+                    <div class="form-check mb-3 pb-3 border-bottom">
+                        <input class="form-check-input" type="checkbox" id="selecionar_todos_colaboradores">
+                        <label class="form-check-label fw-bold" for="selecionar_todos_colaboradores">
+                            Selecionar Todos (${data.length} colaborador${data.length > 1 ? 'es' : ''})
+                        </label>
+                    </div>
+                `;
+            }
+            
             data.forEach(colab => {
                 html += `
                     <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" name="colaboradores[]" value="${colab.id}" id="colab_${colab.id}">
+                        <input class="form-check-input colaborador-checkbox" type="checkbox" name="colaboradores[]" value="${colab.id}" id="colab_${colab.id}">
                         <label class="form-check-label" for="colab_${colab.id}">
                             ${colab.nome_completo} - Salário: R$ ${parseFloat(colab.salario || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                         </label>
@@ -4173,6 +4186,28 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
                 `;
             });
             container.innerHTML = html || '<p class="text-muted">Nenhum colaborador encontrado</p>';
+            
+            // Adiciona evento ao checkbox "Selecionar Todos"
+            const selecionarTodos = document.getElementById('selecionar_todos_colaboradores');
+            if (selecionarTodos) {
+                selecionarTodos.addEventListener('change', function() {
+                    const checkboxes = container.querySelectorAll('.colaborador-checkbox');
+                    checkboxes.forEach(cb => {
+                        cb.checked = this.checked;
+                    });
+                });
+                
+                // Atualiza "Selecionar Todos" quando checkboxes individuais mudam
+                const checkboxes = container.querySelectorAll('.colaborador-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.addEventListener('change', function() {
+                        const todosMarcados = Array.from(checkboxes).every(c => c.checked);
+                        const nenhumMarcado = Array.from(checkboxes).every(c => !c.checked);
+                        selecionarTodos.checked = todosMarcados;
+                        selecionarTodos.indeterminate = !todosMarcados && !nenhumMarcado;
+                    });
+                });
+            }
         })
         .catch(() => {
             container.innerHTML = '<p class="text-danger">Erro ao carregar colaboradores</p>';
@@ -5058,10 +5093,22 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
                 html += '<input type="hidden" name="colaborador_id_hidden" id="extra_colaborador_id_hidden" value="">';
             } else {
                 // Checkboxes múltiplos
+                // Adiciona checkbox "Selecionar Todos"
+                if (data.length > 0) {
+                    html += `
+                        <div class="form-check mb-3 pb-3 border-bottom">
+                            <input class="form-check-input" type="checkbox" id="selecionar_todos_colaboradores_extra">
+                            <label class="form-check-label fw-bold" for="selecionar_todos_colaboradores_extra">
+                                Selecionar Todos (${data.length} colaborador${data.length > 1 ? 'es' : ''})
+                            </label>
+                        </div>
+                    `;
+                }
+                
                 data.forEach(colab => {
                     html += `
                         <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" name="colaboradores[]" value="${colab.id}" id="extra_colab_${colab.id}">
+                            <input class="form-check-input colaborador-checkbox-extra" type="checkbox" name="colaboradores[]" value="${colab.id}" id="extra_colab_${colab.id}">
                             <label class="form-check-label" for="extra_colab_${colab.id}">
                                 ${colab.nome_completo}${colab.empresa_nome ? ' <small class="text-muted">(' + colab.empresa_nome + ')</small>' : ''}
                             </label>
@@ -5070,6 +5117,30 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
                 });
             }
             container.innerHTML = html || '<p class="text-muted">Nenhum colaborador encontrado</p>';
+            
+            // Adiciona evento ao checkbox "Selecionar Todos" (apenas para checkboxes múltiplos)
+            if (subtipo === 'grupal') {
+                const selecionarTodos = document.getElementById('selecionar_todos_colaboradores_extra');
+                if (selecionarTodos) {
+                    selecionarTodos.addEventListener('change', function() {
+                        const checkboxes = container.querySelectorAll('.colaborador-checkbox-extra');
+                        checkboxes.forEach(cb => {
+                            cb.checked = this.checked;
+                        });
+                    });
+                    
+                    // Atualiza "Selecionar Todos" quando checkboxes individuais mudam
+                    const checkboxes = container.querySelectorAll('.colaborador-checkbox-extra');
+                    checkboxes.forEach(cb => {
+                        cb.addEventListener('change', function() {
+                            const todosMarcados = Array.from(checkboxes).every(c => c.checked);
+                            const nenhumMarcado = Array.from(checkboxes).every(c => !c.checked);
+                            selecionarTodos.checked = todosMarcados;
+                            selecionarTodos.indeterminate = !todosMarcados && !nenhumMarcado;
+                        });
+                    });
+                }
+            }
             
             // Verifica duplicações após carregar colaboradores
             verificarDuplicacoes();
