@@ -84,10 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Busca dados da ocorrência
 $stmt = $pdo->prepare("
     SELECT o.*, 
-           c.nome_completo as colaborador_nome, c.email_pessoal,
+           c.nome_completo as colaborador_nome, c.email_pessoal, c.salario,
            u.nome as usuario_nome,
            t.nome as tipo_ocorrencia_nome, t.categoria as tipo_categoria,
-           t.calcula_desconto, t.permite_desconto_banco_horas,
+           t.calcula_desconto, t.permite_desconto_banco_horas, t.codigo as tipo_codigo,
            aprovador.nome as aprovador_nome
     FROM ocorrencias o
     INNER JOIN colaboradores c ON o.colaborador_id = c.id
@@ -393,6 +393,79 @@ require_once __DIR__ . '/../includes/header.php';
                                     </div>
                                 <?php elseif ($ocorrencia['valor_desconto']): ?>
                                     <!-- Desconto em Dinheiro -->
+                                    <?php
+                                    // Calcula a conta do desconto para exibição
+                                    $conta_desconto = '';
+                                    $tipo_codigo = $ocorrencia['tipo_codigo'] ?? '';
+                                    $salario = $ocorrencia['salario'] ?? 0;
+                                    $tempo_atraso = $ocorrencia['tempo_atraso_minutos'] ?? 0;
+                                    $considera_dia_inteiro = !empty($ocorrencia['considera_dia_inteiro']) && $ocorrencia['considera_dia_inteiro'] == 1;
+                                    
+                                    // Verifica se tem valor fixo no tipo de ocorrência
+                                    $stmt_tipo = $pdo->prepare("SELECT valor_desconto FROM tipos_ocorrencias WHERE id = ?");
+                                    $stmt_tipo->execute([$ocorrencia['tipo_ocorrencia_id'] ?? 0]);
+                                    $tipo_data = $stmt_tipo->fetch();
+                                    $valor_fixo_tipo = $tipo_data['valor_desconto'] ?? null;
+                                    
+                                    // Tenta calcular a conta baseada nos dados
+                                    if ($salario > 0) {
+                                        $jornada_diaria = 8; // Padrão 8h
+                                        $horas_mes = 220; // Padrão CLT
+                                        $valor_hora = $salario / $horas_mes;
+                                        
+                                        if ($considera_dia_inteiro) {
+                                            // Dia inteiro
+                                            $valor_calculado = $valor_hora * $jornada_diaria;
+                                            if (abs($valor_calculado - $ocorrencia['valor_desconto']) < 0.01) {
+                                                $conta_desconto = sprintf(
+                                                    'Salário (R$ %s) ÷ %d horas/mês = R$ %s/hora × %d horas = R$ %s',
+                                                    number_format($salario, 2, ',', '.'),
+                                                    $horas_mes,
+                                                    number_format($valor_hora, 2, ',', '.'),
+                                                    $jornada_diaria,
+                                                    number_format($ocorrencia['valor_desconto'], 2, ',', '.')
+                                                );
+                                            }
+                                        } elseif ($tempo_atraso > 0) {
+                                            // Proporcional aos minutos
+                                            $valor_minuto = $valor_hora / 60;
+                                            $valor_calculado = $valor_minuto * $tempo_atraso;
+                                            if (abs($valor_calculado - $ocorrencia['valor_desconto']) < 0.01) {
+                                                $conta_desconto = sprintf(
+                                                    'Salário (R$ %s) ÷ %d horas/mês = R$ %s/hora ÷ 60 = R$ %s/minuto × %d min = R$ %s',
+                                                    number_format($salario, 2, ',', '.'),
+                                                    $horas_mes,
+                                                    number_format($valor_hora, 2, ',', '.'),
+                                                    number_format($valor_minuto, 4, ',', '.'),
+                                                    $tempo_atraso,
+                                                    number_format($ocorrencia['valor_desconto'], 2, ',', '.')
+                                                );
+                                            }
+                                        } elseif (in_array($tipo_codigo, ['falta', 'ausencia_injustificada'])) {
+                                            // Falta completa
+                                            $valor_calculado = $valor_hora * $jornada_diaria;
+                                            if (abs($valor_calculado - $ocorrencia['valor_desconto']) < 0.01) {
+                                                $conta_desconto = sprintf(
+                                                    'Salário (R$ %s) ÷ %d horas/mês = R$ %s/hora × %d horas = R$ %s',
+                                                    number_format($salario, 2, ',', '.'),
+                                                    $horas_mes,
+                                                    number_format($valor_hora, 2, ',', '.'),
+                                                    $jornada_diaria,
+                                                    number_format($ocorrencia['valor_desconto'], 2, ',', '.')
+                                                );
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Se não conseguiu calcular ou se o valor corresponde ao valor fixo do tipo
+                                    if (empty($conta_desconto)) {
+                                        if ($valor_fixo_tipo && abs($valor_fixo_tipo - $ocorrencia['valor_desconto']) < 0.01) {
+                                            $conta_desconto = 'Valor fixo configurado no tipo de ocorrência: R$ ' . number_format($valor_fixo_tipo, 2, ',', '.');
+                                        } else {
+                                            $conta_desconto = 'Valor informado manualmente: R$ ' . number_format($ocorrencia['valor_desconto'], 2, ',', '.');
+                                        }
+                                    }
+                                    ?>
                                     <div class="card card-flush bg-light-danger">
                                         <div class="card-body">
                                             <div class="d-flex align-items-center mb-3">
@@ -406,10 +479,19 @@ require_once __DIR__ . '/../includes/header.php';
                                                 </div>
                                             </div>
                                             <div class="mt-4">
-                                                <div class="d-flex justify-content-between align-items-center">
+                                                <div class="d-flex justify-content-between align-items-center mb-3">
                                                     <span class="fw-semibold text-gray-700">Valor a Descontar:</span>
                                                     <span class="fw-bold fs-4 text-danger">R$ <?= number_format($ocorrencia['valor_desconto'], 2, ',', '.') ?></span>
                                                 </div>
+                                                <?php if ($conta_desconto): ?>
+                                                <div class="separator separator-dashed my-3"></div>
+                                                <div class="bg-white rounded p-3">
+                                                    <label class="fw-semibold fs-7 text-gray-600 mb-2 d-block">Cálculo do Desconto:</label>
+                                                    <div class="text-gray-700 fs-7 font-monospace">
+                                                        <?= htmlspecialchars($conta_desconto) ?>
+                                                    </div>
+                                                </div>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
