@@ -785,7 +785,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Insere bônus editados
                 foreach ($bonus_editados as $bonus_data) {
                     if (!empty($bonus_data['tipo_bonus_id']) && !empty($bonus_data['valor'])) {
-                        $valor_bonus = str_replace(['.', ','], ['', '.'], $bonus_data['valor']);
+                        // O valor já vem formatado do JavaScript (ex: "290.00")
+                        // Apenas converte para float
+                        $valor_bonus = (float)$bonus_data['valor'];
                         $total_bonus += $valor_bonus;
                         
                         $stmt = $pdo->prepare("
@@ -4779,12 +4781,27 @@ function atualizarBonusJSON() {
         const tipoSelect = document.querySelector(`.bonus_tipo[data-index="${index}"]`);
         const valorInput = document.querySelector(`.bonus_valor[data-index="${index}"]`);
         
+        // Remove formatação e converte para número
+        let valor = '0';
+        if (valorInput && valorInput.value) {
+            // Remove tudo exceto números e vírgula
+            valor = valorInput.value.replace(/[^0-9,]/g, '');
+            // Converte vírgula para ponto
+            valor = valor.replace(',', '.');
+            // Remove pontos de milhar (se houver mais de um ponto)
+            const partes = valor.split('.');
+            if (partes.length > 2) {
+                // Tem separador de milhar, junta tudo menos o último ponto
+                valor = partes.slice(0, -1).join('') + '.' + partes[partes.length - 1];
+            }
+        }
+        
         return {
             tipo_bonus_id: tipoSelect ? tipoSelect.value : '',
-            valor: valorInput ? valorInput.value.replace(/[^0-9,]/g, '').replace(',', '.') : '0',
+            valor: valor,
             observacoes: ''
         };
-    }).filter(b => b.tipo_bonus_id && b.valor);
+    }).filter(b => b.tipo_bonus_id && parseFloat(b.valor) > 0);
     
     document.getElementById('bonus_editados_json').value = JSON.stringify(bonusData);
 }
@@ -5976,19 +5993,18 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 </td>
                                             </tr>
                                             ` : ''}
-                                            ${d.ocorrencias.total_descontos > 0 ? `
-                                            <tr>
-                                                <td class="fw-bold text-danger">Descontos (Ocorrências)</td>
-                                                <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ` : ''}
                                             ${d.item.descontos > 0 ? `
                                             <tr>
-                                                <td class="fw-bold text-danger">Outros Descontos</td>
+                                                <td class="fw-bold text-danger">Descontos</td>
                                                 <td class="text-end">
                                                     <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    ${d.ocorrencias.total_descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
+                                                    <br><small class="text-muted fs-8">
+                                                        ${d.ocorrencias.total_descontos > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                        ${d.ocorrencias.total_descontos > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
+                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                    </small>
+                                                    ` : ''}
                                                 </td>
                                             </tr>
                                             ` : ''}
@@ -6523,19 +6539,18 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 </td>
                                             </tr>
                                             ` : ''}
-                                            ${d.ocorrencias.total_descontos > 0 ? `
-                                            <tr>
-                                                <td class="fw-bold text-danger">Descontos (Ocorrências)</td>
-                                                <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ` : ''}
                                             ${d.item.descontos > 0 ? `
                                             <tr>
-                                                <td class="fw-bold text-danger">Outros Descontos</td>
+                                                <td class="fw-bold text-danger">Descontos</td>
                                                 <td class="text-end">
                                                     <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    ${d.ocorrencias.total_descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
+                                                    <br><small class="text-muted fs-8">
+                                                        ${d.ocorrencias.total_descontos > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                        ${d.ocorrencias.total_descontos > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
+                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                    </small>
+                                                    ` : ''}
                                                 </td>
                                             </tr>
                                             ` : ''}
