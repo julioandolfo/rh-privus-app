@@ -89,6 +89,7 @@ try {
     // Busca adiantamentos descontados neste fechamento
     $adiantamentos_descontados = [];
     if ($fechamento['tipo_fechamento'] === 'regular') {
+        // Primeiro tenta buscar pelo fechamento_desconto_id
         $stmt = $pdo->prepare("
             SELECT fa.*, f.mes_referencia as fechamento_mes_referencia, f.data_fechamento as fechamento_data
             FROM fechamentos_pagamento_adiantamentos fa
@@ -100,6 +101,22 @@ try {
         ");
         $stmt->execute([$colaborador_id, $fechamento_id]);
         $adiantamentos_descontados = $stmt->fetchAll();
+        
+        // Se não encontrou, tenta buscar pelo mês de desconto
+        // (pode ser que o fechamento_desconto_id não foi salvo corretamente)
+        if (empty($adiantamentos_descontados)) {
+            $stmt = $pdo->prepare("
+                SELECT fa.*, f.mes_referencia as fechamento_mes_referencia, f.data_fechamento as fechamento_data
+                FROM fechamentos_pagamento_adiantamentos fa
+                INNER JOIN fechamentos_pagamento f ON fa.fechamento_pagamento_id = f.id
+                WHERE fa.colaborador_id = ?
+                AND fa.mes_desconto = ?
+                AND fa.descontado = 1
+                ORDER BY f.data_fechamento DESC
+            ");
+            $stmt->execute([$colaborador_id, $fechamento['mes_referencia']]);
+            $adiantamentos_descontados = $stmt->fetchAll();
+        }
     }
     
     if (!$fechamento) {
