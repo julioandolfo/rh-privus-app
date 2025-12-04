@@ -2967,40 +2967,74 @@ require_once __DIR__ . '/../includes/header.php';
                                 ];
                                 echo $badges[$status_doc] ?? '<span class="badge badge-light-secondary">-</span>';
                                 ?>
-                                <?php if (!empty($item['documento_anexo'])): ?>
-                                    <br><button type="button" class="btn btn-sm btn-light-primary mt-1" 
-                                            onclick="verDocumentoAdmin(<?= $fechamento_view['id'] ?>, <?= $item['id'] ?>)">
-                                        <i class="ki-duotone ki-eye fs-5">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                            <span class="path3"></span>
-                                        </i>
-                                        Ver
-                                    </button>
+                                
+                                <?php 
+                                // Verifica se há ações disponíveis
+                                $tem_acoes = false;
+                                if (!empty($item['documento_anexo'])) $tem_acoes = true;
+                                if ($status_doc === 'enviado') $tem_acoes = true;
+                                ?>
+                                
+                                <?php if ($tem_acoes): ?>
+                                <div class="d-flex gap-2 mt-2">
+                                    <?php if (!empty($item['documento_anexo'])): ?>
+                                        <button type="button" class="btn btn-sm btn-light-primary" 
+                                                onclick="verDocumentoAdmin(<?= $fechamento_view['id'] ?>, <?= $item['id'] ?>)"
+                                                title="Ver Documento">
+                                            <i class="ki-duotone ki-eye fs-5">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($status_doc === 'enviado'): ?>
+                                        <!-- Dropdown de ações -->
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-light-primary dropdown-toggle" type="button" 
+                                                    id="dropdownAcoes_<?= $item['id'] ?>" data-bs-toggle="dropdown" 
+                                                    aria-expanded="false" title="Ações">
+                                                <i class="ki-duotone ki-setting fs-5">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                </i>
+                                            </button>
+                                            <ul class="dropdown-menu" aria-labelledby="dropdownAcoes_<?= $item['id'] ?>">
+                                                <li>
+                                                    <a class="dropdown-item text-success" href="#" 
+                                                       onclick="event.preventDefault(); aprovarDocumento(<?= $item['id'] ?>);">
+                                                        <i class="ki-duotone ki-check fs-5 me-2">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                        Aprovar
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item text-danger" href="#" 
+                                                       onclick="event.preventDefault(); rejeitarDocumento(<?= $item['id'] ?>);">
+                                                        <i class="ki-duotone ki-cross fs-5 me-2">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                        Rejeitar
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
                                 <?php endif; ?>
-                                <?php if ($status_doc === 'enviado'): ?>
-                                    <br><button type="button" class="btn btn-sm btn-success mt-1" 
-                                            onclick="aprovarDocumento(<?= $item['id'] ?>)">
-                                        <i class="ki-duotone ki-check fs-5">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                        Aprovar
-                                    </button>
-                                    <br><button type="button" class="btn btn-sm btn-danger mt-1" 
-                                            onclick="rejeitarDocumento(<?= $item['id'] ?>)">
-                                        <i class="ki-duotone ki-cross fs-5">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                        Rejeitar
-                                    </button>
-                                <?php endif; ?>
+                                
                                 <?php if ($item['documento_observacoes']): ?>
-                                    <br><small class="text-muted" title="<?= htmlspecialchars($item['documento_observacoes']) ?>">
-                                        <?= htmlspecialchars(mb_substr($item['documento_observacoes'], 0, 30)) ?>
-                                        <?= mb_strlen($item['documento_observacoes']) > 30 ? '...' : '' ?>
-                                    </small>
+                                    <div class="mt-2">
+                                        <small class="text-muted" title="<?= htmlspecialchars($item['documento_observacoes']) ?>">
+                                            <?= htmlspecialchars(mb_substr($item['documento_observacoes'], 0, 30)) ?>
+                                            <?= mb_strlen($item['documento_observacoes']) > 30 ? '...' : '' ?>
+                                        </small>
+                                    </div>
                                 <?php endif; ?>
                             </td>
                             <?php elseif ($fechamento_view['status'] === 'fechado' && $is_fechamento_extra): ?>
