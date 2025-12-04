@@ -270,8 +270,9 @@ require_once __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
                         
-                        <?php if ($ocorrencia['tempo_atraso_minutos']): ?>
+                        <?php if ($ocorrencia['tempo_atraso_minutos'] || $ocorrencia['horario_esperado'] || $ocorrencia['horario_real']): ?>
                         <div class="row mb-7">
+                            <?php if ($ocorrencia['tempo_atraso_minutos']): ?>
                             <div class="col-md-4">
                                 <label class="fw-semibold fs-6 text-gray-500">Tempo de Atraso</label>
                                 <div class="fw-bold fs-6">
@@ -282,9 +283,11 @@ require_once __DIR__ . '/../includes/header.php';
                                     ?>
                                 </div>
                             </div>
+                            <?php endif; ?>
+                            
                             <?php if ($ocorrencia['horario_esperado'] || $ocorrencia['horario_real']): ?>
                             <div class="col-md-4">
-                                <label class="fw-semibold fs-6 text-gray-500">Horário Esperado</label>
+                                <label class="fw-semibold fs-6 text-gray-500" id="view_label_horario_esperado">Horário Esperado</label>
                                 <div class="fw-bold fs-6">
                                     <?php if ($ocorrencia['horario_esperado']): ?>
                                         <?= date('H:i', strtotime($ocorrencia['horario_esperado'])) ?>
@@ -294,7 +297,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="fw-semibold fs-6 text-gray-500">Horário Real</label>
+                                <label class="fw-semibold fs-6 text-gray-500" id="view_label_horario_real">Horário Real</label>
                                 <div class="fw-bold fs-6">
                                     <?php if ($ocorrencia['horario_real']): ?>
                                         <?= date('H:i', strtotime($ocorrencia['horario_real'])) ?>
@@ -303,7 +306,9 @@ require_once __DIR__ . '/../includes/header.php';
                                     <?php endif; ?>
                                 </div>
                             </div>
-                            <?php elseif ($ocorrencia['tipo_ponto']): ?>
+                            <?php endif; ?>
+                            
+                            <?php if ($ocorrencia['tipo_ponto'] && !$ocorrencia['horario_esperado'] && !$ocorrencia['horario_real']): ?>
                             <div class="col-md-4">
                                 <label class="fw-semibold fs-6 text-gray-500">Tipo de Ponto</label>
                                 <div class="fw-bold fs-6"><?= ucfirst($ocorrencia['tipo_ponto']) ?></div>
@@ -682,6 +687,39 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 <!--end::Post-->
+
+<script>
+"use strict";
+// Ajusta os labels dos horários conforme o tipo de ponto
+(function() {
+    const tipoPonto = '<?= $ocorrencia['tipo_ponto'] ?? '' ?>';
+    const labelEsperado = document.getElementById('view_label_horario_esperado');
+    const labelReal = document.getElementById('view_label_horario_real');
+    
+    if (tipoPonto && (labelEsperado || labelReal)) {
+        const labels = {
+            'entrada': {
+                esperado: 'Horário que deveria ter chegado',
+                real: 'Horário que realmente chegou'
+            },
+            'saida': {
+                esperado: 'Horário que deveria ter saído',
+                real: 'Horário que realmente saiu'
+            }
+        };
+        
+        const labelsTipo = labels[tipoPonto.toLowerCase()];
+        if (labelsTipo) {
+            if (labelEsperado) {
+                labelEsperado.textContent = labelsTipo.esperado;
+            }
+            if (labelReal) {
+                labelReal.textContent = labelsTipo.real;
+            }
+        }
+    }
+})();
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
