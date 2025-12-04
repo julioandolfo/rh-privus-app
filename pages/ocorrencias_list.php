@@ -393,9 +393,10 @@ $tipos_ocorrencias = [
                         <?php if ($colab_data['foto']): ?>
                         <img src="../<?= htmlspecialchars($colab_data['foto']) ?>" 
                              alt="<?= htmlspecialchars($colab_data['nome']) ?>" 
-                             style="object-fit: cover; width: 100%; height: 100%;"
-                             onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center" style="display: none;">
+                             class="symbol-label"
+                             style="object-fit: cover;"
+                             onerror="this.onerror=null; this.classList.add('d-none'); const fallback = this.nextElementSibling; if (fallback) { fallback.classList.remove('d-none'); fallback.classList.add('d-flex'); }">
+                        <div class="symbol-label bg-primary text-white fw-bold fs-2 align-items-center justify-content-center d-none">
                             <?= htmlspecialchars($colab_data['inicial']) ?>
                         </div>
                         <?php else: ?>

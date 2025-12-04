@@ -488,8 +488,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($adiantamentos_todos as $adiantamento) {
                     // Se o mes_desconto é igual ao mês de referência, deve ser descontado
                     if ($adiantamento['mes_desconto'] === $mes_referencia) {
-                        $total_adiantamentos += (float)$adiantamento['valor_descontar'];
-                        $adiantamentos_ids[] = $adiantamento['id'];
+                    $total_adiantamentos += (float)$adiantamento['valor_descontar'];
+                    $adiantamentos_ids[] = $adiantamento['id'];
                         $adiantamentos_para_descontar[] = $adiantamento;
                     }
                 }
@@ -1273,22 +1273,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 // Cria fechamento único
-                $stmt = $pdo->prepare("
-                    INSERT INTO fechamentos_pagamento 
-                    (empresa_id, tipo_fechamento, subtipo_fechamento, mes_referencia, data_fechamento, data_pagamento, descricao, referencia_externa, total_colaboradores, usuario_id, status)
-                    VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, 0, ?, 'aberto')
-                ");
-                $stmt->execute([
-                    $empresa_id, 
-                    $tipo_fechamento, 
-                    $subtipo_fechamento, 
-                    $mes_referencia,
-                    $data_pagamento,
-                    $descricao,
-                    $referencia_externa,
-                    $usuario['id']
-                ]);
-                $fechamento_id = $pdo->lastInsertId();
+            $stmt = $pdo->prepare("
+                INSERT INTO fechamentos_pagamento 
+                (empresa_id, tipo_fechamento, subtipo_fechamento, mes_referencia, data_fechamento, data_pagamento, descricao, referencia_externa, total_colaboradores, usuario_id, status)
+                VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, 0, ?, 'aberto')
+            ");
+            $stmt->execute([
+                $empresa_id, 
+                $tipo_fechamento, 
+                $subtipo_fechamento, 
+                $mes_referencia,
+                $data_pagamento,
+                $descricao,
+                $referencia_externa,
+                $usuario['id']
+            ]);
+            $fechamento_id = $pdo->lastInsertId();
                 if (!$fechamento_id) {
                     throw new Exception("Erro ao criar fechamento: não foi possível obter o ID do fechamento criado");
                 }
@@ -1314,12 +1314,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $empresa_id = $fechamento_data['empresa_id'];
             
-                $total_pagamento = 0;
-                $colaboradores_ids = [];
-                
-                // Processa conforme o subtipo
-                if ($subtipo_fechamento === 'bonus_especifico') {
-                    // Bônus Específico: múltiplos colaboradores, um tipo de bônus
+            $total_pagamento = 0;
+            $colaboradores_ids = [];
+            
+            // Processa conforme o subtipo
+            if ($subtipo_fechamento === 'bonus_especifico') {
+                // Bônus Específico: múltiplos colaboradores, um tipo de bônus
                     // Tenta usar o campo normal primeiro, depois o hidden
                     $tipo_bonus_id_raw = $_POST['tipo_bonus_id'] ?? '';
                     if (empty($tipo_bonus_id_raw)) {
@@ -1342,15 +1342,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                     
-                    $aplicar_descontos = isset($_POST['aplicar_descontos']) && $_POST['aplicar_descontos'] == '1';
-                    
-                    if (empty($tipo_bonus_id) || empty($colaboradores_ids)) {
+                $aplicar_descontos = isset($_POST['aplicar_descontos']) && $_POST['aplicar_descontos'] == '1';
+                
+                if (empty($tipo_bonus_id) || empty($colaboradores_ids)) {
                         // Não deleta o fechamento - apenas registra erro e continua
                         // Atualiza descrição do fechamento com erro
                         $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Fechamento criado mas sem colaboradores válidos ou tipo de bônus') WHERE id = ?");
                         $stmt->execute([$fechamento_id]);
                         continue;
-                    }
+                }
                 
                 // Busca informações do tipo de bônus
                 $stmt = $pdo->prepare("SELECT tipo_valor, valor_fixo, nome FROM tipos_bonus WHERE id = ?");
@@ -1503,7 +1503,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Debug: verifica o que está sendo recebido
                 // Se colab_id está vazio, tenta buscar do POST novamente (incluindo hidden)
                 if (empty($colab_id)) {
-                    $colab_id = (int)($_POST['colaborador_id'] ?? 0);
+                $colab_id = (int)($_POST['colaborador_id'] ?? 0);
                     if (empty($colab_id)) {
                         $colab_id = (int)($_POST['colaborador_id_hidden'] ?? 0);
                     }
@@ -1664,18 +1664,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $bonus_existente = $stmt_check->fetch();
                     
                     if (!$bonus_existente) {
-                        $stmt = $pdo->prepare("
-                            INSERT INTO fechamentos_pagamento_bonus 
+                    $stmt = $pdo->prepare("
+                        INSERT INTO fechamentos_pagamento_bonus 
                             (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, valor_original, observacoes)
                             VALUES (?, ?, ?, ?, ?, ?)
-                        ");
-                        $stmt->execute([
-                            $fechamento_id,
-                            $colab_id,
-                            $tipo_bonus_id,
-                            $valor_final,
+                    ");
+                    $stmt->execute([
+                        $fechamento_id,
+                        $colab_id,
+                        $tipo_bonus_id,
+                        $valor_final,
                             $valor_original,
-                            $motivo
+                        $motivo
                         ]);
                         
                         log_fechamento_individual("Bônus inserido com sucesso", [
@@ -1889,7 +1889,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $total_pagamento = $valor_adiantamento;
             }
             
-                // Atualiza fechamento com totais
+            // Atualiza fechamento com totais
                 // Garante que colaboradores_ids seja um array válido
                 if (!is_array($colaboradores_ids)) {
                     $colaboradores_ids = [];
@@ -1898,36 +1898,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Garante que total_pagamento seja um número válido
                 $total_pagamento = (float)$total_pagamento;
                 
-                $stmt = $pdo->prepare("
-                    UPDATE fechamentos_pagamento 
-                    SET total_colaboradores = ?, total_pagamento = ?
-                    WHERE id = ?
-                ");
-                $stmt->execute([count($colaboradores_ids), $total_pagamento, $fechamento_id]);
-                
-                // Envia notificações para colaboradores
-                require_once __DIR__ . '/../includes/notificacoes.php';
-                $subtipo_labels = [
-                    'bonus_especifico' => 'Bônus Específico',
-                    'individual' => 'Bônus Individual',
-                    'grupal' => 'Bônus Grupal',
-                    'adiantamento' => 'Adiantamento'
-                ];
-                $subtipo_label = $subtipo_labels[$subtipo_fechamento] ?? 'Pagamento Extra';
-                
-                foreach ($colaboradores_ids as $colab_id) {
-                    try {
-                        criar_notificacao(
-                            null, // usuario_id será buscado internamente
-                            $colab_id,
-                            'fechamento_pagamento_extra',
-                            'Novo Pagamento Extra',
-                            "Você recebeu um {$subtipo_label} no valor de R$ " . number_format($total_pagamento / count($colaboradores_ids), 2, ',', '.'),
-                            '../pages/meus_pagamentos.php',
-                            $fechamento_id,
-                            'pagamento'
-                        );
-                    } catch (Exception $e) {
+            $stmt = $pdo->prepare("
+                UPDATE fechamentos_pagamento 
+                SET total_colaboradores = ?, total_pagamento = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([count($colaboradores_ids), $total_pagamento, $fechamento_id]);
+            
+            // Envia notificações para colaboradores
+            require_once __DIR__ . '/../includes/notificacoes.php';
+            $subtipo_labels = [
+                'bonus_especifico' => 'Bônus Específico',
+                'individual' => 'Bônus Individual',
+                'grupal' => 'Bônus Grupal',
+                'adiantamento' => 'Adiantamento'
+            ];
+            $subtipo_label = $subtipo_labels[$subtipo_fechamento] ?? 'Pagamento Extra';
+            
+            foreach ($colaboradores_ids as $colab_id) {
+                try {
+                    criar_notificacao(
+                        null, // usuario_id será buscado internamente
+                        $colab_id,
+                        'fechamento_pagamento_extra',
+                        'Novo Pagamento Extra',
+                        "Você recebeu um {$subtipo_label} no valor de R$ " . number_format($total_pagamento / count($colaboradores_ids), 2, ',', '.'),
+                        '../pages/meus_pagamentos.php',
+                        $fechamento_id,
+                        'pagamento'
+                    );
+                } catch (Exception $e) {
                         // Erro ao criar notificação não bloqueia criação do fechamento
                     }
                 }
@@ -2924,13 +2924,13 @@ require_once __DIR__ . '/../includes/header.php';
                                                         Editar Adiantamento
                                                     </a>
                                                 <?php else: ?>
-                                                    <a class="dropdown-item" href="#" onclick="editarItem(<?= htmlspecialchars(json_encode($item)) ?>); return false;">
-                                                        <i class="ki-duotone ki-pencil fs-6 me-2">
-                                                            <span class="path1"></span>
-                                                            <span class="path2"></span>
-                                                        </i>
-                                                        Editar
-                                                    </a>
+                                            <a class="dropdown-item" href="#" onclick="editarItem(<?= htmlspecialchars(json_encode($item)) ?>); return false;">
+                                                <i class="ki-duotone ki-pencil fs-6 me-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Editar
+                                            </a>
                                                 <?php endif; ?>
                                             <?php else: ?>
                                                 <a class="dropdown-item" href="#" onclick="editarItem(<?= htmlspecialchars(json_encode($item)) ?>); return false;">
@@ -2977,30 +2977,30 @@ require_once __DIR__ . '/../includes/header.php';
                                 
                                 <?php if ($tem_acoes): ?>
                                 <div class="d-flex gap-2 mt-2">
-                                    <?php if (!empty($item['documento_anexo'])): ?>
+                                <?php if (!empty($item['documento_anexo'])): ?>
                                         <button type="button" class="btn btn-sm btn-light-primary" 
                                                 onclick="verDocumentoAdmin(<?= $fechamento_view['id'] ?>, <?= $item['id'] ?>)"
                                                 title="Ver Documento">
-                                            <i class="ki-duotone ki-eye fs-5">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                                <span class="path3"></span>
-                                            </i>
-                                        </button>
-                                    <?php endif; ?>
+                                        <i class="ki-duotone ki-eye fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                    </button>
+                                <?php endif; ?>
                                     
-                                    <?php if ($status_doc === 'enviado'): ?>
+                                <?php if ($status_doc === 'enviado'): ?>
                                         <!-- Dropdown de ações -->
                                         <div class="dropdown">
                                             <button class="btn btn-sm btn-light-primary dropdown-toggle" type="button" 
                                                     id="dropdownAcoes_<?= $item['id'] ?>" data-bs-toggle="dropdown" 
                                                     aria-expanded="false" title="Ações">
                                                 <i class="ki-duotone ki-setting fs-5">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
                                                     <span class="path3"></span>
-                                                </i>
-                                            </button>
+                                        </i>
+                                    </button>
                                             <ul class="dropdown-menu" aria-labelledby="dropdownAcoes_<?= $item['id'] ?>">
                                                 <li>
                                                     <a class="dropdown-item text-success" href="#" 
@@ -3016,24 +3016,24 @@ require_once __DIR__ . '/../includes/header.php';
                                                     <a class="dropdown-item text-danger" href="#" 
                                                        onclick="event.preventDefault(); rejeitarDocumento(<?= $item['id'] ?>);">
                                                         <i class="ki-duotone ki-cross fs-5 me-2">
-                                                            <span class="path1"></span>
-                                                            <span class="path2"></span>
-                                                        </i>
-                                                        Rejeitar
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Rejeitar
                                                     </a>
                                                 </li>
                                             </ul>
                                         </div>
-                                    <?php endif; ?>
+                                <?php endif; ?>
                                 </div>
                                 <?php endif; ?>
                                 
                                 <?php if ($item['documento_observacoes']): ?>
                                     <div class="mt-2">
                                         <small class="text-muted" title="<?= htmlspecialchars($item['documento_observacoes']) ?>">
-                                            <?= htmlspecialchars(mb_substr($item['documento_observacoes'], 0, 30)) ?>
-                                            <?= mb_strlen($item['documento_observacoes']) > 30 ? '...' : '' ?>
-                                        </small>
+                                        <?= htmlspecialchars(mb_substr($item['documento_observacoes'], 0, 30)) ?>
+                                        <?= mb_strlen($item['documento_observacoes']) > 30 ? '...' : '' ?>
+                                    </small>
                                     </div>
                                 <?php endif; ?>
                             </td>
