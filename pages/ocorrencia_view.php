@@ -272,7 +272,7 @@ require_once __DIR__ . '/../includes/header.php';
                         
                         <?php if ($ocorrencia['tempo_atraso_minutos']): ?>
                         <div class="row mb-7">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="fw-semibold fs-6 text-gray-500">Tempo de Atraso</label>
                                 <div class="fw-bold fs-6">
                                     <?php
@@ -282,8 +282,29 @@ require_once __DIR__ . '/../includes/header.php';
                                     ?>
                                 </div>
                             </div>
-                            <?php if ($ocorrencia['tipo_ponto']): ?>
-                            <div class="col-md-6">
+                            <?php if ($ocorrencia['horario_esperado'] || $ocorrencia['horario_real']): ?>
+                            <div class="col-md-4">
+                                <label class="fw-semibold fs-6 text-gray-500">Horário Esperado</label>
+                                <div class="fw-bold fs-6">
+                                    <?php if ($ocorrencia['horario_esperado']): ?>
+                                        <?= date('H:i', strtotime($ocorrencia['horario_esperado'])) ?>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="fw-semibold fs-6 text-gray-500">Horário Real</label>
+                                <div class="fw-bold fs-6">
+                                    <?php if ($ocorrencia['horario_real']): ?>
+                                        <?= date('H:i', strtotime($ocorrencia['horario_real'])) ?>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php elseif ($ocorrencia['tipo_ponto']): ?>
+                            <div class="col-md-4">
                                 <label class="fw-semibold fs-6 text-gray-500">Tipo de Ponto</label>
                                 <div class="fw-bold fs-6"><?= ucfirst($ocorrencia['tipo_ponto']) ?></div>
                             </div>

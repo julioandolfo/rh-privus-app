@@ -396,13 +396,11 @@ $tipos_ocorrencias = [
                              class="symbol-label"
                              style="object-fit: cover;"
                              onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <?php endif; ?>
-                        <?php if (!$colab_data['foto']): ?>
-                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center">
+                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center" style="display: none;">
                             <?= htmlspecialchars($colab_data['inicial']) ?>
                         </div>
                         <?php else: ?>
-                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center" style="display: none;">
+                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center">
                             <?= htmlspecialchars($colab_data['inicial']) ?>
                         </div>
                         <?php endif; ?>

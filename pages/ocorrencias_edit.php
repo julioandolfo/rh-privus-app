@@ -53,6 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data_ocorrencia = $_POST['data_ocorrencia'] ?? date('Y-m-d');
     $hora_ocorrencia = $_POST['hora_ocorrencia'] ?? null;
     $tempo_atraso_minutos = !empty($_POST['tempo_atraso_minutos']) ? (int)$_POST['tempo_atraso_minutos'] : null;
+    $horario_esperado = !empty($_POST['horario_esperado']) ? $_POST['horario_esperado'] : null;
+    $horario_real = !empty($_POST['horario_real']) ? $_POST['horario_real'] : null;
     $tipo_ponto = !empty($_POST['tipo_ponto']) ? $_POST['tipo_ponto'] : null;
     // Valida se tipo_ponto é um valor válido do ENUM
     if ($tipo_ponto && !in_array($tipo_ponto, ['entrada', 'almoco', 'cafe', 'saida'])) {
@@ -173,6 +175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 data_ocorrencia = ?, 
                 hora_ocorrencia = ?, 
                 tempo_atraso_minutos = ?, 
+                horario_esperado = ?,
+                horario_real = ?,
                 tipo_ponto = ?, 
                 severidade = ?,
                 considera_dia_inteiro = ?,
@@ -190,6 +194,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data_ocorrencia,
             $hora_ocorrencia,
             $tempo_atraso_minutos,
+            $horario_esperado,
+            $horario_real,
             $tipo_ponto,
             $severidade,
             $considera_dia_inteiro ? 1 : 0,
@@ -505,6 +511,16 @@ require_once __DIR__ . '/../includes/header.php';
                                 </i>
                                 <span id="tempo_convertido_texto">-</span>
                             </small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="fw-semibold fs-6 mb-2">Horário Esperado</label>
+                            <input type="time" name="horario_esperado" id="horario_esperado" class="form-control form-control-solid" value="<?= $ocorrencia_existente['horario_esperado'] ?? '' ?>" />
+                            <small class="text-muted d-block mt-1">Horário que deveria ter chegado</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="fw-semibold fs-6 mb-2">Horário Real</label>
+                            <input type="time" name="horario_real" id="horario_real" class="form-control form-control-solid" value="<?= $ocorrencia_existente['horario_real'] ?? '' ?>" />
+                            <small class="text-muted d-block mt-1">Horário que realmente chegou</small>
                         </div>
                     </div>
                     
