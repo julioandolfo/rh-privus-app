@@ -2143,6 +2143,7 @@ if (isset($_GET['view'])) {
         // Busca adiantamentos descontados para cada colaborador neste fechamento
         $adiantamentos_por_colaborador = [];
         if ($fechamento_view['tipo_fechamento'] === 'regular') {
+            // Busca adiantamentos que foram descontados neste fechamento específico
             $stmt = $pdo->prepare("
                 SELECT colaborador_id, SUM(valor_descontar) as total_adiantamentos
                 FROM fechamentos_pagamento_adiantamentos
@@ -2154,6 +2155,32 @@ if (isset($_GET['view'])) {
             $adiantamentos_descontados = $stmt->fetchAll();
             foreach ($adiantamentos_descontados as $ad) {
                 $adiantamentos_por_colaborador[$ad['colaborador_id']] = (float)$ad['total_adiantamentos'];
+            }
+            
+            // Debug: Se não encontrou adiantamentos pelo fechamento_desconto_id,
+            // tenta buscar pelos colaboradores do fechamento e mês de referência
+            // (para fechamentos criados antes da implementação completa)
+            if (empty($adiantamentos_por_colaborador)) {
+                $colaboradores_ids = array_column($itens_fechamento, 'colaborador_id');
+                if (!empty($colaboradores_ids)) {
+                    $placeholders = implode(',', array_fill(0, count($colaboradores_ids), '?'));
+                    $stmt = $pdo->prepare("
+                        SELECT colaborador_id, SUM(valor_descontar) as total_adiantamentos
+                        FROM fechamentos_pagamento_adiantamentos
+                        WHERE colaborador_id IN ($placeholders)
+                        AND mes_desconto = ?
+                        AND descontado = 1
+                        GROUP BY colaborador_id
+                    ");
+                    $params = array_merge($colaboradores_ids, [$fechamento_view['mes_referencia']]);
+                    $stmt->execute($params);
+                    $adiantamentos_alternativos = $stmt->fetchAll();
+                    foreach ($adiantamentos_alternativos as $ad) {
+                        if (!isset($adiantamentos_por_colaborador[$ad['colaborador_id']])) {
+                            $adiantamentos_por_colaborador[$ad['colaborador_id']] = (float)$ad['total_adiantamentos'];
+                        }
+                    }
+                }
             }
         }
         
@@ -2638,8 +2665,26 @@ require_once __DIR__ . '/../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <?php if ($inclui_salario): 
-                                $total_descontos = (float)($item['descontos'] ?? 0);
+                                $descontos_ocorrencias = (float)($item['descontos'] ?? 0);
                                 $adiantamentos_colab = $adiantamentos_por_colaborador[$item['colaborador_id']] ?? 0;
+                                
+                                // Calcula total de descontos exibido
+                                // Se encontrou adiantamentos descontados, sempre inclui no total exibido
+                                // (mesmo que já estejam incluídos no campo descontos do banco)
+                                // Isso garante que sempre apareçam visíveis na coluna
+                                if ($adiantamentos_colab > 0) {
+                                    // Se o campo descontos é menor que os adiantamentos, significa que não estão incluídos
+                                    // Nesse caso, soma ao total
+                                    if ($descontos_ocorrencias < $adiantamentos_colab) {
+                                        $total_descontos = $descontos_ocorrencias + $adiantamentos_colab;
+                                    } else {
+                                        // Já estão incluídos, usa o valor do campo (que já contém os adiantamentos)
+                                        $total_descontos = $descontos_ocorrencias;
+                                    }
+                                } else {
+                                    // Sem adiantamentos, usa apenas o valor do campo
+                                    $total_descontos = $descontos_ocorrencias;
+                                }
                             ?>
                             <td class="text-danger fw-bold">
                                 R$ <?= number_format($total_descontos, 2, ',', '.') ?>
