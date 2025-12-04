@@ -576,7 +576,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <!--begin::Modal - Detalhes Completos do Pagamento-->
 <div class="modal fade" id="kt_modal_detalhes_pagamento_colaborador" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-fullscreen-lg-down">
+    <div class="modal-dialog modal-dialog-centered mw-1000px modal-fullscreen-lg-down" style="max-width: 1000px;">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="fw-bold" id="kt_modal_detalhes_pagamento_colaborador_titulo">Detalhes do Pagamento</h2>
@@ -1482,7 +1482,8 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
                 },
                 pageLength: 10,
                 order: [[0, 'desc']],
-                responsive: true
+                responsive: false, // Desabilita responsive do DataTable pois já temos versão mobile customizada
+                autoWidth: false
             });
         } else {
             setTimeout(waitForDataTable, 100);
@@ -1491,6 +1492,15 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
     waitForDataTable();
 })();
 </script>
+
+<style>
+/* Garante que o modal tenha tamanho correto no desktop */
+@media (min-width: 992px) {
+    #kt_modal_detalhes_pagamento_colaborador .modal-dialog {
+        max-width: 1000px !important;
+    }
+}
+</style>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
