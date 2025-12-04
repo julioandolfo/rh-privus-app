@@ -5993,7 +5993,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 </td>
                                             </tr>
                                             ` : ''}
-                                            ${d.item.descontos > 0 ? `
+                                            ${d.item.descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
                                             <tr>
                                                 <td class="fw-bold text-danger">Descontos</td>
                                                 <td class="text-end">
@@ -6002,7 +6002,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                     <br><small class="text-muted fs-8">
                                                         ${d.ocorrencias.total_descontos > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
                                                         ${d.ocorrencias.total_descontos > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
-                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
                                                     </small>
                                                     ` : ''}
                                                 </td>
@@ -6539,7 +6539,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 </td>
                                             </tr>
                                             ` : ''}
-                                            ${d.item.descontos > 0 ? `
+                                            ${d.item.descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
                                             <tr>
                                                 <td class="fw-bold text-danger">Descontos</td>
                                                 <td class="text-end">
@@ -6548,7 +6548,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                     <br><small class="text-muted fs-8">
                                                         ${d.ocorrencias.total_descontos > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
                                                         ${d.ocorrencias.total_descontos > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
-                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
                                                     </small>
                                                     ` : ''}
                                                 </td>
