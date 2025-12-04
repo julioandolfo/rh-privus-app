@@ -431,7 +431,7 @@ try {
     if ($fechamento['tipo_fechamento'] === 'regular') {
         $total_bonus_calculado = $response['data']['bonus']['total'];
         
-        // Soma o valor dos adiantamentos descontados ao campo de descontos
+        // Calcula total de adiantamentos descontados
         $total_adiantamentos_descontados = 0;
         if (!empty($response['data']['adiantamentos_descontados'])) {
             foreach ($response['data']['adiantamentos_descontados'] as $ad) {
@@ -439,8 +439,26 @@ try {
             }
         }
         
-        // Atualiza o campo de descontos para incluir adiantamentos
-        $descontos_totais = $response['data']['item']['descontos'] + $total_adiantamentos_descontados;
+        // Verifica se os adiantamentos já estão incluídos no campo descontos
+        // Quando um fechamento regular é criado, os adiantamentos são somados ao campo descontos
+        // Então, se há adiantamentos descontados neste fechamento, eles já devem estar incluídos
+        $descontos_originais = (float)$response['data']['item']['descontos'];
+        
+        // Se há adiantamentos descontados e o campo descontos é menor que eles,
+        // significa que os adiantamentos não estão incluídos (caso raro de fechamento antigo)
+        // Caso contrário, assume que já estão incluídos (comportamento padrão)
+        if ($total_adiantamentos_descontados > 0 && $descontos_originais < $total_adiantamentos_descontados) {
+            // Adiantamentos não estão incluídos, soma ao total
+            $descontos_totais = $descontos_originais + $total_adiantamentos_descontados;
+        } else {
+            // Adiantamentos já estão incluídos no campo descontos (comportamento padrão)
+            // ou não há adiantamentos para descontar
+            $descontos_totais = $descontos_originais;
+        }
+        
+        // Mantém o campo descontos original para exibição (sem duplicar)
+        // O total será calculado separadamente para o cálculo do valor_total
+        $response['data']['item']['descontos_original'] = $descontos_originais;
         $response['data']['item']['descontos'] = $descontos_totais;
         
         // Recalcula: salario_base + horas_extras + bonus + adicionais - descontos

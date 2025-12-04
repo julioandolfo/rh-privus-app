@@ -48,6 +48,27 @@ try {
         exit;
     }
     
+    // Função auxiliar para verificar permissão de empresa
+    function usuario_tem_permissao_empresa($usuario, $empresa_id) {
+        // ADMIN sempre tem permissão
+        if ($usuario['role'] === 'ADMIN') {
+            return true;
+        }
+        
+        // RH pode ter múltiplas empresas
+        if ($usuario['role'] === 'RH') {
+            // Verifica empresas_ids (array de empresas)
+            if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+                return in_array($empresa_id, $usuario['empresas_ids']);
+            }
+            // Fallback para empresa_id único
+            return ($usuario['empresa_id'] ?? 0) == $empresa_id;
+        }
+        
+        // Outros roles: apenas sua própria empresa
+        return ($usuario['empresa_id'] ?? 0) == $empresa_id;
+    }
+    
     // Verifica permissão
     if ($usuario['role'] === 'COLABORADOR') {
         if ($item['colaborador_id'] != $usuario['colaborador_id']) {
@@ -55,8 +76,8 @@ try {
             echo json_encode($response);
             exit;
         }
-    } elseif ($usuario['role'] === 'RH') {
-        if ($item['empresa_id'] != $usuario['empresa_id']) {
+    } elseif ($usuario['role'] === 'RH' || $usuario['role'] === 'GESTOR') {
+        if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
             $response['message'] = 'Você não tem permissão para visualizar este documento';
             echo json_encode($response);
             exit;

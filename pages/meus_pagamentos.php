@@ -128,7 +128,21 @@ foreach ($fechamentos_agrupados as $fechamento_id => &$fechamento_data) {
         
         // Recalcula valor total para cada item
         foreach ($fechamento_data['itens'] as &$item) {
-            $descontos_totais = (float)($item['descontos'] ?? 0) + $total_adiantamentos;
+            $descontos_originais = (float)($item['descontos'] ?? 0);
+            
+            // Verifica se os adiantamentos já estão incluídos no campo descontos
+            // Quando um fechamento regular é criado, os adiantamentos são somados ao campo descontos
+            // Então, se há adiantamentos descontados neste fechamento, eles já devem estar incluídos
+            // Se o campo descontos é menor que os adiantamentos, significa que não estão incluídos (caso raro)
+            if ($total_adiantamentos > 0 && $descontos_originais < $total_adiantamentos) {
+                // Adiantamentos não estão incluídos, soma ao total
+                $descontos_totais = $descontos_originais + $total_adiantamentos;
+            } else {
+                // Adiantamentos já estão incluídos no campo descontos (comportamento padrão)
+                // ou não há adiantamentos para descontar
+                $descontos_totais = $descontos_originais;
+            }
+            
             $valor_total_recalculado = 
                 (float)($item['salario_base'] ?? 0) + 
                 (float)($item['valor_horas_extras'] ?? 0) + 
