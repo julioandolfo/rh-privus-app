@@ -329,7 +329,8 @@ try {
                 'valor_horas_extras' => (float)$item['valor_horas_extras'],
                 'descontos' => (float)($item['descontos'] ?? 0),
                 'adicionais' => (float)($item['adicionais'] ?? 0),
-                'valor_total' => (float)$item['valor_total'],
+                'valor_total_original' => (float)$item['valor_total'], // Valor original do banco
+                'valor_total' => (float)$item['valor_total'], // Será recalculado abaixo se necessário
                 'valor_manual' => isset($item['valor_manual']) ? (float)$item['valor_manual'] : null,
                 'motivo' => $item['motivo'] ?? null,
                 'inclui_salario' => isset($item['inclui_salario']) ? (bool)$item['inclui_salario'] : true,
@@ -407,6 +408,21 @@ try {
             }, $adiantamentos_descontados)
         ]
     ];
+    
+    // Recalcula o valor total se houver bônus virtuais (fechamentos extras)
+    // Para fechamentos regulares, o valor total deve incluir os bônus extras
+    if ($fechamento['tipo_fechamento'] === 'regular') {
+        $total_bonus_calculado = $response['data']['bonus']['total'];
+        // Recalcula: salario_base + horas_extras + bonus + adicionais - descontos
+        $valor_total_recalculado = 
+            $response['data']['item']['salario_base'] + 
+            $response['data']['item']['valor_horas_extras'] + 
+            $total_bonus_calculado + 
+            $response['data']['item']['adicionais'] - 
+            $response['data']['item']['descontos'];
+        
+        $response['data']['item']['valor_total'] = $valor_total_recalculado;
+    }
     
     echo json_encode($response, JSON_UNESCAPED_UNICODE);
     
