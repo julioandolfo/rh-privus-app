@@ -6244,6 +6244,11 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                     </i>
                                     Adiantamentos Descontados
                                 </h3>
+                                <div class="card-toolbar">
+                                    <span class="badge badge-light-danger fs-4 fw-bold">
+                                        Total: -R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    </span>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
@@ -6268,13 +6273,6 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 </tr>
                                             `).join('')}
                                         </tbody>
-                                        <tfoot>
-                                            <tr class="fw-bold">
-                                                <td colspan="2" class="text-end">Total Descontado:</td>
-                                                <td class="text-danger">-R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                <td></td>
-                                            </tr>
-                                        </tfoot>
                                     </table>
                                 </div>
                             </div>
@@ -6790,6 +6788,11 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                     </i>
                                     Adiantamentos Descontados
                                 </h3>
+                                <div class="card-toolbar">
+                                    <span class="badge badge-light-danger fs-4 fw-bold">
+                                        Total: -R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    </span>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
@@ -6814,13 +6817,6 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 </tr>
                                             `).join('')}
                                         </tbody>
-                                        <tfoot>
-                                            <tr class="fw-bold">
-                                                <td colspan="2" class="text-end">Total Descontado:</td>
-                                                <td class="text-danger">-R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                <td></td>
-                                            </tr>
-                                        </tfoot>
                                     </table>
                                 </div>
                             </div>
