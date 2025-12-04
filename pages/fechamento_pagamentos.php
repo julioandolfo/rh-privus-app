@@ -74,8 +74,11 @@ function usuario_tem_permissao_empresa($usuario, $empresa_id) {
 /**
  * Verifica se um bônus já foi pago em fechamento extra no mesmo mês
  * Retorna array com IDs dos fechamentos extras que pagaram este bônus
+ * Considera apenas fechamentos com status 'fechado' ou 'pago' (não considera 'aberto' ou 'cancelado')
  */
 function verificar_bonus_ja_pago_extra($pdo, $tipo_bonus_id, $colaborador_id, $mes_referencia) {
+    // Busca fechamentos extras FECHADOS/PAGOS que pagaram este tipo de bônus específico
+    // Apenas fechamentos fechados/pagos devem excluir o bônus do fechamento regular
     $stmt = $pdo->prepare("
         SELECT DISTINCT fp.id as fechamento_id, fp.mes_referencia, fp.data_pagamento, fp.referencia_externa,
                tb.nome as tipo_bonus_nome, fb.valor as valor_pago
@@ -86,7 +89,7 @@ function verificar_bonus_ja_pago_extra($pdo, $tipo_bonus_id, $colaborador_id, $m
         AND fb.colaborador_id = ?
         AND fp.tipo_fechamento = 'extra'
         AND fp.mes_referencia = ?
-        AND fp.status != 'cancelado'
+        AND fp.status IN ('fechado', 'pago')
     ");
     $stmt->execute([$tipo_bonus_id, $colaborador_id, $mes_referencia]);
     return $stmt->fetchAll();
@@ -1929,7 +1932,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN empresas e ON f.empresa_id = e.id
     LEFT JOIN usuarios u ON f.usuario_id = u.id
     $where_sql
-    ORDER BY f.data_pagamento DESC, f.mes_referencia DESC, f.id DESC
+    ORDER BY f.id DESC
 ");
 $stmt->execute($params);
 $fechamentos = $stmt->fetchAll();
