@@ -2351,31 +2351,6 @@ if (isset($_GET['view'])) {
             // IMPORTANTE: Para fechamentos extras individuais/grupais, os bônus já devem estar salvos
             // na tabela fechamentos_pagamento_bonus, então não precisa buscar bônus automáticos
             $inclui_bonus_automaticos_item = $item['inclui_bonus_automaticos'] ?? true;
-            $is_fechamento_extra = ($fechamento_view['tipo_fechamento'] === 'extra');
-            
-            // Para fechamentos extras individuais/grupais sem tipo de bônus, cria um registro virtual
-            // usando o valor_manual do item para aparecer na listagem
-            if (empty($bonus_salvos) && $is_fechamento_extra) {
-                $subtipo_fechamento_view = $fechamento_view['subtipo_fechamento'] ?? '';
-                if (($subtipo_fechamento_view === 'individual' || $subtipo_fechamento_view === 'grupal')) {
-                    $valor_manual = (float)($item['valor_manual'] ?? $item['valor_total'] ?? 0);
-                    if ($valor_manual > 0) {
-                        // Cria um registro virtual de bônus para exibição
-                        $bonus_salvos[] = [
-                            'id' => null,
-                            'fechamento_pagamento_id' => $fechamento_id,
-                            'colaborador_id' => $item['colaborador_id'],
-                            'tipo_bonus_id' => null,
-                            'tipo_bonus_nome' => 'Valor Livre',
-                            'tipo_valor' => 'variavel',
-                            'valor' => $valor_manual,
-                            'valor_original' => $valor_manual,
-                            'desconto_ocorrencias' => 0,
-                            'observacoes' => $item['motivo'] ?? ''
-                        ];
-                    }
-                }
-            }
             
             // Para fechamentos extras, não busca bônus automáticos (já devem estar salvos)
             // Para fechamentos regulares, busca bônus automáticos se não encontrou salvos

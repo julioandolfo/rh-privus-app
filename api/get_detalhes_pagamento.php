@@ -182,6 +182,31 @@ try {
     $stmt->execute([$fechamento_id, $colaborador_id]);
     $bonus_list = $stmt->fetchAll();
     
+    // Para fechamentos extras individuais/grupais sem tipo de bônus, cria um registro virtual
+    // usando o valor_manual do item para aparecer na listagem
+    if (empty($bonus_list) && $fechamento['tipo_fechamento'] === 'extra' && 
+        ($fechamento['subtipo_fechamento'] === 'individual' || $fechamento['subtipo_fechamento'] === 'grupal')) {
+        $valor_manual = (float)($item['valor_manual'] ?? $item['valor_total'] ?? 0);
+        if ($valor_manual > 0) {
+            // Cria um registro virtual de bônus para exibição
+            $bonus_list[] = [
+                'id' => null,
+                'fechamento_pagamento_id' => $fechamento_id,
+                'colaborador_id' => $colaborador_id,
+                'tipo_bonus_id' => null,
+                'tipo_bonus_nome' => 'Valor Livre',
+                'tipo_valor' => 'variavel',
+                'valor_fixo' => null,
+                'valor' => $valor_manual,
+                'valor_original' => $valor_manual,
+                'desconto_ocorrencias' => 0,
+                'detalhes_desconto' => null,
+                'detalhes_desconto_array' => [],
+                'observacoes' => $item['motivo'] ?? ''
+            ];
+        }
+    }
+    
     // Processa detalhes de desconto dos bônus
     foreach ($bonus_list as &$bonus) {
         if (!empty($bonus['detalhes_desconto'])) {
