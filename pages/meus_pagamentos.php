@@ -478,6 +478,9 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                 d.ocorrencias = d.ocorrencias || { total_descontos: 0, descontos: [] };
                 d.horas_extras = d.horas_extras || { resumo: { horas_dinheiro: 0, valor_dinheiro: 0, horas_banco: 0 }, total_horas: 0, registros: [] };
                 d.periodo = d.periodo || { inicio_formatado: '-', fim_formatado: '-' };
+                d.adiantamentos_descontados = d.adiantamentos_descontados || [];
+                d.adiantamentos_pendentes = d.adiantamentos_pendentes || [];
+                d.documento = d.documento || {};
                 
                 titulo.textContent = `Detalhes do Pagamento - ${d.fechamento.mes_referencia_formatado || '-'}`;
                 
@@ -552,19 +555,18 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                                 </td>
                                             </tr>
                                             ` : ''}
-                                            ${(d.ocorrencias.total_descontos || 0) > 0 ? `
+                                            ${(d.item.descontos || 0) > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
                                             <tr>
-                                                <td class="fw-bold text-danger">Descontos (Ocorrências)</td>
-                                                <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.ocorrencias.total_descontos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ` : ''}
-                                            ${(d.item.descontos || 0) > 0 ? `
-                                            <tr>
-                                                <td class="fw-bold text-danger">Outros Descontos</td>
+                                                <td class="fw-bold text-danger">Descontos</td>
                                                 <td class="text-end">
                                                     <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    ${(d.ocorrencias.total_descontos || 0) > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
+                                                    <br><small class="text-muted fs-8">
+                                                        ${(d.ocorrencias.total_descontos || 0) > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                        ${(d.ocorrencias.total_descontos || 0) > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
+                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                    </small>
+                                                    ` : ''}
                                                 </td>
                                             </tr>
                                             ` : ''}
@@ -749,6 +751,160 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                             `).join('')}
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Adiantamentos Descontados -->
+                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-wallet fs-2 text-primary me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Adiantamentos Descontados
+                                </h3>
+                                <div class="card-toolbar">
+                                    <span class="badge badge-light-danger fs-4 fw-bold">
+                                        Total: -R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                                        <thead>
+                                            <tr class="fw-bold text-muted">
+                                                <th class="min-w-100px">Data do Adiantamento</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
+                                                <th class="min-w-150px">Valor</th>
+                                                <th class="min-w-200px">Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.adiantamentos_descontados.map(ad => `
+                                                <tr>
+                                                    <td>${ad.fechamento_data || '-'}</td>
+                                                    <td>
+                                                        <span class="badge badge-light-info">${ad.mes_desconto_formatado || ad.mes_desconto || '-'}</span>
+                                                    </td>
+                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${ad.observacoes || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Adiantamentos Pendentes -->
+                        ${d.adiantamentos_pendentes && d.adiantamentos_pendentes.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-time fs-2 text-warning me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Adiantamentos Pendentes
+                                    <span class="badge badge-light-warning ms-2">${d.adiantamentos_pendentes.length}</span>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info d-flex align-items-center p-3 mb-5">
+                                    <i class="ki-duotone ki-information-5 fs-2hx text-info me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">Atenção:</span>
+                                        <span>Estes adiantamentos ainda não foram descontados. Serão descontados automaticamente quando o fechamento do mês de desconto for criado.</span>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                                        <thead>
+                                            <tr class="fw-bold text-muted">
+                                                <th class="min-w-100px">Data do Adiantamento</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
+                                                <th class="min-w-150px">Valor a Descontar</th>
+                                                <th class="min-w-200px">Observações</th>
+                                                <th class="min-w-100px text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.adiantamentos_pendentes.map(ad => `
+                                                <tr>
+                                                    <td>${ad.fechamento_data || '-'}</td>
+                                                    <td>
+                                                        <span class="badge ${ad.mes_desconto === d.fechamento.mes_referencia ? 'badge-light-success' : 'badge-light-warning'}">
+                                                            ${ad.mes_desconto_formatado || ad.mes_desconto || '-'}
+                                                        </span>
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? '<span class="badge badge-light-success ms-1">Será descontado</span>' : ''}
+                                                    </td>
+                                                    <td class="fw-bold">R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${ad.observacoes || '-'}</td>
+                                                    <td class="text-center">
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? 
+                                                            '<span class="badge badge-light-success">Será descontado</span>' : 
+                                                            '<span class="badge badge-light-warning">Aguardando</span>'}
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold">
+                                                <td colspan="2" class="text-end">Total Pendente:</td>
+                                                <td class="text-warning">R$ ${parseFloat(d.adiantamentos_pendentes.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                <td colspan="2"></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Status do Documento -->
+                        ${d.documento.status ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Status do Documento</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Status:</strong><br>
+                                        ${d.documento.status === 'aprovado' ? '<span class="badge badge-light-success">Aprovado</span>' :
+                                          d.documento.status === 'enviado' ? '<span class="badge badge-light-warning">Enviado</span>' :
+                                          d.documento.status === 'rejeitado' ? '<span class="badge badge-light-danger">Rejeitado</span>' :
+                                          '<span class="badge badge-light-secondary">Pendente</span>'}
+                                    </div>
+                                    ${d.documento.data_envio ? `
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Envio:</strong><br>
+                                        <span class="text-gray-800">${new Date(d.documento.data_envio).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${d.documento.data_aprovacao ? `
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Aprovação:</strong><br>
+                                        <span class="text-gray-800">${new Date(d.documento.data_aprovacao).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${d.documento.observacoes ? `
+                                    <div class="col-md-12 mb-3">
+                                        <strong>Observações:</strong><br>
+                                        <span class="text-gray-800">${d.documento.observacoes}</span>
+                                    </div>
+                                    ` : ''}
                                 </div>
                             </div>
                         </div>
