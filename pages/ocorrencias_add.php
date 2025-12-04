@@ -386,6 +386,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <option value="<?= $tipo['id'] ?>" 
                                         data-permite-tempo="<?= $tipo['permite_tempo_atraso'] ?>"
                                         data-permite-ponto="<?= $tipo['permite_tipo_ponto'] ?>"
+                                        data-permite-horarios="<?= $tipo['permite_horarios'] ?? 0 ?>"
                                         data-permite-dia-inteiro="<?= $tipo['permite_considerar_dia_inteiro'] ?? 0 ?>"
                                         data-permite-desconto-banco="<?= $tipo['permite_desconto_banco_horas'] ?? 0 ?>"
                                         data-calcula-desconto="<?= $tipo['calcula_desconto'] ?? 0 ?>"
@@ -450,15 +451,19 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span id="tempo_convertido_texto">-</span>
                             </small>
                         </div>
-                        <div class="col-md-3">
-                            <label class="fw-semibold fs-6 mb-2">Horário Esperado</label>
-                            <input type="time" name="horario_esperado" id="horario_esperado" class="form-control form-control-solid" />
-                            <small class="text-muted d-block mt-1">Horário que deveria ter chegado</small>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="fw-semibold fs-6 mb-2">Horário Real</label>
-                            <input type="time" name="horario_real" id="horario_real" class="form-control form-control-solid" />
-                            <small class="text-muted d-block mt-1">Horário que realmente chegou</small>
+                        <div class="col-md-6" id="campo_horarios" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="fw-semibold fs-6 mb-2" id="label_horario_esperado">Horário Esperado</label>
+                                    <input type="time" name="horario_esperado" id="horario_esperado" class="form-control form-control-solid" />
+                                    <small class="text-muted d-block mt-1" id="help_horario_esperado">Horário que deveria ter chegado</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="fw-semibold fs-6 mb-2" id="label_horario_real">Horário Real</label>
+                                    <input type="time" name="horario_real" id="horario_real" class="form-control form-control-solid" />
+                                    <small class="text-muted d-block mt-1" id="help_horario_real">Horário que realmente chegou</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -666,6 +671,7 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     const option = this.options[this.selectedIndex];
     const permiteTempo = option.getAttribute('data-permite-tempo') === '1';
     const permitePonto = option.getAttribute('data-permite-ponto') === '1';
+    const permiteHorarios = option.getAttribute('data-permite-horarios') === '1';
     const permiteDiaInteiro = option.getAttribute('data-permite-dia-inteiro') === '1';
     const severidade = option.getAttribute('data-severidade') || 'moderada';
     const requerAprovacao = option.getAttribute('data-requer-aprovacao') === '1';
@@ -782,6 +788,17 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
             document.getElementById('tempo_atraso_minutos').disabled = false;
             // Só torna obrigatório se não permitir considerar dia inteiro OU se não estiver marcado como dia inteiro
             document.getElementById('tempo_atraso_minutos').required = !permiteDiaInteiro || !consideraDiaInteiro;
+            
+            // Mostra/esconde campos de horário
+            const campoHorarios = document.getElementById('campo_horarios');
+            if (permiteHorarios && campoHorarios) {
+                campoHorarios.style.display = 'block';
+                atualizarLabelsHorarios();
+            } else if (campoHorarios) {
+                campoHorarios.style.display = 'none';
+                document.getElementById('horario_esperado').value = '';
+                document.getElementById('horario_real').value = '';
+            }
         }
     } else {
         if (campoTempo) {
@@ -793,6 +810,13 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
             tempoInput.value = '';
             tempoInput.required = false;
             tempoInput.disabled = false;
+        }
+        // Esconde campos de horário também
+        const campoHorarios = document.getElementById('campo_horarios');
+        if (campoHorarios) {
+            campoHorarios.style.display = 'none';
+            document.getElementById('horario_esperado').value = '';
+            document.getElementById('horario_real').value = '';
         }
     }
     
@@ -809,10 +833,59 @@ document.getElementById('tipo_ocorrencia_id').addEventListener('change', functio
     if (permitePonto) {
         campoPonto.style.display = 'block';
         document.getElementById('tipo_ponto').required = true;
+        // Atualiza labels quando tipo de ponto muda
+        const tipoPontoSelect = document.getElementById('tipo_ponto');
+        if (tipoPontoSelect) {
+            tipoPontoSelect.removeEventListener('change', atualizarLabelsHorarios);
+            tipoPontoSelect.addEventListener('change', atualizarLabelsHorarios);
+        }
     } else {
         campoPonto.style.display = 'none';
         document.getElementById('tipo_ponto').value = '';
         document.getElementById('tipo_ponto').required = false;
+    }
+    
+    // Função para atualizar labels dos horários baseado no tipo de ponto
+    function atualizarLabelsHorarios() {
+        const tipoPonto = document.getElementById('tipo_ponto')?.value || '';
+        const labelEsperado = document.getElementById('label_horario_esperado');
+        const labelReal = document.getElementById('label_horario_real');
+        const helpEsperado = document.getElementById('help_horario_esperado');
+        const helpReal = document.getElementById('help_horario_real');
+        
+        // Se for saída antecipada ou tipo de ponto é saída
+        if (codigoTipo === 'saida_antecipada' || tipoPonto === 'saida') {
+            if (labelEsperado) labelEsperado.textContent = 'Horário que deveria ter saído';
+            if (labelReal) labelReal.textContent = 'Horário que realmente saiu';
+            if (helpEsperado) helpEsperado.textContent = 'Horário que deveria ter saído';
+            if (helpReal) helpReal.textContent = 'Horário que realmente saiu';
+        } else {
+            // Para atrasos (entrada, almoço, café)
+            if (labelEsperado) labelEsperado.textContent = 'Horário Esperado';
+            if (labelReal) labelReal.textContent = 'Horário Real';
+            if (helpEsperado) {
+                if (tipoPonto === 'entrada') {
+                    helpEsperado.textContent = 'Horário que deveria ter chegado';
+                } else if (tipoPonto === 'almoco') {
+                    helpEsperado.textContent = 'Horário que deveria ter retornado do almoço';
+                } else if (tipoPonto === 'cafe') {
+                    helpEsperado.textContent = 'Horário que deveria ter retornado do café';
+                } else {
+                    helpEsperado.textContent = 'Horário que deveria ter chegado';
+                }
+            }
+            if (helpReal) {
+                if (tipoPonto === 'entrada') {
+                    helpReal.textContent = 'Horário que realmente chegou';
+                } else if (tipoPonto === 'almoco') {
+                    helpReal.textContent = 'Horário que realmente retornou do almoço';
+                } else if (tipoPonto === 'cafe') {
+                    helpReal.textContent = 'Horário que realmente retornou do café';
+                } else {
+                    helpReal.textContent = 'Horário que realmente chegou';
+                }
+            }
+        }
     }
     
     // Carrega campos dinâmicos

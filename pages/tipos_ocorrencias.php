@@ -52,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $severidade = $_POST['severidade'] ?? 'moderada';
         $permite_tempo_atraso = isset($_POST['permite_tempo_atraso']) ? 1 : 0;
         $permite_tipo_ponto = isset($_POST['permite_tipo_ponto']) ? 1 : 0;
+        $permite_horarios = isset($_POST['permite_horarios']) ? 1 : 0;
         $requer_aprovacao = isset($_POST['requer_aprovacao']) ? 1 : 0;
         $conta_advertencia = isset($_POST['conta_advertencia']) ? 1 : 0;
         $calcula_desconto = isset($_POST['calcula_desconto']) ? 1 : 0;
@@ -103,16 +104,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $stmt = $pdo->prepare("
                     INSERT INTO tipos_ocorrencias 
-                    (nome, codigo, categoria, categoria_id, severidade, permite_tempo_atraso, permite_tipo_ponto, 
+                    (nome, codigo, categoria, categoria_id, severidade, permite_tempo_atraso, permite_tipo_ponto, permite_horarios,
                      requer_aprovacao, conta_advertencia, calcula_desconto, permite_desconto_banco_horas, permite_ocorrencia_rapida, permite_considerar_dia_inteiro, valor_desconto, 
                      template_descricao, validacoes_customizadas, notificar_colaborador, 
                      notificar_colaborador_sistema, notificar_colaborador_email, notificar_colaborador_push,
                      notificar_gestor, notificar_gestor_sistema, notificar_gestor_email, notificar_gestor_push,
                      notificar_rh, notificar_rh_sistema, notificar_rh_email, notificar_rh_push, status) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
-                    $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto,
+                    $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto, $permite_horarios,
                     $requer_aprovacao, $conta_advertencia, $calcula_desconto, $permite_desconto_banco_horas, $permite_ocorrencia_rapida, $permite_considerar_dia_inteiro, $valor_desconto,
                     $template_descricao, $validacoes_customizadas, $notificar_colaborador,
                     $notificar_colaborador_sistema, $notificar_colaborador_email, $notificar_colaborador_push,
@@ -141,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare("
                     UPDATE tipos_ocorrencias SET 
                     nome = ?, codigo = ?, categoria = ?, categoria_id = ?, severidade = ?, 
-                    permite_tempo_atraso = ?, permite_tipo_ponto = ?, 
+                    permite_tempo_atraso = ?, permite_tipo_ponto = ?, permite_horarios = ?,
                     requer_aprovacao = ?, conta_advertencia = ?, calcula_desconto = ?, permite_desconto_banco_horas = ?, permite_ocorrencia_rapida = ?, permite_considerar_dia_inteiro = ?,
                     valor_desconto = ?, template_descricao = ?, validacoes_customizadas = ?,
                     notificar_colaborador = ?, notificar_colaborador_sistema = ?, notificar_colaborador_email = ?, notificar_colaborador_push = ?,
@@ -150,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     WHERE id = ?
                 ");
                 $stmt->execute([
-                    $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto,
+                    $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto, $permite_horarios,
                     $requer_aprovacao, $conta_advertencia, $calcula_desconto, $permite_desconto_banco_horas, $permite_ocorrencia_rapida, $permite_considerar_dia_inteiro, $valor_desconto,
                     $template_descricao, $validacoes_customizadas, $notificar_colaborador,
                     $notificar_colaborador_sistema, $notificar_colaborador_email, $notificar_colaborador_push,
@@ -513,6 +514,28 @@ require_once __DIR__ . '/../includes/header.php';
                                             <small class="text-muted d-block mt-2">
                                                 Quando marcado, o formulário mostrará um campo para selecionar o tipo de ponto (Entrada, Almoço, Café, Saída). 
                                                 Útil para ocorrências relacionadas a registro de ponto.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-7">
+                                <div class="col-md-12">
+                                    <div class="card card-flush">
+                                        <div class="card-body">
+                                            <div class="form-check form-check-custom form-check-solid">
+                                                <input class="form-check-input" type="checkbox" name="permite_horarios" id="permite_horarios" value="1" />
+                                                <label class="form-check-label fw-semibold" for="permite_horarios">
+                                                    Permite informar horários (esperado e real)
+                                                </label>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">
+                                                Quando marcado, o formulário mostrará campos para informar o horário esperado e o horário real. 
+                                                <br><strong>Exemplos:</strong>
+                                                <br>• <strong>Atraso:</strong> Horário que deveria ter chegado vs horário que realmente chegou
+                                                <br>• <strong>Saída antecipada:</strong> Horário que deveria ter saído vs horário que realmente saiu
+                                                <br>Útil para deixar mais claro qual horário estamos falando e facilitar a visualização do dia.
                                             </small>
                                         </div>
                                     </div>
@@ -1443,6 +1466,10 @@ function editarTipoOcorrencia(tipo) {
     document.getElementById('template_descricao').value = tipo.template_descricao || '';
     document.getElementById('permite_tempo_atraso').checked = tipo.permite_tempo_atraso == 1;
     document.getElementById('permite_tipo_ponto').checked = tipo.permite_tipo_ponto == 1;
+    const permiteHorarios = document.getElementById('permite_horarios');
+    if (permiteHorarios) {
+        permiteHorarios.checked = (tipo.permite_horarios == 1 || tipo.permite_horarios === '1');
+    }
     document.getElementById('requer_aprovacao').checked = tipo.requer_aprovacao == 1;
     document.getElementById('conta_advertencia').checked = tipo.conta_advertencia == 1;
     document.getElementById('calcula_desconto').checked = tipo.calcula_desconto == 1;
