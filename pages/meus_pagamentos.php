@@ -668,29 +668,53 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                 <h3 class="card-title">Informações do Fechamento</h3>
                             </div>
                             <div class="card-body">
-                                <div class="row g-3">
-                                    <div class="col-12 col-md-6">
-                                        <div class="d-flex flex-column">
-                                            <strong class="text-muted fs-7 mb-1">Mês/Ano de Referência</strong>
-                                            <span class="text-gray-800 fw-semibold">${d.fechamento.mes_referencia_formatado || '-'}</span>
+                                <!-- Versão Desktop -->
+                                <div class="d-none d-md-block">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <strong>Mês/Ano de Referência:</strong><br>
+                                            <span class="text-gray-800">${d.fechamento.mes_referencia_formatado || '-'}</span>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <strong>Data de Fechamento:</strong><br>
+                                            <span class="text-gray-800">${d.fechamento.data_fechamento_formatada || '-'}</span>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <strong>Empresa:</strong><br>
+                                            <span class="text-gray-800">${d.fechamento.empresa_nome || '-'}</span>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <strong>Período:</strong><br>
+                                            <span class="text-gray-800">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
                                         </div>
                                     </div>
-                                    <div class="col-12 col-md-6">
-                                        <div class="d-flex flex-column">
-                                            <strong class="text-muted fs-7 mb-1">Data de Fechamento</strong>
-                                            <span class="text-gray-800 fw-semibold">${d.fechamento.data_fechamento_formatada || '-'}</span>
+                                </div>
+                                <!-- Versão Mobile -->
+                                <div class="d-md-none">
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <div class="d-flex flex-column">
+                                                <strong class="text-muted fs-7 mb-1">Mês/Ano de Referência</strong>
+                                                <span class="text-gray-800 fw-semibold">${d.fechamento.mes_referencia_formatado || '-'}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-12 col-md-6">
-                                        <div class="d-flex flex-column">
-                                            <strong class="text-muted fs-7 mb-1">Empresa</strong>
-                                            <span class="text-gray-800 fw-semibold">${d.fechamento.empresa_nome || '-'}</span>
+                                        <div class="col-12">
+                                            <div class="d-flex flex-column">
+                                                <strong class="text-muted fs-7 mb-1">Data de Fechamento</strong>
+                                                <span class="text-gray-800 fw-semibold">${d.fechamento.data_fechamento_formatada || '-'}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-12 col-md-6">
-                                        <div class="d-flex flex-column">
-                                            <strong class="text-muted fs-7 mb-1">Período</strong>
-                                            <span class="text-gray-800 fw-semibold">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
+                                        <div class="col-12">
+                                            <div class="d-flex flex-column">
+                                                <strong class="text-muted fs-7 mb-1">Empresa</strong>
+                                                <span class="text-gray-800 fw-semibold">${d.fechamento.empresa_nome || '-'}</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="d-flex flex-column">
+                                                <strong class="text-muted fs-7 mb-1">Período</strong>
+                                                <span class="text-gray-800 fw-semibold">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
