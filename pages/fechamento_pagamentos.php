@@ -2157,7 +2157,7 @@ if (isset($_GET['view'])) {
                 $adiantamentos_por_colaborador[$ad['colaborador_id']] = (float)$ad['total_adiantamentos'];
             }
             
-            // Se não encontrou adiantamentos pelo fechamento_desconto_id,
+            // Debug: Se não encontrou adiantamentos pelo fechamento_desconto_id,
             // tenta buscar pelos colaboradores do fechamento e mês de referência
             // (para fechamentos criados antes da implementação completa)
             if (empty($adiantamentos_por_colaborador)) {
@@ -2182,15 +2182,6 @@ if (isset($_GET['view'])) {
                     }
                 }
             }
-            
-            // DEBUG: Log dos adiantamentos encontrados (visível no HTML como comentário)
-            $debug_info = [];
-            foreach ($itens_fechamento as $item) {
-                $colab_id = $item['colaborador_id'];
-                $ad_valor = $adiantamentos_por_colaborador[$colab_id] ?? 0;
-                $debug_info[] = "Colab {$colab_id} ({$item['colaborador_nome']}): Adiantamentos={$ad_valor}";
-            }
-            $debug_string = "<!-- DEBUG ADIANTAMENTOS: " . implode(" | ", $debug_info) . " -->";
         }
         
         // Calcula estatísticas de documentos
@@ -2284,11 +2275,6 @@ $tipos_bonus = $stmt->fetchAll();
 
 $page_title = 'Fechamento de Pagamentos';
 require_once __DIR__ . '/../includes/header.php';
-
-// DEBUG: Exibe informações de adiantamentos se estiver visualizando um fechamento
-if (isset($debug_string)) {
-    echo $debug_string;
-}
 ?>
 
 <!--begin::Toolbar-->
@@ -2680,11 +2666,7 @@ if (isset($debug_string)) {
                             </td>
                             <?php if ($inclui_salario): 
                                 $descontos_ocorrencias = (float)($item['descontos'] ?? 0);
-                                $colab_id_debug = $item['colaborador_id'];
-                                $adiantamentos_colab = $adiantamentos_por_colaborador[$colab_id_debug] ?? 0;
-                                
-                                // DEBUG: Descomente para ver os valores
-                                // echo "<!-- DEBUG Colab {$colab_id_debug}: Descontos BD={$descontos_ocorrencias}, Adiantamentos={$adiantamentos_colab}, Array=" . print_r($adiantamentos_por_colaborador, true) . " -->";
+                                $adiantamentos_colab = $adiantamentos_por_colaborador[$item['colaborador_id']] ?? 0;
                                 
                                 // Calcula total de descontos exibido
                                 // Se encontrou adiantamentos descontados, sempre inclui no total exibido
@@ -2708,14 +2690,6 @@ if (isset($debug_string)) {
                                 R$ <?= number_format($total_descontos, 2, ',', '.') ?>
                                 <?php if ($adiantamentos_colab > 0): ?>
                                     <br><small class="text-muted">(Adiantamentos: R$ <?= number_format($adiantamentos_colab, 2, ',', '.') ?>)</small>
-                                <?php else: ?>
-                                    <?php 
-                                    // DEBUG: Descomente para ver por que não encontrou adiantamentos
-                                    // $debug_query = $pdo->prepare("SELECT COUNT(*) as total FROM fechamentos_pagamento_adiantamentos WHERE colaborador_id = ? AND fechamento_desconto_id = ? AND descontado = 1");
-                                    // $debug_query->execute([$colab_id_debug, $fechamento_id]);
-                                    // $debug_result = $debug_query->fetch();
-                                    // echo "<!-- DEBUG: Adiantamentos encontrados para colab {$colab_id_debug} no fechamento {$fechamento_id}: " . ($debug_result['total'] ?? 0) . " -->";
-                                    ?>
                                 <?php endif; ?>
                             </td>
                             <td>R$ <?= number_format($item['adicionais'] ?? 0, 2, ',', '.') ?></td>
