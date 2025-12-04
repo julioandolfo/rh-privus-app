@@ -465,26 +465,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ocorrencias_data = $stmt->fetch();
                 $total_descontos_ocorrencias = $ocorrencias_data['total_descontos'] ?? 0;
                 
-                // Busca adiantamentos não descontados para este colaborador no mês de referência
-                $adiantamentos_ids = [];
+                // Busca TODOS os adiantamentos não descontados para este colaborador (para exibição)
+                // Mas descontar apenas os que têm mes_desconto igual ao mês de referência
                 $stmt = $pdo->prepare("
-                    SELECT id, valor_descontar, observacoes
+                    SELECT id, valor_descontar, observacoes, mes_desconto
                     FROM fechamentos_pagamento_adiantamentos
                     WHERE colaborador_id = ?
-                    AND mes_desconto = ?
                     AND descontado = 0
+                    ORDER BY mes_desconto ASC
                 ");
-                $stmt->execute([$colab_id, $mes_referencia]);
-                $adiantamentos = $stmt->fetchAll();
+                $stmt->execute([$colab_id]);
+                $adiantamentos_todos = $stmt->fetchAll();
                 
-                $total_adiantamentos = 0;
+                // Filtra apenas os que devem ser descontados neste mês
+                $adiantamentos_para_descontar = [];
                 $adiantamentos_ids = [];
-                foreach ($adiantamentos as $adiantamento) {
-                    $total_adiantamentos += (float)$adiantamento['valor_descontar'];
-                    $adiantamentos_ids[] = $adiantamento['id'];
+                $total_adiantamentos = 0;
+                
+                foreach ($adiantamentos_todos as $adiantamento) {
+                    // Se o mes_desconto é igual ao mês de referência, deve ser descontado
+                    if ($adiantamento['mes_desconto'] === $mes_referencia) {
+                        $total_adiantamentos += (float)$adiantamento['valor_descontar'];
+                        $adiantamentos_ids[] = $adiantamento['id'];
+                        $adiantamentos_para_descontar[] = $adiantamento;
+                    }
                 }
                 
-                // Adiciona adiantamentos aos descontos
+                // Adiciona adiantamentos aos descontos (apenas os do mês de referência)
                 $total_descontos_ocorrencias += $total_adiantamentos;
                 
                 // Insere bônus no fechamento (incluindo informativos para registro)
@@ -5892,6 +5899,124 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                         </div>
                         ` : ''}
                         
+                        <!-- Adiantamentos Descontados -->
+                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-wallet fs-2 text-primary me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Adiantamentos Descontados
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                                        <thead>
+                                            <tr class="fw-bold text-muted">
+                                                <th class="min-w-100px">Data do Adiantamento</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
+                                                <th class="min-w-150px">Valor</th>
+                                                <th class="min-w-200px">Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.adiantamentos_descontados.map(ad => `
+                                                <tr>
+                                                    <td>${ad.fechamento_data || '-'}</td>
+                                                    <td>
+                                                        <span class="badge badge-light-info">${ad.mes_desconto_formatado || ad.mes_desconto || '-'}</span>
+                                                    </td>
+                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${ad.observacoes || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold">
+                                                <td colspan="2" class="text-end">Total Descontado:</td>
+                                                <td class="text-danger">-R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Adiantamentos Pendentes -->
+                        ${d.adiantamentos_pendentes && d.adiantamentos_pendentes.length > 0 ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-time fs-2 text-warning me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Adiantamentos Pendentes
+                                    <span class="badge badge-light-warning ms-2">${d.adiantamentos_pendentes.length}</span>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info d-flex align-items-center p-3 mb-5">
+                                    <i class="ki-duotone ki-information-5 fs-2hx text-info me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">Atenção:</span>
+                                        <span>Estes adiantamentos ainda não foram descontados. Serão descontados automaticamente quando o fechamento do mês de desconto for criado.</span>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                                        <thead>
+                                            <tr class="fw-bold text-muted">
+                                                <th class="min-w-100px">Data do Adiantamento</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
+                                                <th class="min-w-150px">Valor a Descontar</th>
+                                                <th class="min-w-200px">Observações</th>
+                                                <th class="min-w-100px text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.adiantamentos_pendentes.map(ad => `
+                                                <tr>
+                                                    <td>${ad.fechamento_data || '-'}</td>
+                                                    <td>
+                                                        <span class="badge ${ad.mes_desconto === d.fechamento.mes_referencia ? 'badge-light-success' : 'badge-light-warning'}">
+                                                            ${ad.mes_desconto_formatado || ad.mes_desconto || '-'}
+                                                        </span>
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? '<span class="badge badge-light-success ms-1">Será descontado</span>' : ''}
+                                                    </td>
+                                                    <td class="fw-bold">R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${ad.observacoes || '-'}</td>
+                                                    <td class="text-center">
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? 
+                                                            '<span class="badge badge-light-success">Será descontado</span>' : 
+                                                            '<span class="badge badge-light-warning">Aguardando</span>'}
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold">
+                                                <td colspan="2" class="text-end">Total Pendente:</td>
+                                                <td class="text-warning">R$ ${parseFloat(d.adiantamentos_pendentes.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                <td colspan="2"></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
                         <!-- Status do Documento -->
                         ${d.documento.status ? `
                         <div class="card card-flush">
@@ -6315,6 +6440,124 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 </tr>
                                             `).join('')}
                                         </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Adiantamentos Descontados -->
+                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-wallet fs-2 text-primary me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Adiantamentos Descontados
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                                        <thead>
+                                            <tr class="fw-bold text-muted">
+                                                <th class="min-w-100px">Data do Adiantamento</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
+                                                <th class="min-w-150px">Valor</th>
+                                                <th class="min-w-200px">Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.adiantamentos_descontados.map(ad => `
+                                                <tr>
+                                                    <td>${ad.fechamento_data || '-'}</td>
+                                                    <td>
+                                                        <span class="badge badge-light-info">${ad.mes_desconto_formatado || ad.mes_desconto || '-'}</span>
+                                                    </td>
+                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${ad.observacoes || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold">
+                                                <td colspan="2" class="text-end">Total Descontado:</td>
+                                                <td class="text-danger">-R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Adiantamentos Pendentes -->
+                        ${d.adiantamentos_pendentes && d.adiantamentos_pendentes.length > 0 ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-time fs-2 text-warning me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Adiantamentos Pendentes
+                                    <span class="badge badge-light-warning ms-2">${d.adiantamentos_pendentes.length}</span>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info d-flex align-items-center p-3 mb-5">
+                                    <i class="ki-duotone ki-information-5 fs-2hx text-info me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">Atenção:</span>
+                                        <span>Estes adiantamentos ainda não foram descontados. Serão descontados automaticamente quando o fechamento do mês de desconto for criado.</span>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                                        <thead>
+                                            <tr class="fw-bold text-muted">
+                                                <th class="min-w-100px">Data do Adiantamento</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
+                                                <th class="min-w-150px">Valor a Descontar</th>
+                                                <th class="min-w-200px">Observações</th>
+                                                <th class="min-w-100px text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.adiantamentos_pendentes.map(ad => `
+                                                <tr>
+                                                    <td>${ad.fechamento_data || '-'}</td>
+                                                    <td>
+                                                        <span class="badge ${ad.mes_desconto === d.fechamento.mes_referencia ? 'badge-light-success' : 'badge-light-warning'}">
+                                                            ${ad.mes_desconto_formatado || ad.mes_desconto || '-'}
+                                                        </span>
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? '<span class="badge badge-light-success ms-1">Será descontado</span>' : ''}
+                                                    </td>
+                                                    <td class="fw-bold">R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${ad.observacoes || '-'}</td>
+                                                    <td class="text-center">
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? 
+                                                            '<span class="badge badge-light-success">Será descontado</span>' : 
+                                                            '<span class="badge badge-light-warning">Aguardando</span>'}
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold">
+                                                <td colspan="2" class="text-end">Total Pendente:</td>
+                                                <td class="text-warning">R$ ${parseFloat(d.adiantamentos_pendentes.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                <td colspan="2"></td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             </div>

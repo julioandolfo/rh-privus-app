@@ -73,19 +73,33 @@ try {
         }
     }
     
-    // Busca adiantamentos pendentes do colaborador (para mostrar em fechamentos regulares)
+    // Busca TODOS os adiantamentos pendentes do colaborador (independente do mês)
     $adiantamentos_pendentes = [];
+    $stmt = $pdo->prepare("
+        SELECT fa.*, f.mes_referencia as fechamento_mes_referencia, f.data_fechamento as fechamento_data
+        FROM fechamentos_pagamento_adiantamentos fa
+        INNER JOIN fechamentos_pagamento f ON fa.fechamento_pagamento_id = f.id
+        WHERE fa.colaborador_id = ?
+        AND fa.descontado = 0
+        ORDER BY fa.mes_desconto ASC, f.data_fechamento DESC
+    ");
+    $stmt->execute([$colaborador_id]);
+    $adiantamentos_pendentes = $stmt->fetchAll();
+    
+    // Busca adiantamentos descontados neste fechamento
+    $adiantamentos_descontados = [];
     if ($fechamento['tipo_fechamento'] === 'regular') {
         $stmt = $pdo->prepare("
-            SELECT fa.*, f.mes_referencia as fechamento_mes_referencia
+            SELECT fa.*, f.mes_referencia as fechamento_mes_referencia, f.data_fechamento as fechamento_data
             FROM fechamentos_pagamento_adiantamentos fa
             INNER JOIN fechamentos_pagamento f ON fa.fechamento_pagamento_id = f.id
             WHERE fa.colaborador_id = ?
-            AND fa.mes_desconto = ?
-            AND fa.descontado = 0
+            AND fa.fechamento_desconto_id = ?
+            AND fa.descontado = 1
+            ORDER BY f.data_fechamento DESC
         ");
-        $stmt->execute([$colaborador_id, $fechamento['mes_referencia']]);
-        $adiantamentos_pendentes = $stmt->fetchAll();
+        $stmt->execute([$colaborador_id, $fechamento_id]);
+        $adiantamentos_descontados = $stmt->fetchAll();
     }
     
     if (!$fechamento) {
@@ -279,10 +293,24 @@ try {
                     'valor_adiantamento' => (float)$a['valor_adiantamento'],
                     'valor_descontar' => (float)$a['valor_descontar'],
                     'mes_desconto' => $a['mes_desconto'],
+                    'mes_desconto_formatado' => $a['mes_desconto'] ? date('m/Y', strtotime($a['mes_desconto'] . '-01')) : null,
                     'fechamento_mes_referencia' => $a['fechamento_mes_referencia'],
+                    'fechamento_data' => $a['fechamento_data'] ? date('d/m/Y', strtotime($a['fechamento_data'])) : null,
                     'observacoes' => $a['observacoes']
                 ];
-            }, $adiantamentos_pendentes)
+            }, $adiantamentos_pendentes),
+            'adiantamentos_descontados' => array_map(function($a) {
+                return [
+                    'id' => $a['id'],
+                    'valor_adiantamento' => (float)$a['valor_adiantamento'],
+                    'valor_descontar' => (float)$a['valor_descontar'],
+                    'mes_desconto' => $a['mes_desconto'],
+                    'mes_desconto_formatado' => $a['mes_desconto'] ? date('m/Y', strtotime($a['mes_desconto'] . '-01')) : null,
+                    'fechamento_mes_referencia' => $a['fechamento_mes_referencia'],
+                    'fechamento_data' => $a['fechamento_data'] ? date('d/m/Y', strtotime($a['fechamento_data'])) : null,
+                    'observacoes' => $a['observacoes']
+                ];
+            }, $adiantamentos_descontados)
         ]
     ];
     
