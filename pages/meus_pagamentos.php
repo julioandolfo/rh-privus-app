@@ -13,7 +13,15 @@ require_page_permission('meus_pagamentos.php');
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
-$colaborador_id = $usuario['colaborador_id'];
+// Verifica se o usuário tem colaborador_id (deve ser COLABORADOR)
+$colaborador_id = $usuario['colaborador_id'] ?? null;
+
+if (empty($colaborador_id)) {
+    // Se não tem colaborador_id, redireciona ou mostra erro
+    $_SESSION['error'] = 'Você precisa estar vinculado a um colaborador para acessar esta página.';
+    header('Location: dashboard.php');
+    exit;
+}
 
 // Busca fechamentos fechados do colaborador
 $stmt = $pdo->prepare("
@@ -40,7 +48,7 @@ $stmt = $pdo->prepare("
     ORDER BY f.mes_referencia DESC, f.data_fechamento DESC
 ");
 $stmt->execute([$colaborador_id]);
-$fechamentos = $stmt->fetchAll();
+$fechamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Agrupa por fechamento
 $fechamentos_agrupados = [];
@@ -214,6 +222,10 @@ require_once __DIR__ . '/../includes/header.php';
                             </thead>
                             <tbody>
                                 <?php foreach ($fechamentos_agrupados as $fechamento): 
+                                    // Verifica se há itens antes de acessar
+                                    if (empty($fechamento['itens']) || !is_array($fechamento['itens'])) {
+                                        continue;
+                                    }
                                     $item = $fechamento['itens'][0]; // Pega primeiro item (todos têm mesmo status)
                                     $total_fechamento = array_sum(array_column($fechamento['itens'], 'valor_total'));
                                 ?>
@@ -444,12 +456,25 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
     
     // Busca dados via API (mesma função do admin)
     fetch(`../api/get_detalhes_pagamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success && data.data) {
                 const d = data.data;
                 
-                titulo.textContent = `Detalhes do Pagamento - ${d.fechamento.mes_referencia_formatado}`;
+                // Garante que os objetos existam antes de usar
+                d.fechamento = d.fechamento || {};
+                d.item = d.item || {};
+                d.bonus = d.bonus || { total: 0, total_desconto_ocorrencias: 0, lista: [] };
+                d.ocorrencias = d.ocorrencias || { total_descontos: 0, descontos: [] };
+                d.horas_extras = d.horas_extras || { resumo: { horas_dinheiro: 0, valor_dinheiro: 0, horas_banco: 0 }, total_horas: 0, registros: [] };
+                d.periodo = d.periodo || { inicio_formatado: '-', fim_formatado: '-' };
+                
+                titulo.textContent = `Detalhes do Pagamento - ${d.fechamento.mes_referencia_formatado || '-'}`;
                 
                 // Usa o mesmo HTML do modal do admin (código completo igual ao fechamento_pagamentos.php)
                 let html = `
@@ -463,15 +488,15 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <strong>Mês/Ano de Referência:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.mes_referencia_formatado}</span>
+                                        <span class="text-gray-800">${d.fechamento.mes_referencia_formatado || '-'}</span>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <strong>Data de Fechamento:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.data_fechamento_formatada}</span>
+                                        <span class="text-gray-800">${d.fechamento.data_fechamento_formatada || '-'}</span>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <strong>Empresa:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.empresa_nome}</span>
+                                        <span class="text-gray-800">${d.fechamento.empresa_nome || '-'}</span>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <strong>Período:</strong><br>
@@ -493,63 +518,63 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                             <tr>
                                                 <td class="fw-bold">Salário Base</td>
                                                 <td class="text-end">
-                                                    <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td class="fw-bold">Horas Extras (Total)</td>
                                                 <td class="text-end">
-                                                    <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
+                                                    <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td class="fw-bold">Valor Horas Extras</td>
                                                 <td class="text-end">
-                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td class="fw-bold">Total de Bônus</td>
                                                 <td class="text-end">
-                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
-                                            ${d.bonus.total_desconto_ocorrencias > 0 ? `
+                                            ${(d.bonus.total_desconto_ocorrencias || 0) > 0 ? `
                                             <tr>
                                                 <td class="fw-bold text-danger">Desconto por Ocorrências (Bônus)</td>
                                                 <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
                                             ` : ''}
-                                            ${d.ocorrencias.total_descontos > 0 ? `
+                                            ${(d.ocorrencias.total_descontos || 0) > 0 ? `
                                             <tr>
                                                 <td class="fw-bold text-danger">Descontos (Ocorrências)</td>
                                                 <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.ocorrencias.total_descontos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
                                             ` : ''}
-                                            ${d.item.descontos > 0 ? `
+                                            ${(d.item.descontos || 0) > 0 ? `
                                             <tr>
                                                 <td class="fw-bold text-danger">Outros Descontos</td>
                                                 <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
                                             ` : ''}
-                                            ${d.item.adicionais > 0 ? `
+                                            ${(d.item.adicionais || 0) > 0 ? `
                                             <tr>
                                                 <td class="fw-bold text-success">Adicionais</td>
                                                 <td class="text-end">
-                                                    <span class="text-success fw-bold">+R$ ${parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    <span class="text-success fw-bold">+R$ ${parseFloat(d.item.adicionais || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
                                             ` : ''}
                                             <tr class="border-top border-2">
                                                 <td class="fw-bold fs-4">Valor Total</td>
                                                 <td class="text-end">
-                                                    <span class="text-success fw-bold fs-3">R$ ${parseFloat(d.item.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    <span class="text-success fw-bold fs-3">R$ ${parseFloat(d.item.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -575,8 +600,8 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                                 </i>
                                                 <div>
                                                     <div class="text-muted fs-7">Horas Pagas em R$</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
-                                                    <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                    <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -588,7 +613,7 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                                 </i>
                                                 <div>
                                                     <div class="text-muted fs-7">Horas em Banco</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_banco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_banco || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -600,14 +625,14 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                                 </i>
                                                 <div>
                                                     <div class="text-muted fs-7">Total de Horas</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.total_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.total_horas || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                ${d.horas_extras.registros.length > 0 ? `
+                                ${(d.horas_extras.registros && d.horas_extras.registros.length > 0) ? `
                                 <h5 class="fw-bold mb-3">Registros Individuais</h5>
                                 <div class="table-responsive">
                                     <table class="table table-row-bordered table-row-dashed gy-4">
@@ -646,7 +671,7 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                         </div>
                         
                         <!-- Detalhes de Bônus -->
-                        ${d.bonus.lista.length > 0 ? `
+                        ${(d.bonus.lista && d.bonus.lista.length > 0) ? `
                         <div class="card card-flush mb-5">
                             <div class="card-header">
                                 <h3 class="card-title">Detalhes de Bônus</h3>
@@ -692,7 +717,7 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                         ` : ''}
                         
                         <!-- Ocorrências com Desconto -->
-                        ${d.ocorrencias.descontos.length > 0 ? `
+                        ${(d.ocorrencias.descontos && d.ocorrencias.descontos.length > 0) ? `
                         <div class="card card-flush mb-5">
                             <div class="card-header">
                                 <h3 class="card-title">Ocorrências com Desconto em R$</h3>
