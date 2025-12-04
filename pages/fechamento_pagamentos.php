@@ -1465,11 +1465,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 
                 // Tenta usar o campo normal primeiro, depois o hidden
+                // IMPORTANTE: Para fechamentos individuais, o campo pode vir como 'tipo_bonus_id' ou 'tipo_bonus_id_hidden_individual'
                 $tipo_bonus_id_raw = $_POST['tipo_bonus_id'] ?? '';
-                if (empty($tipo_bonus_id_raw)) {
+                if (empty($tipo_bonus_id_raw) || $tipo_bonus_id_raw === '') {
                     $tipo_bonus_id_raw = $_POST['tipo_bonus_id_hidden_individual'] ?? '';
                 }
-                $tipo_bonus_id = !empty($tipo_bonus_id_raw) ? (int)$tipo_bonus_id_raw : null;
+                // Se ainda estiver vazio, tenta buscar diretamente do campo do formulário individual
+                if (empty($tipo_bonus_id_raw) || $tipo_bonus_id_raw === '') {
+                    // Pode estar vindo com outro nome no POST, verifica todas as possibilidades
+                    foreach ($_POST as $key => $value) {
+                        if (strpos($key, 'tipo_bonus') !== false && !empty($value)) {
+                            $tipo_bonus_id_raw = $value;
+                            break;
+                        }
+                    }
+                }
+                $tipo_bonus_id = !empty($tipo_bonus_id_raw) && $tipo_bonus_id_raw !== '' ? (int)$tipo_bonus_id_raw : null;
                 
                 // Tenta usar o campo normal primeiro, depois o hidden
                 $valor_manual_raw = $_POST['valor_manual'] ?? '';
@@ -1631,19 +1642,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 
                 // Insere bônus se tiver tipo (sempre salva para aparecer na listagem)
-                if ($tipo_bonus_id) {
-                    $stmt = $pdo->prepare("
-                        INSERT INTO fechamentos_pagamento_bonus 
-                        (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, valor_original, observacoes)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                // IMPORTANTE: Mesmo que o tipo seja fixo e o valor venha do valor_fixo,
+                // sempre salva o bônus na tabela para aparecer na listagem
+                if ($tipo_bonus_id && $tipo_bonus_id > 0) {
+                    // Garante que valor_original e valor_final estão definidos
+                    if (!isset($valor_original) || $valor_original <= 0) {
+                        $valor_original = $valor_final;
+                    }
+                    if (!isset($valor_final) || $valor_final <= 0) {
+                        $valor_final = $valor_original;
+                    }
+                    
+                    // Verifica se já existe um bônus para este fechamento e colaborador
+                    $stmt_check = $pdo->prepare("
+                        SELECT id FROM fechamentos_pagamento_bonus 
+                        WHERE fechamento_pagamento_id = ? AND colaborador_id = ? AND tipo_bonus_id = ?
                     ");
-                    $stmt->execute([
-                        $fechamento_id,
-                        $colab_id,
-                        $tipo_bonus_id,
-                        $valor_final,
-                        $valor_original,
-                        $motivo
+                    $stmt_check->execute([$fechamento_id, $colab_id, $tipo_bonus_id]);
+                    $bonus_existente = $stmt_check->fetch();
+                    
+                    if (!$bonus_existente) {
+                        $stmt = $pdo->prepare("
+                            INSERT INTO fechamentos_pagamento_bonus 
+                            (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, valor_original, observacoes)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ");
+                        $stmt->execute([
+                            $fechamento_id,
+                            $colab_id,
+                            $tipo_bonus_id,
+                            $valor_final,
+                            $valor_original,
+                            $motivo
+                        ]);
+                        
+                        log_fechamento_individual("Bônus inserido com sucesso", [
+                            'fechamento_id' => $fechamento_id,
+                            'colab_id' => $colab_id,
+                            'tipo_bonus_id' => $tipo_bonus_id,
+                            'valor_final' => $valor_final,
+                            'valor_original' => $valor_original
+                        ]);
+                    } else {
+                        // Atualiza o bônus existente
+                        $stmt = $pdo->prepare("
+                            UPDATE fechamentos_pagamento_bonus 
+                            SET valor = ?, valor_original = ?, observacoes = ?
+                            WHERE fechamento_pagamento_id = ? AND colaborador_id = ? AND tipo_bonus_id = ?
+                        ");
+                        $stmt->execute([
+                            $valor_final,
+                            $valor_original,
+                            $motivo,
+                            $fechamento_id,
+                            $colab_id,
+                            $tipo_bonus_id
+                        ]);
+                        
+                        log_fechamento_individual("Bônus atualizado com sucesso", [
+                            'fechamento_id' => $fechamento_id,
+                            'colab_id' => $colab_id,
+                            'tipo_bonus_id' => $tipo_bonus_id,
+                            'valor_final' => $valor_final,
+                            'valor_original' => $valor_original
+                        ]);
+                    }
+                } else {
+                    log_fechamento_individual("AVISO - Bônus não inserido: tipo_bonus_id está vazio ou inválido", [
+                        'fechamento_id' => $fechamento_id,
+                        'colab_id' => $colab_id,
+                        'tipo_bonus_id' => $tipo_bonus_id,
+                        'valor_final' => $valor_final,
+                        'POST_tipo_bonus_id' => $_POST['tipo_bonus_id'] ?? null,
+                        'POST_tipo_bonus_id_hidden_individual' => $_POST['tipo_bonus_id_hidden_individual'] ?? null,
+                        'POST_keys' => array_keys($_POST)
                     ]);
                 }
                 
