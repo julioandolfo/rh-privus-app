@@ -2106,6 +2106,7 @@ if ($usuario['role'] === 'ADMIN') {
 $fechamento_view = null;
 $itens_fechamento = [];
 $bonus_por_colaborador = [];
+$adiantamentos_por_colaborador = [];
 if (isset($_GET['view'])) {
     $fechamento_id = (int)$_GET['view'];
     $stmt = $pdo->prepare("
@@ -2138,6 +2139,23 @@ if (isset($_GET['view'])) {
         ");
         $stmt->execute([$fechamento_id]);
         $itens_fechamento = $stmt->fetchAll();
+        
+        // Busca adiantamentos descontados para cada colaborador neste fechamento
+        $adiantamentos_por_colaborador = [];
+        if ($fechamento_view['tipo_fechamento'] === 'regular') {
+            $stmt = $pdo->prepare("
+                SELECT colaborador_id, SUM(valor_descontar) as total_adiantamentos
+                FROM fechamentos_pagamento_adiantamentos
+                WHERE fechamento_desconto_id = ?
+                AND descontado = 1
+                GROUP BY colaborador_id
+            ");
+            $stmt->execute([$fechamento_id]);
+            $adiantamentos_descontados = $stmt->fetchAll();
+            foreach ($adiantamentos_descontados as $ad) {
+                $adiantamentos_por_colaborador[$ad['colaborador_id']] = (float)$ad['total_adiantamentos'];
+            }
+        }
         
         // Calcula estatísticas de documentos
         $stats_pendentes = 0;
@@ -2619,8 +2637,16 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="text-muted">R$ 0,00</span>
                                 <?php endif; ?>
                             </td>
-                            <?php if ($inclui_salario): ?>
-                            <td class="text-danger fw-bold">R$ <?= number_format($item['descontos'] ?? 0, 2, ',', '.') ?></td>
+                            <?php if ($inclui_salario): 
+                                $total_descontos = (float)($item['descontos'] ?? 0);
+                                $adiantamentos_colab = $adiantamentos_por_colaborador[$item['colaborador_id']] ?? 0;
+                            ?>
+                            <td class="text-danger fw-bold">
+                                R$ <?= number_format($total_descontos, 2, ',', '.') ?>
+                                <?php if ($adiantamentos_colab > 0): ?>
+                                    <br><small class="text-muted">(Adiantamentos: R$ <?= number_format($adiantamentos_colab, 2, ',', '.') ?>)</small>
+                                <?php endif; ?>
+                            </td>
                             <td>R$ <?= number_format($item['adicionais'] ?? 0, 2, ',', '.') ?></td>
                             <?php endif; ?>
                             <?php if ($is_fechamento_extra): ?>
