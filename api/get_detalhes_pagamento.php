@@ -259,6 +259,17 @@ try {
         } else {
             $bonus['detalhes_desconto_array'] = [];
         }
+        
+        // Garante que os campos numéricos existam e sejam numéricos
+        if (!isset($bonus['valor'])) {
+            $bonus['valor'] = 0;
+        }
+        if (!isset($bonus['valor_original'])) {
+            $bonus['valor_original'] = $bonus['valor'];
+        }
+        if (!isset($bonus['desconto_ocorrencias'])) {
+            $bonus['desconto_ocorrencias'] = 0;
+        }
     }
     
     // Busca ocorrências com desconto em dinheiro do período
@@ -339,10 +350,23 @@ try {
                 'lista' => $bonus_list,
                 'total' => array_sum(array_map(function($b) {
                     $tipo_valor = $b['tipo_valor'] ?? 'variavel';
-                    return $tipo_valor === 'informativo' ? 0 : (float)($b['valor'] ?? 0);
+                    // Não soma bônus informativos
+                    if ($tipo_valor === 'informativo') {
+                        return 0;
+                    }
+                    // Soma o valor do bônus (já descontado se houver desconto por ocorrências)
+                    return (float)($b['valor'] ?? 0);
                 }, $bonus_list)),
                 'total_desconto_ocorrencias' => array_sum(array_map(function($b) {
                     return (float)($b['desconto_ocorrencias'] ?? 0);
+                }, $bonus_list)),
+                'total_original' => array_sum(array_map(function($b) {
+                    $tipo_valor = $b['tipo_valor'] ?? 'variavel';
+                    // Não soma bônus informativos
+                    if ($tipo_valor === 'informativo') {
+                        return 0;
+                    }
+                    return (float)($b['valor_original'] ?? $b['valor'] ?? 0);
                 }, $bonus_list))
             ],
             'ocorrencias' => [
