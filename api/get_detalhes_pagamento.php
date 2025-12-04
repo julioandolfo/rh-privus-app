@@ -207,6 +207,51 @@ try {
         }
     }
     
+    // Para fechamentos regulares, busca também fechamentos extras individuais/grupais abertos
+    // que ainda não foram pagos e devem aparecer como bônus
+    if ($fechamento['tipo_fechamento'] === 'regular') {
+        // Busca fechamentos extras individuais/grupais abertos para este colaborador no mesmo período
+        $stmt_extras = $pdo->prepare("
+            SELECT fp.id, fp.subtipo_fechamento, fp.mes_referencia, fp.data_fechamento,
+                   fpi.valor_total, fpi.valor_manual, fpi.motivo
+            FROM fechamentos_pagamento fp
+            INNER JOIN fechamentos_pagamento_itens fpi ON fp.id = fpi.fechamento_id
+            WHERE fp.tipo_fechamento = 'extra'
+            AND (fp.subtipo_fechamento = 'individual' OR fp.subtipo_fechamento = 'grupal')
+            AND fp.status = 'aberto'
+            AND fpi.colaborador_id = ?
+            AND fp.mes_referencia = ?
+            ORDER BY fp.data_fechamento DESC
+        ");
+        $stmt_extras->execute([$colaborador_id, $fechamento['mes_referencia']]);
+        $fechamentos_extras = $stmt_extras->fetchAll();
+        
+        // Para cada fechamento extra aberto, adiciona como bônus virtual
+        foreach ($fechamentos_extras as $extra) {
+            $valor_extra = (float)($extra['valor_total'] ?? 0);
+            if ($valor_extra > 0) {
+                // Adiciona um registro virtual de bônus para este fechamento extra
+                $bonus_list[] = [
+                    'id' => null,
+                    'fechamento_pagamento_id' => $fechamento_id,
+                    'colaborador_id' => $colaborador_id,
+                    'tipo_bonus_id' => null,
+                    'tipo_bonus_nome' => 'Bônus Extra (' . ucfirst($extra['subtipo_fechamento']) . ')',
+                    'tipo_valor' => 'variavel',
+                    'valor_fixo' => null,
+                    'valor' => $valor_extra,
+                    'valor_original' => $valor_extra,
+                    'desconto_ocorrencias' => 0,
+                    'detalhes_desconto' => null,
+                    'detalhes_desconto_array' => [],
+                    'observacoes' => ($extra['motivo'] ?? '') . ' | Fechamento Extra #' . $extra['id'] . ' (Aberto)',
+                    'fechamento_extra_id' => $extra['id'],
+                    'fechamento_extra_tipo' => $extra['subtipo_fechamento']
+                ];
+            }
+        }
+    }
+    
     // Processa detalhes de desconto dos bônus
     foreach ($bonus_list as &$bonus) {
         if (!empty($bonus['detalhes_desconto'])) {
