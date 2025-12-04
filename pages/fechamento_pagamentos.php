@@ -1557,6 +1557,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 $valor_final = 0;
+                $valor_original = 0;
                 
                 if ($tipo_bonus_id) {
                     // Usa tipo de bônus
@@ -1566,11 +1567,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($tipo_bonus) {
                         if ($tipo_bonus['tipo_valor'] === 'fixo') {
-                            $valor_final = (float)($tipo_bonus['valor_fixo'] ?? 0);
+                            // Para tipo fixo, usa valor_fixo do tipo de bônus
+                            $valor_original = (float)($tipo_bonus['valor_fixo'] ?? 0);
+                            // Se valor_fixo for 0 ou NULL, tenta usar valor_manual se fornecido
+                            if ($valor_original <= 0 && $valor_manual > 0) {
+                                $valor_original = (float)$valor_manual;
+                            }
+                            $valor_final = $valor_original;
                         } else {
-                            // Busca valor do colaborador ou usa valor manual se fornecido
+                            // Para tipo variável, busca valor do colaborador ou usa valor manual se fornecido
                             if ($valor_manual > 0) {
-                                $valor_final = (float)$valor_manual;
+                                $valor_original = (float)$valor_manual;
+                                $valor_final = $valor_original;
                             } else {
                                 $ano_mes = explode('-', $mes_referencia);
                                 $data_inicio = $ano_mes[0] . '-' . $ano_mes[1] . '-01';
@@ -1578,13 +1586,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $stmt = $pdo->prepare("SELECT valor FROM colaboradores_bonus WHERE colaborador_id = ? AND tipo_bonus_id = ? AND (data_inicio IS NULL OR data_inicio <= ?) AND (data_fim IS NULL OR data_fim >= ?) LIMIT 1");
                                 $stmt->execute([$colab_id, $tipo_bonus_id, $data_fim, $data_inicio]);
                                 $colab_bonus = $stmt->fetch();
-                                $valor_final = $colab_bonus ? (float)$colab_bonus['valor'] : 0;
+                                $valor_original = $colab_bonus ? (float)$colab_bonus['valor'] : 0;
+                                $valor_final = $valor_original;
                             }
                         }
+                    } else {
+                        // Tipo de bônus não encontrado, usa valor manual se fornecido
+                        $valor_original = (float)$valor_manual;
+                        $valor_final = $valor_original;
                     }
                 } else {
-                    // Valor livre
-                    $valor_final = (float)$valor_manual;
+                    // Valor livre (sem tipo de bônus)
+                    $valor_original = (float)$valor_manual;
+                    $valor_final = $valor_original;
+                }
+                
+                // Garante que valor_final seja maior que 0
+                if ($valor_final <= 0) {
+                    log_fechamento_individual("ERRO - Valor final é zero ou negativo", [
+                        'fechamento_id' => $fechamento_id,
+                        'colab_id' => $colab_id,
+                        'tipo_bonus_id' => $tipo_bonus_id,
+                        'valor_original' => $valor_original,
+                        'valor_final' => $valor_final,
+                        'valor_manual' => $valor_manual
+                    ]);
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Valor do bônus é zero ou inválido') WHERE id = ?");
+                    $stmt->execute([$fechamento_id]);
+                    continue;
                 }
                 
                 // Insere item
@@ -1601,18 +1630,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $motivo
                 ]);
                 
-                // Insere bônus se tiver tipo
+                // Insere bônus se tiver tipo (sempre salva para aparecer na listagem)
                 if ($tipo_bonus_id) {
                     $stmt = $pdo->prepare("
                         INSERT INTO fechamentos_pagamento_bonus 
-                        (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, observacoes)
-                        VALUES (?, ?, ?, ?, ?)
+                        (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, valor_original, observacoes)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     ");
                     $stmt->execute([
                         $fechamento_id,
                         $colab_id,
                         $tipo_bonus_id,
                         $valor_final,
+                        $valor_original,
                         $motivo
                     ]);
                 }
@@ -2207,7 +2237,7 @@ if (isset($_GET['view'])) {
         $data_fim_periodo = date('Y-m-t', strtotime($data_inicio_periodo));
         
         // Busca bônus de cada colaborador no fechamento
-        // Primeiro tenta buscar dos bônus salvos no fechamento
+        // Primeiro tenta buscar dos bônus salvos no fechamento (incluindo fechamentos extras individuais/grupais)
         foreach ($itens_fechamento as $item) {
             $stmt = $pdo->prepare("
                 SELECT fb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo,
@@ -2216,14 +2246,21 @@ if (isset($_GET['view'])) {
                 FROM fechamentos_pagamento_bonus fb
                 INNER JOIN tipos_bonus tb ON fb.tipo_bonus_id = tb.id
                 WHERE fb.fechamento_pagamento_id = ? AND fb.colaborador_id = ?
+                ORDER BY tb.nome
             ");
             $stmt->execute([$fechamento_id, $item['colaborador_id']]);
             $bonus_salvos = $stmt->fetchAll();
             
             // Se não encontrou bônus salvos no fechamento, busca bônus ativos do colaborador
             // Mas apenas se o fechamento inclui bônus automáticos (fechamentos extras podem não incluir)
+            // IMPORTANTE: Para fechamentos extras individuais/grupais, os bônus já devem estar salvos
+            // na tabela fechamentos_pagamento_bonus, então não precisa buscar bônus automáticos
             $inclui_bonus_automaticos_item = $item['inclui_bonus_automaticos'] ?? true;
-            if (empty($bonus_salvos) && $inclui_bonus_automaticos_item) {
+            $is_fechamento_extra = ($fechamento_view['tipo_fechamento'] === 'extra');
+            
+            // Para fechamentos extras, não busca bônus automáticos (já devem estar salvos)
+            // Para fechamentos regulares, busca bônus automáticos se não encontrou salvos
+            if (empty($bonus_salvos) && $inclui_bonus_automaticos_item && !$is_fechamento_extra) {
                 $stmt = $pdo->prepare("
                     SELECT cb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo
                     FROM colaboradores_bonus cb
