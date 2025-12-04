@@ -1446,6 +1446,23 @@ function getIcon($name) {
                 <!--end:Menu item-->
                 <?php endif; ?>
                 
+                <!--begin:Menu item - Minhas Ocorrências (apenas para colaboradores)-->
+                <?php if (is_colaborador() && can_access_page('ocorrencias_list.php')): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('ocorrencias_list.php') ?>" href="ocorrencias_list.php">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-file fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Minhas Ocorrências</span>
+                    </a>
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <?php if (is_colaborador()): ?>
                 <!--begin:Seção Conta-->
                 <div class="menu-content px-3 pb-2 pt-5">

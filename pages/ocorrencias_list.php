@@ -3,7 +3,7 @@
  * Lista de Ocorrências
  */
 
-$page_title = 'Ocorrências';
+$page_title = is_colaborador() ? 'Minhas Ocorrências' : 'Ocorrências';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
@@ -30,7 +30,16 @@ $filtro_apenas_informativa = $_GET['apenas_informativa'] ?? '';
 $where = [];
 $params = [];
 
-if ($usuario['role'] === 'RH') {
+if ($usuario['role'] === 'COLABORADOR') {
+    // Colaborador só vê suas próprias ocorrências
+    if (!empty($usuario['colaborador_id'])) {
+        $where[] = "o.colaborador_id = ?";
+        $params[] = $usuario['colaborador_id'];
+    } else {
+        // Se não tem colaborador_id, não mostra nada
+        $where[] = "1 = 0";
+    }
+} elseif ($usuario['role'] === 'RH') {
     // RH pode ter múltiplas empresas
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
@@ -181,6 +190,12 @@ if ($usuario['role'] === 'ADMIN') {
         $colaboradores = $stmt_colab->fetchAll();
     }
 } elseif ($usuario['role'] === 'GESTOR') {
+    if (!isset($setor_id)) {
+        $stmt_setor = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
+        $stmt_setor->execute([$usuario['id']]);
+        $user_data = $stmt_setor->fetch();
+        $setor_id = $user_data['setor_id'] ?? 0;
+    }
     $stmt_colab = $pdo->prepare("SELECT id, nome_completo FROM colaboradores WHERE setor_id = ? AND status = 'ativo' ORDER BY nome_completo");
     $stmt_colab->execute([$setor_id]);
     $colaboradores = $stmt_colab->fetchAll();
@@ -215,7 +230,7 @@ $tipos_ocorrencias = [
 <div class="toolbar d-flex flex-stack mb-3 mb-lg-5" id="kt_toolbar">
     <div id="kt_toolbar_container" class="container-fluid d-flex flex-stack flex-wrap">
         <div class="page-title d-flex flex-column me-5 py-2">
-            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0">Ocorrências</h1>
+            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0"><?= is_colaborador() ? 'Minhas Ocorrências' : 'Ocorrências' ?></h1>
             <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 pt-1">
                 <li class="breadcrumb-item text-muted">
                     <a href="dashboard.php" class="text-muted text-hover-primary">Home</a>
@@ -223,15 +238,17 @@ $tipos_ocorrencias = [
                 <li class="breadcrumb-item">
                     <span class="bullet bg-gray-200 w-5px h-2px"></span>
                 </li>
-                <li class="breadcrumb-item text-gray-900">Ocorrências</li>
+                <li class="breadcrumb-item text-gray-900"><?= is_colaborador() ? 'Minhas Ocorrências' : 'Ocorrências' ?></li>
             </ul>
         </div>
+        <?php if ($usuario['role'] !== 'COLABORADOR' && can_access_page('ocorrencias_add.php')): ?>
         <div class="d-flex align-items-center py-2">
             <a href="ocorrencias_add.php" class="btn btn-primary">
                 <i class="ki-duotone ki-plus fs-2"></i>
                 Nova Ocorrência
             </a>
         </div>
+        <?php endif; ?>
     </div>
 </div>
 <!--end::Toolbar-->
@@ -244,6 +261,7 @@ $tipos_ocorrencias = [
         <div class="card mb-4">
             <div class="card-body">
                 <form method="GET" class="row g-3">
+                    <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
                     <div class="col-md-3">
                         <label class="form-label">Colaborador</label>
                         <select name="colaborador" class="form-select form-select-solid">
@@ -255,6 +273,7 @@ $tipos_ocorrencias = [
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <?php endif; ?>
                     
                     <div class="col-md-3">
                         <label class="form-label">Tipo de Ocorrência</label>
