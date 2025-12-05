@@ -210,6 +210,42 @@ require_once __DIR__ . '/../includes/header.php';
         
         <?= get_session_alert() ?>
         
+        <!--begin::Aviso Navegador Gmail-->
+        <div id="aviso_navegador_gmail" class="alert alert-warning d-none mb-5" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="ki-duotone ki-information-5 fs-2hx text-warning me-4">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+                <div class="flex-grow-1">
+                    <h4 class="alert-heading fw-bold mb-2">Atenção: Navegador Limitado Detectado</h4>
+                    <p class="mb-2">
+                        Você está acessando o sistema pelo navegador do Gmail, que tem limitações para upload de arquivos. 
+                        Para enviar documentos corretamente, abra este link no seu navegador padrão (Chrome, Safari, Firefox).
+                    </p>
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <button type="button" class="btn btn-warning btn-sm" onclick="abrirNoNavegadorPadrao()">
+                            <i class="ki-duotone ki-external-link fs-5 me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Abrir no Navegador Padrão
+                        </button>
+                        <button type="button" class="btn btn-light btn-sm" onclick="document.getElementById('aviso_navegador_gmail').classList.add('d-none')">
+                            Fechar
+                        </button>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <strong>Como fazer:</strong> Toque nos três pontos (⋮) no canto superior direito e selecione "Abrir no Chrome" ou "Abrir no Safari".
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!--end::Aviso Navegador Gmail-->
+        
         <!--begin::Estatísticas-->
         <div class="row g-3 mb-5">
             <div class="col-md-3">
@@ -661,6 +697,82 @@ require_once __DIR__ . '/../includes/header.php';
 <!--end::Modal-->
 
 <script>
+// Detecta se está sendo aberto no navegador do Gmail ou outro navegador limitado
+function detectarNavegadorLimitado(mostrarAviso = true) {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+    
+    // Detecta navegador do Gmail (geralmente contém "wv" ou "Gmail" no user agent)
+    // "wv" indica WebView, que é usado pelo Gmail app
+    const isGmailBrowser = userAgent.includes('wv') || 
+                          userAgent.includes('gmail') ||
+                          (window.navigator.standalone === false && userAgent.includes('android') && !userAgent.includes('chrome')) ||
+                          (isMobile && !userAgent.includes('chrome') && !userAgent.includes('safari') && !userAgent.includes('firefox') && !userAgent.includes('samsung'));
+    
+    // Verifica se tem APIs necessárias para upload de arquivos
+    const temFileAPI = typeof File !== 'undefined' && typeof FileReader !== 'undefined';
+    const temInputFile = document.createElement('input').type === 'file';
+    
+    // Se detectou navegador limitado ou não tem APIs necessárias
+    if (isGmailBrowser || !temFileAPI || !temInputFile) {
+        if (mostrarAviso) {
+            const avisoDiv = document.getElementById('aviso_navegador_gmail');
+            if (avisoDiv) {
+                avisoDiv.classList.remove('d-none');
+            }
+        }
+        return true;
+    }
+    
+    return false;
+}
+
+// Tenta abrir no navegador padrão
+function abrirNoNavegadorPadrao() {
+    const urlAtual = window.location.href;
+    
+    // Tenta diferentes métodos para abrir no navegador padrão
+    try {
+        // Método 1: Intent URL (Android)
+        if (/android/i.test(navigator.userAgent)) {
+            window.location.href = 'intent://' + urlAtual.replace(/https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+            setTimeout(function() {
+                // Fallback: tenta abrir diretamente
+                window.open(urlAtual, '_system');
+            }, 500);
+        } else {
+            // Método 2: Para iOS, tenta abrir no Safari
+            window.open(urlAtual, '_system');
+        }
+    } catch (e) {
+        // Fallback: mostra instruções
+        Swal.fire({
+            title: 'Como Abrir no Navegador Padrão',
+            html: `
+                <div class="text-start">
+                    <p class="mb-3"><strong>Android:</strong></p>
+                    <ol class="text-start mb-3">
+                        <li>Toque nos três pontos (⋮) no canto superior direito</li>
+                        <li>Selecione "Abrir no Chrome" ou "Abrir no navegador"</li>
+                    </ol>
+                    <p class="mb-3"><strong>iOS:</strong></p>
+                    <ol class="text-start">
+                        <li>Toque no ícone de compartilhar</li>
+                        <li>Selecione "Abrir no Safari"</li>
+                    </ol>
+                </div>
+            `,
+            icon: 'info',
+            confirmButtonText: 'Entendi'
+        });
+    }
+}
+
+// Executa detecção ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    detectarNavegadorLimitado();
+});
+
 // Enviar documento
 function enviarDocumento(fechamentoId, itemId) {
     document.getElementById('doc_fechamento_id').value = fechamentoId;
@@ -693,6 +805,15 @@ function enviarDocumento(fechamentoId, itemId) {
     }, { once: true });
     
     modal.show();
+    
+    // Verifica navegador limitado quando modal é aberto (sem mostrar banner, apenas erro no modal)
+    setTimeout(function() {
+        const isGmailBrowser = detectarNavegadorLimitado(false);
+        if (isGmailBrowser) {
+            // Mostra aviso no modal
+            mostrarErroArquivo('Você está usando o navegador do Gmail, que não suporta upload de arquivos. Abra este link no seu navegador padrão (Chrome, Safari ou Firefox) para enviar documentos.');
+        }
+    }, 100);
     
     // Configura eventos após o modal ser exibido
     setTimeout(function() {
@@ -794,7 +915,21 @@ function configurarInputArquivo() {
                         setTimeout(function() {
                             clearInterval(checkInterval);
                             if (!dialogAberto && fileInput.files.length === 0) {
-                                mostrarErroArquivo('Não foi possível abrir o seletor de arquivos. Verifique se o navegador tem permissão para acessar arquivos ou tente tocar diretamente na área do botão.');
+                                // Verifica se está no navegador do Gmail
+                                const userAgent = navigator.userAgent.toLowerCase();
+                                const isGmailBrowser = userAgent.includes('wv') || 
+                                                      userAgent.includes('gmail') ||
+                                                      (window.navigator.standalone === false && userAgent.includes('android') && !userAgent.includes('chrome'));
+                                
+                                if (isGmailBrowser) {
+                                    mostrarErroArquivo('Você está usando o navegador do Gmail, que não suporta upload de arquivos. Abra este link no seu navegador padrão (Chrome, Safari ou Firefox) para enviar documentos.');
+                                    const avisoDiv = document.getElementById('aviso_navegador_gmail');
+                                    if (avisoDiv) {
+                                        avisoDiv.classList.remove('d-none');
+                                    }
+                                } else {
+                                    mostrarErroArquivo('Não foi possível abrir o seletor de arquivos. Verifique se o navegador tem permissão para acessar arquivos ou tente tocar diretamente na área do botão.');
+                                }
                             }
                         }, 500);
                     }
@@ -804,9 +939,18 @@ function configurarInputArquivo() {
             } catch (error) {
                 console.error('Erro ao acionar input de arquivo:', error);
                 
+                // Verifica se está no navegador do Gmail
+                const userAgent = navigator.userAgent.toLowerCase();
+                const isGmailBrowser = userAgent.includes('wv') || 
+                                      userAgent.includes('gmail') ||
+                                      (window.navigator.standalone === false && userAgent.includes('android') && !userAgent.includes('chrome'));
+                
                 // Mensagens específicas baseadas no tipo de erro
                 let mensagemErro = '';
-                if (error.name === 'SecurityError' || error.message.includes('permission') || error.message.includes('Permission')) {
+                if (isGmailBrowser) {
+                    mensagemErro = 'Você está usando o navegador do Gmail, que não suporta upload de arquivos. ';
+                    mensagemErro += 'Por favor, abra este link no seu navegador padrão (Chrome, Safari ou Firefox) para enviar documentos.';
+                } else if (error.name === 'SecurityError' || error.message.includes('permission') || error.message.includes('Permission')) {
                     mensagemErro = 'Erro de permissão: O navegador bloqueou o acesso aos arquivos. ';
                     if (isMobile) {
                         mensagemErro += 'No mobile, verifique as configurações de permissão do navegador nas configurações do dispositivo ou tente usar outro navegador (Chrome, Firefox).';
@@ -825,6 +969,14 @@ function configurarInputArquivo() {
                 }
                 
                 mostrarErroArquivo(mensagemErro);
+                
+                // Se detectou navegador do Gmail, mostra banner também
+                if (isGmailBrowser) {
+                    const avisoDiv = document.getElementById('aviso_navegador_gmail');
+                    if (avisoDiv) {
+                        avisoDiv.classList.remove('d-none');
+                    }
+                }
             }
         });
     }
@@ -1875,6 +2027,36 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+/* Estilo do aviso de navegador Gmail */
+#aviso_navegador_gmail {
+    animation: slideDown 0.3s ease-out;
+    border-left: 4px solid #ffc700;
+}
+
+#aviso_navegador_gmail .alert-heading {
+    color: #664d03;
+}
+
+#aviso_navegador_gmail p {
+    color: #664d03;
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 767px) {
+    #aviso_navegador_gmail {
+        padding: 1rem;
+    }
+    
+    #aviso_navegador_gmail .d-flex {
+        flex-direction: column;
+    }
+    
+    #aviso_navegador_gmail .d-flex > i {
+        margin-bottom: 1rem;
+        margin-right: 0 !important;
     }
 }
 </style>
