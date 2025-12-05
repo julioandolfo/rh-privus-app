@@ -530,30 +530,32 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="mb-7">
                         <label class="required fw-semibold fs-6 mb-3">Documento (Nota Fiscal, Recibo, etc.)</label>
                         
-                        <!-- Input file customizado para mobile -->
-                        <div class="position-relative">
-                            <input type="file" name="documento" id="doc_arquivo" 
-                                   class="form-control form-control-solid d-none" 
-                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" 
-                                   required>
-                            
+                        <!-- Input file customizado -->
+                        <div class="position-relative" style="min-height: 56px;">
                             <!-- Botão customizado para mobile -->
-                            <label for="doc_arquivo" class="btn btn-primary w-100 d-lg-none" style="min-height: 50px; padding: 12px 20px; cursor: pointer;">
+                            <button type="button" id="btn_escolher_arquivo_mobile" class="btn btn-primary w-100 d-lg-none" style="min-height: 56px; padding: 12px 20px; position: relative; z-index: 1;">
                                 <i class="ki-duotone ki-file-up fs-2 me-2">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
                                 <span id="doc_arquivo_label_mobile">Escolher Arquivo</span>
-                            </label>
+                            </button>
                             
-                            <!-- Input padrão para desktop -->
-                            <label for="doc_arquivo" class="form-control form-control-solid d-none d-lg-block" style="cursor: pointer; padding: 12px 20px;">
+                            <!-- Input visual para desktop -->
+                            <div id="doc_arquivo_visual_desktop" class="form-control form-control-solid d-none d-lg-block" style="min-height: 50px; padding: 12px 20px; position: relative; z-index: 1;">
                                 <i class="ki-duotone ki-file-up fs-3 me-2 text-primary">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
                                 <span id="doc_arquivo_label_desktop">Clique para escolher arquivo ou arraste aqui</span>
-                            </label>
+                            </div>
+                            
+                            <!-- Input file real (invisível mas clicável) -->
+                            <input type="file" name="documento" id="doc_arquivo" 
+                                   class="form-control form-control-solid" 
+                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" 
+                                   required
+                                   style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2;">
                             
                             <!-- Nome do arquivo selecionado -->
                             <div id="doc_arquivo_nome" class="mt-2 text-gray-600 fw-semibold" style="display: none;">
@@ -653,46 +655,104 @@ require_once __DIR__ . '/../includes/header.php';
 function enviarDocumento(fechamentoId, itemId) {
     document.getElementById('doc_fechamento_id').value = fechamentoId;
     document.getElementById('doc_item_id').value = itemId;
-    document.getElementById('doc_arquivo').value = '';
+    
+    const fileInput = document.getElementById('doc_arquivo');
+    if (fileInput) {
+        fileInput.value = '';
+    }
     
     // Reseta labels
-    document.getElementById('doc_arquivo_label_mobile').textContent = 'Escolher Arquivo';
-    document.getElementById('doc_arquivo_label_desktop').textContent = 'Clique para escolher arquivo ou arraste aqui';
-    document.getElementById('doc_arquivo_nome').style.display = 'none';
+    const labelMobile = document.getElementById('doc_arquivo_label_mobile');
+    const labelDesktop = document.getElementById('doc_arquivo_label_desktop');
+    const nomeArquivo = document.getElementById('doc_arquivo_nome');
     
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_enviar_documento'));
+    if (labelMobile) labelMobile.textContent = 'Escolher Arquivo';
+    if (labelDesktop) labelDesktop.textContent = 'Clique para escolher arquivo ou arraste aqui';
+    if (nomeArquivo) nomeArquivo.style.display = 'none';
+    
+    const modalEl = document.getElementById('kt_modal_enviar_documento');
+    const modal = new bootstrap.Modal(modalEl);
+    
+    // Reseta flag quando modal é fechado
+    modalEl.addEventListener('hidden.bs.modal', function() {
+        inputArquivoConfigurado = false;
+    }, { once: true });
+    
     modal.show();
+    
+    // Configura eventos após o modal ser exibido
+    setTimeout(function() {
+        inputArquivoConfigurado = false;
+        configurarInputArquivo();
+    }, 300);
 }
 
-// Atualiza label quando arquivo é selecionado
-document.addEventListener('DOMContentLoaded', function() {
+// Variável para controlar se já foi configurado
+let inputArquivoConfigurado = false;
+
+// Configura eventos do input de arquivo
+function configurarInputArquivo() {
+    if (inputArquivoConfigurado) return;
+    
     const fileInput = document.getElementById('doc_arquivo');
+    const btnMobile = document.getElementById('btn_escolher_arquivo_mobile');
     const labelMobile = document.getElementById('doc_arquivo_label_mobile');
     const labelDesktop = document.getElementById('doc_arquivo_label_desktop');
     const nomeArquivo = document.getElementById('doc_arquivo_nome');
     const nomeArquivoTexto = document.getElementById('doc_arquivo_nome_texto');
     
-    if (fileInput) {
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const fileName = file.name;
-                const fileSize = (file.size / 1024 / 1024).toFixed(2); // MB
-                
-                // Atualiza labels
-                labelMobile.textContent = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName;
-                labelDesktop.textContent = fileName.length > 40 ? fileName.substring(0, 37) + '...' : fileName;
-                
-                // Mostra nome completo do arquivo
-                nomeArquivoTexto.textContent = `${fileName} (${fileSize} MB)`;
-                nomeArquivo.style.display = 'block';
-            } else {
-                labelMobile.textContent = 'Escolher Arquivo';
-                labelDesktop.textContent = 'Clique para escolher arquivo ou arraste aqui';
-                nomeArquivo.style.display = 'none';
-            }
+    if (!fileInput) return;
+    
+    // Faz o botão mobile acionar o input
+    if (btnMobile) {
+        btnMobile.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
         });
     }
+    
+    // Atualiza labels quando arquivo é selecionado
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const fileName = file.name;
+            const fileSize = (file.size / 1024 / 1024).toFixed(2); // MB
+            
+            // Atualiza labels
+            if (labelMobile) {
+                labelMobile.textContent = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName;
+            }
+            if (labelDesktop) {
+                labelDesktop.textContent = fileName.length > 40 ? fileName.substring(0, 37) + '...' : fileName;
+            }
+            
+            // Mostra nome completo do arquivo
+            if (nomeArquivoTexto) {
+                nomeArquivoTexto.textContent = `${fileName} (${fileSize} MB)`;
+            }
+            if (nomeArquivo) {
+                nomeArquivo.style.display = 'block';
+            }
+        } else {
+            if (labelMobile) {
+                labelMobile.textContent = 'Escolher Arquivo';
+            }
+            if (labelDesktop) {
+                labelDesktop.textContent = 'Clique para escolher arquivo ou arraste aqui';
+            }
+            if (nomeArquivo) {
+                nomeArquivo.style.display = 'none';
+            }
+        }
+    });
+    
+    inputArquivoConfigurado = true;
+}
+
+// Configura eventos na inicialização também (caso o modal já esteja no DOM)
+document.addEventListener('DOMContentLoaded', function() {
+    configurarInputArquivo();
 });
 
 // Ver detalhes completos do pagamento (colaborador)
@@ -1581,16 +1641,33 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
 }
 
 /* Melhora o input de arquivo no mobile */
-#doc_arquivo_label_mobile {
+#doc_arquivo {
+    position: absolute !important;
+    opacity: 0 !important;
+    width: 100% !important;
+    cursor: pointer !important;
+    z-index: 10 !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+#btn_escolher_arquivo_mobile {
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 16px;
     font-weight: 600;
     -webkit-tap-highlight-color: transparent;
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
 }
 
-#doc_arquivo_label_mobile:active {
+#btn_escolher_arquivo_mobile:active {
     opacity: 0.8;
     transform: scale(0.98);
 }
@@ -1605,13 +1682,31 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
 
 /* Melhora a área de toque no mobile */
 @media (max-width: 991px) {
-    #doc_arquivo_label_mobile {
+    #btn_escolher_arquivo_mobile {
         min-height: 56px;
         font-size: 18px;
     }
     
     #kt_modal_enviar_documento .modal-body {
         padding: 1.5rem;
+    }
+    
+    /* Garante que o input cubra toda a área do botão */
+    #doc_arquivo {
+        height: 56px !important;
+        min-height: 56px !important;
+    }
+}
+
+@media (min-width: 992px) {
+    /* No desktop, o input deve cobrir a área visual */
+    #doc_arquivo {
+        height: 50px !important;
+        min-height: 50px !important;
+    }
+    
+    #doc_arquivo_visual_desktop {
+        pointer-events: none;
     }
 }
 </style>
