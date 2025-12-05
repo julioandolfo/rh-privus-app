@@ -166,52 +166,93 @@ if ($formato === 'pdf') {
  * Gera PDF do fechamento
  */
 function gerar_pdf_fechamento($dados, $fechamento) {
-    $pdf = criar_pdf('Fechamento de Pagamento', 'RH Privus', 'Fechamento de Pagamento');
+    require_once __DIR__ . '/../vendor/autoload.php';
+    
+    // Cria PDF em modo paisagem (landscape)
+    $pdf = new TCPDF('L', PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+    
+    // Informações do documento
+    $pdf->SetCreator('RH Privus');
+    $pdf->SetAuthor('RH Privus');
+    $pdf->SetTitle('Fechamento de Pagamento');
+    $pdf->SetSubject('Fechamento de Pagamento');
+    
+    // Remove header e footer padrão
+    $pdf->setPrintHeader(false);
+    $pdf->setPrintFooter(false);
+    
+    // Configurações de margem (menores para aproveitar melhor o espaço)
+    $pdf->SetMargins(10, 15, 10);
+    $pdf->SetAutoPageBreak(TRUE, 15);
+    
+    // Adiciona página
     $pdf->AddPage();
     
     // Header
-    $pdf->SetFont('helvetica', 'B', 16);
-    $pdf->Cell(0, 10, 'Fechamento de Pagamento', 0, 1, 'C');
+    $pdf->SetFont('helvetica', 'B', 14);
+    $pdf->Cell(0, 8, 'Fechamento de Pagamento', 0, 1, 'C');
     
-    $pdf->SetFont('helvetica', '', 12);
+    $pdf->SetFont('helvetica', '', 11);
     $pdf->Cell(0, 5, $fechamento['empresa_nome'], 0, 1, 'C');
     $pdf->Cell(0, 5, 'Mês/Ano: ' . date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')), 0, 1, 'C');
-    $pdf->Ln(5);
+    $pdf->Ln(3);
+    
+    // Calcula larguras das colunas (total disponível ~277mm em landscape A4)
+    // Colaborador: 55mm, Data: 28mm, Mês: 22mm, CPF/CNPJ: 40mm, PIX: 70mm, Valor: 32mm
+    $w_colaborador = 55;
+    $w_data = 28;
+    $w_mes = 22;
+    $w_cpf_cnpj = 40;
+    $w_pix = 70;
+    $w_valor = 32;
     
     // Tabela
-    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->SetFont('helvetica', 'B', 8);
     $pdf->SetFillColor(230, 230, 230);
     
     // Cabeçalho
-    $pdf->Cell(50, 7, 'Colaborador', 1, 0, 'C', true);
-    $pdf->Cell(30, 7, 'Data Fechamento', 1, 0, 'C', true);
-    $pdf->Cell(25, 7, 'Mês Ref.', 1, 0, 'C', true);
-    $pdf->Cell(35, 7, 'CPF/CNPJ', 1, 0, 'C', true);
-    $pdf->Cell(60, 7, 'PIX/Dados Bancários', 1, 0, 'C', true);
-    $pdf->Cell(0, 7, 'Valor a Pagar', 1, 1, 'C', true);
+    $pdf->Cell($w_colaborador, 6, 'Colaborador', 1, 0, 'C', true);
+    $pdf->Cell($w_data, 6, 'Data Fech.', 1, 0, 'C', true);
+    $pdf->Cell($w_mes, 6, 'Mês Ref.', 1, 0, 'C', true);
+    $pdf->Cell($w_cpf_cnpj, 6, 'CPF/CNPJ', 1, 0, 'C', true);
+    $pdf->Cell($w_pix, 6, 'PIX/Dados Bancários', 1, 0, 'C', true);
+    $pdf->Cell($w_valor, 6, 'Valor a Pagar', 1, 1, 'C', true);
     
-    $pdf->SetFont('helvetica', '', 8);
+    $pdf->SetFont('helvetica', '', 7);
     $pdf->SetFillColor(255, 255, 255);
     
     $total_geral = 0;
     foreach ($dados as $item) {
-        $pdf->Cell(50, 6, substr($item['colaborador'], 0, 30), 1, 0, 'L');
-        $pdf->Cell(30, 6, $item['data_fechamento'], 1, 0, 'C');
-        $pdf->Cell(25, 6, $item['mes_referencia'], 1, 0, 'C');
-        $pdf->Cell(35, 6, $item['cpf_cnpj'] ?: '-', 1, 0, 'C');
-        $pdf->Cell(60, 6, substr($item['dados_pagamento'] ?: '-', 0, 40), 1, 0, 'L');
-        $pdf->Cell(0, 6, 'R$ ' . number_format($item['valor_pagar'], 2, ',', '.'), 1, 1, 'R');
+        // Trunca textos longos para caber nas colunas
+        $nome = $item['colaborador'];
+        if (strlen($nome) > 40) {
+            $nome = substr($nome, 0, 37) . '...';
+        }
+        
+        $pix_dados = $item['dados_pagamento'] ?: '-';
+        if (strlen($pix_dados) > 55) {
+            $pix_dados = substr($pix_dados, 0, 52) . '...';
+        }
+        
+        $pdf->Cell($w_colaborador, 5, $nome, 1, 0, 'L');
+        $pdf->Cell($w_data, 5, $item['data_fechamento'], 1, 0, 'C');
+        $pdf->Cell($w_mes, 5, $item['mes_referencia'], 1, 0, 'C');
+        $pdf->Cell($w_cpf_cnpj, 5, $item['cpf_cnpj'] ?: '-', 1, 0, 'C');
+        $pdf->Cell($w_pix, 5, $pix_dados, 1, 0, 'L');
+        $pdf->Cell($w_valor, 5, 'R$ ' . number_format($item['valor_pagar'], 2, ',', '.'), 1, 1, 'R');
         $total_geral += $item['valor_pagar'];
     }
     
     // Total
-    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->SetFont('helvetica', 'B', 8);
     $pdf->SetFillColor(200, 200, 200);
-    $pdf->Cell(200, 7, 'TOTAL', 1, 0, 'R', true);
-    $pdf->Cell(0, 7, 'R$ ' . number_format($total_geral, 2, ',', '.'), 1, 1, 'R', true);
+    $pdf->Cell($w_colaborador + $w_data + $w_mes + $w_cpf_cnpj + $w_pix, 6, 'TOTAL', 1, 0, 'R', true);
+    $pdf->Cell($w_valor, 6, 'R$ ' . number_format($total_geral, 2, ',', '.'), 1, 1, 'R', true);
     
     // Footer
-    adicionar_footer_pdf($pdf, 'Documento gerado automaticamente pelo sistema RH Privus');
+    $pdf->SetY(-15);
+    $pdf->SetFont('helvetica', 'I', 7);
+    $pdf->Cell(0, 10, 'Gerado em ' . date('d/m/Y H:i') . ' - RH Privus', 0, 0, 'C');
     
     $nome_arquivo = 'fechamento_' . date('Y-m', strtotime($fechamento['mes_referencia'] . '-01')) . '.pdf';
     $pdf->Output($nome_arquivo, 'D');
