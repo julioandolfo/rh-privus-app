@@ -531,7 +531,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <label class="required fw-semibold fs-6 mb-3">Documento (Nota Fiscal, Recibo, etc.)</label>
                         
                         <!-- Input file customizado -->
-                        <div class="position-relative" style="min-height: 56px;">
+                        <div class="position-relative" id="doc_arquivo_container">
                             <!-- Botão customizado para mobile -->
                             <button type="button" id="btn_escolher_arquivo_mobile" class="btn btn-primary w-100 d-lg-none" style="min-height: 56px; padding: 12px 20px; position: relative; z-index: 1;">
                                 <i class="ki-duotone ki-file-up fs-2 me-2">
@@ -542,7 +542,7 @@ require_once __DIR__ . '/../includes/header.php';
                             </button>
                             
                             <!-- Input visual para desktop -->
-                            <div id="doc_arquivo_visual_desktop" class="form-control form-control-solid d-none d-lg-block" style="min-height: 50px; padding: 12px 20px; position: relative; z-index: 1;">
+                            <div id="doc_arquivo_visual_desktop" class="form-control form-control-solid d-none d-lg-flex align-items-center" style="min-height: 50px; padding: 12px 20px; position: relative; z-index: 1;">
                                 <i class="ki-duotone ki-file-up fs-3 me-2 text-primary">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
@@ -555,7 +555,7 @@ require_once __DIR__ . '/../includes/header.php';
                                    class="form-control form-control-solid" 
                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" 
                                    required
-                                   style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2;">
+                                   style="position: absolute; top: 0; left: 0; width: 100%; opacity: 0; cursor: pointer; z-index: 2;">
                             
                             <!-- Nome do arquivo selecionado -->
                             <div id="doc_arquivo_nome" class="mt-2 text-gray-600 fw-semibold" style="display: none;">
@@ -564,6 +564,16 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="path2"></span>
                                 </i>
                                 <span id="doc_arquivo_nome_texto"></span>
+                            </div>
+                            
+                            <!-- Mensagem de erro -->
+                            <div id="doc_arquivo_erro" class="alert alert-danger mt-2" style="display: none;">
+                                <i class="ki-duotone ki-information-5 fs-5 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <span id="doc_arquivo_erro_texto"></span>
                             </div>
                         </div>
                         
@@ -670,12 +680,16 @@ function enviarDocumento(fechamentoId, itemId) {
     if (labelDesktop) labelDesktop.textContent = 'Clique para escolher arquivo ou arraste aqui';
     if (nomeArquivo) nomeArquivo.style.display = 'none';
     
+    // Esconde erros anteriores
+    esconderErroArquivo();
+    
     const modalEl = document.getElementById('kt_modal_enviar_documento');
     const modal = new bootstrap.Modal(modalEl);
     
     // Reseta flag quando modal é fechado
     modalEl.addEventListener('hidden.bs.modal', function() {
         inputArquivoConfigurado = false;
+        esconderErroArquivo();
     }, { once: true });
     
     modal.show();
@@ -690,6 +704,30 @@ function enviarDocumento(fechamentoId, itemId) {
 // Variável para controlar se já foi configurado
 let inputArquivoConfigurado = false;
 
+// Mostra mensagem de erro
+function mostrarErroArquivo(mensagem) {
+    const erroDiv = document.getElementById('doc_arquivo_erro');
+    const erroTexto = document.getElementById('doc_arquivo_erro_texto');
+    if (erroDiv && erroTexto) {
+        erroTexto.textContent = mensagem;
+        erroDiv.style.display = 'flex';
+        erroDiv.style.alignItems = 'center';
+        
+        // Remove o erro após 5 segundos
+        setTimeout(function() {
+            erroDiv.style.display = 'none';
+        }, 5000);
+    }
+}
+
+// Esconde mensagem de erro
+function esconderErroArquivo() {
+    const erroDiv = document.getElementById('doc_arquivo_erro');
+    if (erroDiv) {
+        erroDiv.style.display = 'none';
+    }
+}
+
 // Configura eventos do input de arquivo
 function configurarInputArquivo() {
     if (inputArquivoConfigurado) return;
@@ -703,21 +741,114 @@ function configurarInputArquivo() {
     
     if (!fileInput) return;
     
-    // Faz o botão mobile acionar o input
+    // Faz o botão mobile acionar o input com tratamento de erro
     if (btnMobile) {
         btnMobile.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            fileInput.click();
+            
+            // Esconde erros anteriores
+            esconderErroArquivo();
+            
+            // Verifica se estamos em mobile
+            const isMobile = window.innerWidth < 992;
+            
+            try {
+                // Tenta acionar o input
+                if (fileInput) {
+                    // Verifica se o input está visível/acessível
+                    const rect = fileInput.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) {
+                        mostrarErroArquivo('Erro: O campo de arquivo não está acessível. Tente atualizar a página.');
+                        return;
+                    }
+                    
+                    // Verifica se o input está desabilitado
+                    if (fileInput.disabled) {
+                        mostrarErroArquivo('Erro: O campo de arquivo está desabilitado.');
+                        return;
+                    }
+                    
+                    // Tenta focar no input primeiro (pode ajudar em alguns navegadores mobile)
+                    try {
+                        fileInput.focus();
+                    } catch (focusError) {
+                        console.warn('Não foi possível focar no input:', focusError);
+                    }
+                    
+                    // Tenta clicar no input
+                    fileInput.click();
+                    
+                    // No mobile, verifica após um tempo se o diálogo foi aberto
+                    if (isMobile) {
+                        let dialogAberto = false;
+                        const checkInterval = setInterval(function() {
+                            // Se o input recebeu foco ou mudou, o diálogo foi aberto
+                            if (document.activeElement === fileInput || fileInput.files.length > 0) {
+                                dialogAberto = true;
+                                clearInterval(checkInterval);
+                            }
+                        }, 50);
+                        
+                        // Após 500ms, se não detectou abertura, mostra aviso
+                        setTimeout(function() {
+                            clearInterval(checkInterval);
+                            if (!dialogAberto && fileInput.files.length === 0) {
+                                mostrarErroArquivo('Não foi possível abrir o seletor de arquivos. Verifique se o navegador tem permissão para acessar arquivos ou tente tocar diretamente na área do botão.');
+                            }
+                        }, 500);
+                    }
+                } else {
+                    mostrarErroArquivo('Erro: Campo de arquivo não encontrado. Tente atualizar a página.');
+                }
+            } catch (error) {
+                console.error('Erro ao acionar input de arquivo:', error);
+                
+                // Mensagens específicas baseadas no tipo de erro
+                let mensagemErro = '';
+                if (error.name === 'SecurityError' || error.message.includes('permission') || error.message.includes('Permission')) {
+                    mensagemErro = 'Erro de permissão: O navegador bloqueou o acesso aos arquivos. ';
+                    if (isMobile) {
+                        mensagemErro += 'No mobile, verifique as configurações de permissão do navegador nas configurações do dispositivo ou tente usar outro navegador (Chrome, Firefox).';
+                    } else {
+                        mensagemErro += 'Verifique as configurações de permissão do navegador ou tente usar outro navegador.';
+                    }
+                } else if (error.name === 'InvalidStateError') {
+                    mensagemErro = 'Erro: O campo de arquivo está em estado inválido. Tente atualizar a página.';
+                } else {
+                    mensagemErro = 'Erro ao abrir seletor de arquivos: ' + (error.message || 'Erro desconhecido') + '. ';
+                    if (isMobile) {
+                        mensagemErro += 'Tente atualizar a página ou usar outro navegador.';
+                    } else {
+                        mensagemErro += 'Tente atualizar a página.';
+                    }
+                }
+                
+                mostrarErroArquivo(mensagemErro);
+            }
         });
     }
     
+    // Também adiciona listener direto no input para detectar problemas
+    fileInput.addEventListener('click', function(e) {
+        esconderErroArquivo();
+    });
+    
     // Atualiza labels quando arquivo é selecionado
     fileInput.addEventListener('change', function(e) {
+        esconderErroArquivo();
+        
         const file = e.target.files[0];
         if (file) {
             const fileName = file.name;
             const fileSize = (file.size / 1024 / 1024).toFixed(2); // MB
+            
+            // Verifica tamanho do arquivo
+            if (file.size > 10 * 1024 * 1024) {
+                mostrarErroArquivo('Arquivo muito grande! O tamanho máximo é 10MB. Arquivo selecionado: ' + fileSize + 'MB');
+                fileInput.value = '';
+                return;
+            }
             
             // Atualiza labels
             if (labelMobile) {
@@ -745,6 +876,11 @@ function configurarInputArquivo() {
                 nomeArquivo.style.display = 'none';
             }
         }
+    });
+    
+    // Detecta se o input não está funcionando após tentativa
+    fileInput.addEventListener('focus', function() {
+        esconderErroArquivo();
     });
     
     inputArquivoConfigurado = true;
@@ -1640,7 +1776,18 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
     }
 }
 
-/* Melhora o input de arquivo no mobile */
+/* Container do input de arquivo */
+#doc_arquivo_container {
+    min-height: 56px;
+}
+
+@media (min-width: 992px) {
+    #doc_arquivo_container {
+        min-height: 50px;
+    }
+}
+
+/* Melhora o input de arquivo */
 #doc_arquivo {
     position: absolute !important;
     opacity: 0 !important;
@@ -1672,14 +1819,6 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
     transform: scale(0.98);
 }
 
-/* Garante que o label desktop também seja clicável */
-#doc_arquivo_label_desktop {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 50px;
-}
-
 /* Melhora a área de toque no mobile */
 @media (max-width: 991px) {
     #btn_escolher_arquivo_mobile {
@@ -1691,7 +1830,7 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
         padding: 1.5rem;
     }
     
-    /* Garante que o input cubra toda a área do botão */
+    /* Garante que o input cubra toda a área do botão no mobile */
     #doc_arquivo {
         height: 56px !important;
         min-height: 56px !important;
@@ -1699,14 +1838,43 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
 }
 
 @media (min-width: 992px) {
-    /* No desktop, o input deve cobrir a área visual */
+    /* No desktop, o input deve cobrir apenas a área visual do form-control */
     #doc_arquivo {
         height: 50px !important;
         min-height: 50px !important;
     }
     
+    /* Garante que o div visual não interfira com o clique */
     #doc_arquivo_visual_desktop {
         pointer-events: none;
+    }
+    
+    /* Garante que o div visual tenha altura correta */
+    #doc_arquivo_visual_desktop {
+        min-height: 50px;
+        height: 50px;
+    }
+}
+
+/* Estilo da mensagem de erro */
+#doc_arquivo_erro {
+    display: none;
+    align-items: center;
+    padding: 12px 16px;
+    margin-top: 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 </style>
