@@ -2502,6 +2502,31 @@ require_once __DIR__ . '/../includes/header.php';
                         </button>
                     </form>
                     <?php endif; ?>
+                    <div class="btn-group ms-2">
+                        <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="ki-duotone ki-file-down fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Exportar
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="exportarFechamento(<?= $fechamento_view['id'] ?>, 'pdf'); return false;">
+                                <i class="ki-duotone ki-file-pdf fs-2 text-danger me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Exportar PDF
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportarFechamento(<?= $fechamento_view['id'] ?>, 'xls'); return false;">
+                                <i class="ki-duotone ki-file fs-2 text-success me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Exportar XLS
+                            </a></li>
+                        </ul>
+                    </div>
                     <button type="button" class="btn btn-danger ms-2" onclick="deletarFechamento(<?= $fechamento_view['id'] ?>, '<?= date('m/Y', strtotime($fechamento_view['mes_referencia'] . '-01')) ?>')">
                         <i class="ki-duotone ki-trash fs-2">
                             <span class="path1"></span>
@@ -5671,6 +5696,32 @@ function deletarFechamento(id, mesAno) {
             form.innerHTML = '<input type="hidden" name="action" value="delete"><input type="hidden" name="fechamento_id" value="' + id + '">';
             document.body.appendChild(form);
             form.submit();
+        }
+    });
+}
+
+// Exportar fechamento
+function exportarFechamento(fechamentoId, formato) {
+    Swal.fire({
+        title: 'Exportar Fechamento',
+        text: 'Deseja exportar todos os itens (incluindo pendentes) ou apenas os aprovados?',
+        icon: 'question',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'Todos',
+        denyButtonText: 'Apenas Aprovados',
+        cancelButtonText: 'Cancelar',
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: "btn fw-bold btn-primary",
+            denyButton: "btn fw-bold btn-success",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then(function(result) {
+        if (result.isConfirmed || result.isDenied) {
+            const apenasAprovados = result.isDenied ? '1' : '0';
+            const url = `exportar_fechamento.php?id=${fechamentoId}&formato=${formato}&apenas_aprovados=${apenasAprovados}`;
+            window.open(url, '_blank');
         }
     });
 }
