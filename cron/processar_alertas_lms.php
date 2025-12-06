@@ -10,6 +10,11 @@
  * 0 */6 * * * /usr/bin/php /caminho/para/rh-privus/cron/processar_alertas_lms.php
  */
 
+// Ativa exibição de erros para debug
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/lms_obrigatorios.php';
 require_once __DIR__ . '/../includes/lms_functions.php';
