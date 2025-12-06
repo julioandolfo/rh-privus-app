@@ -9,21 +9,41 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/manual_conduta_functions.php';
 
-// Função helper para destacar termo (se não estiver na functions)
-if (!function_exists('destacar_termo')) {
-    function destacar_termo($texto, $termo) {
+// Função helper para destacar termo em HTML (preserva tags HTML)
+if (!function_exists('destacar_termo_html')) {
+    function destacar_termo_html($html, $termo) {
         if (empty($termo)) {
-            return htmlspecialchars($texto);
+            return $html;
+        }
+        
+        // Extrai apenas o texto visível (sem tags) para verificar se o termo existe
+        $texto_sem_tags = strip_tags($html);
+        if (stripos($texto_sem_tags, $termo) === false) {
+            return $html; // Termo não encontrado
         }
         
         $termo_escaped = preg_quote($termo, '/');
-        $texto_escaped = htmlspecialchars($texto);
         
-        return preg_replace(
-            '/(' . $termo_escaped . ')/i',
-            '<mark class="bg-warning">$1</mark>',
-            $texto_escaped
-        );
+        // Processa o HTML preservando tags
+        // Divide em partes: tags HTML e texto
+        $partes = preg_split('/(<[^>]+>)/', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+        $resultado = '';
+        
+        foreach ($partes as $parte) {
+            // Se é uma tag HTML, adiciona sem modificar
+            if (preg_match('/^<[^>]+>$/', $parte)) {
+                $resultado .= $parte;
+            } else {
+                // Se é texto, destaca o termo
+                $resultado .= preg_replace(
+                    '/(' . $termo_escaped . ')/i',
+                    '<mark class="bg-warning">$1</mark>',
+                    $parte
+                );
+            }
+        }
+        
+        return $resultado;
     }
 }
 
@@ -211,9 +231,9 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="fw-bold text-gray-800" id="pergunta_<?= $faq_id ?>">
                                     <?php 
                                     if ($termo_busca) {
-                                        echo destacar_termo($faq['pergunta'], $termo_busca);
+                                        echo destacar_termo_html($faq['pergunta'], $termo_busca);
                                     } else {
-                                        echo htmlspecialchars($faq['pergunta']);
+                                        echo $faq['pergunta'];
                                     }
                                     ?>
                                 </span>
@@ -225,9 +245,9 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="text-gray-700 mb-5" id="resposta_<?= $faq_id ?>">
                                     <?php 
                                     if ($termo_busca) {
-                                        echo nl2br(destacar_termo($faq['resposta'], $termo_busca));
+                                        echo destacar_termo_html($faq['resposta'], $termo_busca);
                                     } else {
-                                        echo nl2br(htmlspecialchars($faq['resposta']));
+                                        echo $faq['resposta'];
                                     }
                                     ?>
                                 </div>
