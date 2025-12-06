@@ -170,50 +170,26 @@ function require_login() {
         
         // Se URL é relativa, converte para absoluta se necessário
         if (strpos($loginUrl, 'http') !== 0) {
-            // Usa get_base_url() se disponível para detectar automaticamente o caminho
-            if (function_exists('get_base_url')) {
-                $baseUrl = get_base_url();
-                // Se loginUrl já começa com /, usa direto
-                if (strpos($loginUrl, '/') === 0) {
-                    $loginUrl = $baseUrl . $loginUrl;
-                } else {
-                    // Se é relativa (ex: login.php ou ../login.php), resolve
-                    if (strpos($loginUrl, '../') === 0) {
-                        // Remove ../ e adiciona base URL
-                        $loginUrl = str_replace('../', '', $loginUrl);
-                        $loginUrl = $baseUrl . '/' . $loginUrl;
-                    } else {
-                        // Relativa ao diretório atual
-                        $loginUrl = $baseUrl . '/' . $loginUrl;
-                    }
-                }
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'];
+            $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
+            
+            // Remove /rh-privus ou /rh do caminho se necessário
+            $scriptPath = str_replace(['/rh-privus', '/rh'], '', $scriptPath);
+            $scriptPath = rtrim($scriptPath, '/');
+            
+            // Se loginUrl já começa com /, usa direto
+            if (strpos($loginUrl, '/') === 0) {
+                $loginUrl = $protocol . '://' . $host . $loginUrl;
             } else {
-                // Fallback: detecta manualmente
-                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                $host = $_SERVER['HTTP_HOST'];
-                $requestUri = $_SERVER['REQUEST_URI'] ?? '';
-                $requestUri = strtok($requestUri, '?');
-                
-                // Detecta se está em /rh-privus/ (localhost) ou /rh/ (produção)
-                if (strpos($requestUri, '/rh-privus') !== false) {
-                    $basePath = '/rh-privus';
+                // Se é relativa (ex: login.php ou ../login.php), resolve
+                if (strpos($loginUrl, '../') === 0) {
+                    // Remove ../ e adiciona /rh/
+                    $loginUrl = str_replace('../', '', $loginUrl);
+                    $loginUrl = $protocol . '://' . $host . '/rh/' . $loginUrl;
                 } else {
-                    $basePath = '/rh';
-                }
-                
-                // Se loginUrl já começa com /, usa direto
-                if (strpos($loginUrl, '/') === 0) {
-                    $loginUrl = $protocol . '://' . $host . $loginUrl;
-                } else {
-                    // Se é relativa (ex: login.php ou ../login.php), resolve
-                    if (strpos($loginUrl, '../') === 0) {
-                        // Remove ../ e adiciona base path
-                        $loginUrl = str_replace('../', '', $loginUrl);
-                        $loginUrl = $protocol . '://' . $host . $basePath . '/' . $loginUrl;
-                    } else {
-                        // Relativa ao diretório atual
-                        $loginUrl = $protocol . '://' . $host . $basePath . '/' . $loginUrl;
-                    }
+                    // Relativa ao diretório atual
+                    $loginUrl = $protocol . '://' . $host . '/rh/' . $loginUrl;
                 }
             }
         }

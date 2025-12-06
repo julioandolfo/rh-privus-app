@@ -198,6 +198,88 @@ function getIcon($name) {
                 <!--end:Menu item-->
                 <?php endif; ?>
                 
+                <!--begin:Menu item - Manual de Conduta-->
+                <?php if (can_access_page('manual_conduta_view.php') || can_access_page('faq_view.php')): ?>
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('manual_conduta_view.php') || isActive('faq_view.php') || isActive('manual_conduta_edit.php') || isActive('faq_edit.php')) ? 'here show' : '' ?>">
+                    <!--begin:Menu link-->
+                    <span class="menu-link">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-document fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Manual de Conduta</span>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <!--end:Menu link-->
+                    <!--begin:Menu sub-->
+                    <div class="menu-sub menu-sub-accordion">
+                        <?php if (can_access_page('manual_conduta_view.php')): ?>
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('manual_conduta_view.php') ?>" href="manual_conduta_view.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Conduta Privus</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <?php endif; ?>
+                        
+                        <?php if (can_access_page('faq_view.php')): ?>
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('faq_view.php') ?>" href="faq_view.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">FAQ</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <?php endif; ?>
+                        
+                        <?php if (has_role(['ADMIN'])): ?>
+                        <!--begin:Menu separator-->
+                        <div class="separator my-2"></div>
+                        <!--end:Menu separator-->
+                        
+                        <?php if (can_access_page('manual_conduta_edit.php')): ?>
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('manual_conduta_edit.php') ?>" href="manual_conduta_edit.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Editar Conduta</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <?php endif; ?>
+                        
+                        <?php if (can_access_page('faq_edit.php')): ?>
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('faq_edit.php') ?>" href="faq_edit.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Editar FAQ</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                    <!--end:Menu sub-->
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <?php 
                 // Verifica se há menus de desenvolvimento para ADMIN/RH
                 $tem_desenvolvimento_admin = false;

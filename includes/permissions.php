@@ -217,6 +217,16 @@ function get_page_permissions() {
         
         // Configurações Autentique - apenas ADMIN
         'configuracoes_autentique.php' => ['ADMIN'],
+        
+        // Manual de Conduta - todos podem visualizar
+        'manual_conduta_view.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'faq_view.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        
+        // Edição Manual de Conduta - apenas ADMIN
+        'manual_conduta_edit.php' => ['ADMIN'],
+        'faq_edit.php' => ['ADMIN'],
+        'manual_conduta_estatisticas.php' => ['ADMIN'],
+        'manual_conduta_exportar_pdf.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
     ];
     
     // Carrega permissões customizadas (se existir)
