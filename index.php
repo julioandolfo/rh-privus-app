@@ -57,10 +57,25 @@ try {
     header('Expires: 0');
     
     // Em caso de erro, redireciona para login
-    // Usa URL absoluta para evitar problemas
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    $loginUrl = $protocol . '://' . $host . '/rh/login.php';
+    // Usa função que detecta automaticamente o caminho base (/rh-privus ou /rh)
+    if (function_exists('get_base_url')) {
+        $loginUrl = get_base_url() . '/login.php';
+    } else {
+        // Fallback: detecta manualmente
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'];
+        $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+        $requestUri = strtok($requestUri, '?');
+        
+        // Detecta se está em /rh-privus/ (localhost) ou /rh/ (produção)
+        if (strpos($requestUri, '/rh-privus') !== false) {
+            $basePath = '/rh-privus';
+        } else {
+            $basePath = '/rh';
+        }
+        
+        $loginUrl = $protocol . '://' . $host . $basePath . '/login.php';
+    }
     
     header('Location: ' . $loginUrl, true, 302);
     exit;
@@ -74,9 +89,25 @@ try {
     header('Expires: 0');
     
     // Em caso de erro fatal, redireciona para login
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    $loginUrl = $protocol . '://' . $host . '/rh/login.php';
+    // Usa função que detecta automaticamente o caminho base (/rh-privus ou /rh)
+    if (function_exists('get_base_url')) {
+        $loginUrl = get_base_url() . '/login.php';
+    } else {
+        // Fallback: detecta manualmente
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'];
+        $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+        $requestUri = strtok($requestUri, '?');
+        
+        // Detecta se está em /rh-privus/ (localhost) ou /rh/ (produção)
+        if (strpos($requestUri, '/rh-privus') !== false) {
+            $basePath = '/rh-privus';
+        } else {
+            $basePath = '/rh';
+        }
+        
+        $loginUrl = $protocol . '://' . $host . $basePath . '/login.php';
+    }
     
     header('Location: ' . $loginUrl, true, 302);
     exit;
