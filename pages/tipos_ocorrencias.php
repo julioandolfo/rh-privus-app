@@ -1510,7 +1510,8 @@ function carregarValidacoes(validacoesJson) {
     }
 }
 
-function editarTipoOcorrencia(tipo) {
+// Função global para editar tipo de ocorrência (deve estar fora do escopo do módulo)
+window.editarTipoOcorrencia = function(tipo) {
     document.getElementById('kt_modal_tipo_ocorrencia_header').querySelector('h2').textContent = 'Editar Tipo de Ocorrência';
     document.getElementById('tipo_ocorrencia_action').value = 'edit';
     document.getElementById('tipo_ocorrencia_id').value = tipo.id;
@@ -1606,7 +1607,7 @@ function editarTipoOcorrencia(tipo) {
     
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_tipo_ocorrencia'));
     modal.show();
-}
+};
 
 function toggleCampoValorDesconto() {
     const calculaDesconto = document.getElementById('calcula_desconto').checked;
