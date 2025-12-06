@@ -7,7 +7,7 @@
  * 0 * * * * /usr/bin/php /caminho/para/rh-privus/cron/processar_alertas_lms.php
  * 
  * Ou a cada 6 horas:
- * 0 */6 * * * /usr/bin/php /caminho/para/rh-privus/cron/processar_alertas_lms.php
+ * 0 *\/6 * * * /usr/bin/php /caminho/para/rh-privus/cron/processar_alertas_lms.php
  */
 
 // Ativa exibição de erros para debug (ANTES de qualquer include)
@@ -15,15 +15,24 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// Headers para exibir erros mesmo via web
+if (php_sapi_name() !== 'cli') {
+    header('Content-Type: text/plain; charset=utf-8');
+    http_response_code(200); // Evita erro 500 antes de mostrar o erro real
+}
+
 // Desabilita output buffering para ver erros imediatamente
-if (ob_get_level()) {
+while (ob_get_level()) {
     ob_end_clean();
 }
 
-// Captura erros fatais
+// Captura erros fatais ANTES de qualquer include
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (php_sapi_name() !== 'cli') {
+            header('Content-Type: text/plain; charset=utf-8');
+        }
         echo "\n\n=== ERRO FATAL CAPTURADO ===\n";
         echo "Tipo: " . $error['type'] . "\n";
         echo "Mensagem: " . $error['message'] . "\n";
