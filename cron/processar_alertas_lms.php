@@ -10,14 +10,65 @@
  * 0 */6 * * * /usr/bin/php /caminho/para/rh-privus/cron/processar_alertas_lms.php
  */
 
-// Ativa exibição de erros para debug
+// Ativa exibição de erros para debug (ANTES de qualquer include)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-require_once __DIR__ . '/../includes/functions.php';
-require_once __DIR__ . '/../includes/lms_obrigatorios.php';
-require_once __DIR__ . '/../includes/lms_functions.php';
+// Desabilita output buffering para ver erros imediatamente
+if (ob_get_level()) {
+    ob_end_clean();
+}
+
+// Captura erros fatais
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        echo "\n\n=== ERRO FATAL CAPTURADO ===\n";
+        echo "Tipo: " . $error['type'] . "\n";
+        echo "Mensagem: " . $error['message'] . "\n";
+        echo "Arquivo: " . $error['file'] . "\n";
+        echo "Linha: " . $error['line'] . "\n";
+        echo "===========================\n";
+        exit(1);
+    }
+});
+
+// Handler de erros customizado
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    echo "\n=== ERRO ===\n";
+    echo "Nível: " . $errno . "\n";
+    echo "Mensagem: " . $errstr . "\n";
+    echo "Arquivo: " . $errfile . "\n";
+    echo "Linha: " . $errline . "\n";
+    echo "===========\n";
+    return false; // Continua execução normal
+});
+
+echo "Iniciando carregamento de arquivos...\n";
+
+try {
+    echo "Carregando functions.php...\n";
+    require_once __DIR__ . '/../includes/functions.php';
+    echo "OK - functions.php carregado\n";
+    
+    echo "Carregando lms_obrigatorios.php...\n";
+    require_once __DIR__ . '/../includes/lms_obrigatorios.php';
+    echo "OK - lms_obrigatorios.php carregado\n";
+    
+    echo "Carregando lms_functions.php...\n";
+    require_once __DIR__ . '/../includes/lms_functions.php';
+    echo "OK - lms_functions.php carregado\n";
+    
+} catch (Throwable $e) {
+    echo "\n=== ERRO ao carregar arquivos ===\n";
+    echo "Mensagem: " . $e->getMessage() . "\n";
+    echo "Arquivo: " . $e->getFile() . "\n";
+    echo "Linha: " . $e->getLine() . "\n";
+    echo "Trace:\n" . $e->getTraceAsString() . "\n";
+    echo "==================================\n";
+    exit(1);
+}
 
 // Define timezone
 date_default_timezone_set('America/Sao_Paulo');
