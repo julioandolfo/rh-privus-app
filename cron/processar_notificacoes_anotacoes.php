@@ -16,6 +16,9 @@ date_default_timezone_set('America/Sao_Paulo');
 try {
     $pdo = getDB();
     
+    echo "=== PROCESSAMENTO DE NOTIFICAÇÕES DE ANOTAÇÕES ===\n";
+    echo "Data/Hora: " . date('Y-m-d H:i:s') . "\n\n";
+    
     // Busca anotações com notificação agendada que ainda não foram enviadas
     $agora = date('Y-m-d H:i:s');
     
@@ -31,15 +34,28 @@ try {
     $stmt->execute([$agora]);
     $anotacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    if (empty($anotacoes)) {
+        echo "Nenhuma anotação pendente para processar.\n";
+        exit(0);
+    }
+    
+    echo "Anotações encontradas: " . count($anotacoes) . "\n\n";
+    
     $processadas = 0;
     $erros = 0;
     
     foreach ($anotacoes as $anotacao) {
         try {
             $result = enviar_notificacoes_anotacao($anotacao['id'], $pdo);
-            if ($result) {
+            if ($result && (is_array($result) ? $result['success'] : $result)) {
                 $processadas++;
-                echo "Anotação #{$anotacao['id']} processada com sucesso\n";
+                $enviados_email = is_array($result) ? ($result['enviados_email'] ?? 0) : 0;
+                $enviados_push = is_array($result) ? ($result['enviados_push'] ?? 0) : 0;
+                echo "Anotação #{$anotacao['id']} processada com sucesso";
+                if ($enviados_email > 0 || $enviados_push > 0) {
+                    echo " (Email: {$enviados_email}, Push: {$enviados_push})";
+                }
+                echo "\n";
             } else {
                 $erros++;
                 echo "Erro ao processar anotação #{$anotacao['id']}\n";
@@ -47,13 +63,16 @@ try {
         } catch (Exception $e) {
             $erros++;
             echo "Erro ao processar anotação #{$anotacao['id']}: " . $e->getMessage() . "\n";
+            error_log("Erro ao processar anotação #{$anotacao['id']}: " . $e->getMessage());
         }
     }
     
-    echo "Processamento concluído: $processadas processadas, $erros erros\n";
+    echo "\nProcessamento concluído: $processadas processadas, $erros erros\n";
     
 } catch (Exception $e) {
-    echo "Erro fatal: " . $e->getMessage() . "\n";
+    echo "ERRO FATAL: " . $e->getMessage() . "\n";
+    echo "Trace: " . $e->getTraceAsString() . "\n";
+    error_log("Erro fatal em processar_notificacoes_anotacoes: " . $e->getMessage());
     exit(1);
 }
 

@@ -666,3 +666,373 @@ function processar_campos_dinamicos($tipo_ocorrencia_id, $campos) {
     }
 }
 
+/**
+ * ============================================
+ * SISTEMA DE FLAGS AUTOMÁTICAS
+ * ============================================
+ */
+
+/**
+ * Cria uma flag automaticamente quando uma ocorrência é registrada
+ * @param int $ocorrencia_id ID da ocorrência
+ * @param int $usuario_id ID do usuário que criou a ocorrência
+ * @return array Resultado da operação
+ */
+function criar_flag_automatica($ocorrencia_id, $usuario_id) {
+    $pdo = getDB();
+    
+    try {
+        // Busca dados da ocorrência
+        $stmt = $pdo->prepare("
+            SELECT o.*, t.gera_flag, t.tipo_flag, c.id as colaborador_id
+            FROM ocorrencias o
+            INNER JOIN tipos_ocorrencias t ON o.tipo_ocorrencia_id = t.id
+            INNER JOIN colaboradores c ON o.colaborador_id = c.id
+            WHERE o.id = ?
+        ");
+        $stmt->execute([$ocorrencia_id]);
+        $ocorrencia = $stmt->fetch();
+        
+        if (!$ocorrencia || !$ocorrencia['gera_flag'] || !$ocorrencia['tipo_flag']) {
+            return ['success' => false, 'message' => 'Este tipo de ocorrência não gera flag'];
+        }
+        
+        // Verifica se a ocorrência está aprovada (flags só são criadas para ocorrências aprovadas)
+        if ($ocorrencia['status_aprovacao'] !== 'aprovada') {
+            return ['success' => false, 'message' => 'Flag será criada após aprovação da ocorrência'];
+        }
+        
+        // Verifica se já existe flag para esta ocorrência
+        $stmt_check = $pdo->prepare("SELECT id FROM ocorrencias_flags WHERE ocorrencia_id = ?");
+        $stmt_check->execute([$ocorrencia_id]);
+        if ($stmt_check->fetch()) {
+            return ['success' => false, 'message' => 'Flag já existe para esta ocorrência'];
+        }
+        
+        // Calcula data de validade (30 dias corridos a partir da data da ocorrência)
+        $data_flag = $ocorrencia['data_ocorrencia'];
+        
+        // Verifica se colaborador tem flags ativas - se tiver, renova todas para contar juntas
+        verificar_renovacao_flags($ocorrencia['colaborador_id'], $usuario_id);
+        
+        // Busca a nova validade (pode ter sido renovada pela função acima)
+        $stmt_validade = $pdo->prepare("
+            SELECT MAX(data_validade) as max_validade
+            FROM ocorrencias_flags
+            WHERE colaborador_id = ? AND status = 'ativa' AND data_validade >= CURDATE()
+        ");
+        $stmt_validade->execute([$ocorrencia['colaborador_id']]);
+        $result_validade = $stmt_validade->fetch();
+        
+        // Se tem flags ativas, usa a validade renovada, senão cria nova validade
+        if ($result_validade['max_validade']) {
+            $data_validade = $result_validade['max_validade'];
+        } else {
+            $data_validade = date('Y-m-d', strtotime($data_flag . ' +30 days'));
+        }
+        
+        // Insere a flag
+        $stmt = $pdo->prepare("
+            INSERT INTO ocorrencias_flags 
+            (colaborador_id, ocorrencia_id, tipo_flag, data_flag, data_validade, status, created_by)
+            VALUES (?, ?, ?, ?, ?, 'ativa', ?)
+        ");
+        $stmt->execute([
+            $ocorrencia['colaborador_id'],
+            $ocorrencia_id,
+            $ocorrencia['tipo_flag'],
+            $data_flag,
+            $data_validade,
+            $usuario_id
+        ]);
+        
+        $flag_id = $pdo->lastInsertId();
+        
+        // Registra histórico
+        registrar_historico_flag($flag_id, 'criada', $usuario_id, 'Flag criada automaticamente pela ocorrência');
+        
+        // Verifica se atingiu 3 flags ativas (mas não desliga automaticamente)
+        $flags_ativas = contar_flags_ativas($ocorrencia['colaborador_id']);
+        
+        return [
+            'success' => true,
+            'flag_id' => $flag_id,
+            'flags_ativas' => $flags_ativas,
+            'message' => $flags_ativas >= 3 
+                ? 'Flag criada! ATENÇÃO: Colaborador possui 3 ou mais flags ativas.' 
+                : 'Flag criada com sucesso'
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Erro ao criar flag automática: " . $e->getMessage());
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+/**
+ * Conta quantas flags ativas um colaborador possui
+ * @param int $colaborador_id ID do colaborador
+ * @return int Número de flags ativas
+ */
+function contar_flags_ativas($colaborador_id) {
+    $pdo = getDB();
+    
+    // Verifica e expira flags vencidas apenas deste colaborador (otimizado)
+    // Nota: Para melhor performance, recomenda-se executar cron diariamente
+    verificar_expiracao_flags($colaborador_id);
+    
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as total
+        FROM ocorrencias_flags
+        WHERE colaborador_id = ? AND status = 'ativa' AND data_validade >= CURDATE()
+    ");
+    $stmt->execute([$colaborador_id]);
+    $result = $stmt->fetch();
+    
+    return (int)$result['total'];
+}
+
+/**
+ * Busca todas as flags ativas de um colaborador
+ * @param int $colaborador_id ID do colaborador
+ * @return array Lista de flags ativas
+ */
+function get_flags_ativas($colaborador_id) {
+    $pdo = getDB();
+    
+    // Verifica e expira flags vencidas apenas deste colaborador (otimizado)
+    // Nota: Para melhor performance, recomenda-se executar cron diariamente
+    verificar_expiracao_flags($colaborador_id);
+    
+    $stmt = $pdo->prepare("
+        SELECT f.*, 
+               o.descricao as ocorrencia_descricao,
+               o.data_ocorrencia,
+               t.nome as tipo_ocorrencia_nome,
+               u.nome as created_by_nome
+        FROM ocorrencias_flags f
+        INNER JOIN ocorrencias o ON f.ocorrencia_id = o.id
+        LEFT JOIN tipos_ocorrencias t ON o.tipo_ocorrencia_id = t.id
+        LEFT JOIN usuarios u ON f.created_by = u.id
+        WHERE f.colaborador_id = ? 
+        AND f.status = 'ativa' 
+        AND f.data_validade >= CURDATE()
+        ORDER BY f.data_flag DESC, f.data_validade ASC
+    ");
+    $stmt->execute([$colaborador_id]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Busca todas as flags (ativas e expiradas) de um colaborador
+ * @param int $colaborador_id ID do colaborador
+ * @param string $status Filtro por status ('ativa', 'expirada' ou null para todas)
+ * @return array Lista de flags
+ */
+function get_flags_colaborador($colaborador_id, $status = null) {
+    $pdo = getDB();
+    
+    $sql = "
+        SELECT f.*, 
+               o.descricao as ocorrencia_descricao,
+               o.data_ocorrencia,
+               t.nome as tipo_ocorrencia_nome,
+               u.nome as created_by_nome
+        FROM ocorrencias_flags f
+        INNER JOIN ocorrencias o ON f.ocorrencia_id = o.id
+        LEFT JOIN tipos_ocorrencias t ON o.tipo_ocorrencia_id = t.id
+        LEFT JOIN usuarios u ON f.created_by = u.id
+        WHERE f.colaborador_id = ?
+    ";
+    
+    $params = [$colaborador_id];
+    
+    if ($status) {
+        $sql .= " AND f.status = ?";
+        $params[] = $status;
+    }
+    
+    $sql .= " ORDER BY f.data_flag DESC, f.data_validade ASC";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Verifica e expira flags vencidas para um colaborador (ou todos)
+ * @param int|null $colaborador_id ID do colaborador (null para verificar todos)
+ * @return int Número de flags expiradas
+ */
+function verificar_expiracao_flags($colaborador_id = null) {
+    $pdo = getDB();
+    
+    $sql = "
+        UPDATE ocorrencias_flags 
+        SET status = 'expirada', updated_at = NOW()
+        WHERE status = 'ativa' 
+        AND data_validade < CURDATE()
+    ";
+    
+    $params = [];
+    if ($colaborador_id) {
+        $sql .= " AND colaborador_id = ?";
+        $params[] = $colaborador_id;
+    }
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $flags_expiradas = $stmt->rowCount();
+    
+    // Registra histórico das flags expiradas
+    if ($flags_expiradas > 0) {
+        $sql_historico = "
+            INSERT INTO ocorrencias_flags_historico (flag_id, acao, usuario_id, observacoes)
+            SELECT id, 'expirada', 1, 'Flag expirada automaticamente'
+            FROM ocorrencias_flags
+            WHERE status = 'expirada' 
+            AND data_validade < CURDATE()
+        ";
+        
+        if ($colaborador_id) {
+            $sql_historico .= " AND colaborador_id = ?";
+        }
+        
+        $stmt_historico = $pdo->prepare($sql_historico);
+        $stmt_historico->execute($params);
+    }
+    
+    return $flags_expiradas;
+}
+
+/**
+ * Registra histórico de uma flag
+ * @param int $flag_id ID da flag
+ * @param string $acao Ação realizada ('criada', 'expirada', 'renovada', 'cancelada')
+ * @param int $usuario_id ID do usuário
+ * @param string|null $observacoes Observações
+ */
+function registrar_historico_flag($flag_id, $acao, $usuario_id, $observacoes = null) {
+    $pdo = getDB();
+    
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO ocorrencias_flags_historico (flag_id, acao, usuario_id, observacoes)
+            VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([$flag_id, $acao, $usuario_id, $observacoes]);
+    } catch (Exception $e) {
+        error_log("Erro ao registrar histórico de flag: " . $e->getMessage());
+    }
+}
+
+/**
+ * Renova validade de uma flag (adiciona 30 dias a partir de hoje)
+ * Usado quando colaborador recebe nova flag enquanto outra está ativa
+ * @param int $flag_id ID da flag
+ * @param int $usuario_id ID do usuário que está renovando
+ * @return array Resultado da operação
+ */
+function renovar_validade_flag($flag_id, $usuario_id) {
+    $pdo = getDB();
+    
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM ocorrencias_flags WHERE id = ?");
+        $stmt->execute([$flag_id]);
+        $flag = $stmt->fetch();
+        
+        if (!$flag) {
+            return ['success' => false, 'message' => 'Flag não encontrada'];
+        }
+        
+        // Calcula nova validade (30 dias a partir de hoje)
+        $nova_validade = date('Y-m-d', strtotime('+30 days'));
+        
+        $stmt = $pdo->prepare("
+            UPDATE ocorrencias_flags 
+            SET data_validade = ?, status = 'ativa', updated_at = NOW()
+            WHERE id = ?
+        ");
+        $stmt->execute([$nova_validade, $flag_id]);
+        
+        registrar_historico_flag($flag_id, 'renovada', $usuario_id, "Validade renovada até {$nova_validade}");
+        
+        return ['success' => true, 'nova_validade' => $nova_validade];
+        
+    } catch (Exception $e) {
+        error_log("Erro ao renovar validade de flag: " . $e->getMessage());
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+/**
+ * Verifica se deve renovar validade de flags existentes ao criar nova flag
+ * Se colaborador tem flags ativas, renova todas para contar juntas
+ * @param int $colaborador_id ID do colaborador
+ * @param int $usuario_id ID do usuário
+ */
+function verificar_renovacao_flags($colaborador_id, $usuario_id) {
+    $pdo = getDB();
+    
+    // Busca flags ativas do colaborador
+    $stmt = $pdo->prepare("
+        SELECT id FROM ocorrencias_flags
+        WHERE colaborador_id = ? 
+        AND status = 'ativa' 
+        AND data_validade >= CURDATE()
+    ");
+    $stmt->execute([$colaborador_id]);
+    $flags_ativas = $stmt->fetchAll();
+    
+    // Se tem flags ativas, renova todas para contar juntas
+    if (count($flags_ativas) > 0) {
+        $nova_validade = date('Y-m-d', strtotime('+30 days'));
+        
+        foreach ($flags_ativas as $flag) {
+            $stmt_update = $pdo->prepare("
+                UPDATE ocorrencias_flags 
+                SET data_validade = ?, updated_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt_update->execute([$nova_validade, $flag['id']]);
+            
+            registrar_historico_flag(
+                $flag['id'], 
+                'renovada', 
+                $usuario_id, 
+                "Validade renovada para contar junto com nova flag (válido até {$nova_validade})"
+            );
+        }
+    }
+}
+
+/**
+ * Obtém label do tipo de flag
+ * @param string $tipo_flag Tipo da flag
+ * @return string Label formatado
+ */
+function get_label_tipo_flag($tipo_flag) {
+    $labels = [
+        'falta_nao_justificada' => 'Falta Não Justificada',
+        'falta_compromisso_pessoal' => 'Falta por Compromisso Pessoal',
+        'ma_conduta' => 'Má Conduta'
+    ];
+    
+    return $labels[$tipo_flag] ?? $tipo_flag;
+}
+
+/**
+ * Obtém cor do badge para tipo de flag
+ * @param string $tipo_flag Tipo da flag
+ * @return string Classe CSS do badge
+ */
+function get_cor_badge_flag($tipo_flag) {
+    $cores = [
+        'falta_nao_justificada' => 'danger',
+        'falta_compromisso_pessoal' => 'warning',
+        'ma_conduta' => 'danger'
+    ];
+    
+    return $cores[$tipo_flag] ?? 'secondary';
+}
+

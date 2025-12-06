@@ -116,6 +116,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Registra histórico
         registrar_historico_ocorrencia($ocorrencia_id, 'criada', $usuario['id'], null, null, null, 'Ocorrência rápida criada');
         
+        // Cria flag automática se o tipo de ocorrência gerar flag
+        // Só cria se a ocorrência estiver aprovada
+        if ($status_aprovacao === 'aprovada') {
+            $resultado_flag = criar_flag_automatica($ocorrencia_id, $usuario['id']);
+            if ($resultado_flag['success'] && isset($resultado_flag['flags_ativas']) && $resultado_flag['flags_ativas'] >= 3) {
+                // Log de alerta (mas não desliga automaticamente)
+                error_log("ALERTA: Colaborador ID {$colaborador_id} possui 3 ou mais flags ativas");
+            }
+        }
+        
         // Envia notificações básicas
         $stmt_colab = $pdo->prepare("SELECT nome_completo, usuario_id FROM colaboradores WHERE id = ?");
         $stmt_colab->execute([$colaborador_id]);

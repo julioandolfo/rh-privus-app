@@ -12,6 +12,7 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/lms_obrigatorios.php';
+require_once __DIR__ . '/../includes/lms_functions.php';
 
 // Define timezone
 date_default_timezone_set('America/Sao_Paulo');
@@ -25,11 +26,21 @@ try {
     // Processa alertas agendados
     $resultado = processar_alertas_agendados();
     
-    echo "Alertas processados: {$resultado['processados']}\n";
-    echo "Erros: {$resultado['erros']}\n";
+    if (is_array($resultado) && isset($resultado['processados']) && isset($resultado['erros'])) {
+        echo "Alertas processados: {$resultado['processados']}\n";
+        echo "Erros: {$resultado['erros']}\n";
+    } else {
+        echo "Alertas processados: 0\n";
+        echo "Erros: 0\n";
+    }
     
     // Atualiza status de cursos obrigatórios baseado no progresso
-    atualizar_status_cursos_obrigatorios();
+    try {
+        atualizar_status_cursos_obrigatorios();
+    } catch (Exception $e) {
+        echo "Aviso ao atualizar status de cursos: " . $e->getMessage() . "\n";
+        error_log("Erro ao atualizar status de cursos obrigatórios: " . $e->getMessage());
+    }
     
     echo "\nProcessamento concluído com sucesso!\n";
     

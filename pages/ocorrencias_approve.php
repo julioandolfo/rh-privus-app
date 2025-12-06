@@ -71,6 +71,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 verificar_advertencias_progressivas($ocorrencia['colaborador_id'], $ocorrencia['tipo_ocorrencia_id']);
             }
             
+            // Cria flag automática se o tipo de ocorrência gerar flag
+            $resultado_flag = criar_flag_automatica($ocorrencia_id, $usuario['id']);
+            if ($resultado_flag['success'] && isset($resultado_flag['flags_ativas']) && $resultado_flag['flags_ativas'] >= 3) {
+                // Log de alerta (mas não desliga automaticamente)
+                error_log("ALERTA: Colaborador ID {$ocorrencia['colaborador_id']} possui 3 ou mais flags ativas");
+            }
+            
             // Envia notificações
             enviar_notificacoes_ocorrencia($ocorrencia_id);
             

@@ -7,6 +7,7 @@ $page_title = 'Visualizar Colaborador';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/ocorrencias_functions.php';
 
 require_page_permission('colaborador_view.php');
 
@@ -43,6 +44,10 @@ if (!$colaborador) {
 if (!can_access_colaborador($id)) {
     redirect('dashboard.php', 'Você não tem permissão para visualizar este colaborador.', 'error');
 }
+
+// Busca flags ativas do colaborador
+$flags_ativas = get_flags_ativas($id);
+$total_flags_ativas = count($flags_ativas);
 
 // Busca ocorrências do colaborador
 $stmt = $pdo->prepare("
@@ -411,6 +416,14 @@ require_once __DIR__ . '/../includes/header.php';
                                             <span class="badge badge-light-<?= $colaborador['status'] === 'ativo' ? 'success' : ($colaborador['status'] === 'pausado' ? 'warning' : 'secondary') ?>">
                                                 <?= ucfirst($colaborador['status']) ?>
                                             </span>
+                                            <?php if ($total_flags_ativas > 0): ?>
+                                            <a href="flags_view.php?colaborador_id=<?= $id ?>&status=ativa" class="badge badge-<?= $total_flags_ativas >= 3 ? 'danger' : ($total_flags_ativas >= 2 ? 'warning' : 'info') ?>">
+                                                🚩 <?= $total_flags_ativas ?> Flag<?= $total_flags_ativas > 1 ? 's' : '' ?> Ativa<?= $total_flags_ativas > 1 ? 's' : '' ?>
+                                                <?php if ($total_flags_ativas >= 3): ?>
+                                                <span class="ms-1">⚠️</span>
+                                                <?php endif; ?>
+                                            </a>
+                                            <?php endif; ?>
                                         </div>
                                         
                                         <!-- Liderança -->

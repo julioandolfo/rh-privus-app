@@ -1188,6 +1188,18 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('flags_view.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('flags_view.php') ?>" href="flags_view.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Flags</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
                         </div>
                         <!--end:Menu sub-->
                     </div>
@@ -1540,6 +1552,22 @@ function getIcon($name) {
                             </i>
                         </span>
                         <span class="menu-title">Minhas Ocorrências</span>
+                    </a>
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
+                <!--begin:Menu item - Minhas Flags (apenas para colaboradores)-->
+                <?php if (is_colaborador() && can_access_page('flags_view.php')): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('flags_view.php') ?>" href="flags_view.php">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-flag fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Minhas Flags</span>
                     </a>
                 </div>
                 <!--end:Menu item-->

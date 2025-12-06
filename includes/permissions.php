@@ -73,6 +73,7 @@ function get_page_permissions() {
         'categorias_ocorrencias.php' => ['ADMIN', 'RH'],
         'relatorio_ocorrencias_avancado.php' => ['ADMIN', 'RH', 'GESTOR'],
         'tipos_ocorrencias.php' => ['ADMIN', 'RH'],
+        'flags_view.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         
         // Pagamentos - colaborador
         'meus_pagamentos.php' => ['COLABORADOR'],
