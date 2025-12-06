@@ -3,6 +3,15 @@
  * API: Busca campos dinâmicos de um tipo de ocorrência
  */
 
+// Previne output de erros antes do JSON
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
+// Inicia sessão se não estiver iniciada
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
@@ -31,7 +40,12 @@ try {
     $campos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode(['success' => true, 'campos' => $campos]);
+    exit;
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Erro ao buscar campos: ' . $e->getMessage()]);
+    exit;
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+    exit;
 }
 

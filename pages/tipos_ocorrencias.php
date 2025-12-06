@@ -1510,104 +1510,6 @@ function carregarValidacoes(validacoesJson) {
     }
 }
 
-// Função global para editar tipo de ocorrência (deve estar fora do escopo do módulo)
-window.editarTipoOcorrencia = function(tipo) {
-    document.getElementById('kt_modal_tipo_ocorrencia_header').querySelector('h2').textContent = 'Editar Tipo de Ocorrência';
-    document.getElementById('tipo_ocorrencia_action').value = 'edit';
-    document.getElementById('tipo_ocorrencia_id').value = tipo.id;
-    document.getElementById('nome').value = tipo.nome || '';
-    document.getElementById('codigo').value = tipo.codigo || '';
-    document.getElementById('categoria_id').value = tipo.categoria_id || '';
-    // Atualiza campo oculto categoria para compatibilidade
-    var categoriaSelect = document.getElementById('categoria_id');
-    if (categoriaSelect.selectedOptions.length > 0) {
-        document.getElementById('categoria').value = categoriaSelect.selectedOptions[0].dataset.codigo || '';
-    }
-    document.getElementById('severidade').value = tipo.severidade || 'moderada';
-    document.getElementById('status').value = tipo.status || 'ativo';
-    document.getElementById('template_descricao').value = tipo.template_descricao || '';
-    document.getElementById('permite_tempo_atraso').checked = tipo.permite_tempo_atraso == 1;
-    document.getElementById('permite_tipo_ponto').checked = tipo.permite_tipo_ponto == 1;
-    const permiteHorarios = document.getElementById('permite_horarios');
-    if (permiteHorarios) {
-        permiteHorarios.checked = (tipo.permite_horarios == 1 || tipo.permite_horarios === '1');
-    }
-    document.getElementById('requer_aprovacao').checked = tipo.requer_aprovacao == 1;
-    document.getElementById('conta_advertencia').checked = tipo.conta_advertencia == 1;
-    document.getElementById('calcula_desconto').checked = tipo.calcula_desconto == 1;
-    const permiteDescontoBanco = document.getElementById('permite_desconto_banco_horas');
-    if (permiteDescontoBanco) {
-        permiteDescontoBanco.checked = (tipo.permite_desconto_banco_horas == 1 || tipo.permite_desconto_banco_horas === '1');
-    }
-    const permiteOcorrenciaRapida = document.getElementById('permite_ocorrencia_rapida');
-    const geraFlag = document.getElementById('gera_flag');
-    if (geraFlag) {
-        geraFlag.checked = (tipo.gera_flag == 1 || tipo.gera_flag === '1');
-        toggleCampoTipoFlag();
-    }
-    const tipoFlag = document.getElementById('tipo_flag');
-    if (tipoFlag && tipo.tipo_flag) {
-        tipoFlag.value = tipo.tipo_flag;
-    }
-    if (permiteOcorrenciaRapida) {
-        permiteOcorrenciaRapida.checked = (tipo.permite_ocorrencia_rapida == 1 || tipo.permite_ocorrencia_rapida === '1');
-    }
-    const permiteConsiderarDiaInteiro = document.getElementById('permite_considerar_dia_inteiro');
-    if (permiteConsiderarDiaInteiro) {
-        permiteConsiderarDiaInteiro.checked = (tipo.permite_considerar_dia_inteiro == 1 || tipo.permite_considerar_dia_inteiro === '1');
-    }
-    const geraFlag = document.getElementById('gera_flag');
-    if (geraFlag) {
-        geraFlag.checked = (tipo.gera_flag == 1 || tipo.gera_flag === '1');
-        toggleCampoTipoFlag();
-    }
-    const tipoFlag = document.getElementById('tipo_flag');
-    if (tipoFlag && tipo.tipo_flag) {
-        tipoFlag.value = tipo.tipo_flag;
-    }
-    document.getElementById('valor_desconto').value = tipo.valor_desconto || '';
-    document.getElementById('notificar_colaborador').checked = tipo.notificar_colaborador != 0;
-    document.getElementById('notificar_colaborador_sistema').checked = tipo.notificar_colaborador_sistema != 0;
-    document.getElementById('notificar_colaborador_email').checked = tipo.notificar_colaborador_email != 0;
-    document.getElementById('notificar_colaborador_push').checked = tipo.notificar_colaborador_push != 0;
-    document.getElementById('notificar_gestor').checked = tipo.notificar_gestor != 0;
-    document.getElementById('notificar_gestor_sistema').checked = tipo.notificar_gestor_sistema != 0;
-    document.getElementById('notificar_gestor_email').checked = tipo.notificar_gestor_email != 0;
-    document.getElementById('notificar_gestor_push').checked = tipo.notificar_gestor_push != 0;
-    document.getElementById('notificar_rh').checked = tipo.notificar_rh != 0;
-    document.getElementById('notificar_rh_sistema').checked = tipo.notificar_rh_sistema != 0;
-    document.getElementById('notificar_rh_email').checked = tipo.notificar_rh_email != 0;
-    document.getElementById('notificar_rh_push').checked = tipo.notificar_rh_push != 0;
-    
-    // Atualiza estados dos checkboxes de canais
-    setTimeout(function() {
-        var notificarColab = document.getElementById('notificar_colaborador');
-        var notificarGestor = document.getElementById('notificar_gestor');
-        var notificarRh = document.getElementById('notificar_rh');
-        
-        if (notificarColab && typeof toggleCanaisNotificacao === 'function') {
-            toggleCanaisNotificacao(notificarColab, 'notificar_colaborador');
-        }
-        if (notificarGestor && typeof toggleCanaisNotificacao === 'function') {
-            toggleCanaisNotificacao(notificarGestor, 'notificar_gestor');
-        }
-        if (notificarRh && typeof toggleCanaisNotificacao === 'function') {
-            toggleCanaisNotificacao(notificarRh, 'notificar_rh');
-        }
-    }, 200);
-    
-    // Carrega validações de forma visual
-    carregarValidacoes(tipo.validacoes_customizadas);
-    
-    // Mostra/esconde campo de valor desconto
-    toggleCampoValorDesconto();
-    
-    // Carrega campos dinâmicos
-    carregarCamposDinamicos(tipo.id);
-    
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_tipo_ocorrencia'));
-    modal.show();
-};
 
 function toggleCampoValorDesconto() {
     const calculaDesconto = document.getElementById('calcula_desconto').checked;
@@ -1616,21 +1518,39 @@ function toggleCampoValorDesconto() {
 
 function carregarCamposDinamicos(tipoId) {
     // Limpa container
-    document.getElementById('campos_dinamicos_container').innerHTML = '';
+    const container = document.getElementById('campos_dinamicos_container');
+    if (!container) return;
+    container.innerHTML = '';
     camposDinamicosCount = 0;
     
+    // Se não tem tipoId, não faz nada
+    if (!tipoId) return;
+    
     // Busca campos via AJAX
-    fetch(`api/ocorrencias/get_campos_dinamicos.php?tipo_id=${tipoId}`)
-        .then(response => response.json())
+    fetch(`../api/ocorrencias/get_campos_dinamicos.php?tipo_id=${tipoId}`)
+        .then(response => {
+            // Verifica se a resposta é JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                return response.text().then(text => {
+                    throw new Error('Resposta não é JSON. A API pode estar retornando um erro HTML.');
+                });
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.success && data.campos) {
+            if (data.success && data.campos && Array.isArray(data.campos)) {
                 data.campos.forEach(campo => {
                     adicionarCampoDinamico(campo);
                 });
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar campos dinâmicos:', error);
+            // Não mostra erro para o usuário se não houver campos (é normal quando não há campos cadastrados)
+            // Só loga no console para debug
+            if (error.message && !error.message.includes('JSON')) {
+                console.error('Erro ao carregar campos dinâmicos:', error);
+            }
         });
 }
 
@@ -1795,6 +1715,103 @@ document.getElementById('kt_modal_tipo_ocorrencia').addEventListener('shown.bs.m
         if (notificarRh) toggleCanaisNotificacao(notificarRh, 'notificar_rh');
     }, 100);
 });
+</script>
+
+<!-- Funções globais para editar tipos de ocorrências -->
+<script>
+// Função global para editar tipo de ocorrência (garantir escopo global)
+window.editarTipoOcorrencia = function(tipo) {
+    document.getElementById('kt_modal_tipo_ocorrencia_header').querySelector('h2').textContent = 'Editar Tipo de Ocorrência';
+    document.getElementById('tipo_ocorrencia_action').value = 'edit';
+    document.getElementById('tipo_ocorrencia_id').value = tipo.id;
+    document.getElementById('nome').value = tipo.nome || '';
+    document.getElementById('codigo').value = tipo.codigo || '';
+    document.getElementById('categoria_id').value = tipo.categoria_id || '';
+    // Atualiza campo oculto categoria para compatibilidade
+    var categoriaSelect = document.getElementById('categoria_id');
+    if (categoriaSelect.selectedOptions.length > 0) {
+        document.getElementById('categoria').value = categoriaSelect.selectedOptions[0].dataset.codigo || '';
+    }
+    document.getElementById('severidade').value = tipo.severidade || 'moderada';
+    document.getElementById('status').value = tipo.status || 'ativo';
+    document.getElementById('template_descricao').value = tipo.template_descricao || '';
+    document.getElementById('permite_tempo_atraso').checked = tipo.permite_tempo_atraso == 1;
+    document.getElementById('permite_tipo_ponto').checked = tipo.permite_tipo_ponto == 1;
+    const permiteHorarios = document.getElementById('permite_horarios');
+    if (permiteHorarios) {
+        permiteHorarios.checked = (tipo.permite_horarios == 1 || tipo.permite_horarios === '1');
+    }
+    document.getElementById('requer_aprovacao').checked = tipo.requer_aprovacao == 1;
+    document.getElementById('conta_advertencia').checked = tipo.conta_advertencia == 1;
+    document.getElementById('calcula_desconto').checked = tipo.calcula_desconto == 1;
+    const permiteDescontoBanco = document.getElementById('permite_desconto_banco_horas');
+    if (permiteDescontoBanco) {
+        permiteDescontoBanco.checked = (tipo.permite_desconto_banco_horas == 1 || tipo.permite_desconto_banco_horas === '1');
+    }
+    const permiteOcorrenciaRapida = document.getElementById('permite_ocorrencia_rapida');
+    if (permiteOcorrenciaRapida) {
+        permiteOcorrenciaRapida.checked = (tipo.permite_ocorrencia_rapida == 1 || tipo.permite_ocorrencia_rapida === '1');
+    }
+    const permiteConsiderarDiaInteiro = document.getElementById('permite_considerar_dia_inteiro');
+    if (permiteConsiderarDiaInteiro) {
+        permiteConsiderarDiaInteiro.checked = (tipo.permite_considerar_dia_inteiro == 1 || tipo.permite_considerar_dia_inteiro === '1');
+    }
+    const geraFlag = document.getElementById('gera_flag');
+    if (geraFlag) {
+        geraFlag.checked = (tipo.gera_flag == 1 || tipo.gera_flag === '1');
+        toggleCampoTipoFlag();
+    }
+    const tipoFlag = document.getElementById('tipo_flag');
+    if (tipoFlag && tipo.tipo_flag) {
+        tipoFlag.value = tipo.tipo_flag;
+    }
+    document.getElementById('valor_desconto').value = tipo.valor_desconto || '';
+    document.getElementById('notificar_colaborador').checked = tipo.notificar_colaborador != 0;
+    document.getElementById('notificar_colaborador_sistema').checked = tipo.notificar_colaborador_sistema != 0;
+    document.getElementById('notificar_colaborador_email').checked = tipo.notificar_colaborador_email != 0;
+    document.getElementById('notificar_colaborador_push').checked = tipo.notificar_colaborador_push != 0;
+    document.getElementById('notificar_gestor').checked = tipo.notificar_gestor != 0;
+    document.getElementById('notificar_gestor_sistema').checked = tipo.notificar_gestor_sistema != 0;
+    document.getElementById('notificar_gestor_email').checked = tipo.notificar_gestor_email != 0;
+    document.getElementById('notificar_gestor_push').checked = tipo.notificar_gestor_push != 0;
+    document.getElementById('notificar_rh').checked = tipo.notificar_rh != 0;
+    document.getElementById('notificar_rh_sistema').checked = tipo.notificar_rh_sistema != 0;
+    document.getElementById('notificar_rh_email').checked = tipo.notificar_rh_email != 0;
+    document.getElementById('notificar_rh_push').checked = tipo.notificar_rh_push != 0;
+    
+    setTimeout(function() {
+        var notificarColab = document.getElementById('notificar_colaborador');
+        var notificarGestor = document.getElementById('notificar_gestor');
+        var notificarRh = document.getElementById('notificar_rh');
+        
+        if (notificarColab && typeof toggleCanaisNotificacao === 'function') {
+            toggleCanaisNotificacao(notificarColab, 'notificar_colaborador');
+        }
+        if (notificarGestor && typeof toggleCanaisNotificacao === 'function') {
+            toggleCanaisNotificacao(notificarGestor, 'notificar_gestor');
+        }
+        if (notificarRh && typeof toggleCanaisNotificacao === 'function') {
+            toggleCanaisNotificacao(notificarRh, 'notificar_rh');
+        }
+    }, 200);
+    
+    // Carrega validações de forma visual
+    carregarValidacoes(tipo.validacoes_customizadas);
+    
+    // Mostra/esconde campo de valor desconto
+    toggleCampoValorDesconto();
+    
+    // Carrega campos dinâmicos
+    carregarCamposDinamicos(tipo.id);
+    
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_tipo_ocorrencia'));
+    modal.show();
+};
+
+// Também disponibiliza como função normal para compatibilidade
+function editarTipoOcorrencia(tipo) {
+    window.editarTipoOcorrencia(tipo);
+}
 </script>
 
 <!--begin::Tutorial System-->
