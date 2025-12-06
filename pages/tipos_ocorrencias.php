@@ -59,6 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $permite_desconto_banco_horas = isset($_POST['permite_desconto_banco_horas']) ? 1 : 0;
         $permite_ocorrencia_rapida = isset($_POST['permite_ocorrencia_rapida']) ? 1 : 0;
         $permite_considerar_dia_inteiro = isset($_POST['permite_considerar_dia_inteiro']) ? 1 : 0;
+        $gera_flag = isset($_POST['gera_flag']) ? 1 : 0;
+        $tipo_flag = !empty($_POST['tipo_flag']) ? $_POST['tipo_flag'] : null;
         $valor_desconto = !empty($_POST['valor_desconto']) ? (float)$_POST['valor_desconto'] : null;
         $template_descricao = sanitize($_POST['template_descricao'] ?? '');
         
@@ -93,6 +95,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('tipos_ocorrencias.php', 'Erro ao gerar código. Tente novamente.', 'error');
         }
         
+        // Validação: Se gera_flag está marcado, tipo_flag é obrigatório
+        if ($gera_flag && empty($tipo_flag)) {
+            redirect('tipos_ocorrencias.php', 'Se o tipo de ocorrência gera flag, você deve selecionar o tipo de flag!', 'error');
+        }
+        
+        // Se tipo_flag foi informado mas gera_flag não está marcado, desmarca tipo_flag
+        if (!$gera_flag && !empty($tipo_flag)) {
+            $tipo_flag = null;
+        }
+        
         // Valida código único
         try {
             if ($action === 'add') {
@@ -109,8 +121,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      template_descricao, validacoes_customizadas, notificar_colaborador, 
                      notificar_colaborador_sistema, notificar_colaborador_email, notificar_colaborador_push,
                      notificar_gestor, notificar_gestor_sistema, notificar_gestor_email, notificar_gestor_push,
-                     notificar_rh, notificar_rh_sistema, notificar_rh_email, notificar_rh_push, status) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     notificar_rh, notificar_rh_sistema, notificar_rh_email, notificar_rh_push, gera_flag, tipo_flag, status) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $nome, $codigo, $categoria, $categoria_id, $severidade, $permite_tempo_atraso, $permite_tipo_ponto, $permite_horarios,
@@ -118,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $template_descricao, $validacoes_customizadas, $notificar_colaborador,
                     $notificar_colaborador_sistema, $notificar_colaborador_email, $notificar_colaborador_push,
                     $notificar_gestor, $notificar_gestor_sistema, $notificar_gestor_email, $notificar_gestor_push,
-                    $notificar_rh, $notificar_rh_sistema, $notificar_rh_email, $notificar_rh_push, $status
+                    $notificar_rh, $notificar_rh_sistema, $notificar_rh_email, $notificar_rh_push, $gera_flag, $tipo_flag, $status
                 ]);
                 
                 $tipo_id = $pdo->lastInsertId();
@@ -147,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     valor_desconto = ?, template_descricao = ?, validacoes_customizadas = ?,
                     notificar_colaborador = ?, notificar_colaborador_sistema = ?, notificar_colaborador_email = ?, notificar_colaborador_push = ?,
                     notificar_gestor = ?, notificar_gestor_sistema = ?, notificar_gestor_email = ?, notificar_gestor_push = ?,
-                    notificar_rh = ?, notificar_rh_sistema = ?, notificar_rh_email = ?, notificar_rh_push = ?, status = ?
+                    notificar_rh = ?, notificar_rh_sistema = ?, notificar_rh_email = ?, notificar_rh_push = ?, gera_flag = ?, tipo_flag = ?, status = ?
                     WHERE id = ?
                 ");
                 $stmt->execute([
@@ -156,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $template_descricao, $validacoes_customizadas, $notificar_colaborador,
                     $notificar_colaborador_sistema, $notificar_colaborador_email, $notificar_colaborador_push,
                     $notificar_gestor, $notificar_gestor_sistema, $notificar_gestor_email, $notificar_gestor_push,
-                    $notificar_rh, $notificar_rh_sistema, $notificar_rh_email, $notificar_rh_push, $status, $id
+                    $notificar_rh, $notificar_rh_sistema, $notificar_rh_email, $notificar_rh_push, $gera_flag, $tipo_flag, $status, $id
                 ]);
                 
                 // Processa campos dinâmicos
@@ -732,6 +744,55 @@ require_once __DIR__ . '/../includes/header.php';
                                             <p class="text-gray-600 mt-2 mb-0">
                                                 <strong>Importante:</strong> Tipos que requerem muitos campos específicos (como tempo de atraso, tipo de ponto, etc.) geralmente não devem ser marcados para ocorrências rápidas.
                                             </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Campo: Gera Flag -->
+                            <div class="row mb-7">
+                                <div class="col-md-12">
+                                    <div class="card card-flush bg-light-danger mb-5">
+                                        <div class="card-header">
+                                            <div class="card-title">
+                                                <div class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="gera_flag" id="gera_flag" value="1" />
+                                                    <label class="form-check-label fw-bold fs-5" for="gera_flag">
+                                                        🚩 Gera Flag Automática
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="text-gray-700 mb-0">
+                                                <strong>Como funciona:</strong> Quando marcado, ao criar e aprovar uma ocorrência deste tipo, o sistema criará automaticamente uma flag disciplinar para o colaborador. Cada flag tem validade de 30 dias corridos.
+                                            </p>
+                                            <p class="text-gray-600 mt-2 mb-0">
+                                                <strong>Quando usar:</strong> Marque esta opção para tipos de ocorrências que devem gerar flags disciplinares conforme as regras de conduta da empresa (ex: Faltas não justificadas, Má conduta).
+                                            </p>
+                                            <div class="alert alert-danger mt-4 mb-0">
+                                                <strong>⚠️ Importante:</strong> 
+                                                <ul class="mb-0 mt-2">
+                                                    <li>Flags são criadas <strong>apenas quando a ocorrência é aprovada</strong>.</li>
+                                                    <li>Se o colaborador receber uma nova flag enquanto outra está ativa, <strong>todas as flags ativas são renovadas</strong> para contar juntas.</li>
+                                                    <li>Se o colaborador atingir <strong>3 flags ativas simultaneamente</strong>, o sistema emitirá um alerta visual, mas <strong>não desliga automaticamente</strong>.</li>
+                                                </ul>
+                                            </div>
+                                            <div class="mt-5" id="campo_tipo_flag" style="display: none;">
+                                                <label class="fw-semibold fs-6 mb-2">Tipo de Flag</label>
+                                                <select name="tipo_flag" id="tipo_flag" class="form-select form-select-solid">
+                                                    <option value="">Selecione o tipo de flag...</option>
+                                                    <option value="falta_nao_justificada">Falta Não Justificada</option>
+                                                    <option value="falta_compromisso_pessoal">Falta por Compromisso Pessoal</option>
+                                                    <option value="ma_conduta">Má Conduta</option>
+                                                </select>
+                                                <small class="text-muted">
+                                                    <strong>Tipos disponíveis:</strong>
+                                                    <br>• <strong>Falta Não Justificada:</strong> Para faltas sem aviso prévio ou sem justificativa aceita
+                                                    <br>• <strong>Falta por Compromisso Pessoal:</strong> Para faltas não autorizadas previamente
+                                                    <br>• <strong>Má Conduta:</strong> Para atitudes inadequadas, desrespeitosas ou prejudiciais
+                                                </small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1478,12 +1539,30 @@ function editarTipoOcorrencia(tipo) {
         permiteDescontoBanco.checked = (tipo.permite_desconto_banco_horas == 1 || tipo.permite_desconto_banco_horas === '1');
     }
     const permiteOcorrenciaRapida = document.getElementById('permite_ocorrencia_rapida');
+    const geraFlag = document.getElementById('gera_flag');
+    if (geraFlag) {
+        geraFlag.checked = (tipo.gera_flag == 1 || tipo.gera_flag === '1');
+        toggleCampoTipoFlag();
+    }
+    const tipoFlag = document.getElementById('tipo_flag');
+    if (tipoFlag && tipo.tipo_flag) {
+        tipoFlag.value = tipo.tipo_flag;
+    }
     if (permiteOcorrenciaRapida) {
         permiteOcorrenciaRapida.checked = (tipo.permite_ocorrencia_rapida == 1 || tipo.permite_ocorrencia_rapida === '1');
     }
     const permiteConsiderarDiaInteiro = document.getElementById('permite_considerar_dia_inteiro');
     if (permiteConsiderarDiaInteiro) {
         permiteConsiderarDiaInteiro.checked = (tipo.permite_considerar_dia_inteiro == 1 || tipo.permite_considerar_dia_inteiro === '1');
+    }
+    const geraFlag = document.getElementById('gera_flag');
+    if (geraFlag) {
+        geraFlag.checked = (tipo.gera_flag == 1 || tipo.gera_flag === '1');
+        toggleCampoTipoFlag();
+    }
+    const tipoFlag = document.getElementById('tipo_flag');
+    if (tipoFlag && tipo.tipo_flag) {
+        tipoFlag.value = tipo.tipo_flag;
     }
     document.getElementById('valor_desconto').value = tipo.valor_desconto || '';
     document.getElementById('notificar_colaborador').checked = tipo.notificar_colaborador != 0;
@@ -1557,8 +1636,45 @@ function carregarCamposDinamicos(tipoId) {
 // Event listeners
 document.getElementById('calcula_desconto').addEventListener('change', toggleCampoValorDesconto);
 
+// Toggle campo tipo_flag quando gera_flag é marcado/desmarcado
+function toggleCampoTipoFlag() {
+    const geraFlag = document.getElementById('gera_flag').checked;
+    const campoTipoFlag = document.getElementById('campo_tipo_flag');
+    if (campoTipoFlag) {
+        campoTipoFlag.style.display = geraFlag ? 'block' : 'none';
+        if (!geraFlag) {
+            document.getElementById('tipo_flag').value = '';
+        }
+    }
+}
+
+const geraFlagCheckbox = document.getElementById('gera_flag');
+if (geraFlagCheckbox) {
+    geraFlagCheckbox.addEventListener('change', toggleCampoTipoFlag);
+}
+
+// Validação: Se gera_flag está marcado, tipo_flag é obrigatório
+function validarFlags() {
+    const geraFlag = document.getElementById('gera_flag');
+    const tipoFlag = document.getElementById('tipo_flag');
+    
+    if (geraFlag && tipoFlag && geraFlag.checked && !tipoFlag.value) {
+        alert('Se o tipo de ocorrência gera flag, você deve selecionar o tipo de flag!');
+        tipoFlag.focus();
+        return false;
+    }
+    
+    return true;
+}
+
 // Processa validações antes de enviar formulário
 document.getElementById('kt_modal_tipo_ocorrencia_form').addEventListener('submit', function(e) {
+    // Valida flags antes de processar
+    if (!validarFlags()) {
+        e.preventDefault();
+        return false;
+    }
+    
     processarValidacoes();
     
     // Gera código se estiver vazio
