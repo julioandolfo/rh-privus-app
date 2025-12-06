@@ -3,15 +3,28 @@
  * Visualizar Flags de Colaboradores
  */
 
+// Ativa exibição de erros temporariamente para debug
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/ocorrencias_functions.php';
 
-require_page_permission('ocorrencias_list.php');
+require_page_permission('flags_view.php');
 
-$pdo = getDB();
-$usuario = $_SESSION['usuario'];
+try {
+    $pdo = getDB();
+    $usuario = $_SESSION['usuario'];
+    
+    if (empty($usuario)) {
+        throw new Exception("Usuário não autenticado");
+    }
+} catch (Exception $e) {
+    die("Erro ao inicializar: " . $e->getMessage() . "<br>Arquivo: " . $e->getFile() . "<br>Linha: " . $e->getLine());
+}
 
 // Filtros
 $colaborador_id = $_GET['colaborador_id'] ?? null;
@@ -92,9 +105,14 @@ $sql = "
     ORDER BY f.data_flag DESC, f.data_validade ASC
 ";
 
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$flags = $stmt->fetchAll();
+try {
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $flags = $stmt->fetchAll();
+} catch (Exception $e) {
+    error_log("Erro ao buscar flags: " . $e->getMessage());
+    $flags = [];
+}
 
 // Busca colaboradores para filtro
 $sql_colabs = "SELECT id, nome_completo FROM colaboradores WHERE status = 'ativo'";
@@ -115,9 +133,14 @@ if ($usuario['role'] === 'RH') {
 
 $sql_colabs .= " ORDER BY nome_completo";
 
-$stmt_colabs = $pdo->prepare($sql_colabs);
-$stmt_colabs->execute($params_colabs);
-$colaboradores = $stmt_colabs->fetchAll();
+try {
+    $stmt_colabs = $pdo->prepare($sql_colabs);
+    $stmt_colabs->execute($params_colabs);
+    $colaboradores = $stmt_colabs->fetchAll();
+} catch (Exception $e) {
+    error_log("Erro ao buscar colaboradores: " . $e->getMessage());
+    $colaboradores = [];
+}
 
 // Estatísticas
 $sql_stats = "
@@ -132,9 +155,29 @@ $sql_stats = "
     $where_sql
 ";
 
-$stmt_stats = $pdo->prepare($sql_stats);
-$stmt_stats->execute($params);
-$stats = $stmt_stats->fetch();
+try {
+    $stmt_stats = $pdo->prepare($sql_stats);
+    $stmt_stats->execute($params);
+    $stats = $stmt_stats->fetch();
+    
+    // Garante que todas as chaves existem
+    $stats = array_merge([
+        'total_ativas' => 0,
+        'total_expiradas' => 0,
+        'faltas_nao_justificadas' => 0,
+        'ma_conduta' => 0,
+        'colaboradores_com_flags' => 0
+    ], $stats ?: []);
+} catch (Exception $e) {
+    error_log("Erro ao buscar estatísticas de flags: " . $e->getMessage());
+    $stats = [
+        'total_ativas' => 0,
+        'total_expiradas' => 0,
+        'faltas_nao_justificadas' => 0,
+        'ma_conduta' => 0,
+        'colaboradores_com_flags' => 0
+    ];
+}
 
 $page_title = is_colaborador() ? 'Minhas Flags' : 'Flags de Colaboradores';
 require_once __DIR__ . '/../includes/header.php';
@@ -307,20 +350,6 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="d-flex flex-column">
                 <h4 class="mb-1">Suas Flags</h4>
                 <span>Você está visualizando apenas suas próprias flags. Cada flag tem validade de 30 dias corridos a partir da data da ocorrência.</span>
-            </div>
-        </div>
-        <?php endif; ?>
-        <?php else: ?>
-        <!-- Informação para colaborador -->
-        <div class="alert alert-info d-flex align-items-center p-5 mb-5">
-            <i class="ki-duotone ki-information fs-2hx text-info me-4">
-                <span class="path1"></span>
-                <span class="path2"></span>
-                <span class="path3"></span>
-            </i>
-            <div class="d-flex flex-column">
-                <h4 class="mb-1">Suas Flags</h4>
-                <span>Você está visualizando apenas suas próprias flags. Cada flag tem validade de 30 dias corridos.</span>
             </div>
         </div>
         <?php endif; ?>
