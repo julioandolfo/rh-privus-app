@@ -61,6 +61,19 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $ocorrencias = $stmt->fetchAll();
 
+// Busca horas extras do colaborador
+$stmt = $pdo->prepare("
+    SELECT h.*, 
+           COALESCE(h.tipo_pagamento, 'dinheiro') as tipo_pagamento,
+           u.nome as usuario_nome
+    FROM horas_extras h
+    LEFT JOIN usuarios u ON h.usuario_id = u.id
+    WHERE h.colaborador_id = ?
+    ORDER BY h.data_trabalho DESC, h.created_at DESC
+");
+$stmt->execute([$id]);
+$horas_extras_colaborador = $stmt->fetchAll();
+
 // Busca bônus do colaborador (ativos ou permanentes)
 $stmt = $pdo->prepare("
     SELECT cb.*, tb.nome as tipo_bonus_nome, tb.descricao as tipo_bonus_descricao
@@ -337,6 +350,19 @@ require_once __DIR__ . '/../includes/header.php';
                             </a>
                         </li>
                         <?php endif; ?>
+                        <li class="nav-item mt-2 flex-shrink-0">
+                            <a class="nav-link text-active-primary me-5 me-md-10 py-5" data-bs-toggle="tab" href="#kt_tab_pane_horas_extras">
+                                <i class="ki-duotone ki-calendar fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <span class="d-none d-md-inline">Horas Extras</span>
+                                <span class="d-md-none">Horas Extras</span>
+                                <?php if (count($horas_extras_colaborador) > 0): ?>
+                                <span class="badge badge-circle badge-info ms-2"><?= count($horas_extras_colaborador) ?></span>
+                                <?php endif; ?>
+                            </a>
+                        </li>
                         <li class="nav-item mt-2 flex-shrink-0">
                             <a class="nav-link text-active-primary me-5 me-md-10 py-5" data-bs-toggle="tab" href="#kt_tab_pane_banco_horas">
                                 <i class="ki-duotone ki-time fs-2 me-2">
@@ -788,6 +814,131 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     <!--end::Tab Pane - Bônus/Pagamentos-->
                     <?php endif; ?>
+                    
+                    <!--begin::Tab Pane - Horas Extras-->
+                    <div class="tab-pane fade" id="kt_tab_pane_horas_extras" role="tabpanel">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-7 gap-3">
+                            <h3 class="fw-bold text-gray-800 mb-0">Horas Extras do Colaborador</h3>
+                            <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                                <a href="horas_extras.php" class="btn btn-primary w-100 w-md-auto">
+                                    <i class="ki-duotone ki-plus fs-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Nova Hora Extra
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <?php if (empty($horas_extras_colaborador)): ?>
+                            <div class="alert alert-info d-flex align-items-center p-5">
+                                <i class="ki-duotone ki-information fs-2hx text-info me-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <div class="d-flex flex-column">
+                                    <h4 class="mb-1 text-info">Nenhuma hora extra</h4>
+                                    <span>Nenhuma hora extra registrada para este colaborador.</span>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="card">
+                                <div class="card-body pt-0">
+                                    <div class="table-responsive">
+                                        <table class="table align-middle table-row-dashed fs-6 gy-5">
+                                            <thead>
+                                                <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
+                                                    <th class="min-w-100px">Data</th>
+                                                    <th class="min-w-100px">Quantidade</th>
+                                                    <th class="min-w-100px">Tipo</th>
+                                                    <th class="min-w-120px">Valor Hora</th>
+                                                    <th class="min-w-100px">% Adicional</th>
+                                                    <th class="min-w-120px">Valor Total</th>
+                                                    <th class="min-w-200px">Observações</th>
+                                                    <th class="min-w-150px">Registrado por</th>
+                                                    <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                                                    <th class="text-end min-w-100px">Ações</th>
+                                                    <?php endif; ?>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="fw-semibold text-gray-600">
+                                                <?php foreach ($horas_extras_colaborador as $he): 
+                                                    $is_remocao = ($he['quantidade_horas'] < 0);
+                                                    $tipo_pagamento = $he['tipo_pagamento'] ?? 'dinheiro';
+                                                ?>
+                                                <tr>
+                                                    <td><?= date('d/m/Y', strtotime($he['data_trabalho'])) ?></td>
+                                                    <td>
+                                                        <?php if ($is_remocao): ?>
+                                                            <span class="text-danger">-<?= number_format(abs($he['quantidade_horas']), 2, ',', '.') ?>h</span>
+                                                        <?php else: ?>
+                                                            <?= number_format($he['quantidade_horas'], 2, ',', '.') ?>h
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($is_remocao): ?>
+                                                            <span class="badge badge-light-warning">Remoção Banco</span>
+                                                        <?php elseif ($tipo_pagamento === 'banco_horas'): ?>
+                                                            <span class="badge badge-info">Banco de Horas</span>
+                                                        <?php else: ?>
+                                                            <span class="badge badge-success">R$</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($tipo_pagamento === 'banco_horas'): ?>
+                                                            <span class="text-muted">-</span>
+                                                        <?php else: ?>
+                                                            R$ <?= number_format($he['valor_hora'], 2, ',', '.') ?>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($tipo_pagamento === 'banco_horas'): ?>
+                                                            <span class="text-muted">-</span>
+                                                        <?php else: ?>
+                                                            <?= number_format($he['percentual_adicional'], 2, ',', '.') ?>%
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($is_remocao): ?>
+                                                            <span class="text-gray-600">-</span>
+                                                        <?php elseif ($tipo_pagamento === 'banco_horas'): ?>
+                                                            <span class="text-muted">-</span>
+                                                        <?php else: ?>
+                                                            <span class="text-success fw-bold">R$ <?= number_format($he['valor_total'], 2, ',', '.') ?></span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if (!empty($he['observacoes'])): ?>
+                                                            <div class="text-gray-800" title="<?= htmlspecialchars($he['observacoes']) ?>">
+                                                                <?= htmlspecialchars(mb_substr($he['observacoes'], 0, 50)) ?><?= mb_strlen($he['observacoes']) > 50 ? '...' : '' ?>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <span class="text-muted">-</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><?= htmlspecialchars($he['usuario_nome'] ?? 'Sistema') ?></td>
+                                                    <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-sm btn-light-danger" onclick="deletarHoraExtra(<?= $he['id'] ?>)">
+                                                            <i class="ki-duotone ki-trash fs-5">
+                                                                <span class="path1"></span>
+                                                                <span class="path2"></span>
+                                                                <span class="path3"></span>
+                                                            </i>
+                                                        </button>
+                                                    </td>
+                                                    <?php endif; ?>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <!--end::Tab Pane - Horas Extras-->
                     
                     <!--begin::Tab Pane - Banco de Horas-->
                     <div class="tab-pane fade" id="kt_tab_pane_banco_horas" role="tabpanel">
@@ -2262,6 +2413,31 @@ function deletarOcorrencia(ocorrenciaId) {
                     }
                 });
             });
+        }
+    });
+}
+
+// Função para deletar hora extra
+function deletarHoraExtra(id) {
+    Swal.fire({
+        text: "Tem certeza que deseja excluir esta hora extra?",
+        icon: "warning",
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: "Sim, excluir!",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn fw-bold btn-danger",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then(function(result) {
+        if (result.value) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'horas_extras.php';
+            form.innerHTML = '<input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' + id + '">';
+            document.body.appendChild(form);
+            form.submit();
         }
     });
 }

@@ -54,29 +54,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 // Insere hora extra com tipo banco_horas
-                $stmt = $pdo->prepare("
-                    INSERT INTO horas_extras (
-                        colaborador_id, data_trabalho, quantidade_horas, 
-                        valor_hora, percentual_adicional, valor_total, 
-                        observacoes, usuario_id, tipo_pagamento, banco_horas_movimentacao_id
-                    ) VALUES (?, ?, ?, 0, 0, 0, ?, ?, 'banco_horas', ?)
-                ");
-                $stmt->execute([
-                    $colaborador_id, 
-                    $data_trabalho, 
-                    $quantidade_horas,
-                    $observacoes, 
-                    $usuario['id'],
-                    $resultado['movimentacao_id']
-                ]);
-                
-                $hora_extra_id = $pdo->lastInsertId();
-                
-                // Envia email de notificação se template estiver ativo
-                require_once __DIR__ . '/../includes/email_templates.php';
-                enviar_email_horas_extras($hora_extra_id);
-                
-                redirect('horas_extras.php', 'Hora extra adicionada ao banco de horas com sucesso!');
+                // Se falhar, precisamos reverter a movimentação do banco
+                try {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO horas_extras (
+                            colaborador_id, data_trabalho, quantidade_horas, 
+                            valor_hora, percentual_adicional, valor_total, 
+                            observacoes, usuario_id, tipo_pagamento, banco_horas_movimentacao_id
+                        ) VALUES (?, ?, ?, 0, 0, 0, ?, ?, 'banco_horas', ?)
+                    ");
+                    $stmt->execute([
+                        $colaborador_id, 
+                        $data_trabalho, 
+                        $quantidade_horas,
+                        $observacoes, 
+                        $usuario['id'],
+                        $resultado['movimentacao_id']
+                    ]);
+                    
+                    $hora_extra_id = $pdo->lastInsertId();
+                    
+                    // Atualiza a movimentação do banco com o ID da hora extra
+                    $stmt_update = $pdo->prepare("
+                        UPDATE banco_horas_movimentacoes 
+                        SET origem_id = ? 
+                        WHERE id = ?
+                    ");
+                    $stmt_update->execute([$hora_extra_id, $resultado['movimentacao_id']]);
+                    
+                    // Envia email de notificação se template estiver ativo
+                    require_once __DIR__ . '/../includes/email_templates.php';
+                    enviar_email_horas_extras($hora_extra_id);
+                    
+                    redirect('horas_extras.php', 'Hora extra adicionada ao banco de horas com sucesso!');
+                    
+                } catch (Exception $e) {
+                    // Se falhar ao inserir hora_extra, reverte a movimentação do banco
+                    require_once __DIR__ . '/../includes/banco_horas_functions.php';
+                    remover_horas_banco(
+                        $colaborador_id,
+                        $quantidade_horas,
+                        'ajuste_manual',
+                        null,
+                        'Reversão: Erro ao criar registro de hora extra',
+                        'Erro: ' . $e->getMessage(),
+                        $usuario['id'],
+                        date('Y-m-d')
+                    );
+                    
+                    redirect('horas_extras.php', 'Erro ao salvar hora extra: ' . $e->getMessage() . ' (Movimentação do banco revertida)', 'error');
+                }
                 
             } else {
                 // Comportamento atual (pagar em dinheiro)
@@ -214,30 +241,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Busca horas extras
-$where = '';
+// Usa LEFT JOIN para não perder registros mesmo se colaborador foi deletado ou mudou de empresa
+$where_conditions = [];
 $params = [];
+
 if ($usuario['role'] === 'RH') {
     // RH pode ter múltiplas empresas
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where = "WHERE c.empresa_id IN ($placeholders)";
-        $params = $usuario['empresas_ids'];
+        $where_conditions[] = "(c.empresa_id IN ($placeholders) OR c.empresa_id IS NULL)";
+        $params = array_merge($params, $usuario['empresas_ids']);
     } else {
         // Fallback para compatibilidade
-        $where = "WHERE c.empresa_id = ?";
+        $where_conditions[] = "(c.empresa_id = ? OR c.empresa_id IS NULL)";
         $params[] = $usuario['empresa_id'] ?? 0;
     }
 } elseif ($usuario['role'] !== 'ADMIN') {
-    $where = "WHERE c.empresa_id = ?";
+    $where_conditions[] = "(c.empresa_id = ? OR c.empresa_id IS NULL)";
     $params[] = $usuario['empresa_id'] ?? 0;
 }
 
+$where = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+
 $stmt = $pdo->prepare("
-    SELECT h.*, c.nome_completo as colaborador_nome, c.empresa_id,
-           e.nome_fantasia as empresa_nome, u.nome as usuario_nome,
+    SELECT h.*, 
+           COALESCE(c.nome_completo, 'Colaborador Removido') as colaborador_nome, 
+           c.empresa_id,
+           e.nome_fantasia as empresa_nome, 
+           u.nome as usuario_nome,
            COALESCE(h.tipo_pagamento, 'dinheiro') as tipo_pagamento
     FROM horas_extras h
-    INNER JOIN colaboradores c ON h.colaborador_id = c.id
+    LEFT JOIN colaboradores c ON h.colaborador_id = c.id
     LEFT JOIN empresas e ON c.empresa_id = e.id
     LEFT JOIN usuarios u ON h.usuario_id = u.id
     $where
@@ -824,6 +858,74 @@ document.getElementById('colaborador_id_remover')?.addEventListener('change', fu
             saldoValor.textContent = '-';
         });
 });
+
+// Função para validar entrada - aceita apenas números e vírgula
+function validarEntradaHoras(input) {
+    let valor = input.value;
+    // Remove todos os caracteres que não são números ou vírgula (inclui +, -, espaços, etc)
+    valor = valor.replace(/[^0-9,]/g, '');
+    // Garante que há apenas uma vírgula
+    const partes = valor.split(',');
+    if (partes.length > 2) {
+        valor = partes[0] + ',' + partes.slice(1).join('');
+    }
+    // Atualiza o valor apenas se mudou (evita loop infinito)
+    if (input.value !== valor) {
+        input.value = valor;
+    }
+}
+
+// Função para validar tecla pressionada
+function validarTeclaHoras(e) {
+    // Permite teclas de controle (backspace, delete, tab, setas, etc)
+    if (e.keyCode === 8 || e.keyCode === 9 || e.keyCode === 37 || e.keyCode === 39 || 
+        e.keyCode === 46 || e.keyCode === 35 || e.keyCode === 36 || 
+        (e.keyCode >= 35 && e.keyCode <= 40) || (e.ctrlKey && (e.keyCode === 65 || e.keyCode === 67 || e.keyCode === 86 || e.keyCode === 88))) {
+        return true;
+    }
+    // Permite apenas números (0-9) e vírgula
+    const char = String.fromCharCode(e.which || e.keyCode);
+    if (!/[0-9,]/.test(char)) {
+        e.preventDefault();
+        return false;
+    }
+    // Evita múltiplas vírgulas
+    if (char === ',' && e.target.value.includes(',')) {
+        e.preventDefault();
+        return false;
+    }
+    return true;
+}
+
+// Aplica validação no campo de quantidade de horas (modal adicionar)
+const quantidadeHorasInput = document.getElementById('quantidade_horas');
+if (quantidadeHorasInput) {
+    quantidadeHorasInput.addEventListener('input', function(e) {
+        validarEntradaHoras(this);
+        calcularValorTotal();
+    });
+    quantidadeHorasInput.addEventListener('keypress', validarTeclaHoras);
+    quantidadeHorasInput.addEventListener('paste', function(e) {
+        setTimeout(() => {
+            validarEntradaHoras(this);
+            calcularValorTotal();
+        }, 10);
+    });
+}
+
+// Aplica validação no campo de quantidade de horas (modal remover)
+const quantidadeHorasRemoverInput = document.getElementById('quantidade_horas_remover');
+if (quantidadeHorasRemoverInput) {
+    quantidadeHorasRemoverInput.addEventListener('input', function(e) {
+        validarEntradaHoras(this);
+    });
+    quantidadeHorasRemoverInput.addEventListener('keypress', validarTeclaHoras);
+    quantidadeHorasRemoverInput.addEventListener('paste', function(e) {
+        setTimeout(() => {
+            validarEntradaHoras(this);
+        }, 10);
+    });
+}
 
 // Máscara para quantidade de horas
 if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
