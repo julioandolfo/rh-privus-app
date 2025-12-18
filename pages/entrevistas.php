@@ -22,7 +22,7 @@ $params = [];
 if ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where[] = "v.empresa_id IN ($placeholders)";
+        $where[] = "(COALESCE(v.empresa_id, vm.empresa_id) IN ($placeholders))";
         $params = array_merge($params, $usuario['empresas_ids']);
     }
 }
@@ -44,15 +44,17 @@ if ($filtro_entrevistador && $usuario['role'] === 'ADMIN') {
 
 $sql = "
     SELECT e.*,
-           c.nome_completo as candidato_nome,
-           c.email as candidato_email,
-           v.titulo as vaga_titulo,
+           COALESCE(c.nome_completo, e.candidato_nome_manual) as candidato_nome,
+           COALESCE(c.email, e.candidato_email_manual) as candidato_email,
+           COALESCE(v.titulo, vm.titulo) as vaga_titulo,
            u.nome as entrevistador_nome,
-           et.nome as etapa_nome
+           et.nome as etapa_nome,
+           CASE WHEN e.candidatura_id IS NULL THEN 1 ELSE 0 END as is_manual
     FROM entrevistas e
-    INNER JOIN candidaturas cand ON e.candidatura_id = cand.id
-    INNER JOIN candidatos c ON cand.candidato_id = c.id
-    INNER JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN candidaturas cand ON e.candidatura_id = cand.id
+    LEFT JOIN candidatos c ON cand.candidato_id = c.id
+    LEFT JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN vagas vm ON e.vaga_id_manual = vm.id
     LEFT JOIN usuarios u ON e.entrevistador_id = u.id
     LEFT JOIN processo_seletivo_etapas et ON e.etapa_id = et.id
     WHERE " . implode(' AND ', $where) . "
@@ -203,11 +205,57 @@ if ($usuario['role'] === 'ADMIN') {
             </div>
             <form id="formEntrevista">
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Candidatura *</label>
-                        <select name="candidatura_id" class="form-select" required id="candidaturaSelect">
+                    <!-- Toggle entre candidatura existente e manual -->
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="entrevistaManual" name="entrevista_manual">
+                            <label class="form-check-label" for="entrevistaManual">
+                                <strong>Entrevista Manual (sem candidatura no sistema)</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted">Marque esta opção para criar uma entrevista com candidato que ainda não possui candidatura cadastrada</small>
+                    </div>
+                    
+                    <!-- Campos para candidatura existente -->
+                    <div id="camposCandidatura" class="mb-3">
+                        <label class="form-label">Candidatura</label>
+                        <select name="candidatura_id" class="form-select" id="candidaturaSelect">
                             <option value="">Selecione...</option>
                         </select>
+                    </div>
+                    
+                    <!-- Campos para entrevista manual -->
+                    <div id="camposManual" style="display: none;">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nome do Candidato *</label>
+                                <input type="text" name="candidato_nome" class="form-control" id="candidatoNome">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email do Candidato *</label>
+                                <input type="email" name="candidato_email" class="form-control" id="candidatoEmail">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Telefone do Candidato</label>
+                                <input type="text" name="candidato_telefone" class="form-control" id="candidatoTelefone" placeholder="(00) 00000-0000">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Vaga</label>
+                                <select name="vaga_id" class="form-select" id="vagaSelect">
+                                    <option value="">Selecione uma vaga (opcional)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Coluna do Kanban</label>
+                            <select name="coluna_kanban" class="form-select" id="colunaKanbanSelect">
+                                <option value="entrevista">Entrevista</option>
+                                <option value="triagem">Triagem</option>
+                                <option value="avaliacao">Avaliação</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -279,10 +327,68 @@ async function carregarCandidaturas() {
     }
 }
 
+// Carrega vagas para select
+async function carregarVagas() {
+    try {
+        const response = await fetch('../api/recrutamento/vagas/listar.php?status=aberta');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('vagaSelect');
+            select.innerHTML = '<option value="">Selecione uma vaga (opcional)</option>';
+            
+            data.vagas.forEach(vaga => {
+                const option = document.createElement('option');
+                option.value = vaga.id;
+                option.textContent = vaga.titulo;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar vagas:', error);
+    }
+}
+
+// Toggle entre candidatura existente e manual
+document.getElementById('entrevistaManual').addEventListener('change', function() {
+    const isManual = this.checked;
+    const camposCandidatura = document.getElementById('camposCandidatura');
+    const camposManual = document.getElementById('camposManual');
+    const candidaturaSelect = document.getElementById('candidaturaSelect');
+    const candidatoNome = document.getElementById('candidatoNome');
+    const candidatoEmail = document.getElementById('candidatoEmail');
+    
+    if (isManual) {
+        camposCandidatura.style.display = 'none';
+        camposManual.style.display = 'block';
+        candidaturaSelect.removeAttribute('required');
+        candidatoNome.setAttribute('required', 'required');
+        candidatoEmail.setAttribute('required', 'required');
+    } else {
+        camposCandidatura.style.display = 'block';
+        camposManual.style.display = 'none';
+        candidaturaSelect.setAttribute('required', 'required');
+        candidatoNome.removeAttribute('required');
+        candidatoEmail.removeAttribute('required');
+    }
+});
+
 document.getElementById('formEntrevista').addEventListener('submit', async function(e) {
     e.preventDefault();
     const formData = new FormData(this);
     formData.append('entrevistador_id', '<?= $usuario['id'] ?>');
+    
+    // Se não é entrevista manual, remove campos manuais
+    if (!document.getElementById('entrevistaManual').checked) {
+        formData.delete('candidato_nome');
+        formData.delete('candidato_email');
+        formData.delete('candidato_telefone');
+        formData.delete('vaga_id');
+        formData.delete('coluna_kanban');
+    } else {
+        // Se é manual, remove candidatura_id
+        formData.delete('candidatura_id');
+    }
     
     try {
         const response = await fetch('../api/recrutamento/entrevistas/criar.php', {
@@ -303,9 +409,17 @@ document.getElementById('formEntrevista').addEventListener('submit', async funct
     }
 });
 
-// Carrega candidaturas ao abrir modal
+// Carrega dados ao abrir modal
 document.getElementById('modalNovaEntrevista').addEventListener('show.bs.modal', function() {
     carregarCandidaturas();
+    carregarVagas();
+    // Reseta formulário
+    document.getElementById('entrevistaManual').checked = false;
+    document.getElementById('camposCandidatura').style.display = 'block';
+    document.getElementById('camposManual').style.display = 'none';
+    document.getElementById('candidaturaSelect').setAttribute('required', 'required');
+    document.getElementById('candidatoNome').removeAttribute('required');
+    document.getElementById('candidatoEmail').removeAttribute('required');
 });
 </script>
 

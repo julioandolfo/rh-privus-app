@@ -21,19 +21,22 @@ if (!$entrevista_id) {
     redirect('entrevistas.php', 'Entrevista não encontrada', 'error');
 }
 
-// Busca entrevista
+// Busca entrevista (com suporte a entrevistas sem candidatura)
 $stmt = $pdo->prepare("
     SELECT e.*,
-           c.nome_completo as candidato_nome,
-           c.email as candidato_email,
-           v.titulo as vaga_titulo,
+           COALESCE(c.nome_completo, e.candidato_nome_manual) as candidato_nome,
+           COALESCE(c.email, e.candidato_email_manual) as candidato_email,
+           COALESCE(v.titulo, vm.titulo) as vaga_titulo,
            u.nome as entrevistador_nome,
            et.nome as etapa_nome,
-           cand.id as candidatura_id
+           cand.id as candidatura_id,
+           COALESCE(v.empresa_id, vm.empresa_id) as empresa_id,
+           CASE WHEN e.candidatura_id IS NULL THEN 1 ELSE 0 END as is_manual
     FROM entrevistas e
-    INNER JOIN candidaturas cand ON e.candidatura_id = cand.id
-    INNER JOIN candidatos c ON cand.candidato_id = c.id
-    INNER JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN candidaturas cand ON e.candidatura_id = cand.id
+    LEFT JOIN candidatos c ON cand.candidato_id = c.id
+    LEFT JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN vagas vm ON e.vaga_id_manual = vm.id
     LEFT JOIN usuarios u ON e.entrevistador_id = u.id
     LEFT JOIN processo_seletivo_etapas et ON e.etapa_id = et.id
     WHERE e.id = ?
@@ -46,11 +49,7 @@ if (!$entrevista) {
 }
 
 // Verifica permissão
-$stmt = $pdo->prepare("SELECT empresa_id FROM vagas WHERE id = (SELECT vaga_id FROM candidaturas WHERE id = ?)");
-$stmt->execute([$entrevista['candidatura_id']]);
-$vaga = $stmt->fetch();
-
-if ($vaga && !can_access_empresa($vaga['empresa_id'])) {
+if ($entrevista['empresa_id'] && !can_access_empresa($entrevista['empresa_id'])) {
     redirect('entrevistas.php', 'Sem permissão', 'error');
 }
 ?>
@@ -67,11 +66,26 @@ if ($vaga && !can_access_empresa($vaga['empresa_id'])) {
                         </div>
                     </div>
                     <div class="card-body">
+                        <?php if (!empty($entrevista['is_manual'])): ?>
+                        <div class="alert alert-info mb-4">
+                            <i class="ki-duotone ki-information-5 fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <strong>Entrevista Manual:</strong> Esta entrevista foi criada sem candidatura no sistema.
+                        </div>
+                        <?php endif; ?>
                         <div class="row">
                             <div class="col-md-6">
                                 <p><strong>Candidato:</strong> <?= htmlspecialchars($entrevista['candidato_nome']) ?></p>
                                 <p><strong>Email:</strong> <?= htmlspecialchars($entrevista['candidato_email']) ?></p>
+                                <?php if (!empty($entrevista['candidato_telefone_manual'])): ?>
+                                <p><strong>Telefone:</strong> <?= htmlspecialchars($entrevista['candidato_telefone_manual']) ?></p>
+                                <?php endif; ?>
+                                <?php if ($entrevista['vaga_titulo']): ?>
                                 <p><strong>Vaga:</strong> <?= htmlspecialchars($entrevista['vaga_titulo']) ?></p>
+                                <?php endif; ?>
                                 <?php if ($entrevista['etapa_nome']): ?>
                                 <p><strong>Etapa:</strong> <?= htmlspecialchars($entrevista['etapa_nome']) ?></p>
                                 <?php endif; ?>

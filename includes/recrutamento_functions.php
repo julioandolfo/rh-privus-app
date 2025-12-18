@@ -557,7 +557,69 @@ function calcular_nota_geral_candidatura($candidatura_id) {
 }
 
 /**
- * Busca candidaturas para Kanban
+ * Busca entrevistas sem candidatura para Kanban
+ */
+function buscar_entrevistas_kanban($filtros = []) {
+    $pdo = getDB();
+    $usuario = $_SESSION['usuario'] ?? null;
+    
+    $where = ["e.candidatura_id IS NULL"];
+    $params = [];
+    
+    // Filtro por vaga
+    if (!empty($filtros['vaga_id'])) {
+        $where[] = "e.vaga_id_manual = ?";
+        $params[] = $filtros['vaga_id'];
+    }
+    
+    // Filtro por coluna
+    if (!empty($filtros['coluna'])) {
+        $where[] = "e.coluna_kanban = ?";
+        $params[] = $filtros['coluna'];
+    }
+    
+    // Permissões por empresa
+    if ($usuario && $usuario['role'] === 'RH') {
+        if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+            // Se não tem vaga manual, não filtra por empresa (mostra todas)
+            // Se tem vaga manual, filtra pela empresa da vaga
+            $where[] = "(e.vaga_id_manual IS NULL OR v.empresa_id IN ($placeholders))";
+            $params = array_merge($params, $usuario['empresas_ids']);
+        }
+    }
+    
+    $sql = "
+        SELECT 
+            CONCAT('entrevista_', e.id) as id,
+            e.vaga_id_manual as vaga_id,
+            e.candidato_nome_manual as nome_completo,
+            e.candidato_email_manual as email,
+            v.titulo as vaga_titulo,
+            v.empresa_id,
+            emp.nome_fantasia as empresa_nome,
+            u.nome as recrutador_nome,
+            e.coluna_kanban,
+            e.status,
+            e.data_agendada as data_candidatura,
+            e.created_at,
+            e.titulo as entrevista_titulo,
+            1 as is_entrevista_manual
+        FROM entrevistas e
+        LEFT JOIN vagas v ON e.vaga_id_manual = v.id
+        LEFT JOIN empresas emp ON v.empresa_id = emp.id
+        LEFT JOIN usuarios u ON e.entrevistador_id = u.id
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY e.created_at DESC
+    ";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Busca candidaturas para Kanban (inclui entrevistas sem candidatura)
  */
 function buscar_candidaturas_kanban($filtros = []) {
     $pdo = getDB();
@@ -607,7 +669,8 @@ function buscar_candidaturas_kanban($filtros = []) {
                v.titulo as vaga_titulo,
                v.empresa_id,
                e.nome_fantasia as empresa_nome,
-               u.nome as recrutador_nome
+               u.nome as recrutador_nome,
+               0 as is_entrevista_manual
         FROM candidaturas c
         INNER JOIN candidatos cand ON c.candidato_id = cand.id
         INNER JOIN vagas v ON c.vaga_id = v.id
@@ -619,7 +682,13 @@ function buscar_candidaturas_kanban($filtros = []) {
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
-    return $stmt->fetchAll();
+    $candidaturas = $stmt->fetchAll();
+    
+    // Busca também entrevistas sem candidatura
+    $entrevistas = buscar_entrevistas_kanban($filtros);
+    
+    // Combina resultados
+    return array_merge($candidaturas, $entrevistas);
 }
 
 /**

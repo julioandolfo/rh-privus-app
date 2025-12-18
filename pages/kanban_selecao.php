@@ -127,13 +127,23 @@ $vagas = $stmt->fetchAll();
                                         </div>
                                         
                                         <?php foreach ($candidaturas_coluna as $candidatura): ?>
+                                        <?php 
+                                        $is_entrevista_manual = !empty($candidatura['is_entrevista_manual']);
+                                        $entrevista_id = $is_entrevista_manual ? str_replace('entrevista_', '', $candidatura['id']) : null;
+                                        ?>
                                         <div class="card shadow-sm mb-3 kanban-card cursor-move" 
                                              draggable="true" 
                                              data-candidatura-id="<?= $candidatura['id'] ?>"
                                              data-coluna-atual="<?= htmlspecialchars($coluna['codigo']) ?>"
                                              data-coluna-cor="<?= htmlspecialchars($coluna['cor']) ?>"
-                                             data-nome="<?= strtolower(htmlspecialchars($candidatura['nome_completo'])) ?>">
+                                             data-nome="<?= strtolower(htmlspecialchars($candidatura['nome_completo'])) ?>"
+                                             data-is-entrevista="<?= $is_entrevista_manual ? '1' : '0' ?>">
                                             <div class="kanban-card-color-indicator" style="background-color: <?= htmlspecialchars($coluna['cor']) ?>;"></div>
+                                            <?php if ($is_entrevista_manual): ?>
+                                            <div class="position-absolute top-0 end-0 m-2">
+                                                <span class="badge badge-light-warning">Entrevista Manual</span>
+                                            </div>
+                                            <?php endif; ?>
                                             <div class="card-body p-4">
                                                 <div class="d-flex align-items-start mb-3">
                                                     <div class="symbol symbol-45px symbol-circle me-3">
@@ -143,18 +153,29 @@ $vagas = $stmt->fetchAll();
                                                     </div>
                                                     <div class="flex-grow-1 min-w-0">
                                                         <div class="d-flex align-items-center justify-content-between mb-1">
+                                                            <?php if ($is_entrevista_manual): ?>
+                                                            <a href="entrevista_view.php?id=<?= $entrevista_id ?>" class="text-gray-800 text-hover-primary fw-bold d-block fs-6">
+                                                                <?= htmlspecialchars($candidatura['nome_completo']) ?>
+                                                            </a>
+                                                            <?php else: ?>
                                                             <a href="candidatura_view.php?id=<?= $candidatura['id'] ?>" class="text-gray-800 text-hover-primary fw-bold d-block fs-6">
                                                                 <?= htmlspecialchars($candidatura['nome_completo']) ?>
                                                             </a>
+                                                            <?php endif; ?>
                                                             <span class="kanban-stage-badge" style="background-color: <?= htmlspecialchars($coluna['cor']) ?>20; border-left: 3px solid <?= htmlspecialchars($coluna['cor']) ?>;"></span>
                                                         </div>
                                                         <span class="text-muted fw-semibold d-block fs-7 mt-1">
-                                                            <?= htmlspecialchars($candidatura['vaga_titulo']) ?>
+                                                            <?= htmlspecialchars($candidatura['vaga_titulo'] ?? 'Sem vaga') ?>
                                                         </span>
+                                                        <?php if ($is_entrevista_manual && !empty($candidatura['entrevista_titulo'])): ?>
+                                                        <span class="text-muted fw-semibold d-block fs-7">
+                                                            <i class="ki-duotone ki-calendar fs-6"></i> <?= htmlspecialchars($candidatura['entrevista_titulo']) ?>
+                                                        </span>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </div>
                                                 
-                                                <?php if ($candidatura['nota_geral']): ?>
+                                                <?php if (!$is_entrevista_manual && !empty($candidatura['nota_geral'])): ?>
                                                 <div class="mb-3">
                                                     <div class="d-flex align-items-center">
                                                         <span class="badge badge-light-info fs-7 me-2">Nota</span>
@@ -172,13 +193,20 @@ $vagas = $stmt->fetchAll();
                                                     <div class="d-flex flex-column">
                                                         <span class="text-gray-500 fs-7">Data</span>
                                                         <span class="text-gray-800 fw-semibold fs-7">
-                                                            <?= date('d/m/Y', strtotime($candidatura['data_candidatura'])) ?>
+                                                            <?= date('d/m/Y', strtotime($candidatura['data_candidatura'] ?? $candidatura['created_at'])) ?>
                                                         </span>
                                                     </div>
+                                                    <?php if ($is_entrevista_manual): ?>
+                                                    <a href="entrevista_view.php?id=<?= $entrevista_id ?>" 
+                                                       class="btn btn-sm btn-light-primary">
+                                                        Ver Entrevista
+                                                    </a>
+                                                    <?php else: ?>
                                                     <a href="candidatura_view.php?id=<?= $candidatura['id'] ?>" 
                                                        class="btn btn-sm btn-light-primary">
                                                         Ver Detalhes
                                                     </a>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </div>
@@ -319,9 +347,13 @@ async function handleDrop(e) {
     
     // Salva no servidor
     try {
+        const isEntrevista = draggedElement.dataset.isEntrevista === '1';
         const formData = new FormData();
         formData.append('candidatura_id', candidaturaId);
         formData.append('coluna_codigo', colunaDestino);
+        if (isEntrevista) {
+            formData.append('is_entrevista', '1');
+        }
         
         const response = await fetch('../api/recrutamento/kanban/mover.php', {
             method: 'POST',
