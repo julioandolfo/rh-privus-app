@@ -178,11 +178,51 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
                     }
                 }
                 if ($colab_com_mesmo_id) {
-                    echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: ID " . $user_id . " já existe na lista de colaboradores:', " . json_encode($colab_com_mesmo_id, JSON_UNESCAPED_UNICODE) . ");</script>";
+                    // Verifica se o colaborador está vinculado a este usuário
+                    $stmt_check_user = $pdo->prepare("SELECT id FROM usuarios WHERE id = ? AND colaborador_id = ?");
+                    $stmt_check_user->execute([$user_lider['usuario_id'], $user_id]);
+                    $is_same_user = $stmt_check_user->fetch();
+                    
+                    if ($is_same_user) {
+                        // É o mesmo usuário, não adiciona duplicata
+                        echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: Colaborador ID " . $user_id . " já está vinculado a este usuário');</script>";
+                        continue;
+                    } else {
+                        // ID conflita mas não é o mesmo usuário
+                        // Como o usuário não tem colaborador_id próprio, vamos incluir mesmo assim
+                        // mas vamos substituir o nome do colaborador existente pelo nome do usuário
+                        // para que apareça na lista com o nome correto
+                        echo "<script>console.log('DEBUG - " . $nome_usuario . " - ID colaborador " . $user_id . " conflita, mas incluindo usuário substituindo nome do colaborador existente');</script>";
+                        
+                        // Encontra o colaborador na lista e substitui o nome
+                        foreach ($lideres as $key => $lider) {
+                            if ((int)$lider['id'] === $user_id) {
+                                // Substitui o nome do colaborador pelo nome do usuário
+                                $lideres[$key]['nome_completo'] = $user_lider['nome_completo'];
+                                $lideres[$key]['foto'] = !empty($user_lider['foto']) ? $user_lider['foto'] : $lider['foto'];
+                                echo "<script>console.log('DEBUG - " . $nome_usuario . " - Nome do colaborador ID " . $user_id . " substituído pelo nome do usuário');</script>";
+                                break;
+                            }
+                        }
+                        // Não adiciona novamente, apenas substituiu o nome
+                        continue;
+                    }
                 } else {
                     echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: ID " . $user_id . " já existe na lista de líderes (duplicata)');</script>";
+                    continue;
                 }
-                continue;
+            } else {
+                // Se não tem colaborador_id, usa o ID do usuário ao invés do colaborador_id
+                if (empty($user_lider['colaborador_id'])) {
+                    $user_id = (int)$user_lider['usuario_id'];
+                    echo "<script>console.log('DEBUG - " . $nome_usuario . " - Sem colaborador_id, usando ID do usuário: " . $user_id . "');</script>";
+                    
+                    // Verifica se esse ID de usuário já existe na lista
+                    if (in_array($user_id, $lideres_ids)) {
+                        echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: ID do usuário " . $user_id . " já existe na lista');</script>";
+                        continue;
+                    }
+                }
             }
             
             // Garante que foto seja null se vazio
