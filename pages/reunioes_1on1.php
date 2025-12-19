@@ -72,8 +72,14 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
         $stmt_usuarios_lideres = $pdo->query("
             SELECT DISTINCT 
                 c.id,
-                COALESCE(NULLIF(u.nome, ''), c.nome_completo) as nome_completo,
-                COALESCE(NULLIF(u.foto, ''), c.foto) as foto
+                CASE 
+                    WHEN u.nome IS NOT NULL AND u.nome != '' THEN u.nome
+                    ELSE c.nome_completo
+                END as nome_completo,
+                CASE 
+                    WHEN u.foto IS NOT NULL AND u.foto != '' THEN u.foto
+                    ELSE c.foto
+                END as foto
             FROM usuarios u
             INNER JOIN colaboradores c ON u.colaborador_id = c.id
             WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
@@ -89,8 +95,14 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
             $stmt_usuarios_lideres = $pdo->prepare("
                 SELECT DISTINCT 
                     c.id,
-                    COALESCE(NULLIF(u.nome, ''), c.nome_completo) as nome_completo,
-                    COALESCE(NULLIF(u.foto, ''), c.foto) as foto
+                    CASE 
+                        WHEN u.nome IS NOT NULL AND u.nome != '' THEN u.nome
+                        ELSE c.nome_completo
+                    END as nome_completo,
+                    CASE 
+                        WHEN u.foto IS NOT NULL AND u.foto != '' THEN u.foto
+                        ELSE c.foto
+                    END as foto
                 FROM usuarios u
                 INNER JOIN colaboradores c ON u.colaborador_id = c.id
                 WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
@@ -105,8 +117,14 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
             $stmt_usuarios_lideres = $pdo->prepare("
                 SELECT DISTINCT 
                     c.id,
-                    COALESCE(NULLIF(u.nome, ''), c.nome_completo) as nome_completo,
-                    COALESCE(NULLIF(u.foto, ''), c.foto) as foto
+                    CASE 
+                        WHEN u.nome IS NOT NULL AND u.nome != '' THEN u.nome
+                        ELSE c.nome_completo
+                    END as nome_completo,
+                    CASE 
+                        WHEN u.foto IS NOT NULL AND u.foto != '' THEN u.foto
+                        ELSE c.foto
+                    END as foto
                 FROM usuarios u
                 INNER JOIN colaboradores c ON u.colaborador_id = c.id
                 WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
@@ -160,8 +178,14 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
         $stmt_usuarios_lideres = $pdo->prepare("
             SELECT DISTINCT 
                 c.id,
-                COALESCE(NULLIF(u.nome, ''), c.nome_completo) as nome_completo,
-                COALESCE(NULLIF(u.foto, ''), c.foto) as foto
+                CASE 
+                    WHEN u.nome IS NOT NULL AND u.nome != '' THEN u.nome
+                    ELSE c.nome_completo
+                END as nome_completo,
+                CASE 
+                    WHEN u.foto IS NOT NULL AND u.foto != '' THEN u.foto
+                    ELSE c.foto
+                END as foto
             FROM usuarios u
             INNER JOIN colaboradores c ON u.colaborador_id = c.id
             WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
