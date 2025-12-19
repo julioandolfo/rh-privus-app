@@ -76,9 +76,10 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
             FROM usuarios
             WHERE role IN ('ADMIN', 'RH', 'GESTOR')
             AND status = 'ativo'
+            AND COALESCE(colaborador_id, id) IS NOT NULL
             ORDER BY nome
         ");
-        $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+        $usuarios_lideres = $stmt_usuarios_lideres->fetchAll(PDO::FETCH_ASSOC);
     } else {
         // RH só pode ver usuários das empresas dele
         if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
@@ -92,11 +93,12 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
                 LEFT JOIN usuarios_empresas ue ON u.id = ue.usuario_id
                 WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
                 AND u.status = 'ativo'
+                AND COALESCE(u.colaborador_id, u.id) IS NOT NULL
                 AND (u.empresa_id IN ($placeholders) OR ue.empresa_id IN ($placeholders))
                 ORDER BY u.nome
             ");
             $stmt_usuarios_lideres->execute(array_merge($usuario['empresas_ids'], $usuario['empresas_ids']));
-            $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+            $usuarios_lideres = $stmt_usuarios_lideres->fetchAll(PDO::FETCH_ASSOC);
         } elseif (!empty($usuario['empresa_id'])) {
             $stmt_usuarios_lideres = $pdo->prepare("
                 SELECT DISTINCT
@@ -107,11 +109,12 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
                 LEFT JOIN usuarios_empresas ue ON u.id = ue.usuario_id
                 WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
                 AND u.status = 'ativo'
+                AND COALESCE(u.colaborador_id, u.id) IS NOT NULL
                 AND (u.empresa_id = ? OR ue.empresa_id = ?)
                 ORDER BY u.nome
             ");
             $stmt_usuarios_lideres->execute([$usuario['empresa_id'], $usuario['empresa_id']]);
-            $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+            $usuarios_lideres = $stmt_usuarios_lideres->fetchAll(PDO::FETCH_ASSOC);
         }
     }
     
@@ -119,9 +122,17 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     if (!empty($usuarios_lideres)) {
         $lideres_ids = array_column($lideres, 'id');
         foreach ($usuarios_lideres as $user_lider) {
-            if (!in_array($user_lider['id'], $lideres_ids)) {
-                $lideres[] = $user_lider;
-                $lideres_ids[] = $user_lider['id'];
+            // Garante que tem id e nome_completo válidos
+            if (!empty($user_lider['id']) && !empty($user_lider['nome_completo'])) {
+                // Converte id para inteiro para comparação correta
+                $user_id = (int)$user_lider['id'];
+                if (!in_array($user_id, $lideres_ids)) {
+                    // Garante que foto seja null se vazio
+                    $user_lider['foto'] = !empty($user_lider['foto']) ? $user_lider['foto'] : null;
+                    $user_lider['id'] = $user_id; // Garante que id seja inteiro
+                    $lideres[] = $user_lider;
+                    $lideres_ids[] = $user_id;
+                }
             }
         }
     }
@@ -159,11 +170,12 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
             FROM usuarios
             WHERE role IN ('ADMIN', 'RH', 'GESTOR')
             AND status = 'ativo'
+            AND COALESCE(colaborador_id, id) IS NOT NULL
             AND setor_id = ?
             ORDER BY nome
         ");
         $stmt_usuarios_lideres->execute([$setor_id]);
-        $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+        $usuarios_lideres = $stmt_usuarios_lideres->fetchAll(PDO::FETCH_ASSOC);
         
         // Combina os arrays, evitando duplicatas
         $lideres_ids = array_column($lideres, 'id');
