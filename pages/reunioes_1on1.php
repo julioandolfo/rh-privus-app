@@ -63,8 +63,34 @@ $lideres = [];
 if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     // Para ADMIN/RH, pode selecionar qualquer colaborador como líder
     $lideres = $colaboradores;
+    
+    // Adiciona também usuários ADMIN, RH e GESTOR que tenham colaborador associado
+    $stmt_usuarios_lideres = $pdo->query("
+        SELECT DISTINCT c.id, c.nome_completo, c.foto
+        FROM usuarios u
+        INNER JOIN colaboradores c ON u.colaborador_id = c.id
+        WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
+        AND u.status = 'ativo'
+        AND c.status = 'ativo'
+        ORDER BY c.nome_completo
+    ");
+    $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+    
+    // Combina os arrays, evitando duplicatas
+    $lideres_ids = array_column($lideres, 'id');
+    foreach ($usuarios_lideres as $user_lider) {
+        if (!in_array($user_lider['id'], $lideres_ids)) {
+            $lideres[] = $user_lider;
+            $lideres_ids[] = $user_lider['id'];
+        }
+    }
+    
+    // Ordena novamente por nome
+    usort($lideres, function($a, $b) {
+        return strcmp($a['nome_completo'], $b['nome_completo']);
+    });
 } else {
-    // Para GESTOR, só mostra líderes que têm liderados
+    // Para GESTOR, mostra líderes que têm liderados + usuários ADMIN/RH/GESTOR
     $stmt_lideres = $pdo->query("
         SELECT DISTINCT c.id, c.nome_completo, c.foto
         FROM colaboradores c
@@ -75,6 +101,32 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
         ORDER BY c.nome_completo
     ");
     $lideres = $stmt_lideres->fetchAll();
+    
+    // Adiciona também usuários ADMIN, RH e GESTOR que tenham colaborador associado
+    $stmt_usuarios_lideres = $pdo->query("
+        SELECT DISTINCT c.id, c.nome_completo, c.foto
+        FROM usuarios u
+        INNER JOIN colaboradores c ON u.colaborador_id = c.id
+        WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
+        AND u.status = 'ativo'
+        AND c.status = 'ativo'
+        ORDER BY c.nome_completo
+    ");
+    $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+    
+    // Combina os arrays, evitando duplicatas
+    $lideres_ids = array_column($lideres, 'id');
+    foreach ($usuarios_lideres as $user_lider) {
+        if (!in_array($user_lider['id'], $lideres_ids)) {
+            $lideres[] = $user_lider;
+            $lideres_ids[] = $user_lider['id'];
+        }
+    }
+    
+    // Ordena novamente por nome
+    usort($lideres, function($a, $b) {
+        return strcmp($a['nome_completo'], $b['nome_completo']);
+    });
 }
 
 // Busca líder do colaborador logado (se for colaborador)
