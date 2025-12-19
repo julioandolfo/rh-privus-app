@@ -141,28 +141,47 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     // Combina os arrays, evitando duplicatas
     if (!empty($usuarios_lideres)) {
         $lideres_ids = array_column($lideres, 'id');
-        echo "<script>console.log('DEBUG - IDs de líderes já existentes:', " . json_encode($lideres_ids, JSON_UNESCAPED_UNICODE) . ");</script>";
+        echo "<script>console.log('DEBUG - IDs de líderes já existentes (colaboradores):', " . json_encode($lideres_ids, JSON_UNESCAPED_UNICODE) . ");</script>";
+        echo "<script>console.log('DEBUG - Lista completa de colaboradores:', " . json_encode($colaboradores, JSON_UNESCAPED_UNICODE) . ");</script>";
         
         foreach ($usuarios_lideres as $idx => $user_lider) {
+            $nome_usuario = htmlspecialchars($user_lider['nome_completo'] ?? 'Sem nome', ENT_QUOTES);
             // DEBUG: Log de cada usuário sendo processado
-            echo "<script>console.log('DEBUG - Processando usuário " . ($idx + 1) . ":', " . json_encode($user_lider, JSON_UNESCAPED_UNICODE) . ");</script>";
+            echo "<script>console.log('DEBUG - Processando usuário " . ($idx + 1) . " (" . $nome_usuario . "):', " . json_encode($user_lider, JSON_UNESCAPED_UNICODE) . ");</script>";
             
             // Garante que tem id e nome_completo válidos
             if (empty($user_lider['id'])) {
-                echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " REJEITADO: id vazio');</script>";
+                echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: id vazio');</script>";
                 continue;
             }
             if (empty($user_lider['nome_completo'])) {
-                echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " REJEITADO: nome_completo vazio');</script>";
+                echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: nome_completo vazio');</script>";
                 continue;
             }
             
             // Converte id para inteiro para comparação correta
             $user_id = (int)$user_lider['id'];
-            echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " - ID convertido:', " . $user_id . ");</script>";
+            echo "<script>console.log('DEBUG - " . $nome_usuario . " - ID original:', " . json_encode($user_lider['id']) . ", ID convertido:', " . $user_id . ");</script>";
+            echo "<script>console.log('DEBUG - " . $nome_usuario . " - Verificando se ID ' . " . $user_id . " . ' está em:', " . json_encode($lideres_ids, JSON_UNESCAPED_UNICODE) . ");</script>";
             
-            if (in_array($user_id, $lideres_ids)) {
-                echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " REJEITADO: ID já existe na lista (duplicata)');</script>";
+            // Verifica se o ID já existe na lista
+            $id_existe = in_array($user_id, $lideres_ids);
+            echo "<script>console.log('DEBUG - " . $nome_usuario . " - ID existe na lista?', " . ($id_existe ? 'true' : 'false') . ");</script>";
+            
+            if ($id_existe) {
+                // Verifica qual colaborador tem esse ID
+                $colab_com_mesmo_id = null;
+                foreach ($colaboradores as $colab) {
+                    if ((int)$colab['id'] === $user_id) {
+                        $colab_com_mesmo_id = $colab;
+                        break;
+                    }
+                }
+                if ($colab_com_mesmo_id) {
+                    echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: ID " . $user_id . " já existe na lista de colaboradores:', " . json_encode($colab_com_mesmo_id, JSON_UNESCAPED_UNICODE) . ");</script>";
+                } else {
+                    echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: ID " . $user_id . " já existe na lista de líderes (duplicata)');</script>";
+                }
                 continue;
             }
             
@@ -171,7 +190,7 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
             $user_lider['id'] = $user_id; // Garante que id seja inteiro
             $lideres[] = $user_lider;
             $lideres_ids[] = $user_id;
-            echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " ADICIONADO à lista de líderes');</script>";
+            echo "<script>console.log('DEBUG - " . $nome_usuario . " ADICIONADO à lista de líderes com ID: " . $user_id . "');</script>";
         }
     } else {
         echo "<script>console.log('DEBUG - Nenhum usuário líder retornado da query');</script>";
