@@ -65,23 +65,59 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     $lideres = $colaboradores;
     
     // Adiciona também usuários ADMIN, RH e GESTOR que tenham colaborador associado
-    $stmt_usuarios_lideres = $pdo->query("
-        SELECT DISTINCT c.id, c.nome_completo, c.foto
-        FROM usuarios u
-        INNER JOIN colaboradores c ON u.colaborador_id = c.id
-        WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
-        AND u.status = 'ativo'
-        AND c.status = 'ativo'
-        ORDER BY c.nome_completo
-    ");
-    $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+    $usuarios_lideres = [];
+    if ($usuario['role'] === 'ADMIN') {
+        // ADMIN pode ver todos os usuários ADMIN/RH/GESTOR com colaborador
+        $stmt_usuarios_lideres = $pdo->query("
+            SELECT DISTINCT c.id, c.nome_completo, c.foto
+            FROM usuarios u
+            INNER JOIN colaboradores c ON u.colaborador_id = c.id
+            WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
+            AND u.status = 'ativo'
+            AND c.status = 'ativo'
+            ORDER BY c.nome_completo
+        ");
+        $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+    } else {
+        // RH só pode ver usuários das empresas dele
+        if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
+            $stmt_usuarios_lideres = $pdo->prepare("
+                SELECT DISTINCT c.id, c.nome_completo, c.foto
+                FROM usuarios u
+                INNER JOIN colaboradores c ON u.colaborador_id = c.id
+                WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
+                AND u.status = 'ativo'
+                AND c.status = 'ativo'
+                AND c.empresa_id IN ($placeholders)
+                ORDER BY c.nome_completo
+            ");
+            $stmt_usuarios_lideres->execute($usuario['empresas_ids']);
+            $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+        } elseif (!empty($usuario['empresa_id'])) {
+            $stmt_usuarios_lideres = $pdo->prepare("
+                SELECT DISTINCT c.id, c.nome_completo, c.foto
+                FROM usuarios u
+                INNER JOIN colaboradores c ON u.colaborador_id = c.id
+                WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
+                AND u.status = 'ativo'
+                AND c.status = 'ativo'
+                AND c.empresa_id = ?
+                ORDER BY c.nome_completo
+            ");
+            $stmt_usuarios_lideres->execute([$usuario['empresa_id']]);
+            $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+        }
+    }
     
     // Combina os arrays, evitando duplicatas
-    $lideres_ids = array_column($lideres, 'id');
-    foreach ($usuarios_lideres as $user_lider) {
-        if (!in_array($user_lider['id'], $lideres_ids)) {
-            $lideres[] = $user_lider;
-            $lideres_ids[] = $user_lider['id'];
+    if (!empty($usuarios_lideres)) {
+        $lideres_ids = array_column($lideres, 'id');
+        foreach ($usuarios_lideres as $user_lider) {
+            if (!in_array($user_lider['id'], $lideres_ids)) {
+                $lideres[] = $user_lider;
+                $lideres_ids[] = $user_lider['id'];
+            }
         }
     }
     
@@ -103,30 +139,40 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     $lideres = $stmt_lideres->fetchAll();
     
     // Adiciona também usuários ADMIN, RH e GESTOR que tenham colaborador associado
-    $stmt_usuarios_lideres = $pdo->query("
-        SELECT DISTINCT c.id, c.nome_completo, c.foto
-        FROM usuarios u
-        INNER JOIN colaboradores c ON u.colaborador_id = c.id
-        WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
-        AND u.status = 'ativo'
-        AND c.status = 'ativo'
-        ORDER BY c.nome_completo
-    ");
-    $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+    // GESTOR só pode ver usuários do seu setor
+    $stmt_setor = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
+    $stmt_setor->execute([$usuario['id']]);
+    $user_data = $stmt_setor->fetch();
+    $setor_id = $user_data['setor_id'] ?? 0;
     
-    // Combina os arrays, evitando duplicatas
-    $lideres_ids = array_column($lideres, 'id');
-    foreach ($usuarios_lideres as $user_lider) {
-        if (!in_array($user_lider['id'], $lideres_ids)) {
-            $lideres[] = $user_lider;
-            $lideres_ids[] = $user_lider['id'];
+    if ($setor_id) {
+        $stmt_usuarios_lideres = $pdo->prepare("
+            SELECT DISTINCT c.id, c.nome_completo, c.foto
+            FROM usuarios u
+            INNER JOIN colaboradores c ON u.colaborador_id = c.id
+            WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
+            AND u.status = 'ativo'
+            AND c.status = 'ativo'
+            AND c.setor_id = ?
+            ORDER BY c.nome_completo
+        ");
+        $stmt_usuarios_lideres->execute([$setor_id]);
+        $usuarios_lideres = $stmt_usuarios_lideres->fetchAll();
+        
+        // Combina os arrays, evitando duplicatas
+        $lideres_ids = array_column($lideres, 'id');
+        foreach ($usuarios_lideres as $user_lider) {
+            if (!in_array($user_lider['id'], $lideres_ids)) {
+                $lideres[] = $user_lider;
+                $lideres_ids[] = $user_lider['id'];
+            }
         }
+        
+        // Ordena novamente por nome
+        usort($lideres, function($a, $b) {
+            return strcmp($a['nome_completo'], $b['nome_completo']);
+        });
     }
-    
-    // Ordena novamente por nome
-    usort($lideres, function($a, $b) {
-        return strcmp($a['nome_completo'], $b['nome_completo']);
-    });
 }
 
 // Busca líder do colaborador logado (se for colaborador)
