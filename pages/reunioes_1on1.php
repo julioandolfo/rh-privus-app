@@ -68,11 +68,24 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     $usuarios_lideres = [];
     if ($usuario['role'] === 'ADMIN') {
         // ADMIN pode ver todos os usuários ADMIN/RH/GESTOR
+        // DEBUG: Query completa para ver todos os usuários
+        $stmt_debug = $pdo->query("
+            SELECT id, nome, role, status, colaborador_id, empresa_id, setor_id
+            FROM usuarios
+            WHERE role IN ('ADMIN', 'RH', 'GESTOR')
+            ORDER BY nome
+        ");
+        $todos_usuarios = $stmt_debug->fetchAll(PDO::FETCH_ASSOC);
+        echo "<script>console.log('DEBUG - Todos os usuários ADMIN/RH/GESTOR no banco:', " . json_encode($todos_usuarios, JSON_UNESCAPED_UNICODE) . ");</script>";
+        
         $stmt_usuarios_lideres = $pdo->query("
             SELECT 
                 COALESCE(colaborador_id, id) as id,
                 nome as nome_completo,
-                foto
+                foto,
+                id as usuario_id,
+                colaborador_id,
+                role
             FROM usuarios
             WHERE role IN ('ADMIN', 'RH', 'GESTOR')
             AND status = 'ativo'
@@ -80,6 +93,13 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
             ORDER BY nome
         ");
         $usuarios_lideres = $stmt_usuarios_lideres->fetchAll(PDO::FETCH_ASSOC);
+        
+        // DEBUG: Log detalhado de cada usuário retornado
+        echo "<script>console.log('DEBUG - Query retornou ' + " . count($usuarios_lideres) . " + ' usuários');";
+        foreach ($usuarios_lideres as $idx => $user) {
+            echo "console.log('DEBUG - Usuário " . ($idx + 1) . ":', " . json_encode($user, JSON_UNESCAPED_UNICODE) . ");";
+        }
+        echo "</script>";
     } else {
         // RH só pode ver usuários das empresas dele
         if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
@@ -121,20 +141,40 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     // Combina os arrays, evitando duplicatas
     if (!empty($usuarios_lideres)) {
         $lideres_ids = array_column($lideres, 'id');
-        foreach ($usuarios_lideres as $user_lider) {
+        echo "<script>console.log('DEBUG - IDs de líderes já existentes:', " . json_encode($lideres_ids, JSON_UNESCAPED_UNICODE) . ");</script>";
+        
+        foreach ($usuarios_lideres as $idx => $user_lider) {
+            // DEBUG: Log de cada usuário sendo processado
+            echo "<script>console.log('DEBUG - Processando usuário " . ($idx + 1) . ":', " . json_encode($user_lider, JSON_UNESCAPED_UNICODE) . ");</script>";
+            
             // Garante que tem id e nome_completo válidos
-            if (!empty($user_lider['id']) && !empty($user_lider['nome_completo'])) {
-                // Converte id para inteiro para comparação correta
-                $user_id = (int)$user_lider['id'];
-                if (!in_array($user_id, $lideres_ids)) {
-                    // Garante que foto seja null se vazio
-                    $user_lider['foto'] = !empty($user_lider['foto']) ? $user_lider['foto'] : null;
-                    $user_lider['id'] = $user_id; // Garante que id seja inteiro
-                    $lideres[] = $user_lider;
-                    $lideres_ids[] = $user_id;
-                }
+            if (empty($user_lider['id'])) {
+                echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " REJEITADO: id vazio');</script>";
+                continue;
             }
+            if (empty($user_lider['nome_completo'])) {
+                echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " REJEITADO: nome_completo vazio');</script>";
+                continue;
+            }
+            
+            // Converte id para inteiro para comparação correta
+            $user_id = (int)$user_lider['id'];
+            echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " - ID convertido:', " . $user_id . ");</script>";
+            
+            if (in_array($user_id, $lideres_ids)) {
+                echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " REJEITADO: ID já existe na lista (duplicata)');</script>";
+                continue;
+            }
+            
+            // Garante que foto seja null se vazio
+            $user_lider['foto'] = !empty($user_lider['foto']) ? $user_lider['foto'] : null;
+            $user_lider['id'] = $user_id; // Garante que id seja inteiro
+            $lideres[] = $user_lider;
+            $lideres_ids[] = $user_id;
+            echo "<script>console.log('DEBUG - Usuário " . ($idx + 1) . " ADICIONADO à lista de líderes');</script>";
         }
+    } else {
+        echo "<script>console.log('DEBUG - Nenhum usuário líder retornado da query');</script>";
     }
     
     // Ordena novamente por nome
