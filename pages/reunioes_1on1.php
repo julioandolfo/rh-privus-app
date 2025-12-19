@@ -141,6 +141,15 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     usort($lideres, function($a, $b) {
         return strcmp($a['nome_completo'], $b['nome_completo']);
     });
+    
+    // DEBUG: Log dos dados para console
+    echo "<script>console.log('DEBUG - Role do usuário:', '" . htmlspecialchars($usuario['role'], ENT_QUOTES) . "');";
+    echo "console.log('DEBUG - Total de líderes:', " . count($lideres) . ");";
+    echo "console.log('DEBUG - Total de colaboradores:', " . count($colaboradores) . ");";
+    echo "console.log('DEBUG - Total de usuários líderes retornados:', " . count($usuarios_lideres) . ");";
+    echo "console.log('DEBUG - Usuários líderes retornados:', " . json_encode($usuarios_lideres, JSON_UNESCAPED_UNICODE) . ");";
+    echo "console.log('DEBUG - Líderes finais combinados:', " . json_encode($lideres, JSON_UNESCAPED_UNICODE) . ");";
+    echo "</script>";
 } else {
     // Para GESTOR, mostra líderes que têm liderados + usuários ADMIN/RH/GESTOR
     $stmt_lideres = $pdo->query("
@@ -190,6 +199,12 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
         usort($lideres, function($a, $b) {
             return strcmp($a['nome_completo'], $b['nome_completo']);
         });
+        
+        // DEBUG: Log dos dados para console (GESTOR)
+        echo "<script>console.log('DEBUG GESTOR - Total de líderes:', " . count($lideres) . ");";
+        echo "console.log('DEBUG GESTOR - Usuários líderes retornados:', " . json_encode($usuarios_lideres, JSON_UNESCAPED_UNICODE) . ");";
+        echo "console.log('DEBUG GESTOR - Líderes finais combinados:', " . json_encode($lideres, JSON_UNESCAPED_UNICODE) . ");";
+        echo "</script>";
     }
 }
 
@@ -489,7 +504,22 @@ function initSelect2OnModal(modalId, selectId) {
             }
             
             const $select = jQuery('#' + selectId);
-            if ($select.length === 0) return;
+            if ($select.length === 0) {
+                console.log('DEBUG - Select não encontrado:', selectId);
+                return;
+            }
+            
+            // DEBUG: Mostra as opções disponíveis no select
+            console.log('DEBUG - Inicializando Select2 para:', selectId);
+            const options = $select.find('option').map(function() {
+                return {
+                    value: jQuery(this).val(),
+                    text: jQuery(this).text(),
+                    dataFoto: jQuery(this).attr('data-foto'),
+                    dataNome: jQuery(this).attr('data-nome')
+                };
+            }).get();
+            console.log('DEBUG - Opções no select ' + selectId + ':', options);
             
             if ($select.hasClass('select2-hidden-accessible')) {
                 $select.select2('destroy');
