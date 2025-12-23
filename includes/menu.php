@@ -442,7 +442,7 @@ function getIcon($name) {
                 
                 <?php if (can_access_recrutamento()): ?>
                     <!--begin:Menu item - Recrutamento e Seleção-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('vagas.php') || isActive('kanban_selecao.php') || isActive('candidaturas.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('vagas.php') || isActive('kanban_selecao.php') || isActive('candidaturas.php') || isActive('contratados_pendentes.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -489,6 +489,16 @@ function getIcon($name) {
                                         <span class="bullet bullet-dot"></span>
                                     </span>
                                     <span class="menu-title">Kanban de Seleção</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('contratados_pendentes.php') ?>" href="contratados_pendentes.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Contratados Pendentes</span>
                                 </a>
                             </div>
                             <!--end:Menu item-->

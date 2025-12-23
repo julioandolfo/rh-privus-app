@@ -209,17 +209,35 @@ $vagas = $stmt->fetchAll();
                                                             <?= date('d/m/Y', strtotime($candidatura['data_candidatura'] ?? $candidatura['created_at'])) ?>
                                                         </span>
                                                     </div>
-                                                    <?php if ($is_entrevista_manual): ?>
-                                                    <a href="entrevista_view.php?id=<?= $entrevista_id ?>" 
-                                                       class="btn btn-sm btn-light-primary">
-                                                        Ver Entrevista
-                                                    </a>
-                                                    <?php else: ?>
-                                                    <a href="candidatura_view.php?id=<?= $candidatura['id'] ?>" 
-                                                       class="btn btn-sm btn-light-primary">
-                                                        Ver Detalhes
-                                                    </a>
-                                                    <?php endif; ?>
+                                                    <div class="d-flex gap-1">
+                                                        <?php if ($is_entrevista_manual): ?>
+                                                        <a href="entrevista_view.php?id=<?= $entrevista_id ?>" 
+                                                           class="btn btn-sm btn-light-primary">
+                                                            Ver
+                                                        </a>
+                                                        <?php else: ?>
+                                                        <a href="candidatura_view.php?id=<?= $candidatura['id'] ?>" 
+                                                           class="btn btn-sm btn-light-primary">
+                                                            Ver
+                                                        </a>
+                                                        <?php endif; ?>
+                                                        <?php if (has_role(['ADMIN', 'RH'])): ?>
+                                                        <button type="button" 
+                                                                class="btn btn-sm btn-light-danger btn-remover-card" 
+                                                                data-id="<?= $candidatura['id'] ?>"
+                                                                data-is-entrevista="<?= $is_entrevista_manual ? '1' : '0' ?>"
+                                                                data-nome="<?= htmlspecialchars($candidatura['nome_completo']) ?>"
+                                                                title="Remover">
+                                                            <i class="ki-duotone ki-trash fs-6">
+                                                                <span class="path1"></span>
+                                                                <span class="path2"></span>
+                                                                <span class="path3"></span>
+                                                                <span class="path4"></span>
+                                                                <span class="path5"></span>
+                                                            </i>
+                                                        </button>
+                                                        <?php endif; ?>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -470,7 +488,54 @@ async function handleDrop(e) {
 // Inicializa drag and drop quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', function() {
     inicializarDragAndDrop();
+    
+    // Botões de remover
+    document.querySelectorAll('.btn-remover-card').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const id = this.dataset.id;
+            const isEntrevista = this.dataset.isEntrevista === '1';
+            const nome = this.dataset.nome;
+            
+            removerCard(id, isEntrevista, nome, this.closest('.kanban-card'));
+        });
+    });
 });
+
+// Função para remover card
+async function removerCard(id, isEntrevista, nome, cardElement) {
+    const tipo = isEntrevista ? 'entrevista' : 'candidatura';
+    
+    if (!confirm(`Tem certeza que deseja remover a ${tipo} de "${nome}"?\n\nEsta ação não pode ser desfeita!`)) {
+        return;
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('id', id);
+        formData.append('is_entrevista', isEntrevista ? '1' : '0');
+        formData.append('confirmar', '1');
+        
+        const response = await fetch('../api/recrutamento/kanban/remover.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Remove o card da tela
+            cardElement.remove();
+            atualizarContadores();
+            alert('Removido com sucesso!');
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao remover');
+    }
+}
 
 // Filtro de vaga
 document.addEventListener('DOMContentLoaded', function() {

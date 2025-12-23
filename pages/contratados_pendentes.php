@@ -16,8 +16,8 @@ require_once __DIR__ . '/../includes/header.php';
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
-// Busca candidaturas pendentes
-$where_candidaturas = ["c.coluna_kanban = 'contratado'", "c.status = 'contratado_pendente'"];
+// Busca candidaturas pendentes (coluna contratado OU status contratado_pendente)
+$where_candidaturas = ["(c.coluna_kanban = 'contratado' OR c.status = 'contratado_pendente')", "c.status != 'contratado'"];
 $params_candidaturas = [];
 
 if ($usuario['role'] === 'RH') {
@@ -51,8 +51,8 @@ $stmt = $pdo->prepare($sql_candidaturas);
 $stmt->execute($params_candidaturas);
 $candidaturas = $stmt->fetchAll();
 
-// Busca entrevistas manuais pendentes
-$where_entrevistas = ["ent.candidatura_id IS NULL", "ent.coluna_kanban = 'contratado'", "(ent.status = 'contratado_pendente' OR ent.status = 'agendada')"];
+// Busca entrevistas manuais pendentes (coluna contratado OU status contratado_pendente)
+$where_entrevistas = ["ent.candidatura_id IS NULL", "(ent.coluna_kanban = 'contratado' OR ent.status = 'contratado_pendente')", "ent.status != 'contratado'"];
 $params_entrevistas = [];
 
 if ($usuario['role'] === 'RH') {

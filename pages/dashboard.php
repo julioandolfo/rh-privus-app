@@ -956,7 +956,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                         <textarea name="descricao" class="form-control form-control-solid" rows="4" placeholder="Fique à vontade para falar o que sente. Essa informação é privada e será lida somente por alguém que quer te ver feliz!"></textarea>
                                     </div>
                                     
-                                    <button type="button" class="btn btn-primary btn-lg" onclick="document.getElementById('form_emocao_dashboard_colab').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})); return false;">
+                                    <button type="button" class="btn btn-primary btn-lg" onclick="enviarHumorColab(); return false;">
                                         <span class="indicator-label">Enviar humor</span>
                                         <span class="indicator-progress">Enviando...
                                             <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
@@ -1547,7 +1547,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                         <textarea name="descricao" class="form-control form-control-solid" rows="4" placeholder="Fique à vontade para falar o que sente. Essa informação é privada e será lida somente por alguém que quer te ver feliz!"></textarea>
                                     </div>
                                     
-                                    <button type="button" class="btn btn-primary btn-lg" onclick="document.getElementById('form_emocao_dashboard').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})); return false;">
+                                    <button type="button" class="btn btn-primary btn-lg" onclick="enviarHumorAdmin(); return false;">
                                         <span class="indicator-label">Enviar humor</span>
                                         <span class="indicator-progress">Enviando...
                                             <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
@@ -6967,6 +6967,242 @@ setTimeout(() => {
 
 <!--begin::Emoções Script-->
 <script>
+// Função global para enviar humor (Colaborador)
+window.enviarHumorColab = function() {
+    console.log('enviarHumorColab chamado');
+    const form = document.getElementById('form_emocao_dashboard_colab');
+    if (!form) {
+        console.error('Formulário não encontrado');
+        return false;
+    }
+    
+    const nivelEmocao = form.querySelector('input[name="nivel_emocao"]:checked');
+    if (!nivelEmocao) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                text: "Por favor, selecione como você está se sentindo",
+                icon: "warning",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary"
+                }
+            });
+        } else {
+            alert("Por favor, selecione como você está se sentindo");
+        }
+        return false;
+    }
+    
+    const formData = new FormData(form);
+    const btn = form.querySelector('button.btn-primary');
+    const indicator = btn ? btn.querySelector('.indicator-label') : null;
+    const progress = btn ? btn.querySelector('.indicator-progress') : null;
+    
+    if (btn) {
+        btn.setAttribute('data-kt-indicator', 'on');
+        btn.disabled = true;
+        if (indicator) indicator.style.display = 'none';
+        if (progress) progress.style.display = 'inline-block';
+    }
+    
+    console.log('Enviando para API...');
+    fetch('../api/registrar_emocao.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Resposta recebida:', response.status);
+        if (!response.ok) {
+            throw new Error('Erro na resposta do servidor: ' + response.status);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Dados:', data);
+        if (data.success) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    text: data.message,
+                    icon: "success",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                }).then(function() {
+                    location.reload();
+                });
+            } else {
+                alert(data.message);
+                location.reload();
+            }
+        } else {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    text: data.message || "Erro ao registrar emoção",
+                    icon: "error",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                });
+            } else {
+                alert(data.message || "Erro ao registrar emoção");
+            }
+            if (btn) {
+                btn.removeAttribute('data-kt-indicator');
+                btn.disabled = false;
+                if (indicator) indicator.style.display = 'inline-block';
+                if (progress) progress.style.display = 'none';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                text: "Erro ao registrar emoção. Tente novamente.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary"
+                }
+            });
+        } else {
+            alert("Erro ao registrar emoção. Tente novamente.");
+        }
+        if (btn) {
+            btn.removeAttribute('data-kt-indicator');
+            btn.disabled = false;
+            if (indicator) indicator.style.display = 'inline-block';
+            if (progress) progress.style.display = 'none';
+        }
+    });
+    
+    return false;
+};
+
+// Função global para enviar humor (Admin/RH/GESTOR)
+window.enviarHumorAdmin = function() {
+    console.log('enviarHumorAdmin chamado');
+    const form = document.getElementById('form_emocao_dashboard');
+    if (!form) {
+        console.error('Formulário não encontrado');
+        return false;
+    }
+    
+    const nivelEmocao = form.querySelector('input[name="nivel_emocao"]:checked');
+    if (!nivelEmocao) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                text: "Por favor, selecione como você está se sentindo",
+                icon: "warning",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary"
+                }
+            });
+        } else {
+            alert("Por favor, selecione como você está se sentindo");
+        }
+        return false;
+    }
+    
+    const formData = new FormData(form);
+    const btn = form.querySelector('button.btn-primary');
+    const indicator = btn ? btn.querySelector('.indicator-label') : null;
+    const progress = btn ? btn.querySelector('.indicator-progress') : null;
+    
+    if (btn) {
+        btn.setAttribute('data-kt-indicator', 'on');
+        btn.disabled = true;
+        if (indicator) indicator.style.display = 'none';
+        if (progress) progress.style.display = 'inline-block';
+    }
+    
+    console.log('Enviando para API...');
+    fetch('../api/registrar_emocao.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Resposta recebida:', response.status);
+        if (!response.ok) {
+            throw new Error('Erro na resposta do servidor: ' + response.status);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Dados:', data);
+        if (data.success) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    text: data.message,
+                    icon: "success",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                }).then(function() {
+                    location.reload();
+                });
+            } else {
+                alert(data.message);
+                location.reload();
+            }
+        } else {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    text: data.message || "Erro ao registrar emoção",
+                    icon: "error",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                });
+            } else {
+                alert(data.message || "Erro ao registrar emoção");
+            }
+            if (btn) {
+                btn.removeAttribute('data-kt-indicator');
+                btn.disabled = false;
+                if (indicator) indicator.style.display = 'inline-block';
+                if (progress) progress.style.display = 'none';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                text: "Erro ao registrar emoção. Tente novamente.",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary"
+                }
+            });
+        } else {
+            alert("Erro ao registrar emoção. Tente novamente.");
+        }
+        if (btn) {
+            btn.removeAttribute('data-kt-indicator');
+            btn.disabled = false;
+            if (indicator) indicator.style.display = 'inline-block';
+            if (progress) progress.style.display = 'none';
+        }
+    });
+    
+    return false;
+};
+
 (function() {
     console.log('Inicializando scripts de emoção...');
     

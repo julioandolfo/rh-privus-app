@@ -78,6 +78,22 @@ try {
         ");
         $stmt->execute([$coluna_codigo, $entrevista_id]);
         
+        // Se moveu para contratado, cria entrada no onboarding (para entrevistas manuais)
+        if ($coluna_codigo === 'contratado') {
+            // Verifica se já existe onboarding para esta entrevista
+            $stmt = $pdo->prepare("SELECT id FROM onboarding WHERE entrevista_id = ?");
+            $stmt->execute([$entrevista_id]);
+            if (!$stmt->fetch()) {
+                // Cria onboarding para entrevista manual
+                $stmt = $pdo->prepare("
+                    INSERT INTO onboarding 
+                    (entrevista_id, status, coluna_kanban, data_inicio, responsavel_id)
+                    VALUES (?, 'contratado', 'contratado', CURDATE(), ?)
+                ");
+                $stmt->execute([$entrevista_id, $usuario['id']]);
+            }
+        }
+        
         echo json_encode([
             'success' => true,
             'message' => 'Entrevista movida com sucesso'
@@ -137,6 +153,22 @@ try {
         
         // Executa automações da nova coluna
         executar_automatizacoes_kanban($candidatura_id_int, $coluna_codigo);
+        
+        // Se moveu para contratado, cria entrada no onboarding
+        if ($coluna_codigo === 'contratado') {
+            // Verifica se já existe onboarding
+            $stmt = $pdo->prepare("SELECT id FROM onboarding WHERE candidatura_id = ?");
+            $stmt->execute([$candidatura_id_int]);
+            if (!$stmt->fetch()) {
+                // Cria onboarding
+                $stmt = $pdo->prepare("
+                    INSERT INTO onboarding 
+                    (candidatura_id, status, coluna_kanban, data_inicio, responsavel_id)
+                    VALUES (?, 'contratado', 'contratado', CURDATE(), ?)
+                ");
+                $stmt->execute([$candidatura_id_int, $usuario['id']]);
+            }
+        }
         
         echo json_encode([
             'success' => true,
