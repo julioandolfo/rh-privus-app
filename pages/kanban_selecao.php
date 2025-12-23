@@ -293,8 +293,9 @@ function setupAutoScroll() {
     const container = document.getElementById('kanbanContainer');
     if (!container) return;
     
-    const SCROLL_SPEED = 15;
-    const SCROLL_ZONE = 80; // Pixels da borda para ativar scroll
+    const SCROLL_ZONE = 150; // Pixels da borda para ativar scroll (aumentado para mais flexibilidade)
+    const MAX_SCROLL_SPEED = 25; // Velocidade máxima de scroll
+    const MIN_SCROLL_SPEED = 8; // Velocidade mínima de scroll
     
     container.addEventListener('dragover', function(e) {
         const containerRect = container.getBoundingClientRect();
@@ -306,17 +307,30 @@ function setupAutoScroll() {
             autoScrollInterval = null;
         }
         
+        // Calcula distância da borda esquerda
+        const distFromLeft = mouseX - containerRect.left;
+        // Calcula distância da borda direita
+        const distFromRight = containerRect.right - mouseX;
+        
         // Verifica se está na zona de scroll esquerda
-        if (mouseX < containerRect.left + SCROLL_ZONE) {
+        if (distFromLeft < SCROLL_ZONE && distFromLeft >= 0) {
+            // Quanto mais perto da borda, mais rápido o scroll (progressivo)
+            const intensity = 1 - (distFromLeft / SCROLL_ZONE);
+            const speed = MIN_SCROLL_SPEED + (MAX_SCROLL_SPEED - MIN_SCROLL_SPEED) * intensity;
+            
             autoScrollInterval = setInterval(() => {
-                container.scrollLeft -= SCROLL_SPEED;
-            }, 20);
+                container.scrollLeft -= speed;
+            }, 16);
         }
         // Verifica se está na zona de scroll direita
-        else if (mouseX > containerRect.right - SCROLL_ZONE) {
+        else if (distFromRight < SCROLL_ZONE && distFromRight >= 0) {
+            // Quanto mais perto da borda, mais rápido o scroll (progressivo)
+            const intensity = 1 - (distFromRight / SCROLL_ZONE);
+            const speed = MIN_SCROLL_SPEED + (MAX_SCROLL_SPEED - MIN_SCROLL_SPEED) * intensity;
+            
             autoScrollInterval = setInterval(() => {
-                container.scrollLeft += SCROLL_SPEED;
-            }, 20);
+                container.scrollLeft += speed;
+            }, 16);
         }
     });
     
