@@ -24,16 +24,20 @@ if (!$onboarding_id) {
 // Busca onboarding
 $stmt = $pdo->prepare("
     SELECT o.*,
-           c.nome_completo as candidato_nome,
-           c.email as candidato_email,
+           COALESCE(c.nome_completo, e.candidato_nome_manual) as candidato_nome,
+           COALESCE(c.email, e.candidato_email_manual) as candidato_email,
+           COALESCE(c.telefone, e.candidato_telefone_manual) as candidato_telefone,
            col.nome_completo as colaborador_nome,
-           v.titulo as vaga_titulo,
+           COALESCE(v.titulo, ve.titulo) as vaga_titulo,
            u.nome as responsavel_nome,
-           m.nome_completo as mentor_nome
+           m.nome_completo as mentor_nome,
+           CASE WHEN o.entrevista_id IS NOT NULL AND o.candidatura_id IS NULL THEN 1 ELSE 0 END as is_entrevista_manual
     FROM onboarding o
-    INNER JOIN candidaturas cand ON o.candidatura_id = cand.id
-    INNER JOIN candidatos c ON cand.candidato_id = c.id
-    INNER JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN candidaturas cand ON o.candidatura_id = cand.id
+    LEFT JOIN candidatos c ON cand.candidato_id = c.id
+    LEFT JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN entrevistas e ON o.entrevista_id = e.id
+    LEFT JOIN vagas ve ON e.vaga_id_manual = ve.id
     LEFT JOIN colaboradores col ON o.colaborador_id = col.id
     LEFT JOIN usuarios u ON o.responsavel_id = u.id
     LEFT JOIN colaboradores m ON o.mentor_id = m.id
@@ -74,15 +78,28 @@ foreach ($tarefas as $tarefa) {
                 
                 <div class="card mb-5">
                     <div class="card-header">
-                        <h2>Onboarding - <?= htmlspecialchars($onboarding['colaborador_nome'] ?: $onboarding['candidato_nome']) ?></h2>
+                        <h2>
+                            Onboarding - <?= htmlspecialchars($onboarding['colaborador_nome'] ?: $onboarding['candidato_nome']) ?>
+                            <?php if (!empty($onboarding['is_entrevista_manual'])): ?>
+                            <span class="badge badge-light-warning ms-2">Entrevista Manual</span>
+                            <?php endif; ?>
+                        </h2>
                         <div class="card-toolbar">
+                            <a href="kanban_onboarding.php" class="btn btn-light-primary me-2">Kanban</a>
                             <a href="onboarding.php" class="btn btn-light">Voltar</a>
                         </div>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <p><strong>Vaga:</strong> <?= htmlspecialchars($onboarding['vaga_titulo']) ?></p>
+                                <p><strong>Candidato:</strong> <?= htmlspecialchars($onboarding['candidato_nome']) ?></p>
+                                <?php if (!empty($onboarding['candidato_email'])): ?>
+                                <p><strong>Email:</strong> <?= htmlspecialchars($onboarding['candidato_email']) ?></p>
+                                <?php endif; ?>
+                                <?php if (!empty($onboarding['candidato_telefone'])): ?>
+                                <p><strong>Telefone:</strong> <?= htmlspecialchars($onboarding['candidato_telefone']) ?></p>
+                                <?php endif; ?>
+                                <p><strong>Vaga:</strong> <?= htmlspecialchars($onboarding['vaga_titulo'] ?? 'Não informada') ?></p>
                                 <p><strong>Status:</strong> 
                                     <span class="badge badge-light-primary"><?= ucfirst($onboarding['status']) ?></span>
                                 </p>
