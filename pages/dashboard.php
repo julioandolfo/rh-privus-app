@@ -7000,8 +7000,29 @@ document.addEventListener('DOMContentLoaded', function() {
     // Submit do formulário de emoção (Admin/RH/GESTOR)
     const formEmocao = document.getElementById('form_emocao_dashboard');
     if (formEmocao) {
+        // Garante que não há action ou method que cause redirecionamento
+        formEmocao.setAttribute('method', 'post');
+        formEmocao.removeAttribute('action');
+        formEmocao.setAttribute('onsubmit', 'return false;');
+        
         formEmocao.addEventListener('submit', function(e) {
             e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            const nivelEmocao = this.querySelector('input[name="nivel_emocao"]:checked');
+            if (!nivelEmocao) {
+                Swal.fire({
+                    text: "Por favor, selecione como você está se sentindo",
+                    icon: "warning",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                });
+                return false;
+            }
             
             const formData = new FormData(this);
             const btn = this.querySelector('button[type="submit"]');
@@ -7009,6 +7030,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const progress = btn.querySelector('.indicator-progress');
             
             btn.setAttribute('data-kt-indicator', 'on');
+            btn.disabled = true;
             indicator.style.display = 'none';
             progress.style.display = 'inline-block';
             
@@ -7016,7 +7038,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro na resposta do servidor');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     Swal.fire({
@@ -7032,7 +7059,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 } else {
                     Swal.fire({
-                        text: data.message,
+                        text: data.message || "Erro ao registrar emoção",
                         icon: "error",
                         buttonsStyling: false,
                         confirmButtonText: "Ok",
@@ -7040,11 +7067,16 @@ document.addEventListener('DOMContentLoaded', function() {
                             confirmButton: "btn btn-primary"
                         }
                     });
+                    btn.removeAttribute('data-kt-indicator');
+                    btn.disabled = false;
+                    indicator.style.display = 'inline-block';
+                    progress.style.display = 'none';
                 }
             })
             .catch(error => {
+                console.error('Erro ao registrar emoção:', error);
                 Swal.fire({
-                    text: "Erro ao registrar emoção",
+                    text: "Erro ao registrar emoção. Tente novamente.",
                     icon: "error",
                     buttonsStyling: false,
                     confirmButtonText: "Ok",
@@ -7052,20 +7084,42 @@ document.addEventListener('DOMContentLoaded', function() {
                         confirmButton: "btn btn-primary"
                     }
                 });
-            })
-            .finally(() => {
                 btn.removeAttribute('data-kt-indicator');
+                btn.disabled = false;
                 indicator.style.display = 'inline-block';
                 progress.style.display = 'none';
             });
+            
+            return false;
         });
     }
     
     // Submit do formulário de emoção (Colaborador)
     const formEmocaoColab = document.getElementById('form_emocao_dashboard_colab');
     if (formEmocaoColab) {
+        // Garante que não há action ou method que cause redirecionamento
+        formEmocaoColab.setAttribute('method', 'post');
+        formEmocaoColab.removeAttribute('action');
+        formEmocaoColab.setAttribute('onsubmit', 'return false;');
+        
         formEmocaoColab.addEventListener('submit', function(e) {
             e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            const nivelEmocao = this.querySelector('input[name="nivel_emocao"]:checked');
+            if (!nivelEmocao) {
+                Swal.fire({
+                    text: "Por favor, selecione como você está se sentindo",
+                    icon: "warning",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                });
+                return false;
+            }
             
             const formData = new FormData(this);
             const btn = this.querySelector('button[type="submit"]');
@@ -7073,6 +7127,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const progress = btn.querySelector('.indicator-progress');
             
             btn.setAttribute('data-kt-indicator', 'on');
+            btn.disabled = true;
             indicator.style.display = 'none';
             progress.style.display = 'inline-block';
             
@@ -7080,7 +7135,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro na resposta do servidor');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     Swal.fire({
@@ -7096,7 +7156,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 } else {
                     Swal.fire({
-                        text: data.message,
+                        text: data.message || "Erro ao registrar emoção",
                         icon: "error",
                         buttonsStyling: false,
                         confirmButtonText: "Ok",
@@ -7104,11 +7164,16 @@ document.addEventListener('DOMContentLoaded', function() {
                             confirmButton: "btn btn-primary"
                         }
                     });
+                    btn.removeAttribute('data-kt-indicator');
+                    btn.disabled = false;
+                    indicator.style.display = 'inline-block';
+                    progress.style.display = 'none';
                 }
             })
             .catch(error => {
+                console.error('Erro ao registrar emoção:', error);
                 Swal.fire({
-                    text: "Erro ao registrar emoção",
+                    text: "Erro ao registrar emoção. Tente novamente.",
                     icon: "error",
                     buttonsStyling: false,
                     confirmButtonText: "Ok",
@@ -7116,12 +7181,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         confirmButton: "btn btn-primary"
                     }
                 });
-            })
-            .finally(() => {
                 btn.removeAttribute('data-kt-indicator');
+                btn.disabled = false;
                 indicator.style.display = 'inline-block';
                 progress.style.display = 'none';
             });
+            
+            return false;
         });
     }
 });

@@ -251,9 +251,11 @@ if ($usuario['role'] === 'ADMIN') {
                         <div class="mb-3">
                             <label class="form-label">Coluna do Kanban</label>
                             <select name="coluna_kanban" class="form-select" id="colunaKanbanSelect">
-                                <option value="entrevista">Entrevista</option>
-                                <option value="triagem">Triagem</option>
+                                <option value="entrevistas">Entrevistas</option>
+                                <option value="novos_candidatos">Novos Candidatos</option>
+                                <option value="em_analise">Em Análise</option>
                                 <option value="avaliacao">Avaliação</option>
+                                <option value="aprovados">Aprovados</option>
                             </select>
                         </div>
                     </div>

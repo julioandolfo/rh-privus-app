@@ -89,7 +89,7 @@ try {
             
             // Define coluna padrão se não informada
             if (empty($coluna_kanban)) {
-                $coluna_kanban = 'entrevista';
+                $coluna_kanban = 'entrevistas'; // Usa o código da coluna do kanban
             }
         }
     }

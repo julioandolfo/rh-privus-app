@@ -113,7 +113,12 @@ $vagas = $stmt->fetchAll();
                                     <div class="card-body p-4 kanban-column" style="min-height: 600px;">
                                         <?php
                                         $candidaturas_coluna = array_filter($candidaturas, function($c) use ($coluna) {
-                                            return ($c['coluna_kanban'] ?? 'novos_candidatos') === $coluna['codigo'];
+                                            $coluna_candidatura = $c['coluna_kanban'] ?? 'novos_candidatos';
+                                            // Se for entrevista manual sem coluna, coloca na coluna entrevistas
+                                            if (!empty($c['is_entrevista_manual']) && empty($c['coluna_kanban'])) {
+                                                $coluna_candidatura = 'entrevistas';
+                                            }
+                                            return $coluna_candidatura === $coluna['codigo'];
                                         });
                                         ?>
                                         
@@ -371,6 +376,14 @@ async function handleDrop(e) {
                 draggedElement.dataset.colunaAtual = draggedFromColumn;
                 atualizarContadores();
             }
+        } else {
+            // Se moveu para contratado ou aprovados, abre modal para cadastrar colaborador
+            if ((colunaDestino === 'contratado' || colunaDestino === 'aprovados') && !isEntrevista) {
+                // Aguarda um pouco para garantir que o movimento foi salvo
+                setTimeout(() => {
+                    abrirModalCadastrarColaborador(candidaturaId, draggedElement);
+                }, 500);
+            }
         }
     } catch (error) {
         console.error('Erro:', error);
@@ -615,6 +628,244 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 document.head.appendChild(style);
+
+// Função para abrir modal de cadastrar colaborador
+function abrirModalCadastrarColaborador(candidaturaId, elementoCard) {
+    // Remove prefixo se for entrevista
+    const idLimpo = candidaturaId.toString().replace('entrevista_', '');
+    const isEntrevista = candidaturaId.toString().startsWith('entrevista_');
+    
+    // Busca dados da candidatura/entrevista
+    fetch(`../api/recrutamento/candidaturas/dados_cadastro.php?id=${idLimpo}&is_entrevista=${isEntrevista ? '1' : '0'}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Preenche modal com dados
+                document.getElementById('modalCadastrarColaborador').querySelector('[name="candidatura_id"]').value = candidaturaId;
+                document.getElementById('modalCadastrarColaborador').querySelector('[name="is_entrevista"]').value = isEntrevista ? '1' : '0';
+                
+                // Preenche campos do formulário
+                if (data.dados) {
+                    const form = document.getElementById('formCadastrarColaborador');
+                    if (data.dados.nome_completo) form.querySelector('[name="nome_completo"]').value = data.dados.nome_completo;
+                    if (data.dados.email) form.querySelector('[name="email_pessoal"]').value = data.dados.email;
+                    if (data.dados.telefone) form.querySelector('[name="telefone"]').value = data.dados.telefone;
+                    if (data.dados.cpf) form.querySelector('[name="cpf"]').value = data.dados.cpf;
+                    if (data.dados.empresa_id) form.querySelector('[name="empresa_id"]').value = data.dados.empresa_id;
+                    if (data.dados.setor_id) form.querySelector('[name="setor_id"]').value = data.dados.setor_id;
+                    if (data.dados.cargo_id) form.querySelector('[name="cargo_id"]').value = data.dados.cargo_id;
+                }
+                
+                // Abre modal
+                const modal = new bootstrap.Modal(document.getElementById('modalCadastrarColaborador'));
+                modal.show();
+            } else {
+                alert('Erro ao carregar dados: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar dados da candidatura');
+        });
+}
+</script>
+
+<!-- Modal Cadastrar Colaborador -->
+<div class="modal fade" id="modalCadastrarColaborador" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cadastrar como Colaborador</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formCadastrarColaborador">
+                <input type="hidden" name="candidatura_id" value="">
+                <input type="hidden" name="is_entrevista" value="0">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="ki-duotone ki-information-5 fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Preencha os dados abaixo para cadastrar como colaborador. Os campos marcados com * são obrigatórios.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nome Completo *</label>
+                            <input type="text" name="nome_completo" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">CPF *</label>
+                            <input type="text" name="cpf" class="form-control" required placeholder="000.000.000-00">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" name="email_pessoal" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" name="telefone" class="form-control" placeholder="(00) 00000-0000">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Empresa *</label>
+                            <select name="empresa_id" class="form-select" required id="empresaSelect">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Setor *</label>
+                            <select name="setor_id" class="form-select" required id="setorSelect">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Cargo *</label>
+                            <select name="cargo_id" class="form-select" required id="cargoSelect">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data de Início *</label>
+                            <input type="date" name="data_inicio" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tipo de Contrato</label>
+                            <select name="tipo_contrato" class="form-select">
+                                <option value="CLT">CLT</option>
+                                <option value="PJ">PJ</option>
+                                <option value="Estágio">Estágio</option>
+                                <option value="Terceirizado">Terceirizado</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Salário</label>
+                        <input type="text" name="salario" class="form-control" placeholder="0,00">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Cadastrar Colaborador</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Carrega empresas, setores e cargos ao abrir modal
+document.getElementById('modalCadastrarColaborador').addEventListener('show.bs.modal', function() {
+    carregarEmpresas();
+});
+
+// Quando seleciona empresa, carrega setores
+document.getElementById('empresaSelect').addEventListener('change', function() {
+    if (this.value) {
+        carregarSetores(this.value);
+    }
+});
+
+// Quando seleciona setor, carrega cargos
+document.getElementById('setorSelect').addEventListener('change', function() {
+    if (this.value) {
+        carregarCargos(this.value);
+    }
+});
+
+async function carregarEmpresas() {
+    try {
+        const response = await fetch('../api/empresas/listar.php');
+        const data = await response.json();
+        if (data.success) {
+            const select = document.getElementById('empresaSelect');
+            select.innerHTML = '<option value="">Selecione...</option>';
+            data.empresas.forEach(empresa => {
+                const option = document.createElement('option');
+                option.value = empresa.id;
+                option.textContent = empresa.nome_fantasia;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar empresas:', error);
+    }
+}
+
+async function carregarSetores(empresaId) {
+    try {
+        const response = await fetch(`../api/setores/listar.php?empresa_id=${empresaId}`);
+        const data = await response.json();
+        if (data.success) {
+            const select = document.getElementById('setorSelect');
+            select.innerHTML = '<option value="">Selecione...</option>';
+            data.setores.forEach(setor => {
+                const option = document.createElement('option');
+                option.value = setor.id;
+                option.textContent = setor.nome_setor;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar setores:', error);
+    }
+}
+
+async function carregarCargos(setorId) {
+    try {
+        const response = await fetch(`../api/cargos/listar.php?setor_id=${setorId}`);
+        const data = await response.json();
+        if (data.success) {
+            const select = document.getElementById('cargoSelect');
+            select.innerHTML = '<option value="">Selecione...</option>';
+            data.cargos.forEach(cargo => {
+                const option = document.createElement('option');
+                option.value = cargo.id;
+                option.textContent = cargo.nome_cargo;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar cargos:', error);
+    }
+}
+
+// Submete formulário
+document.getElementById('formCadastrarColaborador').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('../api/recrutamento/colaborador/cadastrar.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Colaborador cadastrado com sucesso!');
+            bootstrap.Modal.getInstance(document.getElementById('modalCadastrarColaborador')).hide();
+            location.reload();
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    } catch (error) {
+        alert('Erro ao cadastrar colaborador');
+        console.error(error);
+    }
+});
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

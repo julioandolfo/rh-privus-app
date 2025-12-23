@@ -599,7 +599,7 @@ function buscar_entrevistas_kanban($filtros = []) {
             v.empresa_id,
             emp.nome_fantasia as empresa_nome,
             u.nome as recrutador_nome,
-            e.coluna_kanban,
+            COALESCE(e.coluna_kanban, 'entrevistas') as coluna_kanban,
             e.status,
             e.data_agendada as data_candidatura,
             e.created_at,
