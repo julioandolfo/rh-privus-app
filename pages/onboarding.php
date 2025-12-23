@@ -22,23 +22,26 @@ $params = [];
 if ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where[] = "v.empresa_id IN ($placeholders)";
-        $params = array_merge($params, $usuario['empresas_ids']);
+        $where[] = "(v.empresa_id IN ($placeholders) OR ve.empresa_id IN ($placeholders))";
+        $params = array_merge($params, $usuario['empresas_ids'], $usuario['empresas_ids']);
     }
 }
 
 $sql = "
     SELECT o.*,
-           c.nome_completo as candidato_nome,
+           COALESCE(c.nome_completo, e.candidato_nome_manual) as candidato_nome,
            col.nome_completo as colaborador_nome,
-           v.titulo as vaga_titulo,
+           COALESCE(v.titulo, ve.titulo) as vaga_titulo,
            u.nome as responsavel_nome,
            COUNT(DISTINCT t.id) as total_tarefas,
-           COUNT(DISTINCT CASE WHEN t.status = 'concluida' THEN t.id END) as tarefas_concluidas
+           COUNT(DISTINCT CASE WHEN t.status = 'concluida' THEN t.id END) as tarefas_concluidas,
+           CASE WHEN o.entrevista_id IS NOT NULL AND o.candidatura_id IS NULL THEN 1 ELSE 0 END as is_entrevista_manual
     FROM onboarding o
-    INNER JOIN candidaturas cand ON o.candidatura_id = cand.id
-    INNER JOIN candidatos c ON cand.candidato_id = c.id
-    INNER JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN candidaturas cand ON o.candidatura_id = cand.id
+    LEFT JOIN candidatos c ON cand.candidato_id = c.id
+    LEFT JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN entrevistas e ON o.entrevista_id = e.id
+    LEFT JOIN vagas ve ON e.vaga_id_manual = ve.id
     LEFT JOIN colaboradores col ON o.colaborador_id = col.id
     LEFT JOIN usuarios u ON o.responsavel_id = u.id
     LEFT JOIN onboarding_tarefas t ON o.id = t.onboarding_id
@@ -89,7 +92,12 @@ $onboardings = $stmt->fetchAll();
                                         <td>
                                             <strong><?= htmlspecialchars($onboarding['colaborador_nome'] ?: $onboarding['candidato_nome']) ?></strong>
                                         </td>
-                                        <td><?= htmlspecialchars($onboarding['vaga_titulo']) ?></td>
+                                        <td>
+                                            <?= htmlspecialchars($onboarding['vaga_titulo'] ?? 'Sem vaga') ?>
+                                            <?php if (!empty($onboarding['is_entrevista_manual'])): ?>
+                                            <br><span class="badge badge-light-warning">Entrevista Manual</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <?php
                                             $status_colors = [

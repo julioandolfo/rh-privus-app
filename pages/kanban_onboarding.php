@@ -22,24 +22,28 @@ $params = [];
 if ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where[] = "v.empresa_id IN ($placeholders)";
-        $params = array_merge($params, $usuario['empresas_ids']);
+        $where[] = "(v.empresa_id IN ($placeholders) OR ve.empresa_id IN ($placeholders))";
+        $params = array_merge($params, $usuario['empresas_ids'], $usuario['empresas_ids']);
     }
 }
 
 $sql = "
     SELECT o.*,
-           c.nome_completo as candidato_nome,
+           COALESCE(c.nome_completo, e.candidato_nome_manual) as candidato_nome,
            col.nome_completo as colaborador_nome,
-           v.titulo as vaga_titulo,
+           COALESCE(v.titulo, ve.titulo) as vaga_titulo,
+           COALESCE(v.empresa_id, ve.empresa_id) as empresa_id,
            u.nome as responsavel_nome,
            m.nome_completo as mentor_nome,
            COUNT(DISTINCT t.id) as total_tarefas,
-           COUNT(DISTINCT CASE WHEN t.status = 'concluida' THEN t.id END) as tarefas_concluidas
+           COUNT(DISTINCT CASE WHEN t.status = 'concluida' THEN t.id END) as tarefas_concluidas,
+           CASE WHEN o.entrevista_id IS NOT NULL AND o.candidatura_id IS NULL THEN 1 ELSE 0 END as is_entrevista_manual
     FROM onboarding o
-    INNER JOIN candidaturas cand ON o.candidatura_id = cand.id
-    INNER JOIN candidatos c ON cand.candidato_id = c.id
-    INNER JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN candidaturas cand ON o.candidatura_id = cand.id
+    LEFT JOIN candidatos c ON cand.candidato_id = c.id
+    LEFT JOIN vagas v ON cand.vaga_id = v.id
+    LEFT JOIN entrevistas e ON o.entrevista_id = e.id
+    LEFT JOIN vagas ve ON e.vaga_id_manual = ve.id
     LEFT JOIN colaboradores col ON o.colaborador_id = col.id
     LEFT JOIN usuarios u ON o.responsavel_id = u.id
     LEFT JOIN colaboradores m ON o.mentor_id = m.id
@@ -162,8 +166,11 @@ $colunas = [
                                                             <span class="kanban-stage-badge" style="background-color: <?= htmlspecialchars($coluna['cor']) ?>20; border-left: 3px solid <?= htmlspecialchars($coluna['cor']) ?>;"></span>
                                                         </div>
                                                         <span class="text-muted fw-semibold d-block fs-7 mt-1">
-                                                            <?= htmlspecialchars($onboarding['vaga_titulo']) ?>
+                                                            <?= htmlspecialchars($onboarding['vaga_titulo'] ?? 'Sem vaga definida') ?>
                                                         </span>
+                                                        <?php if (!empty($onboarding['is_entrevista_manual'])): ?>
+                                                        <span class="badge badge-light-warning mt-1">Entrevista Manual</span>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </div>
                                                 
