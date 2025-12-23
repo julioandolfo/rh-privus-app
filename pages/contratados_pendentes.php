@@ -415,31 +415,46 @@ async function carregarEmpresas() {
     }
 }
 
+let empresaSelecionadaId = null;
+
 async function carregarSetores(empresaId) {
+    empresaSelecionadaId = empresaId;
     try {
         const response = await fetch(`../api/setores/listar.php?empresa_id=${empresaId}`);
         const data = await response.json();
-        if (data.success) {
-            const select = document.getElementById('setorSelect');
-            select.innerHTML = '<option value="">Selecione...</option>';
+        const select = document.getElementById('setorSelect');
+        select.innerHTML = '<option value="">Selecione...</option>';
+        
+        if (data.success && data.setores && data.setores.length > 0) {
             data.setores.forEach(setor => {
                 const option = document.createElement('option');
                 option.value = setor.id;
                 option.textContent = setor.nome_setor;
                 select.appendChild(option);
             });
+        } else {
+            select.innerHTML = '<option value="">Nenhum setor encontrado</option>';
         }
+        
+        // Limpa cargos e tenta carregar por empresa
+        const cargoSelect = document.getElementById('cargoSelect');
+        cargoSelect.innerHTML = '<option value="">Selecione o setor primeiro</option>';
+        
+        // Tenta carregar cargos por empresa também
+        carregarCargosPorEmpresa(empresaId);
     } catch (error) {
         console.error('Erro ao carregar setores:', error);
+        document.getElementById('setorSelect').innerHTML = '<option value="">Erro ao carregar</option>';
     }
 }
 
-async function carregarCargos(setorId) {
+async function carregarCargosPorEmpresa(empresaId) {
     try {
-        const response = await fetch(`../api/cargos/listar.php?setor_id=${setorId}`);
+        const response = await fetch(`../api/cargos/listar.php?empresa_id=${empresaId}`);
         const data = await response.json();
-        if (data.success) {
-            const select = document.getElementById('cargoSelect');
+        const select = document.getElementById('cargoSelect');
+        
+        if (data.success && data.cargos && data.cargos.length > 0) {
             select.innerHTML = '<option value="">Selecione...</option>';
             data.cargos.forEach(cargo => {
                 const option = document.createElement('option');
@@ -449,7 +464,40 @@ async function carregarCargos(setorId) {
             });
         }
     } catch (error) {
+        console.error('Erro ao carregar cargos por empresa:', error);
+    }
+}
+
+async function carregarCargos(setorId) {
+    try {
+        let url = `../api/cargos/listar.php?setor_id=${setorId}`;
+        if (empresaSelecionadaId) {
+            url += `&empresa_id=${empresaSelecionadaId}`;
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        const select = document.getElementById('cargoSelect');
+        select.innerHTML = '<option value="">Selecione...</option>';
+        
+        if (data.success && data.cargos && data.cargos.length > 0) {
+            data.cargos.forEach(cargo => {
+                const option = document.createElement('option');
+                option.value = cargo.id;
+                option.textContent = cargo.nome_cargo;
+                select.appendChild(option);
+            });
+        } else {
+            // Se não encontrou por setor, tenta por empresa
+            if (empresaSelecionadaId) {
+                carregarCargosPorEmpresa(empresaSelecionadaId);
+            } else {
+                select.innerHTML = '<option value="">Nenhum cargo encontrado</option>';
+            }
+        }
+    } catch (error) {
         console.error('Erro ao carregar cargos:', error);
+        document.getElementById('cargoSelect').innerHTML = '<option value="">Erro ao carregar</option>';
     }
 }
 

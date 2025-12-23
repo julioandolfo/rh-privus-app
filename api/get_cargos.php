@@ -43,7 +43,15 @@ try {
     
     // Busca cargos da empresa
     if ($empresa_id) {
-        $stmt = $pdo->prepare("SELECT id, nome_cargo FROM cargos WHERE empresa_id = ? AND status = 'ativo' ORDER BY nome_cargo");
+        // Verifica se existe coluna status na tabela cargos
+        $stmt_check = $pdo->query("SHOW COLUMNS FROM cargos LIKE 'status'");
+        $has_status_column = $stmt_check->fetch() !== false;
+        
+        if ($has_status_column) {
+            $stmt = $pdo->prepare("SELECT id, nome_cargo FROM cargos WHERE empresa_id = ? AND (status = 'ativo' OR status IS NULL) ORDER BY nome_cargo");
+        } else {
+            $stmt = $pdo->prepare("SELECT id, nome_cargo FROM cargos WHERE empresa_id = ? ORDER BY nome_cargo");
+        }
         $stmt->execute([$empresa_id]);
         $cargos = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode(['success' => true, 'cargos' => $cargos]);

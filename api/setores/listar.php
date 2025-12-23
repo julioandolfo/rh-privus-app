@@ -26,7 +26,15 @@ try {
         throw new Exception('Sem permissão');
     }
     
-    $stmt = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? ORDER BY nome_setor");
+    // Verifica se existe coluna status na tabela setores
+    $stmt_check = $pdo->query("SHOW COLUMNS FROM setores LIKE 'status'");
+    $has_status_column = $stmt_check->fetch() !== false;
+    
+    if ($has_status_column) {
+        $stmt = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? AND (status = 'ativo' OR status IS NULL) ORDER BY nome_setor");
+    } else {
+        $stmt = $pdo->prepare("SELECT id, nome_setor FROM setores WHERE empresa_id = ? ORDER BY nome_setor");
+    }
     $stmt->execute([$empresa_id]);
     $setores = $stmt->fetchAll();
     

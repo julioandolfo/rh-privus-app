@@ -24,8 +24,16 @@ $empresa_id = isset($_GET['empresa_id']) ? (int)$_GET['empresa_id'] : null;
 
 try {
     $pdo = getDB();
-    $where = ["s.status = 'ativo'"];
+    $where = ["1=1"];
     $params = [];
+    
+    // Verifica se existe coluna status na tabela setores
+    $stmt_check = $pdo->query("SHOW COLUMNS FROM setores LIKE 'status'");
+    $has_status_column = $stmt_check->fetch() !== false;
+    
+    if ($has_status_column) {
+        $where[] = "(s.status = 'ativo' OR s.status IS NULL)";
+    }
     
     if ($empresa_id) {
         $where[] = "s.empresa_id = ?";
@@ -60,8 +68,10 @@ try {
     ");
     $stmt->execute($params);
     $setores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    echo json_encode(['success' => true, 'data' => $setores]);
+    
+    // Retorna tanto 'data' quanto 'setores' para compatibilidade
+    echo json_encode(['success' => true, 'data' => $setores, 'setores' => $setores]);
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'data' => [], 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'data' => [], 'setores' => [], 'error' => $e->getMessage()]);
 }
 
