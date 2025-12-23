@@ -126,7 +126,7 @@ $stmt = $pdo->prepare("
     FROM onboarding_tarefas t
     LEFT JOIN usuarios u ON t.responsavel_id = u.id
     WHERE t.onboarding_id = ?
-    ORDER BY t.etapa, t.ordem ASC
+    ORDER BY t.etapa, t.id ASC
 ");
 $stmt->execute([$onboarding_id]);
 $tarefas = $stmt->fetchAll();
