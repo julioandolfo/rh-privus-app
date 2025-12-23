@@ -956,7 +956,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                         <textarea name="descricao" class="form-control form-control-solid" rows="4" placeholder="Fique à vontade para falar o que sente. Essa informação é privada e será lida somente por alguém que quer te ver feliz!"></textarea>
                                     </div>
                                     
-                                    <button type="submit" class="btn btn-primary btn-lg">
+                                    <button type="button" class="btn btn-primary btn-lg" onclick="document.getElementById('form_emocao_dashboard_colab').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})); return false;">
                                         <span class="indicator-label">Enviar humor</span>
                                         <span class="indicator-progress">Enviando...
                                             <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
@@ -1500,7 +1500,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                 </div>
                             </div>
                         <?php else: ?>
-                            <form id="form_emocao_dashboard">
+                            <form id="form_emocao_dashboard" onsubmit="return false;">
                                 <div class="d-flex flex-column align-items-center mb-10">
                                     <h3 class="text-center mb-5">Selecione como você está se sentindo:</h3>
                                     
@@ -1547,7 +1547,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                         <textarea name="descricao" class="form-control form-control-solid" rows="4" placeholder="Fique à vontade para falar o que sente. Essa informação é privada e será lida somente por alguém que quer te ver feliz!"></textarea>
                                     </div>
                                     
-                                    <button type="submit" class="btn btn-primary btn-lg">
+                                    <button type="button" class="btn btn-primary btn-lg" onclick="document.getElementById('form_emocao_dashboard').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})); return false;">
                                         <span class="indicator-label">Enviar humor</span>
                                         <span class="indicator-progress">Enviando...
                                             <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
@@ -6968,8 +6968,11 @@ setTimeout(() => {
 <!--begin::Emoções Script-->
 <script>
 (function() {
+    console.log('Inicializando scripts de emoção...');
+    
     // Função para inicializar seleção visual de emoção
     function initSelecaoVisualEmocao() {
+        console.log('Inicializando seleção visual de emoções');
         document.querySelectorAll('.emocao-option').forEach(function(option) {
             option.addEventListener('click', function() {
                 const radio = this.previousElementSibling;
@@ -7001,11 +7004,16 @@ setTimeout(() => {
     
     // Função para inicializar os formulários de emoção
     function initFormulariosEmocao() {
+        console.log('Inicializando formulários de emoção...');
+        
         // Submit do formulário de emoção (Admin/RH/GESTOR)
         const formEmocao = document.getElementById('form_emocao_dashboard');
+        console.log('Formulário Admin/RH encontrado:', formEmocao !== null);
+        
         if (formEmocao) {
             // Garante que não há action que cause redirecionamento
             formEmocao.removeAttribute('action');
+            formEmocao.onsubmit = function() { return false; };
             
             formEmocao.addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -7123,9 +7131,12 @@ setTimeout(() => {
         
         // Submit do formulário de emoção (Colaborador)
         const formEmocaoColab = document.getElementById('form_emocao_dashboard_colab');
+        console.log('Formulário Colaborador encontrado:', formEmocaoColab !== null);
+        
         if (formEmocaoColab) {
             // Garante que não há action que cause redirecionamento
             formEmocaoColab.removeAttribute('action');
+            formEmocaoColab.onsubmit = function() { return false; };
             
             formEmocaoColab.addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -7244,15 +7255,20 @@ setTimeout(() => {
     
     // Executa quando o DOM estiver pronto
     if (document.readyState === 'loading') {
+        console.log('DOM ainda carregando, aguardando DOMContentLoaded...');
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOMContentLoaded disparado');
             initSelecaoVisualEmocao();
             initFormulariosEmocao();
         });
     } else {
         // DOM já está carregado, executa imediatamente
+        console.log('DOM já carregado, executando imediatamente');
         initSelecaoVisualEmocao();
         initFormulariosEmocao();
     }
+    
+    console.log('Script de emoções inicializado com sucesso');
 })();
 </script>
 <style>

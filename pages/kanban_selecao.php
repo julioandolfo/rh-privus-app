@@ -66,7 +66,15 @@ $vagas = $stmt->fetchAll();
                                 <input type="text" id="kt_filter_search" class="form-control form-control-solid w-250px ps-13" placeholder="Buscar candidato..." />
                             </div>
                         </div>
-                        <div class="card-toolbar">
+                        <div class="card-toolbar gap-3">
+                            <a href="contratados_pendentes.php" class="btn btn-light-warning">
+                                <i class="ki-duotone ki-user-tick fs-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Contratados Pendentes
+                            </a>
                             <select id="filtroVaga" class="form-select form-select-solid w-250px">
                                 <option value="">Todas as vagas</option>
                                 <?php foreach ($vagas as $vaga): ?>
@@ -260,8 +268,66 @@ function atualizarContadores() {
 // Drag and Drop
 let draggedElement = null;
 let draggedFromColumn = null;
+let autoScrollInterval = null;
+
+// Auto-scroll quando arrastar para as bordas
+function setupAutoScroll() {
+    const container = document.getElementById('kanbanContainer');
+    if (!container) return;
+    
+    const SCROLL_SPEED = 15;
+    const SCROLL_ZONE = 80; // Pixels da borda para ativar scroll
+    
+    container.addEventListener('dragover', function(e) {
+        const containerRect = container.getBoundingClientRect();
+        const mouseX = e.clientX;
+        
+        // Limpa intervalo anterior
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+        
+        // Verifica se está na zona de scroll esquerda
+        if (mouseX < containerRect.left + SCROLL_ZONE) {
+            autoScrollInterval = setInterval(() => {
+                container.scrollLeft -= SCROLL_SPEED;
+            }, 20);
+        }
+        // Verifica se está na zona de scroll direita
+        else if (mouseX > containerRect.right - SCROLL_ZONE) {
+            autoScrollInterval = setInterval(() => {
+                container.scrollLeft += SCROLL_SPEED;
+            }, 20);
+        }
+    });
+    
+    // Para o scroll quando solta ou sai da área
+    container.addEventListener('dragleave', function() {
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+    });
+    
+    container.addEventListener('drop', function() {
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+    });
+    
+    document.addEventListener('dragend', function() {
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+    });
+}
 
 function inicializarDragAndDrop() {
+    // Inicializa auto-scroll
+    setupAutoScroll();
     // Remove listeners antigos se existirem
     document.querySelectorAll('.kanban-card').forEach(card => {
         card.removeEventListener('dragstart', handleDragStart);
@@ -377,8 +443,8 @@ async function handleDrop(e) {
                 atualizarContadores();
             }
         } else {
-            // Se moveu para contratado ou aprovados, abre modal para cadastrar colaborador
-            if ((colunaDestino === 'contratado' || colunaDestino === 'aprovados') && !isEntrevista) {
+            // Se moveu para contratado, abre modal para cadastrar colaborador
+            if (colunaDestino === 'contratado') {
                 // Aguarda um pouco para garantir que o movimento foi salvo
                 setTimeout(() => {
                     abrirModalCadastrarColaborador(candidaturaId, draggedElement);
@@ -755,9 +821,18 @@ function abrirModalCadastrarColaborador(candidaturaId, elementoCard) {
                         <input type="text" name="salario" class="form-control" placeholder="0,00">
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Cadastrar Colaborador</button>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-light-warning" onclick="cadastrarDepois()">
+                        <i class="ki-duotone ki-time fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Cadastrar Depois
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Cadastrar Colaborador</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -765,6 +840,37 @@ function abrirModalCadastrarColaborador(candidaturaId, elementoCard) {
 </div>
 
 <script>
+// Função para cadastrar depois (deixar pendente)
+async function cadastrarDepois() {
+    const candidaturaId = document.querySelector('#formCadastrarColaborador [name="candidatura_id"]').value;
+    const isEntrevista = document.querySelector('#formCadastrarColaborador [name="is_entrevista"]').value === '1';
+    
+    try {
+        const formData = new FormData();
+        formData.append('candidatura_id', candidaturaId);
+        formData.append('is_entrevista', isEntrevista ? '1' : '0');
+        formData.append('acao', 'cadastrar_depois');
+        
+        const response = await fetch('../api/recrutamento/colaborador/marcar_pendente.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Contratação marcada como pendente. Você pode cadastrar o colaborador posteriormente.');
+            bootstrap.Modal.getInstance(document.getElementById('modalCadastrarColaborador')).hide();
+            location.reload();
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao marcar como pendente');
+    }
+}
+
 // Carrega empresas, setores e cargos ao abrir modal
 document.getElementById('modalCadastrarColaborador').addEventListener('show.bs.modal', function() {
     carregarEmpresas();

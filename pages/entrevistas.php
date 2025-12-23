@@ -181,6 +181,13 @@ if ($usuario['role'] === 'ADMIN') {
                                             <a href="entrevista_view.php?id=<?= $entrevista['id'] ?>" class="btn btn-sm btn-light-primary">
                                                 Ver
                                             </a>
+                                            <button type="button" class="btn btn-sm btn-light-warning" onclick="editarEntrevista(<?= $entrevista['id'] ?>)">
+                                                <i class="ki-duotone ki-pencil fs-6">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Editar
+                                            </button>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -306,7 +313,222 @@ if ($usuario['role'] === 'ADMIN') {
     </div>
 </div>
 
+<!-- Modal Editar Entrevista -->
+<div class="modal fade" id="modalEditarEntrevista" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Entrevista</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditarEntrevista">
+                <input type="hidden" name="id" id="editEntrevistaId">
+                <input type="hidden" name="is_manual" id="editIsManual">
+                <div class="modal-body">
+                    <!-- Campos para entrevista manual (só aparecem se for manual) -->
+                    <div id="editCamposManual" style="display: none;">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nome do Candidato *</label>
+                                <input type="text" name="candidato_nome" class="form-control" id="editCandidatoNome">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email do Candidato *</label>
+                                <input type="email" name="candidato_email" class="form-control" id="editCandidatoEmail">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Telefone do Candidato</label>
+                                <input type="text" name="candidato_telefone" class="form-control" id="editCandidatoTelefone" placeholder="(00) 00000-0000">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Vaga</label>
+                                <select name="vaga_id_manual" class="form-select" id="editVagaSelect">
+                                    <option value="">Selecione uma vaga (opcional)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Coluna do Kanban</label>
+                            <select name="coluna_kanban" class="form-select" id="editColunaKanban">
+                                <option value="novos_candidatos">Novos Candidatos</option>
+                                <option value="em_analise">Em Análise</option>
+                                <option value="entrevistas">Entrevistas</option>
+                                <option value="avaliacao">Avaliação</option>
+                                <option value="aprovados">Aprovados</option>
+                                <option value="contratado">Contratado</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Informação do candidato (se não for manual) -->
+                    <div id="editInfoCandidato" class="mb-3 p-3 bg-light rounded" style="display: none;">
+                        <h6 class="mb-2">Candidato</h6>
+                        <p class="mb-0"><strong id="editCandidatoNomeDisplay"></strong></p>
+                        <small class="text-muted" id="editCandidatoEmailDisplay"></small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Título *</label>
+                        <input type="text" name="titulo" class="form-control" id="editTitulo" required>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo *</label>
+                            <select name="tipo" class="form-select" id="editTipo" required>
+                                <option value="presencial">Presencial</option>
+                                <option value="video">Vídeo</option>
+                                <option value="telefone">Telefone</option>
+                                <option value="grupo">Grupo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Data e Hora *</label>
+                            <input type="datetime-local" name="data_agendada" class="form-control" id="editDataAgendada" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Duração (minutos)</label>
+                            <input type="number" name="duracao_minutos" class="form-control" id="editDuracao" value="60">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select" id="editStatus">
+                                <option value="agendada">Agendada</option>
+                                <option value="realizada">Realizada</option>
+                                <option value="cancelada">Cancelada</option>
+                                <option value="reagendada">Reagendada</option>
+                                <option value="nao_compareceu">Não Compareceu</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Localização / Link</label>
+                        <input type="text" name="localizacao" class="form-control" id="editLocalizacao" placeholder="Endereço ou link de videoconferência">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Descrição</label>
+                        <textarea name="descricao" class="form-control" id="editDescricao" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
+// Função para editar entrevista
+async function editarEntrevista(id) {
+    try {
+        const response = await fetch(`../api/recrutamento/entrevistas/buscar.php?id=${id}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+            alert('Erro: ' + data.message);
+            return;
+        }
+        
+        const entrevista = data.entrevista;
+        
+        // Preenche campos
+        document.getElementById('editEntrevistaId').value = entrevista.id;
+        document.getElementById('editIsManual').value = entrevista.is_manual;
+        document.getElementById('editTitulo').value = entrevista.titulo || '';
+        document.getElementById('editTipo').value = entrevista.tipo || 'presencial';
+        document.getElementById('editDataAgendada').value = entrevista.data_agendada_formatted || '';
+        document.getElementById('editDuracao').value = entrevista.duracao_minutos || 60;
+        document.getElementById('editStatus').value = entrevista.status || 'agendada';
+        document.getElementById('editLocalizacao').value = entrevista.localizacao || '';
+        document.getElementById('editDescricao').value = entrevista.descricao || '';
+        
+        // Verifica se é entrevista manual
+        if (entrevista.is_manual == 1) {
+            document.getElementById('editCamposManual').style.display = 'block';
+            document.getElementById('editInfoCandidato').style.display = 'none';
+            document.getElementById('editCandidatoNome').value = entrevista.candidato_nome_manual || '';
+            document.getElementById('editCandidatoEmail').value = entrevista.candidato_email_manual || '';
+            document.getElementById('editCandidatoTelefone').value = entrevista.candidato_telefone_manual || '';
+            document.getElementById('editColunaKanban').value = entrevista.coluna_kanban || 'entrevistas';
+            
+            // Carrega vagas e seleciona a atual
+            await carregarVagasEdicao(entrevista.vaga_id_manual);
+        } else {
+            document.getElementById('editCamposManual').style.display = 'none';
+            document.getElementById('editInfoCandidato').style.display = 'block';
+            document.getElementById('editCandidatoNomeDisplay').textContent = entrevista.candidato_nome || '';
+            document.getElementById('editCandidatoEmailDisplay').textContent = entrevista.candidato_email || '';
+        }
+        
+        // Abre o modal
+        const modal = new bootstrap.Modal(document.getElementById('modalEditarEntrevista'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao carregar dados da entrevista');
+    }
+}
+
+// Carrega vagas para edição
+async function carregarVagasEdicao(vagaSelecionada) {
+    try {
+        const response = await fetch('../api/recrutamento/vagas/listar.php?status=aberta');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('editVagaSelect');
+            select.innerHTML = '<option value="">Selecione uma vaga (opcional)</option>';
+            
+            data.vagas.forEach(vaga => {
+                const option = document.createElement('option');
+                option.value = vaga.id;
+                option.textContent = vaga.titulo;
+                if (vaga.id == vagaSelecionada) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar vagas:', error);
+    }
+}
+
+// Submit do formulário de edição
+document.getElementById('formEditarEntrevista').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('../api/recrutamento/entrevistas/atualizar.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Entrevista atualizada com sucesso!');
+            location.reload();
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao atualizar entrevista');
+    }
+});
+
 // Carrega candidaturas para select
 async function carregarCandidaturas() {
     try {
