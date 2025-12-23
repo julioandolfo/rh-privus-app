@@ -909,7 +909,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                 </div>
                             </div>
                         <?php else: ?>
-                            <form id="form_emocao_dashboard_colab">
+                            <form id="form_emocao_dashboard_colab" onsubmit="return false;">
                                 <div class="d-flex flex-column align-items-center mb-10">
                                     <h3 class="text-center mb-5">Selecione como você está se sentindo:</h3>
                                     
@@ -8053,7 +8053,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (anotacao.publico_alvo === 'especifico' && 
                             anotacao.destinatarios_usuarios && 
                             anotacao.destinatarios_usuarios.length === 1 &&
-                            anotacao.destinatarios_usuarios[0] == <?= $usuario['id'] ?>) {
+                            anotacao.destinatarios_usuarios[0] == <?= isset($usuario['id']) ? intval($usuario['id']) : 'null' ?>) {
                             document.querySelector('[name="publico_alvo"]').value = 'atribuir_mim';
                             atualizarVisibilidadeDestinatarios();
                         }
