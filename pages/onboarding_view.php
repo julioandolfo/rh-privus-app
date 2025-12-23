@@ -46,8 +46,28 @@ $stmt = $pdo->prepare("
 $stmt->execute([$onboarding_id]);
 $onboarding = $stmt->fetch();
 
+// DEBUG TEMPORÁRIO - REMOVER DEPOIS
 if (!$onboarding) {
-    redirect('onboarding.php', 'Onboarding não encontrado', 'error');
+    echo "<pre>DEBUG: Onboarding ID = $onboarding_id\n";
+    
+    // Testa query simples
+    $stmt2 = $pdo->prepare("SELECT * FROM onboarding WHERE id = ?");
+    $stmt2->execute([$onboarding_id]);
+    $test = $stmt2->fetch();
+    echo "Query simples: ";
+    print_r($test);
+    
+    // Testa a entrevista
+    if ($test && $test['entrevista_id']) {
+        $stmt3 = $pdo->prepare("SELECT * FROM entrevistas WHERE id = ?");
+        $stmt3->execute([$test['entrevista_id']]);
+        $ent = $stmt3->fetch();
+        echo "\nEntrevista: ";
+        print_r($ent);
+    }
+    echo "</pre>";
+    exit;
+    // redirect('onboarding.php', 'Onboarding não encontrado', 'error');
 }
 
 // Busca tarefas
