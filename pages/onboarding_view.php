@@ -21,53 +21,103 @@ if (!$onboarding_id) {
     redirect('onboarding.php', 'Onboarding não encontrado', 'error');
 }
 
-// Busca onboarding
-$stmt = $pdo->prepare("
-    SELECT o.*,
-           COALESCE(c.nome_completo, e.candidato_nome_manual) as candidato_nome,
-           COALESCE(c.email, e.candidato_email_manual) as candidato_email,
-           COALESCE(c.telefone, e.candidato_telefone_manual) as candidato_telefone,
-           col.nome_completo as colaborador_nome,
-           COALESCE(v.titulo, ve.titulo) as vaga_titulo,
-           u.nome as responsavel_nome,
-           m.nome_completo as mentor_nome,
-           CASE WHEN o.entrevista_id IS NOT NULL AND o.candidatura_id IS NULL THEN 1 ELSE 0 END as is_entrevista_manual
-    FROM onboarding o
-    LEFT JOIN candidaturas cand ON o.candidatura_id = cand.id
-    LEFT JOIN candidatos c ON cand.candidato_id = c.id
-    LEFT JOIN vagas v ON cand.vaga_id = v.id
-    LEFT JOIN entrevistas e ON o.entrevista_id = e.id
-    LEFT JOIN vagas ve ON e.vaga_id_manual = ve.id
-    LEFT JOIN colaboradores col ON o.colaborador_id = col.id
-    LEFT JOIN usuarios u ON o.responsavel_id = u.id
-    LEFT JOIN colaboradores m ON o.mentor_id = m.id
-    WHERE o.id = ?
-");
-$stmt->execute([$onboarding_id]);
-$onboarding = $stmt->fetch();
+// DEBUG - ANTES DA QUERY
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-// DEBUG TEMPORÁRIO - REMOVER DEPOIS
-if (!$onboarding) {
-    echo "<pre>DEBUG: Onboarding ID = $onboarding_id\n";
-    
-    // Testa query simples
-    $stmt2 = $pdo->prepare("SELECT * FROM onboarding WHERE id = ?");
-    $stmt2->execute([$onboarding_id]);
-    $test = $stmt2->fetch();
-    echo "Query simples: ";
-    print_r($test);
-    
-    // Testa a entrevista
-    if ($test && $test['entrevista_id']) {
-        $stmt3 = $pdo->prepare("SELECT * FROM entrevistas WHERE id = ?");
-        $stmt3->execute([$test['entrevista_id']]);
-        $ent = $stmt3->fetch();
-        echo "\nEntrevista: ";
-        print_r($ent);
-    }
-    echo "</pre>";
+// Primeiro testa query simples
+$stmt_simple = $pdo->prepare("SELECT * FROM onboarding WHERE id = ?");
+$stmt_simple->execute([$onboarding_id]);
+$onboarding_simple = $stmt_simple->fetch(PDO::FETCH_ASSOC);
+
+if (!$onboarding_simple) {
+    echo "Onboarding não encontrado com query simples. ID: $onboarding_id";
     exit;
-    // redirect('onboarding.php', 'Onboarding não encontrado', 'error');
+}
+
+// Busca dados da entrevista se existir
+$entrevista = null;
+if (!empty($onboarding_simple['entrevista_id'])) {
+    $stmt_ent = $pdo->prepare("SELECT * FROM entrevistas WHERE id = ?");
+    $stmt_ent->execute([$onboarding_simple['entrevista_id']]);
+    $entrevista = $stmt_ent->fetch(PDO::FETCH_ASSOC);
+}
+
+// Busca dados da candidatura se existir
+$candidatura = null;
+$candidato = null;
+$vaga = null;
+if (!empty($onboarding_simple['candidatura_id'])) {
+    $stmt_cand = $pdo->prepare("
+        SELECT cand.*, c.nome_completo, c.email, c.telefone, v.titulo as vaga_titulo
+        FROM candidaturas cand
+        INNER JOIN candidatos c ON cand.candidato_id = c.id
+        INNER JOIN vagas v ON cand.vaga_id = v.id
+        WHERE cand.id = ?
+    ");
+    $stmt_cand->execute([$onboarding_simple['candidatura_id']]);
+    $candidatura = $stmt_cand->fetch(PDO::FETCH_ASSOC);
+}
+
+// Busca vaga da entrevista manual
+$vaga_entrevista = null;
+if ($entrevista && !empty($entrevista['vaga_id_manual'])) {
+    $stmt_vaga = $pdo->prepare("SELECT titulo FROM vagas WHERE id = ?");
+    $stmt_vaga->execute([$entrevista['vaga_id_manual']]);
+    $vaga_entrevista = $stmt_vaga->fetch(PDO::FETCH_ASSOC);
+}
+
+// Busca responsável
+$responsavel = null;
+if (!empty($onboarding_simple['responsavel_id'])) {
+    $stmt_resp = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ?");
+    $stmt_resp->execute([$onboarding_simple['responsavel_id']]);
+    $responsavel = $stmt_resp->fetch(PDO::FETCH_ASSOC);
+}
+
+// Busca colaborador
+$colaborador = null;
+if (!empty($onboarding_simple['colaborador_id'])) {
+    $stmt_col = $pdo->prepare("SELECT nome_completo FROM colaboradores WHERE id = ?");
+    $stmt_col->execute([$onboarding_simple['colaborador_id']]);
+    $colaborador = $stmt_col->fetch(PDO::FETCH_ASSOC);
+}
+
+// Busca mentor
+$mentor = null;
+if (!empty($onboarding_simple['mentor_id'])) {
+    $stmt_mentor = $pdo->prepare("SELECT nome_completo FROM colaboradores WHERE id = ?");
+    $stmt_mentor->execute([$onboarding_simple['mentor_id']]);
+    $mentor = $stmt_mentor->fetch(PDO::FETCH_ASSOC);
+}
+
+// Monta objeto onboarding
+$onboarding = $onboarding_simple;
+$onboarding['is_entrevista_manual'] = (!empty($onboarding_simple['entrevista_id']) && empty($onboarding_simple['candidatura_id'])) ? 1 : 0;
+
+if ($candidatura) {
+    $onboarding['candidato_nome'] = $candidatura['nome_completo'];
+    $onboarding['candidato_email'] = $candidatura['email'];
+    $onboarding['candidato_telefone'] = $candidatura['telefone'];
+    $onboarding['vaga_titulo'] = $candidatura['vaga_titulo'];
+} elseif ($entrevista) {
+    $onboarding['candidato_nome'] = $entrevista['candidato_nome_manual'];
+    $onboarding['candidato_email'] = $entrevista['candidato_email_manual'];
+    $onboarding['candidato_telefone'] = $entrevista['candidato_telefone_manual'];
+    $onboarding['vaga_titulo'] = $vaga_entrevista['titulo'] ?? null;
+} else {
+    $onboarding['candidato_nome'] = 'Desconhecido';
+    $onboarding['candidato_email'] = null;
+    $onboarding['candidato_telefone'] = null;
+    $onboarding['vaga_titulo'] = null;
+}
+
+$onboarding['colaborador_nome'] = $colaborador['nome_completo'] ?? null;
+$onboarding['responsavel_nome'] = $responsavel['nome'] ?? null;
+$onboarding['mentor_nome'] = $mentor['nome_completo'] ?? null;
+
+if (!$onboarding) {
+    redirect('onboarding.php', 'Onboarding não encontrado', 'error');
 }
 
 // Busca tarefas
