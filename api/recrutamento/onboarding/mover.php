@@ -71,18 +71,57 @@ try {
     
     // Se concluído, cria colaborador no sistema (se ainda não existe)
     if ($coluna === 'concluido' && !$onboarding['colaborador_id']) {
-        // Busca dados da candidatura
-        $stmt = $pdo->prepare("
-            SELECT c.*, cand.*, v.setor_id, v.cargo_id
-            FROM candidaturas c
-            INNER JOIN candidatos cand ON c.candidato_id = cand.id
-            INNER JOIN vagas v ON c.vaga_id = v.id
-            WHERE c.id = ?
-        ");
-        $stmt->execute([$onboarding['candidatura_id']]);
-        $candidatura = $stmt->fetch();
+        $dados_candidato = null;
         
-        if ($candidatura) {
+        // Verifica se é de candidatura ou entrevista manual
+        if ($onboarding['candidatura_id']) {
+            // Busca dados da candidatura
+            $stmt = $pdo->prepare("
+                SELECT c.*, cand.*, v.setor_id, v.cargo_id, v.empresa_id
+                FROM candidaturas c
+                INNER JOIN candidatos cand ON c.candidato_id = cand.id
+                INNER JOIN vagas v ON c.vaga_id = v.id
+                WHERE c.id = ?
+            ");
+            $stmt->execute([$onboarding['candidatura_id']]);
+            $candidatura = $stmt->fetch();
+            
+            if ($candidatura) {
+                $dados_candidato = [
+                    'empresa_id' => $candidatura['empresa_id'],
+                    'setor_id' => $candidatura['setor_id'],
+                    'cargo_id' => $candidatura['cargo_id'],
+                    'nome_completo' => $candidatura['nome_completo'],
+                    'email' => $candidatura['email'],
+                    'telefone' => $candidatura['telefone'],
+                    'cpf' => $candidatura['cpf'] ?? null
+                ];
+            }
+        } elseif ($onboarding['entrevista_id']) {
+            // Busca dados da entrevista manual
+            $stmt = $pdo->prepare("
+                SELECT e.*, v.setor_id, v.cargo_id, v.empresa_id
+                FROM entrevistas e
+                LEFT JOIN vagas v ON e.vaga_id_manual = v.id
+                WHERE e.id = ?
+            ");
+            $stmt->execute([$onboarding['entrevista_id']]);
+            $entrevista = $stmt->fetch();
+            
+            if ($entrevista) {
+                $dados_candidato = [
+                    'empresa_id' => $entrevista['empresa_id'],
+                    'setor_id' => $entrevista['setor_id'],
+                    'cargo_id' => $entrevista['cargo_id'],
+                    'nome_completo' => $entrevista['candidato_nome_manual'],
+                    'email' => $entrevista['candidato_email_manual'],
+                    'telefone' => $entrevista['candidato_telefone_manual'],
+                    'cpf' => null
+                ];
+            }
+        }
+        
+        if ($dados_candidato && $dados_candidato['email']) {
             // Cria colaborador
             $stmt = $pdo->prepare("
                 INSERT INTO colaboradores 
@@ -90,13 +129,13 @@ try {
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'ativo')
             ");
             $stmt->execute([
-                $candidatura['empresa_id'],
-                $candidatura['setor_id'],
-                $candidatura['cargo_id'],
-                $candidatura['nome_completo'],
-                $candidatura['email'],
-                $candidatura['telefone'],
-                $candidatura['cpf']
+                $dados_candidato['empresa_id'],
+                $dados_candidato['setor_id'],
+                $dados_candidato['cargo_id'],
+                $dados_candidato['nome_completo'],
+                $dados_candidato['email'],
+                $dados_candidato['telefone'],
+                $dados_candidato['cpf']
             ]);
             
             $colaborador_id = $pdo->lastInsertId();
@@ -113,10 +152,10 @@ try {
                 VALUES (?, ?, ?, 'COLABORADOR', ?, ?, 'ativo')
             ");
             $stmt->execute([
-                $candidatura['nome_completo'],
-                $candidatura['email'],
+                $dados_candidato['nome_completo'],
+                $dados_candidato['email'],
                 $senha_hash,
-                $candidatura['empresa_id'],
+                $dados_candidato['empresa_id'],
                 $colaborador_id
             ]);
         }

@@ -225,30 +225,37 @@ $colunas = [
 </div>
 
 <script>
+// Variável global para controle do auto-scroll
+let autoScrollInterval = null;
+
 // Atualiza contadores e mensagens de vazio
 function atualizarContadores() {
     <?php foreach ($colunas as $codigo => $coluna): ?>
-    const count<?= str_replace('-', '_', $codigo) ?> = document.querySelectorAll('[data-coluna-atual="<?= $codigo ?>"]').length;
-    document.getElementById('count-<?= $codigo ?>').textContent = count<?= str_replace('-', '_', $codigo) ?>;
-    const countTextEl<?= str_replace('-', '_', $codigo) ?> = document.getElementById('count-text-<?= $codigo ?>');
-    if (countTextEl<?= str_replace('-', '_', $codigo) ?>) {
-        countTextEl<?= str_replace('-', '_', $codigo) ?>.textContent = count<?= str_replace('-', '_', $codigo) ?> === 1 ? 'processo' : 'processo(s)';
-    }
-    
-    // Atualiza mensagem de vazio
-    const colunaElement = document.querySelector(`[data-coluna="<?= $codigo ?>"] .kanban-column`);
-    if (colunaElement) {
-        const emptyMessage = colunaElement.querySelector('.empty-message');
-        // Conta apenas cards visíveis (não ocultos pelo filtro de busca)
-        const visibleCards = Array.from(colunaElement.querySelectorAll('.kanban-card')).filter(card => {
-            return card.style.display !== 'none' && window.getComputedStyle(card).display !== 'none';
-        });
-        const hasCards = visibleCards.length > 0;
+    (function() {
+        const count = document.querySelectorAll('[data-coluna-atual="<?= $codigo ?>"]').length;
+        const countEl = document.getElementById('count-<?= $codigo ?>');
+        if (countEl) countEl.textContent = count;
         
-        if (emptyMessage) {
-            emptyMessage.style.display = hasCards ? 'none' : 'block';
+        const countTextEl = document.getElementById('count-text-<?= $codigo ?>');
+        if (countTextEl) {
+            countTextEl.textContent = count === 1 ? 'processo' : 'processo(s)';
         }
-    }
+        
+        // Atualiza mensagem de vazio
+        const colunaElement = document.querySelector('[data-coluna="<?= $codigo ?>"] .kanban-column');
+        if (colunaElement) {
+            const emptyMessage = colunaElement.querySelector('.empty-message');
+            // Conta apenas cards visíveis (não ocultos pelo filtro de busca)
+            const visibleCards = Array.from(colunaElement.querySelectorAll('.kanban-card')).filter(card => {
+                return card.style.display !== 'none' && window.getComputedStyle(card).display !== 'none';
+            });
+            const hasCards = visibleCards.length > 0;
+            
+            if (emptyMessage) {
+                emptyMessage.style.display = hasCards ? 'none' : 'block';
+            }
+        }
+    })();
     <?php endforeach; ?>
 }
 
@@ -384,9 +391,75 @@ async function handleDrop(e) {
     draggedFromColumn = null;
 }
 
+// Auto-scroll quando arrastar para as bordas
+function setupAutoScroll() {
+    const container = document.getElementById('kanbanOnboarding');
+    if (!container) return;
+    
+    const SCROLL_ZONE = 150; // Pixels da borda para ativar scroll
+    const MAX_SCROLL_SPEED = 25; // Velocidade máxima de scroll
+    const MIN_SCROLL_SPEED = 8; // Velocidade mínima de scroll
+    const SCROLL_INTERVAL_MS = 16; // Intervalo para suavizar (aprox. 60fps)
+    
+    container.addEventListener('dragover', function(e) {
+        const containerRect = container.getBoundingClientRect();
+        const mouseX = e.clientX;
+        
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+        
+        let scrollAmount = 0;
+        
+        // Zona de scroll esquerda
+        if (mouseX < containerRect.left + SCROLL_ZONE) {
+            const distance = (containerRect.left + SCROLL_ZONE) - mouseX;
+            scrollAmount = -Math.max(MIN_SCROLL_SPEED, (distance / SCROLL_ZONE) * MAX_SCROLL_SPEED);
+        }
+        // Zona de scroll direita
+        else if (mouseX > containerRect.right - SCROLL_ZONE) {
+            const distance = mouseX - (containerRect.right - SCROLL_ZONE);
+            scrollAmount = Math.max(MIN_SCROLL_SPEED, (distance / SCROLL_ZONE) * MAX_SCROLL_SPEED);
+        }
+        
+        if (scrollAmount !== 0) {
+            autoScrollInterval = setInterval(() => {
+                container.scrollLeft += scrollAmount;
+            }, SCROLL_INTERVAL_MS);
+        }
+    });
+    
+    container.addEventListener('dragleave', function(e) {
+        // Verifica se realmente saiu do container
+        if (!container.contains(e.relatedTarget)) {
+            if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+            }
+        }
+    });
+    
+    container.addEventListener('drop', function() {
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+    });
+    
+    // Para o scroll quando soltar o mouse (mesmo fora da área)
+    document.addEventListener('dragend', function() {
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+    });
+}
+
 // Inicializa drag and drop quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', function() {
     inicializarDragAndDrop();
+    setupAutoScroll();
 });
 
 // Busca de colaboradores
