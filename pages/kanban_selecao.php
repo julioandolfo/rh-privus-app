@@ -241,17 +241,17 @@ function atualizarContadores() {
     }
     
     // Atualiza mensagem de vazio
-    const colunaElement = document.querySelector(`[data-coluna="<?= $coluna['codigo'] ?>"] .kanban-column`);
-    if (colunaElement) {
-        const emptyMessage = colunaElement.querySelector('.empty-message');
+    const colunaElement<?= $coluna['codigo'] ?> = document.querySelector(`[data-coluna="<?= $coluna['codigo'] ?>"] .kanban-column`);
+    if (colunaElement<?= $coluna['codigo'] ?>) {
+        const emptyMessage<?= $coluna['codigo'] ?> = colunaElement<?= $coluna['codigo'] ?>.querySelector('.empty-message');
         // Conta apenas cards visíveis (não ocultos pelo filtro de busca)
-        const visibleCards = Array.from(colunaElement.querySelectorAll('.kanban-card')).filter(card => {
+        const visibleCards<?= $coluna['codigo'] ?> = Array.from(colunaElement<?= $coluna['codigo'] ?>.querySelectorAll('.kanban-card')).filter(card => {
             return card.style.display !== 'none' && window.getComputedStyle(card).display !== 'none';
         });
-        const hasCards = visibleCards.length > 0;
+        const hasCards<?= $coluna['codigo'] ?> = visibleCards<?= $coluna['codigo'] ?>.length > 0;
         
-        if (emptyMessage) {
-            emptyMessage.style.display = hasCards ? 'none' : 'block';
+        if (emptyMessage<?= $coluna['codigo'] ?>) {
+            emptyMessage<?= $coluna['codigo'] ?>.style.display = hasCards<?= $coluna['codigo'] ?> ? 'none' : 'block';
         }
     }
     <?php endforeach; ?>

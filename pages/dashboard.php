@@ -6967,72 +6967,81 @@ setTimeout(() => {
 
 <!--begin::Emoções Script-->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Seleção visual de emoção (funciona para ambos os formulários)
-    document.querySelectorAll('.emocao-option').forEach(function(option) {
-        option.addEventListener('click', function() {
-            const radio = this.previousElementSibling;
-            if (radio) {
-                radio.checked = true;
-            }
-            
-            // Remove seleção anterior no mesmo formulário
-            const form = this.closest('form');
-            if (form) {
-                form.querySelectorAll('.emocao-option').forEach(function(opt) {
-                    opt.style.borderColor = 'transparent';
-                    opt.style.backgroundColor = '';
-                });
-            } else {
-                // Fallback: remove de todos se não encontrar form
-                document.querySelectorAll('.emocao-option').forEach(function(opt) {
-                    opt.style.borderColor = 'transparent';
-                    opt.style.backgroundColor = '';
-                });
-            }
-            
-            // Marca selecionado
-            this.style.borderColor = '#009ef7';
-            this.style.backgroundColor = '#f1faff';
+(function() {
+    // Função para inicializar seleção visual de emoção
+    function initSelecaoVisualEmocao() {
+        document.querySelectorAll('.emocao-option').forEach(function(option) {
+            option.addEventListener('click', function() {
+                const radio = this.previousElementSibling;
+                if (radio) {
+                    radio.checked = true;
+                }
+                
+                // Remove seleção anterior no mesmo formulário
+                const form = this.closest('form');
+                if (form) {
+                    form.querySelectorAll('.emocao-option').forEach(function(opt) {
+                        opt.style.borderColor = 'transparent';
+                        opt.style.backgroundColor = '';
+                    });
+                } else {
+                    // Fallback: remove de todos se não encontrar form
+                    document.querySelectorAll('.emocao-option').forEach(function(opt) {
+                        opt.style.borderColor = 'transparent';
+                        opt.style.backgroundColor = '';
+                    });
+                }
+                
+                // Marca selecionado
+                this.style.borderColor = '#009ef7';
+                this.style.backgroundColor = '#f1faff';
+            });
         });
-    });
+    }
     
-    // Submit do formulário de emoção (Admin/RH/GESTOR)
+    // Função para inicializar os formulários de emoção
+    function initFormulariosEmocao() {
+        // Submit do formulário de emoção (Admin/RH/GESTOR)
     const formEmocao = document.getElementById('form_emocao_dashboard');
     if (formEmocao) {
-        // Garante que não há action ou method que cause redirecionamento
-        formEmocao.setAttribute('method', 'post');
+        // Garante que não há action que cause redirecionamento
         formEmocao.removeAttribute('action');
-        formEmocao.setAttribute('onsubmit', 'return false;');
         
         formEmocao.addEventListener('submit', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            e.stopImmediatePropagation();
+            
+            console.log('Formulário de emoção submetido');
             
             const nivelEmocao = this.querySelector('input[name="nivel_emocao"]:checked');
             if (!nivelEmocao) {
-                Swal.fire({
-                    text: "Por favor, selecione como você está se sentindo",
-                    icon: "warning",
-                    buttonsStyling: false,
-                    confirmButtonText: "Ok",
-                    customClass: {
-                        confirmButton: "btn btn-primary"
-                    }
-                });
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        text: "Por favor, selecione como você está se sentindo",
+                        icon: "warning",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    });
+                } else {
+                    alert("Por favor, selecione como você está se sentindo");
+                }
                 return false;
             }
             
             const formData = new FormData(this);
             const btn = this.querySelector('button[type="submit"]');
-            const indicator = btn.querySelector('.indicator-label');
-            const progress = btn.querySelector('.indicator-progress');
+            const indicator = btn ? btn.querySelector('.indicator-label') : null;
+            const progress = btn ? btn.querySelector('.indicator-progress') : null;
             
-            btn.setAttribute('data-kt-indicator', 'on');
-            btn.disabled = true;
-            indicator.style.display = 'none';
-            progress.style.display = 'inline-block';
+            if (btn) {
+                btn.setAttribute('data-kt-indicator', 'on');
+                btn.disabled = true;
+                if (indicator) indicator.style.display = 'none';
+                if (progress) progress.style.display = 'inline-block';
+            }
             
             fetch('../api/registrar_emocao.php', {
                 method: 'POST',
@@ -7040,26 +7049,56 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Erro na resposta do servidor');
+                    throw new Error('Erro na resposta do servidor: ' + response.status);
                 }
                 return response.json();
             })
             .then(data => {
+                console.log('Resposta da API:', data);
                 if (data.success) {
-                    Swal.fire({
-                        text: data.message,
-                        icon: "success",
-                        buttonsStyling: false,
-                        confirmButtonText: "Ok",
-                        customClass: {
-                            confirmButton: "btn btn-primary"
-                        }
-                    }).then(function() {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            text: data.message,
+                            icon: "success",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        }).then(function() {
+                            location.reload();
+                        });
+                    } else {
+                        alert(data.message);
                         location.reload();
-                    });
+                    }
                 } else {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            text: data.message || "Erro ao registrar emoção",
+                            icon: "error",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        });
+                    } else {
+                        alert(data.message || "Erro ao registrar emoção");
+                    }
+                    if (btn) {
+                        btn.removeAttribute('data-kt-indicator');
+                        btn.disabled = false;
+                        if (indicator) indicator.style.display = 'inline-block';
+                        if (progress) progress.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao registrar emoção:', error);
+                if (typeof Swal !== 'undefined') {
                     Swal.fire({
-                        text: data.message || "Erro ao registrar emoção",
+                        text: "Erro ao registrar emoção. Tente novamente.",
                         icon: "error",
                         buttonsStyling: false,
                         confirmButtonText: "Ok",
@@ -7067,27 +7106,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             confirmButton: "btn btn-primary"
                         }
                     });
+                } else {
+                    alert("Erro ao registrar emoção. Tente novamente.");
+                }
+                if (btn) {
                     btn.removeAttribute('data-kt-indicator');
                     btn.disabled = false;
-                    indicator.style.display = 'inline-block';
-                    progress.style.display = 'none';
+                    if (indicator) indicator.style.display = 'inline-block';
+                    if (progress) progress.style.display = 'none';
                 }
-            })
-            .catch(error => {
-                console.error('Erro ao registrar emoção:', error);
-                Swal.fire({
-                    text: "Erro ao registrar emoção. Tente novamente.",
-                    icon: "error",
-                    buttonsStyling: false,
-                    confirmButtonText: "Ok",
-                    customClass: {
-                        confirmButton: "btn btn-primary"
-                    }
-                });
-                btn.removeAttribute('data-kt-indicator');
-                btn.disabled = false;
-                indicator.style.display = 'inline-block';
-                progress.style.display = 'none';
             });
             
             return false;
@@ -7097,39 +7124,44 @@ document.addEventListener('DOMContentLoaded', function() {
     // Submit do formulário de emoção (Colaborador)
     const formEmocaoColab = document.getElementById('form_emocao_dashboard_colab');
     if (formEmocaoColab) {
-        // Garante que não há action ou method que cause redirecionamento
-        formEmocaoColab.setAttribute('method', 'post');
+        // Garante que não há action que cause redirecionamento
         formEmocaoColab.removeAttribute('action');
-        formEmocaoColab.setAttribute('onsubmit', 'return false;');
         
         formEmocaoColab.addEventListener('submit', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            e.stopImmediatePropagation();
+            
+            console.log('Formulário de emoção (colab) submetido');
             
             const nivelEmocao = this.querySelector('input[name="nivel_emocao"]:checked');
             if (!nivelEmocao) {
-                Swal.fire({
-                    text: "Por favor, selecione como você está se sentindo",
-                    icon: "warning",
-                    buttonsStyling: false,
-                    confirmButtonText: "Ok",
-                    customClass: {
-                        confirmButton: "btn btn-primary"
-                    }
-                });
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        text: "Por favor, selecione como você está se sentindo",
+                        icon: "warning",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    });
+                } else {
+                    alert("Por favor, selecione como você está se sentindo");
+                }
                 return false;
             }
             
             const formData = new FormData(this);
             const btn = this.querySelector('button[type="submit"]');
-            const indicator = btn.querySelector('.indicator-label');
-            const progress = btn.querySelector('.indicator-progress');
+            const indicator = btn ? btn.querySelector('.indicator-label') : null;
+            const progress = btn ? btn.querySelector('.indicator-progress') : null;
             
-            btn.setAttribute('data-kt-indicator', 'on');
-            btn.disabled = true;
-            indicator.style.display = 'none';
-            progress.style.display = 'inline-block';
+            if (btn) {
+                btn.setAttribute('data-kt-indicator', 'on');
+                btn.disabled = true;
+                if (indicator) indicator.style.display = 'none';
+                if (progress) progress.style.display = 'inline-block';
+            }
             
             fetch('../api/registrar_emocao.php', {
                 method: 'POST',
@@ -7137,26 +7169,56 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Erro na resposta do servidor');
+                    throw new Error('Erro na resposta do servidor: ' + response.status);
                 }
                 return response.json();
             })
             .then(data => {
+                console.log('Resposta da API:', data);
                 if (data.success) {
-                    Swal.fire({
-                        text: data.message,
-                        icon: "success",
-                        buttonsStyling: false,
-                        confirmButtonText: "Ok",
-                        customClass: {
-                            confirmButton: "btn btn-primary"
-                        }
-                    }).then(function() {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            text: data.message,
+                            icon: "success",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        }).then(function() {
+                            location.reload();
+                        });
+                    } else {
+                        alert(data.message);
                         location.reload();
-                    });
+                    }
                 } else {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            text: data.message || "Erro ao registrar emoção",
+                            icon: "error",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        });
+                    } else {
+                        alert(data.message || "Erro ao registrar emoção");
+                    }
+                    if (btn) {
+                        btn.removeAttribute('data-kt-indicator');
+                        btn.disabled = false;
+                        if (indicator) indicator.style.display = 'inline-block';
+                        if (progress) progress.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao registrar emoção:', error);
+                if (typeof Swal !== 'undefined') {
                     Swal.fire({
-                        text: data.message || "Erro ao registrar emoção",
+                        text: "Erro ao registrar emoção. Tente novamente.",
                         icon: "error",
                         buttonsStyling: false,
                         confirmButtonText: "Ok",
@@ -7164,33 +7226,33 @@ document.addEventListener('DOMContentLoaded', function() {
                             confirmButton: "btn btn-primary"
                         }
                     });
+                } else {
+                    alert("Erro ao registrar emoção. Tente novamente.");
+                }
+                if (btn) {
                     btn.removeAttribute('data-kt-indicator');
                     btn.disabled = false;
-                    indicator.style.display = 'inline-block';
-                    progress.style.display = 'none';
+                    if (indicator) indicator.style.display = 'inline-block';
+                    if (progress) progress.style.display = 'none';
                 }
-            })
-            .catch(error => {
-                console.error('Erro ao registrar emoção:', error);
-                Swal.fire({
-                    text: "Erro ao registrar emoção. Tente novamente.",
-                    icon: "error",
-                    buttonsStyling: false,
-                    confirmButtonText: "Ok",
-                    customClass: {
-                        confirmButton: "btn btn-primary"
-                    }
-                });
-                btn.removeAttribute('data-kt-indicator');
-                btn.disabled = false;
-                indicator.style.display = 'inline-block';
-                progress.style.display = 'none';
             });
             
             return false;
         });
     }
-});
+    
+    // Executa quando o DOM estiver pronto
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            initSelecaoVisualEmocao();
+            initFormulariosEmocao();
+        });
+    } else {
+        // DOM já está carregado, executa imediatamente
+        initSelecaoVisualEmocao();
+        initFormulariosEmocao();
+    }
+})();
 </script>
 <style>
 .emocao-option {
