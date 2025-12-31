@@ -107,7 +107,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="col-md-12">
                             <label class="form-label required">Conteúdo</label>
                             <textarea name="conteudo" id="conteudo" class="form-control form-control-solid" rows="15" required></textarea>
-                            <div class="form-text">Você pode usar HTML para formatar o conteúdo. Inclua informações como acessos, senhas, funções específicas, etc.</div>
+                            <div class="form-text">Use o editor abaixo para formatar o conteúdo. Inclua informações como acessos, senhas, funções específicas, etc.</div>
                         </div>
                     </div>
                     
@@ -172,6 +172,11 @@ document.getElementById('selecionar_todos').addEventListener('change', function(
 document.getElementById('form_manual').addEventListener('submit', function(e) {
     e.preventDefault();
     
+    // Salva conteúdo do TinyMCE antes de submeter
+    if (typeof tinymce !== 'undefined' && tinymce.get('conteudo')) {
+        tinymce.get('conteudo').save();
+    }
+    
     const formData = new FormData(this);
     
     Swal.fire({
@@ -227,5 +232,64 @@ document.getElementById('form_manual').addEventListener('submit', function(e) {
     });
 });
 </script>
+
+<!--begin::TinyMCE-->
+<script src="../assets/plugins/custom/tinymce/tinymce.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializa TinyMCE
+    function initTinyMCE() {
+        // Verifica se TinyMCE está disponível
+        if (typeof tinymce === 'undefined') {
+            console.warn('TinyMCE não está carregado. Tentando novamente...');
+            setTimeout(initTinyMCE, 200);
+            return;
+        }
+        
+        // Remove editor existente se houver
+        const editorId = 'conteudo';
+        if (tinymce.get(editorId)) {
+            tinymce.get(editorId).remove();
+        }
+        
+        // Configura base_url e suffix para usar os arquivos diretamente
+        const baseUrl = '../assets/plugins/custom/tinymce';
+        
+        // Inicializa TinyMCE
+        tinymce.init({
+            selector: '#' + editorId,
+            height: 600,
+            menubar: true,
+            base_url: baseUrl,
+            suffix: '.min',
+            license_key: 'gpl',
+            plugins: [
+                'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
+            ],
+            toolbar: 'undo redo | blocks | ' +
+                'bold italic forecolor | alignleft aligncenter ' +
+                'alignright alignjustify | bullist numlist outdent indent | ' +
+                'removeformat | link image | help | code',
+            content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; }',
+            language: 'pt_BR',
+            promotion: false,
+            branding: false,
+            skin: 'oxide',
+            content_css: baseUrl + '/skins/ui/oxide/content.min.css',
+            setup: function(editor) {
+                editor.on('change', function() {
+                    editor.save();
+                });
+            }
+        });
+    }
+    
+    // Inicializa TinyMCE após carregar
+    setTimeout(initTinyMCE, 500);
+});
+</script>
+<!--end::TinyMCE-->
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
