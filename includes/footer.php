@@ -1128,5 +1128,66 @@
     </script>
     <!--end::Atualização Badge Chat Menu-->
     
+<script>
+// Função para voltar ao usuário original após impersonation
+function voltarUsuarioOriginal() {
+    Swal.fire({
+        title: 'Voltar ao seu usuário?',
+        text: 'Você está prestes a voltar ao seu usuário original.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, voltar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-light'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Voltando...',
+                text: 'Por favor, aguarde.',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            fetch('../api/voltar_usuario_original.php', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect || 'dashboard.php';
+                } else {
+                    Swal.fire({
+                        text: data.message || 'Erro ao voltar',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'Ok',
+                        customClass: {
+                            confirmButton: 'btn btn-primary'
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    text: 'Erro ao voltar: ' + error.message,
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+            });
+        }
+    });
+}
+</script>
+
 </body>
 </html>

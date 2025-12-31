@@ -228,6 +228,13 @@ function get_page_permissions() {
         'faq_edit.php' => ['ADMIN'],
         'manual_conduta_estatisticas.php' => ['ADMIN'],
         'manual_conduta_exportar_pdf.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        
+        // Manuais Individuais - ADMIN, RH e GESTOR para gestão, COLABORADOR para visualização
+        'manuais_individuais.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'manual_individuais_add.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'manual_individuais_edit.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'manual_individuais_view.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'meus_manuais_individuais.php' => ['COLABORADOR'],
     ];
     
     // Carrega permissões customizadas (se existir)

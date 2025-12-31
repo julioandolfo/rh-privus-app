@@ -1378,6 +1378,22 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
+                <?php if (can_access_page('manuais_individuais.php')): ?>
+                    <!--begin:Menu item-->
+                    <div class="menu-item">
+                        <a class="menu-link <?= (isActive('manuais_individuais.php') || isActive('manual_individuais_add.php') || isActive('manual_individuais_edit.php') || isActive('manual_individuais_view.php')) ? 'active' : '' ?>" href="manuais_individuais.php">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-book fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </span>
+                            <span class="menu-title">Manuais Individuais</span>
+                        </a>
+                    </div>
+                    <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <?php if (can_show_menu('ADMIN') || can_access_configuracoes()): ?>
                     <!--begin:Menu separator-->
                     <div class="menu-item pt-5">

@@ -218,6 +218,18 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $lms_evolucao = $stmt->fetchAll();
 
+// Busca manuais individuais do colaborador
+$stmt = $pdo->prepare("
+    SELECT m.*, u.nome as criado_por_nome
+    FROM manuais_individuais m
+    INNER JOIN manuais_individuais_colaboradores mc ON m.id = mc.manual_id
+    LEFT JOIN usuarios u ON m.created_by = u.id
+    WHERE mc.colaborador_id = ? AND m.status = 'ativo'
+    ORDER BY m.created_at DESC
+");
+$stmt->execute([$id]);
+$manuais_individuais = $stmt->fetchAll();
+
 // Calcula percentual geral de conclusão
 $lms_percentual_geral = 0;
 if ($lms_stats['total_aulas_disponiveis'] > 0) {
@@ -271,6 +283,16 @@ require_once __DIR__ . '/../includes/header.php';
                     <span class="d-none d-md-inline">Enviar Dados de Acesso</span>
                 </button>
                 <?php endif; ?>
+            <?php endif; ?>
+            <?php if (in_array($usuario['role'], ['ADMIN', 'RH', 'GESTOR']) && $colaborador['status'] === 'ativo'): ?>
+                <button type="button" class="btn btn-sm btn-info" onclick="logarComoColaborador(<?= $id ?>, '<?= htmlspecialchars($colaborador['nome_completo'], ENT_QUOTES) ?>')">
+                    <i class="ki-duotone ki-user fs-2 d-none d-md-inline">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <span class="d-md-none">Logar como</span>
+                    <span class="d-none d-md-inline">Logar como Colaborador</span>
+                </button>
             <?php endif; ?>
             <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
                 <a href="colaboradores.php" class="btn btn-sm btn-light">
@@ -383,6 +405,19 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="d-md-none">Ocorrências</span>
                                 <?php if (count($ocorrencias) > 0): ?>
                                 <span class="badge badge-circle badge-danger ms-2"><?= count($ocorrencias) ?></span>
+                                <?php endif; ?>
+                            </a>
+                        </li>
+                        <li class="nav-item mt-2 flex-shrink-0">
+                            <a class="nav-link text-active-primary py-5" data-bs-toggle="tab" href="#kt_tab_pane_manuais">
+                                <i class="ki-duotone ki-book fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <span class="d-none d-md-inline">Manuais Individuais</span>
+                                <span class="d-md-none">Manuais</span>
+                                <?php if (count($manuais_individuais) > 0): ?>
+                                <span class="badge badge-circle badge-primary ms-2"><?= count($manuais_individuais) ?></span>
                                 <?php endif; ?>
                             </a>
                         </li>
@@ -1206,6 +1241,53 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php endif; ?>
                     </div>
                     <!--end::Tab Pane - Ocorrências-->
+                    
+                    <!--begin::Tab Pane - Manuais Individuais-->
+                    <div class="tab-pane fade" id="kt_tab_pane_manuais" role="tabpanel">
+                        <div class="card-body pt-0">
+                            <?php if (empty($manuais_individuais)): ?>
+                            <div class="text-center py-10">
+                                <i class="ki-duotone ki-book fs-3x text-gray-400 mb-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <p class="text-gray-600 fs-5">Nenhum manual individual disponível no momento.</p>
+                            </div>
+                            <?php else: ?>
+                            <div class="row g-5">
+                                <?php foreach ($manuais_individuais as $manual): ?>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="card h-100">
+                                        <div class="card-header border-0 pt-6">
+                                            <div class="card-title">
+                                                <h3 class="fw-bold m-0"><?= htmlspecialchars($manual['titulo']) ?></h3>
+                                            </div>
+                                        </div>
+                                        <div class="card-body pt-0">
+                                            <?php if ($manual['descricao']): ?>
+                                            <p class="text-gray-600 mb-4"><?= nl2br(htmlspecialchars(mb_substr($manual['descricao'], 0, 150))) ?><?= mb_strlen($manual['descricao']) > 150 ? '...' : '' ?></p>
+                                            <?php endif; ?>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted fs-7">
+                                                    Criado em <?= formatar_data($manual['created_at']) ?>
+                                                </span>
+                                                <a href="manual_individuais_view.php?id=<?= $manual['id'] ?>" class="btn btn-sm btn-light-primary">
+                                                    Ver Manual
+                                                    <i class="ki-duotone ki-arrow-right fs-3 ms-1">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <!--end::Tab Pane - Manuais Individuais-->
                     
                     <!--begin::Tab Pane - Escola Privus-->
                     <div class="tab-pane fade" id="kt_tab_pane_escola_privus" role="tabpanel">
@@ -2591,6 +2673,55 @@ document.getElementById('kt_modal_bonus_form')?.addEventListener('submit', funct
 
 <?php if ($usuario['role'] !== 'COLABORADOR' && $usuario['role'] !== 'GESTOR'): ?>
 <script>
+// Função para logar como colaborador
+function logarComoColaborador(colaboradorId, nomeColaborador) {
+    Swal.fire({
+        title: 'Logar como Colaborador',
+        html: `
+            <p>Você está prestes a fazer login como <strong>${nomeColaborador}</strong>.</p>
+            <p class="text-muted">Você poderá voltar ao seu usuário original a qualquer momento.</p>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar Login',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-light'
+        },
+        preConfirm: () => {
+            const formData = new FormData();
+            formData.append('colaborador_id', colaboradorId);
+            
+            return fetch('../api/logar_como_colaborador.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Erro ao fazer login');
+                }
+                return data;
+            });
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                text: 'Login realizado com sucesso!',
+                icon: 'success',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok',
+                customClass: {
+                    confirmButton: 'btn btn-primary'
+                }
+            }).then(() => {
+                window.location.href = result.value.redirect || 'dashboard.php';
+            });
+        }
+    });
+}
+
 function enviarDadosAcesso(colaboradorId) {
     Swal.fire({
         title: 'Enviar Dados de Acesso?',

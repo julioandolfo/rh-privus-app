@@ -221,6 +221,25 @@ $usuario = $_SESSION['usuario'];
                         <!--end::Brand-->
                         <!--begin::Topbar-->
                         <div class="topbar d-flex align-items-stretch">
+                            <?php if (isset($_SESSION['impersonating']) && $_SESSION['impersonating']): ?>
+                            <!--begin::Aviso Impersonation-->
+                            <div class="d-flex align-items-center me-2">
+                                <div class="alert alert-warning d-flex align-items-center p-3 mb-0" style="min-width: 300px;">
+                                    <i class="ki-duotone ki-information-5 fs-2x text-warning me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">Logado como Colaborador</span>
+                                        <span class="fs-7">Você está visualizando como outro usuário</span>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-light-warning ms-3" onclick="voltarUsuarioOriginal()">
+                                        Voltar
+                                    </button>
+                                </div>
+                            </div>
+                            <!--end::Aviso Impersonation-->
+                            <?php endif; ?>
                             <!--begin::Theme mode-->
                             <div class="d-flex align-items-center me-2 me-lg-4">
                                 <!--begin::Menu toggle-->

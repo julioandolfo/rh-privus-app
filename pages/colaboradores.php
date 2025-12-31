@@ -327,6 +327,19 @@ require_once __DIR__ . '/../includes/header.php';
                                         <a href="colaborador_view.php?id=<?= $colab['id'] ?>" class="menu-link px-3">Visualizar</a>
                                     </div>
                                     <!--end::Menu item-->
+                                    <?php if ($colab['status'] === 'ativo'): ?>
+                                    <!--begin::Menu item-->
+                                    <div class="menu-item px-3">
+                                        <a href="#" class="menu-link px-3" onclick="logarComoColaborador(<?= $colab['id'] ?>, '<?= htmlspecialchars($colab['nome_completo'], ENT_QUOTES) ?>'); return false;">
+                                            <i class="ki-duotone ki-user fs-6 me-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Logar como Colaborador
+                                        </a>
+                                    </div>
+                                    <!--end::Menu item-->
+                                    <?php endif; ?>
                                     <?php if ($usuario['role'] !== 'GESTOR' && $colab['status'] !== 'desligado'): ?>
                                     <!--begin::Menu item-->
                                     <div class="menu-item px-3">
@@ -417,6 +430,55 @@ var KTColaboradoresList = function() {
         KTColaboradoresList.init();
     });
 })();
+
+// Função para logar como colaborador
+function logarComoColaborador(colaboradorId, nomeColaborador) {
+    Swal.fire({
+        title: 'Logar como Colaborador',
+        html: `
+            <p>Você está prestes a fazer login como <strong>${nomeColaborador}</strong>.</p>
+            <p class="text-muted">Você poderá voltar ao seu usuário original a qualquer momento.</p>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar Login',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-light'
+        },
+        preConfirm: () => {
+            const formData = new FormData();
+            formData.append('colaborador_id', colaboradorId);
+            
+            return fetch('../api/logar_como_colaborador.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Erro ao fazer login');
+                }
+                return data;
+            });
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                text: 'Login realizado com sucesso!',
+                icon: 'success',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok',
+                customClass: {
+                    confirmButton: 'btn btn-primary'
+                }
+            }).then(() => {
+                window.location.href = result.value.redirect || 'dashboard.php';
+            });
+        }
+    });
+}
 
 // Modal de Demissão
 function abrirModalDemissao(colaboradorId, nomeColaborador) {
