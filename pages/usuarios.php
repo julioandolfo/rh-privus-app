@@ -192,10 +192,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         try {
+            // Verifica dependências antes de excluir
+            $dependencias = [];
+            
+            // Lista de verificações: [tabela, coluna, descrição]
+            $verificacoes = [
+                ['entrevistas', 'entrevistador_id', 'entrevista(s) como entrevistador'],
+                ['entrevistas', 'criado_por', 'entrevista(s) criadas'],
+                ['feedbacks', 'avaliador_id', 'feedback(s) como avaliador'],
+                ['ocorrencias', 'registrado_por', 'ocorrência(s) registradas'],
+                ['horas_extras', 'registrado_por', 'hora(s) extra(s) registradas'],
+                ['bonus_colaboradores', 'registrado_por', 'bônus registrado(s)'],
+                ['banco_horas_movimentacoes', 'usuario_id', 'movimentação(ões) de banco de horas'],
+                ['comunicados', 'criado_por', 'comunicado(s) criado(s)'],
+                ['manual_conduta', 'criado_por', 'manual(is) de conduta criado(s)'],
+                ['manual_conduta', 'publicado_por', 'manual(is) de conduta publicado(s)'],
+                ['vagas', 'criado_por', 'vaga(s) criada(s)'],
+                ['candidatos', 'atualizado_por', 'candidato(s) atualizado(s)'],
+                ['cursos', 'criado_por', 'curso(s) criado(s)'],
+                ['celebracoes', 'criado_por', 'celebração(ões) criada(s)'],
+                ['enquetes', 'criado_por', 'enquete(s) criada(s)'],
+                ['posts', 'criado_por', 'post(s) criado(s)'],
+                ['contratos', 'criado_por', 'contrato(s) criado(s)'],
+                ['flags_sistema', 'created_by', 'flag(s) do sistema'],
+            ];
+            
+            foreach ($verificacoes as $v) {
+                try {
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM {$v[0]} WHERE {$v[1]} = ?");
+                    $stmt->execute([$id]);
+                    $count = $stmt->fetchColumn();
+                    if ($count > 0) {
+                        $dependencias[] = "$count {$v[2]}";
+                    }
+                } catch (PDOException $e) {
+                    // Tabela pode não existir, ignora
+                }
+            }
+            
+            // Se há dependências, não permite excluir
+            if (!empty($dependencias)) {
+                $msg = 'Não é possível excluir este usuário pois possui: ' . implode(', ', $dependencias) . '. Considere desativar o usuário em vez de excluir.';
+                redirect('usuarios.php', $msg, 'error');
+            }
+            
+            // Remove relação com empresas primeiro
+            $stmt = $pdo->prepare("DELETE FROM usuarios_empresas WHERE usuario_id = ?");
+            $stmt->execute([$id]);
+            
+            // Exclui o usuário
             $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
             $stmt->execute([$id]);
             redirect('usuarios.php', 'Usuário excluído com sucesso!');
         } catch (PDOException $e) {
+            // Mensagem amigável para erro de FK
+            if (strpos($e->getMessage(), 'foreign key constraint') !== false) {
+                redirect('usuarios.php', 'Não é possível excluir este usuário pois está vinculado a outros registros. Considere desativar o usuário em vez de excluir.', 'error');
+            }
             redirect('usuarios.php', 'Erro ao excluir: ' . $e->getMessage(), 'error');
         }
     }
