@@ -60,7 +60,12 @@ function adicionar_horas_banco($colaborador_id, $quantidade_horas, $origem, $ori
         $data_movimentacao = date('Y-m-d');
     }
     
-    $pdo->beginTransaction();
+    // Verifica se já existe uma transação ativa
+    $transaction_started = false;
+    if (!$pdo->inTransaction()) {
+        $pdo->beginTransaction();
+        $transaction_started = true;
+    }
     
     try {
         // Busca saldo atual
@@ -105,7 +110,10 @@ function adicionar_horas_banco($colaborador_id, $quantidade_horas, $origem, $ori
         ");
         $stmt->execute([$horas_inteiras, $minutos, $colaborador_id]);
         
-        $pdo->commit();
+        // Só faz commit se foi esta função que iniciou a transação
+        if ($transaction_started) {
+            $pdo->commit();
+        }
         
         return [
             'success' => true,
@@ -115,7 +123,10 @@ function adicionar_horas_banco($colaborador_id, $quantidade_horas, $origem, $ori
         ];
         
     } catch (Exception $e) {
-        $pdo->rollBack();
+        // Só faz rollback se foi esta função que iniciou a transação
+        if ($transaction_started) {
+            $pdo->rollBack();
+        }
         return [
             'success' => false,
             'error' => $e->getMessage()
@@ -137,7 +148,12 @@ function remover_horas_banco($colaborador_id, $quantidade_horas, $origem, $orige
         $data_movimentacao = date('Y-m-d');
     }
     
-    $pdo->beginTransaction();
+    // Verifica se já existe uma transação ativa
+    $transaction_started = false;
+    if (!$pdo->inTransaction()) {
+        $pdo->beginTransaction();
+        $transaction_started = true;
+    }
     
     try {
         // Busca saldo atual
@@ -146,7 +162,9 @@ function remover_horas_banco($colaborador_id, $quantidade_horas, $origem, $orige
         
         // Valida saldo (se não permitir negativo)
         if (!$permitir_saldo_negativo && $saldo_anterior < $quantidade_horas) {
-            $pdo->rollBack();
+            if ($transaction_started) {
+                $pdo->rollBack();
+            }
             return [
                 'success' => false,
                 'error' => 'Saldo insuficiente. Saldo atual: ' . number_format($saldo_anterior, 2, ',', '.') . ' horas.'
@@ -196,7 +214,10 @@ function remover_horas_banco($colaborador_id, $quantidade_horas, $origem, $orige
         ");
         $stmt->execute([$horas_inteiras, $minutos, $colaborador_id]);
         
-        $pdo->commit();
+        // Só faz commit se foi esta função que iniciou a transação
+        if ($transaction_started) {
+            $pdo->commit();
+        }
         
         return [
             'success' => true,
@@ -206,7 +227,10 @@ function remover_horas_banco($colaborador_id, $quantidade_horas, $origem, $orige
         ];
         
     } catch (Exception $e) {
-        $pdo->rollBack();
+        // Só faz rollback se foi esta função que iniciou a transação
+        if ($transaction_started) {
+            $pdo->rollBack();
+        }
         return [
             'success' => false,
             'error' => $e->getMessage()
