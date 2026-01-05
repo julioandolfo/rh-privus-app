@@ -2098,6 +2098,14 @@ function exportarParaPDF(dados) {
         font-weight: 500 !important;
     }
     
+    /* Correção de contraste nas opções do filtro (garante texto claro) */
+    #select2-filtro_colaborador-results,
+    #select2-filtro_colaborador-results li.select2-results__option,
+    #select2-filtro_colaborador-results li.select2-results__option * {
+        color: #e1e3ea !important;
+        background-color: #1f2128 !important;
+    }
+    
     /* Container do dropdown dos filtros */
     #select2-filtro_colaborador-results,
     #select2-filtro_tipo_pagamento-results {
