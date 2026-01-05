@@ -542,7 +542,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <select class="form-select form-select-solid" id="filtro_colaborador" data-placeholder="Todos">
                             <option value="">Todos os colaboradores</option>
                             <?php foreach ($colaboradores as $colab): ?>
-                            <option value="<?= $colab['id'] ?>"><?= htmlspecialchars($colab['nome']) ?></option>
+                            <option value="<?= $colab['id'] ?>"><?= htmlspecialchars($colab['nome_completo'] ?? $colab['nome'] ?? '') ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
