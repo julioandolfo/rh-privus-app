@@ -765,19 +765,40 @@ var KTOcorrenciasList = (function() {
                         
                         // Detecta o tema
                         var isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
-                                     document.body.getAttribute('data-theme') === 'dark';
+                                     document.body.getAttribute('data-theme') === 'dark' ||
+                                     document.body.classList.contains('dark-mode') ||
+                                     document.documentElement.getAttribute('data-bs-theme') === 'dark';
                         
-                        var bgColor = isDark ? '#1e1e2d' : '#f3f6f9';
+                        var bgColor = isDark ? '#1b1b29' : '#f3f6f9';
                         var textColor = isDark ? '#ffffff' : '#181c32';
                         var borderColor = isDark ? '#2b2b40' : '#e4e6ef';
                         
-                        return $('<tr/>')
-                            .addClass('group-row')
-                            .append('<td colspan="10" class="fw-bold" style="padding: 15px; background-color: ' + bgColor + ' !important; color: ' + textColor + ' !important; border-top: 2px solid #3699ff; border-bottom: 1px solid ' + borderColor + ';">' +
-                                    '<i class="ki-duotone ki-user fs-2 me-2" style="color: ' + textColor + ';"><span class="path1"></span><span class="path2"></span></i>' +
-                                    '<span style="color: ' + textColor + ';">' + group + '</span>' +
-                                    ' <span class="badge badge-primary ms-3">' + totalOcorrencias + ' ocorrência' + (totalOcorrencias > 1 ? 's' : '') + '</span>' +
-                                    '</td>');
+                        // Cria a linha com estilo inline forçado
+                        var $row = $('<tr/>')
+                            .addClass('group-row dtrg-group')
+                            .css({
+                                'background': bgColor,
+                                'background-color': bgColor
+                            });
+                        
+                        var $td = $('<td colspan="10"/>')
+                            .addClass('fw-bold')
+                            .css({
+                                'padding': '15px',
+                                'background': bgColor,
+                                'background-color': bgColor,
+                                'color': textColor,
+                                'border-top': '2px solid #3699ff',
+                                'border-bottom': '1px solid ' + borderColor
+                            })
+                            .html(
+                                '<i class="ki-duotone ki-user fs-2 me-2" style="color: ' + textColor + ' !important;"><span class="path1"></span><span class="path2"></span></i>' +
+                                '<span style="color: ' + textColor + ' !important;">' + group + '</span>' +
+                                ' <span class="badge badge-primary ms-3" style="background-color: #3699ff !important; color: #fff !important;">' + totalOcorrencias + ' ocorrência' + (totalOcorrencias > 1 ? 's' : '') + '</span>'
+                            );
+                        
+                        $row.append($td);
+                        return $row;
                     }
                 },
                 drawCallback: function() {
@@ -786,19 +807,36 @@ var KTOcorrenciasList = (function() {
                     
                     // Força cores corretas nas linhas de agrupamento após cada redesenho
                     var isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
-                                 document.body.getAttribute('data-theme') === 'dark';
+                                 document.body.getAttribute('data-theme') === 'dark' ||
+                                 document.body.classList.contains('dark-mode') ||
+                                 document.documentElement.getAttribute('data-bs-theme') === 'dark';
                     
-                    if (isDark) {
-                        $('.group-row td').css({
-                            'background-color': '#1e1e2d',
+                    var bgColor = isDark ? '#1b1b29' : '#f3f6f9';
+                    var textColor = isDark ? '#ffffff' : '#181c32';
+                    var borderColor = isDark ? '#2b2b40' : '#e4e6ef';
+                    
+                    // Aplica a TODAS as linhas de grupo
+                    $('.group-row, .dtrg-group, tr.dtrg-group').each(function() {
+                        $(this).css({
+                            'background': bgColor,
+                            'background-color': bgColor
+                        });
+                        
+                        $(this).find('td').css({
+                            'background': bgColor,
+                            'background-color': bgColor,
+                            'color': textColor
+                        });
+                        
+                        // Força todos os elementos filhos
+                        $(this).find('*').css('color', textColor);
+                        
+                        // Badge mantém sua cor
+                        $(this).find('.badge').css({
+                            'background-color': '#3699ff',
                             'color': '#ffffff'
                         });
-                    } else {
-                        $('.group-row td').css({
-                            'background-color': '#f3f6f9',
-                            'color': '#181c32'
-                        });
-                    }
+                    });
                 }
             });
         },
@@ -971,11 +1009,55 @@ function deletarOcorrencia(ocorrenciaId) {
 <!-- Adiciona bibliotecas necessárias para exportação -->
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/rowgroup/1.4.1/js/dataTables.rowGroup.min.js"></script>
-<link rel="stylesheet" href="https://cdn.datatables.net/rowgroup/1.4.1/css/rowGroup.dataTables.min.css">
+<!-- CSS do RowGroup removido para controle manual das cores -->
 
 <style>
-/* Estilos para agrupamento de linhas */
-.group-row td {
+/* =====================================================
+   LINHAS DE AGRUPAMENTO (CABEÇALHOS DE COLABORADOR)
+   ===================================================== */
+
+/* TEMA ESCURO - Força máxima para linhas de grupo */
+[data-theme="dark"] tr.group-row,
+[data-theme="dark"] tr.group-row td,
+[data-theme="dark"] tr.dtrg-group,
+[data-theme="dark"] tr.dtrg-group td,
+[data-theme="dark"] table.dataTable tr.group-row,
+[data-theme="dark"] table.dataTable tr.group-row td,
+[data-theme="dark"] table.dataTable tr.dtrg-group,
+[data-theme="dark"] table.dataTable tr.dtrg-group td,
+body.dark-mode tr.group-row,
+body.dark-mode tr.group-row td,
+html[data-bs-theme="dark"] tr.group-row,
+html[data-bs-theme="dark"] tr.group-row td {
+    background: #1b1b29 !important;
+    background-color: #1b1b29 !important;
+    color: #ffffff !important;
+    border-top: 2px solid #3699ff !important;
+    border-bottom: 1px solid #2b2b40 !important;
+}
+
+/* Força todos os elementos dentro da linha de grupo */
+[data-theme="dark"] tr.group-row *,
+[data-theme="dark"] tr.dtrg-group *,
+body.dark-mode tr.group-row *,
+html[data-bs-theme="dark"] tr.group-row * {
+    color: #ffffff !important;
+}
+
+/* Badge dentro do grupo */
+[data-theme="dark"] tr.group-row .badge,
+[data-theme="dark"] tr.dtrg-group .badge,
+body.dark-mode tr.group-row .badge {
+    background-color: #3699ff !important;
+    color: #ffffff !important;
+}
+
+/* Tema claro */
+tr.group-row,
+tr.group-row td,
+tr.dtrg-group,
+tr.dtrg-group td {
+    background: #f3f6f9 !important;
     background-color: #f3f6f9 !important;
     color: #181c32 !important;
     font-weight: 600 !important;
@@ -984,86 +1066,54 @@ function deletarOcorrencia(ocorrenciaId) {
     border-bottom: 1px solid #e4e6ef !important;
 }
 
-/* Tema escuro - força fundo escuro e texto claro */
-[data-theme="dark"] .group-row td,
-body[data-theme="dark"] .group-row td,
-html[data-theme="dark"] .group-row td {
-    background-color: #1e1e2d !important;
-    color: #ffffff !important;
-    border-top: 2px solid #3699ff !important;
-    border-bottom: 1px solid #2b2b40 !important;
-}
+/* =====================================================
+   LINHAS NORMAIS DA TABELA
+   ===================================================== */
 
-/* Força para linhas pares/ímpares do DataTables */
-table.dataTable tbody tr.group-row {
-    background-color: #f3f6f9 !important;
-    color: #181c32 !important;
-}
-
-[data-theme="dark"] table.dataTable tbody tr.group-row,
-body[data-theme="dark"] table.dataTable tbody tr.group-row {
-    background-color: #1e1e2d !important;
-    color: #ffffff !important;
-}
-
-/* Corrige linhas normais no tema escuro */
-[data-theme="dark"] #kt_table_ocorrencias tbody tr,
-body[data-theme="dark"] #kt_table_ocorrencias tbody tr {
+/* Linhas normais no tema escuro */
+[data-theme="dark"] #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group),
+body.dark-mode #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group) {
     background-color: #151521 !important;
-    color: #a1a5b7 !important;
 }
 
-[data-theme="dark"] #kt_table_ocorrencias tbody tr:nth-child(even),
-body[data-theme="dark"] #kt_table_ocorrencias tbody tr:nth-child(even) {
+[data-theme="dark"] #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group):nth-child(even),
+body.dark-mode #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group):nth-child(even) {
     background-color: #1a1a27 !important;
 }
 
-/* Garante que badges dentro de linhas de grupo sejam visíveis */
-[data-theme="dark"] .group-row .badge,
-body[data-theme="dark"] .group-row .badge {
-    background-color: #3699ff !important;
-    color: #ffffff !important;
-}
-
-/* Ícones dentro das linhas de grupo */
-[data-theme="dark"] .group-row i.ki-duotone,
-body[data-theme="dark"] .group-row i.ki-duotone {
-    color: #ffffff !important;
-}
-
-/* Força todos os textos dentro de células da tabela no tema escuro */
-[data-theme="dark"] #kt_table_ocorrencias tbody td,
-body[data-theme="dark"] #kt_table_ocorrencias tbody td {
+[data-theme="dark"] #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group) td,
+body.dark-mode #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group) td {
     color: #a1a5b7 !important;
 }
 
-/* Links de colaboradores no tema escuro */
+/* Links de colaboradores */
 [data-theme="dark"] #kt_table_ocorrencias tbody td a,
-body[data-theme="dark"] #kt_table_ocorrencias tbody td a {
+body.dark-mode #kt_table_ocorrencias tbody td a {
     color: #3699ff !important;
 }
 
 [data-theme="dark"] #kt_table_ocorrencias tbody td a:hover,
-body[data-theme="dark"] #kt_table_ocorrencias tbody td a:hover {
+body.dark-mode #kt_table_ocorrencias tbody td a:hover {
     color: #0095e8 !important;
 }
 
-/* Cabeçalho da tabela no tema escuro */
+/* =====================================================
+   CABEÇALHO E WRAPPER
+   ===================================================== */
+
+/* Cabeçalho da tabela */
 [data-theme="dark"] #kt_table_ocorrencias thead th,
-body[data-theme="dark"] #kt_table_ocorrencias thead th {
+body.dark-mode #kt_table_ocorrencias thead th {
     background-color: #1e1e2d !important;
     color: #a1a5b7 !important;
     border-bottom: 1px solid #2b2b40 !important;
 }
 
-/* Linhas de filtro/busca do DataTables */
+/* DataTables wrapper */
 [data-theme="dark"] .dataTables_wrapper,
-body[data-theme="dark"] .dataTables_wrapper {
-    color: #a1a5b7 !important;
-}
-
 [data-theme="dark"] .dataTables_info,
-body[data-theme="dark"] .dataTables_info {
+body.dark-mode .dataTables_wrapper,
+body.dark-mode .dataTables_info {
     color: #a1a5b7 !important;
 }
 
@@ -1153,18 +1203,60 @@ body[data-theme="dark"] tr.group-row > td,
 html[data-theme="dark"] tr.group-row > td,
 [data-theme="dark"] tr.dtrg-group > td,
 body[data-theme="dark"] tr.dtrg-group > td {
-    background-color: #1e1e2d !important;
+    background-color: #1b1b29 !important;
+    background: #1b1b29 !important;
     color: #ffffff !important;
 }
 
 /* Força para todos os elementos dentro da linha de grupo */
 [data-theme="dark"] .group-row *,
-body[data-theme="dark"] .group-row * {
+body[data-theme="dark"] .group-row *,
+[data-theme="dark"] .dtrg-group *,
+body[data-theme="dark"] .dtrg-group * {
     color: #ffffff !important;
 }
 
 [data-theme="dark"] .group-row .badge,
-body[data-theme="dark"] .group-row .badge {
+body[data-theme="dark"] .group-row .badge,
+[data-theme="dark"] .dtrg-group .badge,
+body[data-theme="dark"] .dtrg-group .badge {
+    background-color: #3699ff !important;
+    color: #ffffff !important;
+}
+
+/* =====================================================
+   OVERRIDE ABSOLUTO - última linha de defesa
+   ===================================================== */
+   
+table#kt_table_ocorrencias tr.group-row,
+table#kt_table_ocorrencias tr.group-row td,
+table#kt_table_ocorrencias tr.dtrg-group,
+table#kt_table_ocorrencias tr.dtrg-group td,
+#kt_table_ocorrencias tr.group-row,
+#kt_table_ocorrencias tr.group-row td {
+    background: inherit;
+}
+
+[data-theme="dark"] table#kt_table_ocorrencias tr.group-row,
+[data-theme="dark"] table#kt_table_ocorrencias tr.group-row td,
+[data-theme="dark"] table#kt_table_ocorrencias tr.dtrg-group,
+[data-theme="dark"] table#kt_table_ocorrencias tr.dtrg-group td,
+[data-theme="dark"] #kt_table_ocorrencias tr.group-row,
+[data-theme="dark"] #kt_table_ocorrencias tr.group-row td {
+    background: #1b1b29 !important;
+    background-color: #1b1b29 !important;
+    color: #fff !important;
+}
+
+/* Symbol do avatar na linha de grupo - mantém visível */
+[data-theme="dark"] tr.group-row .symbol,
+[data-theme="dark"] tr.dtrg-group .symbol {
+    background: transparent !important;
+}
+
+[data-theme="dark"] tr.group-row .symbol-label,
+[data-theme="dark"] tr.dtrg-group .symbol-label {
+    background-color: #3699ff !important;
     color: #ffffff !important;
 }
 </style>
