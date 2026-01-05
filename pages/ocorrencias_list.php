@@ -763,11 +763,19 @@ var KTOcorrenciasList = (function() {
                     startRender: function(rows, group) {
                         var totalOcorrencias = rows.count();
                         
+                        // Detecta o tema
+                        var isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
+                                     document.body.getAttribute('data-theme') === 'dark';
+                        
+                        var bgColor = isDark ? '#1e1e2d' : '#f3f6f9';
+                        var textColor = isDark ? '#ffffff' : '#181c32';
+                        var borderColor = isDark ? '#2b2b40' : '#e4e6ef';
+                        
                         return $('<tr/>')
                             .addClass('group-row')
-                            .append('<td colspan="10" class="fw-bold text-gray-800 bg-light-primary" style="padding: 15px;">' +
-                                    '<i class="ki-duotone ki-user fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>' +
-                                    group + 
+                            .append('<td colspan="10" class="fw-bold" style="padding: 15px; background-color: ' + bgColor + ' !important; color: ' + textColor + ' !important; border-top: 2px solid #3699ff; border-bottom: 1px solid ' + borderColor + ';">' +
+                                    '<i class="ki-duotone ki-user fs-2 me-2" style="color: ' + textColor + ';"><span class="path1"></span><span class="path2"></span></i>' +
+                                    '<span style="color: ' + textColor + ';">' + group + '</span>' +
                                     ' <span class="badge badge-primary ms-3">' + totalOcorrencias + ' ocorrência' + (totalOcorrencias > 1 ? 's' : '') + '</span>' +
                                     '</td>');
                     }
@@ -775,6 +783,22 @@ var KTOcorrenciasList = (function() {
                 drawCallback: function() {
                     // Reinicializa menus do Metronic após cada redesenho
                     KTMenu.createInstances();
+                    
+                    // Força cores corretas nas linhas de agrupamento após cada redesenho
+                    var isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
+                                 document.body.getAttribute('data-theme') === 'dark';
+                    
+                    if (isDark) {
+                        $('.group-row td').css({
+                            'background-color': '#1e1e2d',
+                            'color': '#ffffff'
+                        });
+                    } else {
+                        $('.group-row td').css({
+                            'background-color': '#f3f6f9',
+                            'color': '#181c32'
+                        });
+                    }
                 }
             });
         },
@@ -914,6 +938,31 @@ function deletarOcorrencia(ocorrenciaId) {
         // Aguarda um pouco para garantir que a tabela foi renderizada
         setTimeout(function() {
             KTOcorrenciasList.init();
+            
+            // Observer para mudanças de tema
+            if (typeof MutationObserver !== 'undefined') {
+                var observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.attributeName === 'data-theme') {
+                            var dt = KTOcorrenciasList.getDatatable();
+                            if (dt) {
+                                dt.draw(false);
+                            }
+                        }
+                    });
+                });
+                
+                // Observa mudanças no atributo data-theme
+                observer.observe(document.documentElement, {
+                    attributes: true,
+                    attributeFilter: ['data-theme']
+                });
+                
+                observer.observe(document.body, {
+                    attributes: true,
+                    attributeFilter: ['data-theme']
+                });
+            }
         }, 300);
     });
 })();
@@ -928,16 +977,94 @@ function deletarOcorrencia(ocorrenciaId) {
 /* Estilos para agrupamento de linhas */
 .group-row td {
     background-color: #f3f6f9 !important;
+    color: #181c32 !important;
     font-weight: 600 !important;
     font-size: 1.05rem !important;
     border-top: 2px solid #3699ff !important;
     border-bottom: 1px solid #e4e6ef !important;
 }
 
-[data-theme="dark"] .group-row td {
+/* Tema escuro - força fundo escuro e texto claro */
+[data-theme="dark"] .group-row td,
+body[data-theme="dark"] .group-row td,
+html[data-theme="dark"] .group-row td {
     background-color: #1e1e2d !important;
+    color: #ffffff !important;
     border-top: 2px solid #3699ff !important;
     border-bottom: 1px solid #2b2b40 !important;
+}
+
+/* Força para linhas pares/ímpares do DataTables */
+table.dataTable tbody tr.group-row {
+    background-color: #f3f6f9 !important;
+    color: #181c32 !important;
+}
+
+[data-theme="dark"] table.dataTable tbody tr.group-row,
+body[data-theme="dark"] table.dataTable tbody tr.group-row {
+    background-color: #1e1e2d !important;
+    color: #ffffff !important;
+}
+
+/* Corrige linhas normais no tema escuro */
+[data-theme="dark"] #kt_table_ocorrencias tbody tr,
+body[data-theme="dark"] #kt_table_ocorrencias tbody tr {
+    background-color: #151521 !important;
+    color: #a1a5b7 !important;
+}
+
+[data-theme="dark"] #kt_table_ocorrencias tbody tr:nth-child(even),
+body[data-theme="dark"] #kt_table_ocorrencias tbody tr:nth-child(even) {
+    background-color: #1a1a27 !important;
+}
+
+/* Garante que badges dentro de linhas de grupo sejam visíveis */
+[data-theme="dark"] .group-row .badge,
+body[data-theme="dark"] .group-row .badge {
+    background-color: #3699ff !important;
+    color: #ffffff !important;
+}
+
+/* Ícones dentro das linhas de grupo */
+[data-theme="dark"] .group-row i.ki-duotone,
+body[data-theme="dark"] .group-row i.ki-duotone {
+    color: #ffffff !important;
+}
+
+/* Força todos os textos dentro de células da tabela no tema escuro */
+[data-theme="dark"] #kt_table_ocorrencias tbody td,
+body[data-theme="dark"] #kt_table_ocorrencias tbody td {
+    color: #a1a5b7 !important;
+}
+
+/* Links de colaboradores no tema escuro */
+[data-theme="dark"] #kt_table_ocorrencias tbody td a,
+body[data-theme="dark"] #kt_table_ocorrencias tbody td a {
+    color: #3699ff !important;
+}
+
+[data-theme="dark"] #kt_table_ocorrencias tbody td a:hover,
+body[data-theme="dark"] #kt_table_ocorrencias tbody td a:hover {
+    color: #0095e8 !important;
+}
+
+/* Cabeçalho da tabela no tema escuro */
+[data-theme="dark"] #kt_table_ocorrencias thead th,
+body[data-theme="dark"] #kt_table_ocorrencias thead th {
+    background-color: #1e1e2d !important;
+    color: #a1a5b7 !important;
+    border-bottom: 1px solid #2b2b40 !important;
+}
+
+/* Linhas de filtro/busca do DataTables */
+[data-theme="dark"] .dataTables_wrapper,
+body[data-theme="dark"] .dataTables_wrapper {
+    color: #a1a5b7 !important;
+}
+
+[data-theme="dark"] .dataTables_info,
+body[data-theme="dark"] .dataTables_info {
+    color: #a1a5b7 !important;
 }
 
 /* Melhora visual dos badges */
@@ -1018,6 +1145,27 @@ function deletarOcorrencia(ocorrenciaId) {
 .dataTables_paginate .paginate_button.current {
     background: #3699ff !important;
     color: white !important;
+}
+
+/* FORÇA MÁXIMA para linhas de agrupamento no tema escuro */
+[data-theme="dark"] tr.group-row > td,
+body[data-theme="dark"] tr.group-row > td,
+html[data-theme="dark"] tr.group-row > td,
+[data-theme="dark"] tr.dtrg-group > td,
+body[data-theme="dark"] tr.dtrg-group > td {
+    background-color: #1e1e2d !important;
+    color: #ffffff !important;
+}
+
+/* Força para todos os elementos dentro da linha de grupo */
+[data-theme="dark"] .group-row *,
+body[data-theme="dark"] .group-row * {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .group-row .badge,
+body[data-theme="dark"] .group-row .badge {
+    color: #ffffff !important;
 }
 </style>
 
