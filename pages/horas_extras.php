@@ -2105,6 +2105,22 @@ function exportarParaPDF(dados) {
         color: #e1e3ea !important;
         background-color: #1f2128 !important;
     }
+    /* Mais especificidade para evitar override do tema */
+    #select2-filtro_colaborador-results .select2-results__options {
+        background-color: #1f2128 !important;
+    }
+    #select2-filtro_colaborador-results .select2-results__option {
+        background-color: #1f2128 !important;
+        color: #e1e3ea !important;
+    }
+    #select2-filtro_colaborador-results .select2-results__option--highlighted[aria-selected] {
+        background-color: #3699ff !important;
+        color: #ffffff !important;
+    }
+    #select2-filtro_colaborador-results .select2-results__option[aria-selected="true"] {
+        background-color: #2a2d3a !important;
+        color: #c8ddff !important;
+    }
     
     /* Container do dropdown dos filtros */
     #select2-filtro_colaborador-results,
