@@ -1041,6 +1041,17 @@ require_once __DIR__ . '/../includes/header.php';
                                         </h3>
                                         <div class="card-toolbar">
                                             <div class="d-flex gap-2">
+                                                <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                                                <button type="button" class="btn btn-sm btn-warning" 
+                                                        onclick="recalcularSaldoBancoHoras(<?= $id ?>)"
+                                                        title="Recalcular saldo baseado no histórico">
+                                                    <i class="ki-duotone ki-calculator fs-3">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                    Recalcular Saldo
+                                                </button>
+                                                <?php endif; ?>
                                                 <select id="filtro_tipo_historico" class="form-select form-select-solid w-150px">
                                                     <option value="">Todos os tipos</option>
                                                     <option value="credito">Créditos</option>
@@ -1082,6 +1093,9 @@ require_once __DIR__ . '/../includes/header.php';
                                                             <th class="min-w-100px">Saldo Posterior</th>
                                                             <th class="min-w-200px">Motivo</th>
                                                             <th class="min-w-150px">Usuário</th>
+                                                            <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                                                            <th class="text-end min-w-70px">Ações</th>
+                                                            <?php endif; ?>
                                                         </tr>
                                                     </thead>
                                                     <tbody class="fw-semibold text-gray-600">
@@ -1132,6 +1146,19 @@ require_once __DIR__ . '/../includes/header.php';
                                                                 <?php endif; ?>
                                                             </td>
                                                             <td><?= htmlspecialchars($mov['usuario_nome'] ?? 'Sistema') ?></td>
+                                                            <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
+                                                            <td class="text-end">
+                                                                <button type="button" class="btn btn-sm btn-light-danger" 
+                                                                        onclick="deletarMovimentacaoBancoHoras(<?= $mov['id'] ?>, <?= $id ?>)"
+                                                                        title="Deletar movimentação">
+                                                                    <i class="ki-duotone ki-trash fs-5">
+                                                                        <span class="path1"></span>
+                                                                        <span class="path2"></span>
+                                                                        <span class="path3"></span>
+                                                                    </i>
+                                                                </button>
+                                                            </td>
+                                                            <?php endif; ?>
                                                         </tr>
                                                         <?php endforeach; ?>
                                                     </tbody>
@@ -2520,6 +2547,171 @@ function deletarHoraExtra(id) {
             form.innerHTML = '<input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' + id + '">';
             document.body.appendChild(form);
             form.submit();
+        }
+    });
+}
+
+// Função para recalcular saldo do banco de horas
+function recalcularSaldoBancoHoras(colaboradorId) {
+    Swal.fire({
+        title: "Recalcular Saldo?",
+        html: "Esta ação irá:<br><br>" +
+              "✓ Recalcular o saldo baseado em todas as movimentações<br>" +
+              "✓ Corrigir os saldos anterior/posterior de cada movimentação<br>" +
+              "✓ Atualizar o saldo atual do colaborador<br><br>" +
+              "<strong>Use após deletar movimentações incorretas!</strong>",
+        icon: "question",
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: "Sim, recalcular!",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn fw-bold btn-warning",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then(function(result) {
+        if (result.value) {
+            // Mostra loading
+            Swal.fire({
+                text: "Recalculando saldo...",
+                icon: "info",
+                buttonsStyling: false,
+                showConfirmButton: false,
+                allowOutsideClick: false
+            });
+            
+            fetch('../api/banco_horas/recalcular_saldo.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    colaborador_id: colaboradorId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: "Sucesso!",
+                        html: data.message + "<br><br>" +
+                              "<strong>Movimentações atualizadas:</strong> " + data.dados.movimentacoes_atualizadas + "<br>" +
+                              "<strong>Saldo final:</strong> " + data.dados.saldo_final,
+                        icon: "success",
+                        buttonsStyling: false,
+                        confirmButtonText: "OK",
+                        customClass: {
+                            confirmButton: "btn fw-bold btn-success"
+                        }
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        text: data.error || 'Erro ao recalcular saldo',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    text: 'Erro ao conectar com o servidor',
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        confirmButton: 'btn fw-bold btn-primary'
+                    }
+                });
+            });
+        }
+    });
+}
+
+// Função para deletar movimentação do banco de horas
+function deletarMovimentacaoBancoHoras(movimentacaoId, colaboradorId) {
+    Swal.fire({
+        title: "Atenção!",
+        html: "Tem certeza que deseja excluir esta movimentação?<br><br>" +
+              "<strong class='text-danger'>⚠️ IMPORTANTE:</strong><br>" +
+              "Após deletar, você precisará <strong>recalcular o saldo</strong> do banco de horas!<br>" +
+              "Use o botão 'Recalcular Saldo' que aparecerá após a exclusão.",
+        icon: "warning",
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: "Sim, excluir!",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn fw-bold btn-danger",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then(function(result) {
+        if (result.value) {
+            // Mostra loading
+            Swal.fire({
+                text: "Excluindo movimentação...",
+                icon: "info",
+                buttonsStyling: false,
+                showConfirmButton: false,
+                allowOutsideClick: false
+            });
+            
+            fetch('../api/banco_horas/deletar_movimentacao.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    movimentacao_id: movimentacaoId,
+                    colaborador_id: colaboradorId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: "Excluído!",
+                        html: data.message + "<br><br>" +
+                              "<strong>⚠️ Não esqueça de recalcular o saldo!</strong>",
+                        icon: "success",
+                        buttonsStyling: false,
+                        confirmButtonText: "OK, vou recalcular",
+                        customClass: {
+                            confirmButton: "btn fw-bold btn-primary"
+                        }
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        text: data.error || 'Erro ao excluir movimentação',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'btn fw-bold btn-primary'
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    text: 'Erro ao conectar com o servidor',
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        confirmButton: 'btn fw-bold btn-primary'
+                    }
+                });
+            });
         }
     });
 }
