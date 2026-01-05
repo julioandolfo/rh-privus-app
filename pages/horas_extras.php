@@ -1943,11 +1943,123 @@ function exportarParaPDF(dados) {
         transition: transform 0.3s ease-in-out;
     }
     
-    /* Destaque nos campos com filtro ativo */
-    .form-control:not(:placeholder-shown),
-    .form-select:not([value=""]) {
+    /* Estilos dos campos de filtro - fundo cinza consistente */
+    #kt_filtros_avancados_content .form-control,
+    #kt_filtros_avancados_content .form-select {
+        background-color: #f5f8fa !important;
+        border: 1px solid #e4e6ef !important;
+        color: #181c32 !important;
+        transition: all 0.2s ease;
+    }
+    
+    #kt_filtros_avancados_content .form-control:focus,
+    #kt_filtros_avancados_content .form-select:focus {
+        background-color: #eef3f7 !important;
         border-color: #3699ff !important;
-        background-color: #f1faff !important;
+        box-shadow: 0 0 0 0.2rem rgba(54, 153, 255, 0.1) !important;
+    }
+    
+    /* Placeholder dos inputs */
+    #kt_filtros_avancados_content .form-control::placeholder {
+        color: #a1a5b7 !important;
+        opacity: 1;
+    }
+    
+    /* Classe para campos preenchidos - destaque azul claro */
+    #kt_filtros_avancados_content .campo-preenchido,
+    #kt_filtros_avancados_content .form-control:not(:placeholder-shown),
+    #kt_filtros_avancados_content input[type="date"]:valid:not([value=""]),
+    #kt_filtros_avancados_content input[type="number"]:valid:not([value=""]) {
+        background-color: #e8f4fc !important;
+        border-color: #3699ff !important;
+        font-weight: 500;
+    }
+    
+    /* Select quando tem valor selecionado */
+    #kt_filtros_avancados_content .form-select option:checked:not([value=""]) ~ .form-select {
+        background-color: #e8f4fc !important;
+        border-color: #3699ff !important;
+    }
+    
+    /* Select2 dentro dos filtros - estilo consistente */
+    #kt_filtros_avancados_content .select2-container--default .select2-selection--single {
+        background-color: #f5f8fa !important;
+        border: 1px solid #e4e6ef !important;
+        height: 44px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    #kt_filtros_avancados_content .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: #181c32 !important;
+        line-height: 44px !important;
+        padding-left: 12px !important;
+    }
+    
+    #kt_filtros_avancados_content .select2-container--default .select2-selection--single .select2-selection__placeholder {
+        color: #a1a5b7 !important;
+    }
+    
+    #kt_filtros_avancados_content .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 42px !important;
+        top: 1px !important;
+    }
+    
+    #kt_filtros_avancados_content .select2-container--default.select2-container--focus .select2-selection--single,
+    #kt_filtros_avancados_content .select2-container--default.select2-container--open .select2-selection--single {
+        background-color: #eef3f7 !important;
+        border-color: #3699ff !important;
+        box-shadow: 0 0 0 0.2rem rgba(54, 153, 255, 0.1) !important;
+    }
+    
+    /* Select2 com valor selecionado - aplica destaque */
+    #kt_filtros_avancados_content .select2-container.campo-preenchido .select2-selection--single {
+        background-color: #e8f4fc !important;
+        border-color: #3699ff !important;
+        font-weight: 500;
+    }
+    
+    #kt_filtros_avancados_content .select2-container.campo-preenchido .select2-selection__rendered {
+        font-weight: 500 !important;
+    }
+    
+    /* Dropdown do Select2 */
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: #3699ff !important;
+        color: white !important;
+    }
+    
+    /* Campos de data com cor de fundo consistente */
+    #kt_filtros_avancados_content input[type="date"] {
+        background-color: #f5f8fa !important;
+        border: 1px solid #e4e6ef !important;
+        color: #181c32 !important;
+        padding: 0.75rem 1rem;
+    }
+    
+    #kt_filtros_avancados_content input[type="date"]:focus {
+        background-color: #eef3f7 !important;
+        border-color: #3699ff !important;
+        box-shadow: 0 0 0 0.2rem rgba(54, 153, 255, 0.1) !important;
+    }
+    
+    #kt_filtros_avancados_content input[type="date"]:not(:placeholder-shown),
+    #kt_filtros_avancados_content input[type="date"]:valid {
+        background-color: #e8f4fc !important;
+        border-color: #3699ff !important;
+    }
+    
+    /* Campos number com cor de fundo consistente */
+    #kt_filtros_avancados_content input[type="number"] {
+        background-color: #f5f8fa !important;
+        border: 1px solid #e4e6ef !important;
+        color: #181c32 !important;
+    }
+    
+    #kt_filtros_avancados_content input[type="number"]:focus {
+        background-color: #eef3f7 !important;
+        border-color: #3699ff !important;
+        box-shadow: 0 0 0 0.2rem rgba(54, 153, 255, 0.1) !important;
     }
     
     /* Estilo do badge de contagem */
@@ -2077,6 +2189,113 @@ document.getElementById('kt_modal_horaextra')?.addEventListener('shown.bs.modal'
             console.log('Select2 inicializado com sucesso!');
         }
     }, 350);
+});
+
+// Inicializa Select2 no filtro de colaborador
+function initFiltroColaboradorSelect2() {
+    if (typeof jQuery === 'undefined' || typeof jQuery.fn.select2 === 'undefined') {
+        setTimeout(initFiltroColaboradorSelect2, 200);
+        return;
+    }
+    
+    var $selectFiltro = jQuery('#filtro_colaborador');
+    if ($selectFiltro.length > 0) {
+        // Destrói se já existe
+        if ($selectFiltro.hasClass('select2-hidden-accessible')) {
+            $selectFiltro.select2('destroy');
+        }
+        
+        // Inicializa com estilo consistente
+        $selectFiltro.select2({
+            placeholder: 'Todos os colaboradores',
+            allowClear: true,
+            width: '100%',
+            minimumResultsForSearch: 0,
+            language: {
+                noResults: function() { return 'Nenhum colaborador encontrado'; },
+                searching: function() { return 'Buscando...'; }
+            }
+        });
+        
+        // Listener para mudanças no select
+        $selectFiltro.on('select2:select select2:clear', function(e) {
+            verificarCamposPreenchidos();
+        });
+        
+        console.log('Select2 do filtro inicializado!');
+    }
+    
+    // Inicializa também o select de tipo de pagamento como Select2
+    var $selectTipo = jQuery('#filtro_tipo_pagamento');
+    if ($selectTipo.length > 0) {
+        if ($selectTipo.hasClass('select2-hidden-accessible')) {
+            $selectTipo.select2('destroy');
+        }
+        
+        $selectTipo.select2({
+            placeholder: 'Todos os tipos',
+            allowClear: true,
+            width: '100%',
+            minimumResultsForSearch: Infinity, // Desabilita busca (poucos itens)
+            language: {
+                noResults: function() { return 'Nenhum tipo encontrado'; }
+            }
+        });
+        
+        $selectTipo.on('select2:select select2:clear', function(e) {
+            verificarCamposPreenchidos();
+        });
+    }
+}
+
+// Função para verificar campos preenchidos e destacá-los
+function verificarCamposPreenchidos() {
+    // Verifica inputs
+    jQuery('#kt_filtros_avancados_content input').each(function() {
+        var $input = jQuery(this);
+        if ($input.val() && $input.val() !== '') {
+            $input.addClass('campo-preenchido');
+        } else {
+            $input.removeClass('campo-preenchido');
+        }
+    });
+    
+    // Verifica selects nativos
+    jQuery('#kt_filtros_avancados_content select:not(.select2-hidden-accessible)').each(function() {
+        var $select = jQuery(this);
+        if ($select.val() && $select.val() !== '') {
+            $select.addClass('campo-preenchido');
+        } else {
+            $select.removeClass('campo-preenchido');
+        }
+    });
+    
+    // Verifica Select2
+    jQuery('#kt_filtros_avancados_content .select2-hidden-accessible').each(function() {
+        var $select = jQuery(this);
+        var $container = $select.next('.select2-container');
+        
+        if ($select.val() && $select.val() !== '') {
+            $container.addClass('campo-preenchido');
+        } else {
+            $container.removeClass('campo-preenchido');
+        }
+    });
+}
+
+// Adiciona listeners para mudanças nos campos
+jQuery(document).ready(function() {
+    initFiltroColaboradorSelect2();
+    
+    // Listeners para inputs de data e number
+    jQuery('#kt_filtros_avancados_content input').on('change input', function() {
+        verificarCamposPreenchidos();
+    });
+    
+    // Listener para selects nativos
+    jQuery('#kt_filtros_avancados_content select:not(.select2-hidden-accessible)').on('change', function() {
+        verificarCamposPreenchidos();
+    });
 });
 </script>
 
