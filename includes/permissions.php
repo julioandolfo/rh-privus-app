@@ -78,6 +78,9 @@ function get_page_permissions() {
         // Pagamentos - colaborador
         'meus_pagamentos.php' => ['COLABORADOR'],
         
+        // Meu Perfil - colaborador
+        'meu_perfil.php' => ['COLABORADOR'],
+        
         // Usuários - apenas ADMIN
         'usuarios.php' => ['ADMIN'],
         

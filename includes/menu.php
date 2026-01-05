@@ -137,6 +137,25 @@ function getIcon($name) {
                 </div>
                 <!--end:Menu item-->
                 
+                <!--begin:Menu item - Meu Perfil (apenas para colaboradores)-->
+                <?php if (is_colaborador() && can_access_page('meu_perfil.php')): ?>
+                <div class="menu-item">
+                    <!--begin:Menu link-->
+                    <a class="menu-link <?= isActive('meu_perfil.php') ?>" href="meu_perfil.php">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-profile-circle fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Meu Perfil</span>
+                    </a>
+                    <!--end:Menu link-->
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <?php 
                 // Verifica se há menus de comunicação para ADMIN/RH
                 $tem_comunicacao_admin = false;
