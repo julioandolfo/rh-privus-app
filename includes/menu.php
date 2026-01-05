@@ -138,7 +138,7 @@ function getIcon($name) {
                 <!--end:Menu item-->
                 
                 <!--begin:Menu item - Meu Perfil (apenas para colaboradores)-->
-                <?php if (is_colaborador() && can_access_page('meu_perfil.php')): ?>
+                <?php if (is_colaborador()): ?>
                 <div class="menu-item">
                     <!--begin:Menu link-->
                     <a class="menu-link <?= isActive('meu_perfil.php') ?>" href="meu_perfil.php">
