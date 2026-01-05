@@ -899,8 +899,24 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="text-center pt-5">
                         <button type="reset" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-success me-2" id="btn_salvar_e_adicionar">
+                            <span class="indicator-label">
+                                <i class="ki-duotone ki-add-files fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Salvar e Adicionar Outra
+                            </span>
+                            <span class="indicator-progress">
+                                Aguarde... <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                            </span>
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="btn_salvar">
                             <span class="indicator-label">Salvar</span>
+                            <span class="indicator-progress">
+                                Aguarde... <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                            </span>
                         </button>
                     </div>
                 </form>
@@ -966,8 +982,24 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="text-center pt-5">
                         <button type="reset" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-warning">
+                        <button type="submit" class="btn btn-success me-2" id="btn_remover_e_adicionar">
+                            <span class="indicator-label">
+                                <i class="ki-duotone ki-add-files fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Remover e Adicionar Outra
+                            </span>
+                            <span class="indicator-progress">
+                                Aguarde... <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                            </span>
+                        </button>
+                        <button type="submit" class="btn btn-warning" id="btn_remover">
                             <span class="indicator-label">Remover Horas</span>
+                            <span class="indicator-progress">
+                                Aguarde... <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                            </span>
                         </button>
                     </div>
                 </form>
@@ -1906,11 +1938,15 @@ function exportarParaPDF(dados) {
         padding: 0.75rem 1rem !important;
         display: flex !important;
         align-items: center !important;
+        background-color: #f5f8fa !important;
+        border: 1px solid #e4e6ef !important;
     }
     
     .select2-container--default .select2-selection--single .select2-selection__rendered {
         line-height: 44px !important;
         padding-left: 0 !important;
+        color: #181c32 !important;
+        font-weight: 400 !important;
     }
     
     .select2-container--default .select2-selection--single .select2-selection__arrow {
@@ -1920,6 +1956,42 @@ function exportarParaPDF(dados) {
     .select2-container .select2-selection--single .select2-selection__rendered {
         display: flex !important;
         align-items: center !important;
+        color: #181c32 !important;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__placeholder {
+        color: #a1a5b7 !important;
+    }
+    
+    /* Força cor do texto em todos os Select2 - importante para sobrescrever estilos conflitantes */
+    .select2-selection__rendered,
+    .select2-selection__rendered *,
+    .select2-container--default .select2-selection--single .select2-selection__rendered,
+    .select2-container--default .select2-selection--single .select2-selection__rendered * {
+        color: #181c32 !important;
+    }
+    
+    /* Texto do colaborador selecionado no modal */
+    #kt_modal_horaextra .select2-selection__rendered,
+    #kt_modal_horaextra .select2-selection__rendered * {
+        color: #181c32 !important;
+    }
+    
+    /* Texto do colaborador no filtro */
+    #kt_filtros_avancados_content .select2-selection__rendered,
+    #kt_filtros_avancados_content .select2-selection__rendered * {
+        color: #181c32 !important;
+    }
+    
+    /* Dropdown options - garante texto escuro */
+    .select2-results__option,
+    .select2-results__option * {
+        color: #181c32 !important;
+    }
+    
+    .select2-results__option--highlighted,
+    .select2-results__option--highlighted * {
+        color: #ffffff !important;
     }
     
     /* Animação do painel de filtros */
@@ -1994,10 +2066,17 @@ function exportarParaPDF(dados) {
         color: #181c32 !important;
         line-height: 44px !important;
         padding-left: 12px !important;
+        font-weight: 400 !important;
     }
     
     #kt_filtros_avancados_content .select2-container--default .select2-selection--single .select2-selection__placeholder {
         color: #a1a5b7 !important;
+        font-weight: 400 !important;
+    }
+    
+    /* Garante que o texto selecionado seja visível */
+    #kt_filtros_avancados_content .select2-selection__rendered {
+        color: #181c32 !important;
     }
     
     #kt_filtros_avancados_content .select2-container--default .select2-selection--single .select2-selection__arrow {
@@ -2023,10 +2102,58 @@ function exportarParaPDF(dados) {
         font-weight: 500 !important;
     }
     
-    /* Dropdown do Select2 */
+    /* Dropdown do Select2 - Fundo e texto */
+    .select2-container--default .select2-results__option {
+        background-color: #ffffff !important;
+        color: #181c32 !important;
+        padding: 8px 12px !important;
+    }
+    
+    .select2-container--default .select2-results__option:hover {
+        background-color: #f5f8fa !important;
+        color: #181c32 !important;
+    }
+    
     .select2-container--default .select2-results__option--highlighted[aria-selected] {
         background-color: #3699ff !important;
-        color: white !important;
+        color: #ffffff !important;
+    }
+    
+    .select2-container--default .select2-results__option[aria-selected="true"] {
+        background-color: #e8f4fc !important;
+        color: #3699ff !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Container do dropdown */
+    .select2-container--default .select2-results {
+        background-color: #ffffff !important;
+    }
+    
+    .select2-dropdown {
+        background-color: #ffffff !important;
+        border: 1px solid #e4e6ef !important;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    /* Campo de busca dentro do dropdown */
+    .select2-container--default .select2-search--dropdown .select2-search__field {
+        background-color: #f5f8fa !important;
+        border: 1px solid #e4e6ef !important;
+        color: #181c32 !important;
+        padding: 8px 12px !important;
+    }
+    
+    .select2-container--default .select2-search--dropdown .select2-search__field:focus {
+        background-color: #ffffff !important;
+        border-color: #3699ff !important;
+        outline: none !important;
+    }
+    
+    /* Mensagem "Nenhum resultado" */
+    .select2-container--default .select2-results__option.select2-results__message {
+        background-color: #ffffff !important;
+        color: #a1a5b7 !important;
     }
     
     /* Campos de data com cor de fundo consistente */
@@ -2096,6 +2223,367 @@ function exportarParaPDF(dados) {
 <!--end::Select2 CSS-->
 
 <script>
+// Variáveis globais para controlar se deve adicionar outra
+var adicionarOutra = false;
+var colaboradorAnterior = null;
+var removerOutra = false;
+var colaboradorAnteriorRemover = null;
+
+// Manipula o envio do formulário de adicionar hora extra
+document.getElementById('kt_modal_horaextra_form')?.addEventListener('submit', function(e) {
+    const btnClicked = document.activeElement;
+    
+    // Verifica qual botão foi clicado
+    if (btnClicked && btnClicked.id === 'btn_salvar_e_adicionar') {
+        e.preventDefault();
+        adicionarOutra = true;
+        enviarFormularioHoraExtra(this, btnClicked);
+    } else if (btnClicked && btnClicked.id === 'btn_salvar') {
+        adicionarOutra = false;
+        // Deixa o form submeter normalmente
+    }
+});
+
+// Manipula o envio do formulário de remover horas
+document.getElementById('kt_modal_remover_horas_form')?.addEventListener('submit', function(e) {
+    const btnClicked = document.activeElement;
+    
+    // Verifica qual botão foi clicado
+    if (btnClicked && btnClicked.id === 'btn_remover_e_adicionar') {
+        e.preventDefault();
+        removerOutra = true;
+        enviarFormularioRemoverHoras(this, btnClicked);
+    } else if (btnClicked && btnClicked.id === 'btn_remover') {
+        removerOutra = false;
+        // Deixa o form submeter normalmente
+    }
+});
+
+// Função para enviar formulário via AJAX
+function enviarFormularioHoraExtra(form, btn) {
+    // Mostra loading no botão
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+    
+    // Pega dados do formulário
+    const formData = new FormData(form);
+    colaboradorAnterior = formData.get('colaborador_id');
+    
+    // Envia via AJAX
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(html => {
+        // Remove loading
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        // Verifica se houve sucesso (procura por mensagem de sucesso no HTML)
+        if (html.includes('alert-success') || html.includes('sucesso')) {
+            // Fecha o modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_horaextra'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Mostra notificação de sucesso
+            Swal.fire({
+                text: "Hora extra cadastrada com sucesso!",
+                icon: "success",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary"
+                },
+                timer: 2000,
+                timerProgressBar: true
+            }).then(() => {
+                if (adicionarOutra) {
+                    // Reabre o modal após breve pausa
+                    setTimeout(function() {
+                        reabrirModalComColaborador();
+                    }, 300);
+                } else {
+                    // Recarrega a página
+                    window.location.reload();
+                }
+            });
+        } else if (html.includes('alert-danger') || html.includes('Erro')) {
+            // Extrai mensagem de erro
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const alertElement = doc.querySelector('.alert-danger');
+            const mensagemErro = alertElement ? alertElement.textContent.trim() : 'Erro ao salvar hora extra';
+            
+            Swal.fire({
+                text: mensagemErro,
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-danger"
+                }
+            });
+        } else {
+            // Erro genérico
+            Swal.fire({
+                text: "Erro ao processar a requisição",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-danger"
+                }
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        
+        // Remove loading
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        Swal.fire({
+            text: "Erro ao enviar formulário: " + error.message,
+            icon: "error",
+            buttonsStyling: false,
+            confirmButtonText: "Ok",
+            customClass: {
+                confirmButton: "btn btn-danger"
+            }
+        });
+    });
+}
+
+// Função para enviar formulário de remover horas via AJAX
+function enviarFormularioRemoverHoras(form, btn) {
+    // Mostra loading no botão
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+    
+    // Pega dados do formulário
+    const formData = new FormData(form);
+    colaboradorAnteriorRemover = formData.get('colaborador_id');
+    
+    // Envia via AJAX
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(html => {
+        // Remove loading
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        // Verifica se houve sucesso
+        if (html.includes('alert-success') || html.includes('sucesso')) {
+            // Fecha o modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_remover_horas'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Mostra notificação de sucesso
+            Swal.fire({
+                text: "Horas removidas do banco com sucesso!",
+                icon: "success",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-primary"
+                },
+                timer: 2000,
+                timerProgressBar: true
+            }).then(() => {
+                if (removerOutra) {
+                    // Reabre o modal após breve pausa
+                    setTimeout(function() {
+                        reabrirModalRemoverComColaborador();
+                    }, 300);
+                } else {
+                    // Recarrega a página
+                    window.location.reload();
+                }
+            });
+        } else if (html.includes('alert-danger') || html.includes('Erro')) {
+            // Extrai mensagem de erro
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const alertElement = doc.querySelector('.alert-danger');
+            const mensagemErro = alertElement ? alertElement.textContent.trim() : 'Erro ao remover horas';
+            
+            Swal.fire({
+                text: mensagemErro,
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-danger"
+                }
+            });
+        } else {
+            Swal.fire({
+                text: "Erro ao processar a requisição",
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "Ok",
+                customClass: {
+                    confirmButton: "btn btn-danger"
+                }
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        
+        // Remove loading
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        Swal.fire({
+            text: "Erro ao enviar formulário: " + error.message,
+            icon: "error",
+            buttonsStyling: false,
+            confirmButtonText: "Ok",
+            customClass: {
+                confirmButton: "btn btn-danger"
+            }
+        });
+    });
+}
+
+// Função para reabrir modal de remover mantendo colaborador selecionado
+function reabrirModalRemoverComColaborador() {
+    // Limpa o formulário
+    const form = document.getElementById('kt_modal_remover_horas_form');
+    if (form) {
+        form.reset();
+    }
+    
+    // Define data atual
+    const dataInput = form.querySelector('input[name="data_movimentacao"]');
+    if (dataInput) {
+        dataInput.value = new Date().toISOString().split('T')[0];
+    }
+    
+    // Restaura colaborador selecionado
+    if (colaboradorAnteriorRemover) {
+        const selectColaborador = document.getElementById('colaborador_id_remover');
+        if (selectColaborador) {
+            selectColaborador.value = colaboradorAnteriorRemover;
+            
+            // Atualiza Select2
+            if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                jQuery('#colaborador_id_remover').val(colaboradorAnteriorRemover).trigger('change');
+            }
+            
+            // Atualiza saldo
+            const event = new Event('change');
+            selectColaborador.dispatchEvent(event);
+        }
+    }
+    
+    // Limpa campos
+    const quantidadeHoras = document.getElementById('quantidade_horas_remover');
+    if (quantidadeHoras) {
+        quantidadeHoras.value = '';
+    }
+    
+    const motivo = form.querySelector('textarea[name="motivo"]');
+    if (motivo) {
+        motivo.value = '';
+    }
+    
+    const observacoes = form.querySelector('textarea[name="observacoes"]');
+    if (observacoes) {
+        observacoes.value = '';
+    }
+    
+    // Reabre o modal
+    const modalElement = document.getElementById('kt_modal_remover_horas');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        // Foca no campo de horas após abrir
+        setTimeout(function() {
+            if (quantidadeHoras) {
+                quantidadeHoras.focus();
+            }
+        }, 500);
+    }
+}
+
+// Função para reabrir modal de adicionar mantendo colaborador selecionado
+function reabrirModalComColaborador() {
+    // Limpa o formulário
+    const form = document.getElementById('kt_modal_horaextra_form');
+    if (form) {
+        form.reset();
+    }
+    
+    // Define data atual
+    const dataInput = form.querySelector('input[name="data_trabalho"]');
+    if (dataInput) {
+        dataInput.value = new Date().toISOString().split('T')[0];
+    }
+    
+    // Restaura colaborador selecionado
+    if (colaboradorAnterior) {
+        const selectColaborador = document.getElementById('colaborador_id');
+        if (selectColaborador) {
+            selectColaborador.value = colaboradorAnterior;
+            
+            // Atualiza Select2
+            if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                jQuery('#colaborador_id').val(colaboradorAnterior).trigger('change');
+            }
+        }
+    }
+    
+    // Marca tipo de pagamento como dinheiro (padrão)
+    const radioDinheiro = document.getElementById('tipo_pagamento_dinheiro');
+    if (radioDinheiro) {
+        radioDinheiro.checked = true;
+        
+        // Mostra card de cálculo
+        document.getElementById('card_calculo_dinheiro').style.display = 'block';
+        document.getElementById('info_saldo_banco').style.display = 'none';
+    }
+    
+    // Limpa campos
+    const quantidadeHoras = document.getElementById('quantidade_horas');
+    if (quantidadeHoras) {
+        quantidadeHoras.value = '';
+    }
+    
+    const observacoes = form.querySelector('textarea[name="observacoes"]');
+    if (observacoes) {
+        observacoes.value = '';
+    }
+    
+    // Atualiza cálculo
+    calcularValorTotal();
+    
+    // Reabre o modal
+    const modalElement = document.getElementById('kt_modal_horaextra');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        // Foca no campo de horas após abrir
+        setTimeout(function() {
+            if (quantidadeHoras) {
+                quantidadeHoras.focus();
+            }
+        }, 500);
+    }
+}
+
 // Inicializa Select2 quando o modal de hora extra for aberto
 document.getElementById('kt_modal_horaextra')?.addEventListener('shown.bs.modal', function() {
     console.log('Modal aberto - inicializando Select2...');
