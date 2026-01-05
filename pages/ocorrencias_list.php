@@ -258,10 +258,76 @@ $tipos_ocorrencias = [
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
         
+        <!-- Cards de Estatísticas -->
+        <div class="row g-5 g-xl-8 mb-5">
+            <div class="col-xl-3">
+                <div class="card card-flush h-100">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="fs-2hx fw-bold text-gray-800 me-2 lh-1">
+                                <?= count($ocorrencias) ?>
+                            </span>
+                        </div>
+                        <span class="fs-6 fw-semibold text-gray-500">Total de Ocorrências</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3">
+                <div class="card card-flush h-100 bg-warning">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="fs-2hx fw-bold text-white me-2 lh-1">
+                                <?= count(array_filter($ocorrencias, fn($o) => ($o['status_aprovacao'] ?? 'aprovada') === 'pendente')) ?>
+                            </span>
+                        </div>
+                        <span class="fs-6 fw-semibold text-white">Pendentes de Aprovação</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3">
+                <div class="card card-flush h-100 bg-danger">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="fs-2hx fw-bold text-white me-2 lh-1">
+                                <?= count(array_filter($ocorrencias, fn($o) => in_array($o['severidade'] ?? '', ['grave', 'critica']))) ?>
+                            </span>
+                        </div>
+                        <span class="fs-6 fw-semibold text-white">Graves/Críticas</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3">
+                <div class="card card-flush h-100 bg-success">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="fs-2hx fw-bold text-white me-2 lh-1">
+                                <?= count(array_unique(array_column($ocorrencias, 'colaborador_id'))) ?>
+                            </span>
+                        </div>
+                        <span class="fs-6 fw-semibold text-white">Colaboradores</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Filtros -->
         <div class="card mb-4">
-            <div class="card-body">
-                <form method="GET" class="row g-3">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Filtros</span>
+                </h3>
+                <div class="card-toolbar">
+                    <button type="button" class="btn btn-sm btn-icon btn-active-light-primary" data-bs-toggle="collapse" data-bs-target="#kt_filtros_collapse">
+                        <i class="ki-duotone ki-down fs-2"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="collapse show" id="kt_filtros_collapse">
+                <div class="card-body">
+                    <form method="GET" class="row g-3" id="form_filtros">
                     <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
                     <div class="col-md-3">
                         <label class="form-label">Colaborador</label>
@@ -355,8 +421,8 @@ $tipos_ocorrencias = [
                         <input type="date" name="data_fim" class="form-control form-control-solid" value="<?= $filtro_data_fim ?>">
                     </div>
                     
-                    <div class="col-md-12 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary me-2">
+                    <div class="col-md-12 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-primary">
                             <i class="ki-duotone ki-magnifier fs-2"></i>
                             Filtrar
                         </button>
@@ -366,13 +432,49 @@ $tipos_ocorrencias = [
                         </a>
                     </div>
                 </form>
+                </div>
             </div>
         </div>
     
-        <!-- Lista Agrupada por Colaborador e Tipo -->
-        <?php if (empty($ocorrencias_agrupadas)): ?>
+        <!-- Tabela Principal de Ocorrências -->
         <div class="card">
-            <div class="card-body">
+            <div class="card-header border-0 pt-6">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Lista de Ocorrências</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7"><?= count($ocorrencias) ?> ocorrência(s) encontrada(s)</span>
+                </h3>
+                <div class="card-toolbar">
+                    <div class="d-flex justify-content-end" data-kt-user-table-toolbar="base">
+                        <!-- Botão de Exportar -->
+                        <button type="button" class="btn btn-light-primary me-3" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                            <i class="ki-duotone ki-exit-up fs-2"><span class="path1"></span><span class="path2"></span></i>
+                            Exportar
+                        </button>
+                        <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-200px py-4" data-kt-menu="true">
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" onclick="exportarTabela('excel'); return false;">
+                                    <i class="ki-duotone ki-file fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                    Excel
+                                </a>
+                            </div>
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" onclick="exportarTabela('pdf'); return false;">
+                                    <i class="ki-duotone ki-file fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                    PDF
+                                </a>
+                            </div>
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" onclick="exportarTabela('csv'); return false;">
+                                    <i class="ki-duotone ki-file fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                    CSV
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body py-4">
+                <?php if (empty($ocorrencias)): ?>
                 <div class="text-center py-10">
                     <i class="ki-duotone ki-information-5 fs-3x text-muted mb-5">
                         <span class="path1"></span>
@@ -381,94 +483,80 @@ $tipos_ocorrencias = [
                     </i>
                     <p class="text-muted fs-4">Nenhuma ocorrência encontrada com os filtros aplicados.</p>
                 </div>
-            </div>
-        </div>
-        <?php else: ?>
-        <?php foreach ($ocorrencias_agrupadas as $colab_id => $colab_data): ?>
-        <div class="card mb-5 shadow-sm">
-            <div class="card-header border-0 pt-6 pb-4">
-                <div class="card-title d-flex align-items-center">
-                    <!-- Avatar do Colaborador -->
-                    <div class="symbol symbol-65px symbol-circle me-4">
-                        <?php if ($colab_data['foto']): ?>
-                        <img src="../<?= htmlspecialchars($colab_data['foto']) ?>" 
-                             alt="<?= htmlspecialchars($colab_data['nome']) ?>" 
-                             class="symbol-label"
-                             style="object-fit: cover;"
-                             onerror="this.onerror=null; this.classList.add('d-none'); const fallback = this.nextElementSibling; if (fallback) { fallback.classList.remove('d-none'); fallback.classList.add('d-flex'); }">
-                        <div class="symbol-label bg-primary text-white fw-bold fs-2 align-items-center justify-content-center d-none">
-                            <?= htmlspecialchars($colab_data['inicial']) ?>
-                        </div>
-                        <?php else: ?>
-                        <div class="symbol-label bg-primary text-white fw-bold fs-2 d-flex align-items-center justify-content-center">
-                            <?= htmlspecialchars($colab_data['inicial']) ?>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <!-- Informações do Colaborador -->
-                    <div class="d-flex flex-column">
-                        <h3 class="fw-bold text-gray-800 mb-1">
-                            <a href="colaborador_view.php?id=<?= $colab_id ?>" class="text-gray-800 text-hover-primary">
-                                <?= htmlspecialchars($colab_data['nome']) ?>
-                            </a>
-                        </h3>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge badge-light-primary">
-                                <i class="ki-duotone ki-notepad fs-2 me-1">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                                <?= array_sum(array_map(function($tipo) { return count($tipo['ocorrencias']); }, $colab_data['tipos'])) ?> ocorrência<?= array_sum(array_map(function($tipo) { return count($tipo['ocorrencias']); }, $colab_data['tipos'])) > 1 ? 's' : '' ?>
-                            </span>
-                            <span class="text-muted fs-7">
-                                <?= count($colab_data['tipos']) ?> tipo<?= count($colab_data['tipos']) > 1 ? 's' : '' ?> diferente<?= count($colab_data['tipos']) > 1 ? 's' : '' ?>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body pt-0">
-                <?php foreach ($colab_data['tipos'] as $tipo_key => $tipo_data): ?>
-                <div class="mb-8">
-                    <div class="d-flex align-items-center mb-4">
-                        <?php
-                        $categoria = $tipo_data['categoria'] ?? 'outros';
-                        $categoria_colors = [
-                            'pontualidade' => 'badge-light-warning',
-                            'comportamento' => 'badge-light-danger',
-                            'desempenho' => 'badge-light-primary',
-                            'outros' => 'badge-light-secondary'
-                        ];
-                        ?>
-                        <h4 class="fw-bold text-gray-700 me-3">
-                            <span class="badge <?= $categoria_colors[$categoria] ?? 'badge-light-secondary' ?> fs-6 me-2">
-                                <?= htmlspecialchars($tipo_data['nome']) ?>
-                            </span>
-                            <span class="text-muted fs-6">
-                                (<?= count($tipo_data['ocorrencias']) ?> ocorrência<?= count($tipo_data['ocorrencias']) > 1 ? 's' : '' ?>)
-                            </span>
-                        </h4>
-                    </div>
-                    
+                <?php else: ?>
                 <div class="table-responsive">
-                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                    <table id="kt_table_ocorrencias" class="table align-middle table-row-dashed fs-6 gy-5">
                         <thead>
-                                <tr class="fw-bold text-muted">
-                                <th class="min-w-100px">Data</th>
-                                <th class="min-w-100px">Severidade</th>
-                                <th class="min-w-100px">Status</th>
-                                <th class="min-w-200px">Descrição</th>
-                                <th class="min-w-100px">Anexos</th>
-                                <th class="min-w-100px">Comentários</th>
-                                <th class="min-w-100px">Registrado por</th>
-                                <th class="text-end min-w-70px">Ações</th>
+                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
+                                <th class="min-w-150px">Colaborador</th>
+                                <th class="min-w-100px">Tipo</th>
+                                <th class="min-w-90px">Data</th>
+                                <th class="min-w-80px">Severidade</th>
+                                <th class="min-w-80px">Status</th>
+                                <th class="min-w-250px">Descrição</th>
+                                <th class="min-w-60px text-center">Anexos</th>
+                                <th class="min-w-80px text-center">Comentários</th>
+                                <th class="min-w-120px">Registrado por</th>
+                                <th class="text-end min-w-100px">Ações</th>
                             </tr>
                         </thead>
-                            <tbody>
-                                <?php foreach ($tipo_data['ocorrencias'] as $ocorrencia): ?>
-                            <tr>
-                                <td><?= formatar_data($ocorrencia['data_ocorrencia']) ?></td>
+                        <tbody class="text-gray-600 fw-semibold">
+                            <?php foreach ($ocorrencias as $ocorrencia): ?>
+                            <tr data-colaborador-id="<?= $ocorrencia['colaborador_id'] ?>">
+                                <!-- Colaborador com Avatar -->
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-circle symbol-40px me-3">
+                                            <?php if ($ocorrencia['colaborador_foto']): ?>
+                                            <img src="../<?= htmlspecialchars($ocorrencia['colaborador_foto']) ?>" 
+                                                 alt="<?= htmlspecialchars($ocorrencia['colaborador_nome']) ?>" 
+                                                 style="object-fit: cover;"
+                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            <div class="symbol-label bg-light-primary text-primary fw-bold" style="display:none;">
+                                                <?= mb_substr($ocorrencia['colaborador_nome'], 0, 1) ?>
+                                            </div>
+                                            <?php else: ?>
+                                            <div class="symbol-label bg-light-primary text-primary fw-bold">
+                                                <?= mb_substr($ocorrencia['colaborador_nome'], 0, 1) ?>
+                                            </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="d-flex flex-column">
+                                            <a href="colaborador_view.php?id=<?= $ocorrencia['colaborador_id'] ?>" class="text-gray-800 text-hover-primary mb-1 fw-bold">
+                                                <?= htmlspecialchars($ocorrencia['colaborador_nome']) ?>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </td>
+                                
+                                <!-- Tipo de Ocorrência -->
+                                <td>
+                                    <?php
+                                    $categoria = $ocorrencia['tipo_categoria'] ?? 'outros';
+                                    $categoria_colors = [
+                                        'pontualidade' => 'badge-light-warning',
+                                        'comportamento' => 'badge-light-danger',
+                                        'desempenho' => 'badge-light-primary',
+                                        'outros' => 'badge-light-secondary'
+                                    ];
+                                    $tipo_nome = $ocorrencia['tipo_ocorrencia_nome'] ?? 'N/A';
+                                    ?>
+                                    <span class="badge <?= $categoria_colors[$categoria] ?? 'badge-light-secondary' ?>">
+                                        <?= htmlspecialchars($tipo_nome) ?>
+                                    </span>
+                                    <?php if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1): ?>
+                                    <br><span class="badge badge-light-success mt-1" title="Apenas Informativa">
+                                        <i class="ki-duotone ki-information-5 fs-6"></i> Info
+                                    </span>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <!-- Data -->
+                                <td>
+                                    <span class="fw-bold"><?= formatar_data($ocorrencia['data_ocorrencia']) ?></span>
+                                </td>
+                                
+                                <!-- Severidade -->
                                 <td>
                                     <?php
                                     $severidade = $ocorrencia['severidade'] ?? 'moderada';
@@ -489,13 +577,15 @@ $tipos_ocorrencias = [
                                         <?= $severidade_labels[$severidade] ?? 'Moderada' ?>
                                     </span>
                                 </td>
+                                
+                                <!-- Status -->
                                 <td>
                                     <?php
                                     $status_aprovacao = $ocorrencia['status_aprovacao'] ?? 'aprovada';
                                     $status_colors = [
-                                        'pendente' => 'badge-light-warning',
-                                        'aprovada' => 'badge-light-success',
-                                        'rejeitada' => 'badge-light-danger'
+                                        'pendente' => 'badge-warning',
+                                        'aprovada' => 'badge-success',
+                                        'rejeitada' => 'badge-danger'
                                     ];
                                     $status_labels = [
                                         'pendente' => 'Pendente',
@@ -503,41 +593,31 @@ $tipos_ocorrencias = [
                                         'rejeitada' => 'Rejeitada'
                                     ];
                                     ?>
-                                    <span class="badge <?= $status_colors[$status_aprovacao] ?? 'badge-light-success' ?>">
+                                    <span class="badge <?= $status_colors[$status_aprovacao] ?? 'badge-success' ?>">
                                         <?= $status_labels[$status_aprovacao] ?? 'Aprovada' ?>
                                     </span>
                                 </td>
+                                
+                                <!-- Descrição -->
                                 <td>
                                     <?php
                                     $descricao = $ocorrencia['descricao'] ?? '';
-                                    $descricao_curta = mb_substr($descricao, 0, 100);
+                                    $descricao_curta = mb_substr($descricao, 0, 80);
                                     ?>
-                                    <span class="text-gray-800" title="<?= htmlspecialchars($descricao) ?>">
-                                        <?= nl2br(htmlspecialchars($descricao_curta)) ?>
-                                        <?= mb_strlen($descricao) > 100 ? '...' : '' ?>
+                                    <span class="text-gray-700" title="<?= htmlspecialchars($descricao) ?>">
+                                        <?= htmlspecialchars($descricao_curta) ?>
+                                        <?= mb_strlen($descricao) > 80 ? '...' : '' ?>
                                     </span>
                                     <?php
-                                    // Mostra badge de "Apenas Informativa" se aplicável
-                                    if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1) {
-                                        echo '<div class="mt-2">';
-                                        echo '<span class="badge badge-light-success" title="Esta ocorrência é apenas informativa e não gera impacto financeiro">';
-                                        echo '<i class="ki-duotone ki-information-5 fs-2 me-1">';
-                                        echo '<span class="path1"></span><span class="path2"></span><span class="path3"></span>';
-                                        echo '</i>';
-                                        echo 'Apenas Informativa';
-                                        echo '</span>';
-                                        echo '</div>';
-                                    }
-                                    
                                     // Mostra tags
                                     if (!empty($ocorrencia['tags'])) {
                                         $tags_array = json_decode($ocorrencia['tags'], true);
                                         if ($tags_array) {
-                                            echo '<div class="mt-2">';
+                                            echo '<div class="mt-1">';
                                             foreach ($tags_array as $tag_id) {
                                                 foreach ($tags_disponiveis as $tag) {
                                                     if ($tag['id'] == $tag_id) {
-                                                        echo '<span class="badge badge-light" style="background-color: ' . htmlspecialchars($tag['cor']) . '20; color: ' . htmlspecialchars($tag['cor']) . ';">' . htmlspecialchars($tag['nome']) . '</span> ';
+                                                        echo '<span class="badge badge-sm" style="background-color: ' . htmlspecialchars($tag['cor']) . '20; color: ' . htmlspecialchars($tag['cor']) . '; font-size: 0.75rem;">' . htmlspecialchars($tag['nome']) . '</span> ';
                                                         break;
                                                     }
                                                 }
@@ -547,52 +627,64 @@ $tipos_ocorrencias = [
                                     }
                                     ?>
                                 </td>
-                                <td>
+                                
+                                <!-- Anexos -->
+                                <td class="text-center">
                                     <?php if ($ocorrencia['total_anexos'] > 0): ?>
                                         <span class="badge badge-light-info">
-                                            <i class="ki-duotone ki-file fs-2"></i>
+                                            <i class="ki-duotone ki-file fs-5"></i>
                                             <?= $ocorrencia['total_anexos'] ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
                                 </td>
-                                <td>
+                                
+                                <!-- Comentários -->
+                                <td class="text-center">
                                     <?php if ($ocorrencia['total_comentarios'] > 0): ?>
                                         <span class="badge badge-light-primary">
-                                            <i class="ki-duotone ki-message fs-2"></i>
+                                            <i class="ki-duotone ki-message-text-2 fs-5"></i>
                                             <?= $ocorrencia['total_comentarios'] ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?= htmlspecialchars($ocorrencia['usuario_nome'] ?? 'N/A') ?></td>
+                                
+                                <!-- Registrado por -->
+                                <td>
+                                    <span class="text-gray-600 fw-semibold">
+                                        <?= htmlspecialchars($ocorrencia['usuario_nome'] ?? 'N/A') ?>
+                                    </span>
+                                </td>
+                                
+                                <!-- Ações -->
                                 <td class="text-end">
-                                    <div class="d-flex gap-2 justify-content-end">
-                                        <a href="ocorrencia_view.php?id=<?= $ocorrencia['id'] ?>" class="btn btn-sm btn-light btn-active-light-primary" title="Ver Detalhes">
-                                            <i class="ki-duotone ki-eye fs-2">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                                <span class="path3"></span>
-                                            </i>
-                                        </a>
+                                    <a href="#" class="btn btn-light btn-active-light-primary btn-sm" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                                        Ações
+                                        <i class="ki-duotone ki-down fs-5 ms-1"></i>
+                                    </a>
+                                    <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-150px py-4" data-kt-menu="true">
+                                        <div class="menu-item px-3">
+                                            <a href="ocorrencia_view.php?id=<?= $ocorrencia['id'] ?>" class="menu-link px-3">
+                                                <i class="ki-duotone ki-eye fs-5 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                                Ver Detalhes
+                                            </a>
+                                        </div>
                                         <?php if (has_role(['ADMIN', 'RH'])): ?>
-                                        <a href="ocorrencias_edit.php?id=<?= $ocorrencia['id'] ?>" class="btn btn-sm btn-light btn-active-light-warning" title="Editar">
-                                            <i class="ki-duotone ki-pencil fs-2">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                        </a>
-                                        <a href="#" onclick="deletarOcorrencia(<?= $ocorrencia['id'] ?>); return false;" class="btn btn-sm btn-light btn-active-light-danger" title="Deletar">
-                                            <i class="ki-duotone ki-trash fs-2">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                                <span class="path3"></span>
-                                                <span class="path4"></span>
-                                                <span class="path5"></span>
-                                            </i>
-                                        </a>
+                                        <div class="menu-item px-3">
+                                            <a href="ocorrencias_edit.php?id=<?= $ocorrencia['id'] ?>" class="menu-link px-3">
+                                                <i class="ki-duotone ki-pencil fs-5 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                                Editar
+                                            </a>
+                                        </div>
+                                        <div class="menu-item px-3">
+                                            <a href="#" onclick="deletarOcorrencia(<?= $ocorrencia['id'] ?>); return false;" class="menu-link px-3 text-danger">
+                                                <i class="ki-duotone ki-trash fs-5 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                                Deletar
+                                            </a>
+                                        </div>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -601,12 +693,9 @@ $tipos_ocorrencias = [
                         </tbody>
                     </table>
                 </div>
-                </div>
-                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
-        <?php endforeach; ?>
-        <?php endif; ?>
         
     </div>
 </div>
@@ -614,42 +703,135 @@ $tipos_ocorrencias = [
 
 <script>
 "use strict";
-// Inicializa DataTables para cada tabela de tipo de ocorrência
-var KTOcorrenciasList = function() {
+
+var KTOcorrenciasList = (function() {
+    var table;
+    var datatable;
+    
     return {
         init: function() {
-            // Encontra todas as tabelas dentro dos cards de colaborador (mas não a tabela de filtros)
-            const cards = document.querySelectorAll('.card.mb-5');
+            table = document.querySelector('#kt_table_ocorrencias');
             
-            cards.forEach((card) => {
-                const tables = card.querySelectorAll('.table-responsive table');
-            
-                tables.forEach((table) => {
-                    // Verifica se a tabela já não foi inicializada e se tem o cabeçalho correto
-                    if (table.querySelector('thead') && !$(table).hasClass('dataTable')) {
-                        $(table).DataTable({
-                    info: true,
-                    order: [[0, 'desc']],
-                            pageLength: 10,
-                    language: {
-                        url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
-                    },
-                    columnDefs: [
-                                { orderable: false, targets: 7 }
-                            ],
-                            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
-                                 '<"row"<"col-sm-12"tr>>' +
-                                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
-                            paging: true,
-                            searching: true,
-                            ordering: true
-                });
+            if (!table) {
+                return;
             }
-                });
+            
+            // Inicializa DataTable
+            datatable = $(table).DataTable({
+                info: true,
+                order: [[2, 'desc']], // Ordena por data (coluna 2) decrescente
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
+                language: {
+                    url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+                },
+                columnDefs: [
+                    { orderable: false, targets: 9 }, // Coluna de ações não ordenável
+                    { width: '150px', targets: 0 }, // Colaborador
+                    { width: '100px', targets: 1 }, // Tipo
+                    { width: '90px', targets: 2 }, // Data
+                    { width: '80px', targets: 3 }, // Severidade
+                    { width: '80px', targets: 4 }, // Status
+                    { width: '250px', targets: 5 }, // Descrição
+                    { width: '60px', targets: 6, className: 'text-center' }, // Anexos
+                    { width: '80px', targets: 7, className: 'text-center' }, // Comentários
+                    { width: '120px', targets: 8 }, // Registrado por
+                    { width: '100px', targets: 9, className: 'text-end' } // Ações
+                ],
+                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                     '<"row"<"col-sm-12"tr>>' +
+                     '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+                buttons: [
+                    {
+                        extend: 'excel',
+                        text: 'Excel',
+                        className: 'btn btn-light-success'
+                    },
+                    {
+                        extend: 'pdf',
+                        text: 'PDF',
+                        className: 'btn btn-light-danger'
+                    },
+                    {
+                        extend: 'csv',
+                        text: 'CSV',
+                        className: 'btn btn-light-info'
+                    }
+                ],
+                rowGroup: {
+                    dataSrc: 0, // Agrupa pela coluna 0 (Colaborador)
+                    startRender: function(rows, group) {
+                        var totalOcorrencias = rows.count();
+                        
+                        return $('<tr/>')
+                            .addClass('group-row')
+                            .append('<td colspan="10" class="fw-bold text-gray-800 bg-light-primary" style="padding: 15px;">' +
+                                    '<i class="ki-duotone ki-user fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>' +
+                                    group + 
+                                    ' <span class="badge badge-primary ms-3">' + totalOcorrencias + ' ocorrência' + (totalOcorrencias > 1 ? 's' : '') + '</span>' +
+                                    '</td>');
+                    }
+                },
+                drawCallback: function() {
+                    // Reinicializa menus do Metronic após cada redesenho
+                    KTMenu.createInstances();
+                }
             });
+        },
+        
+        getDatatable: function() {
+            return datatable;
         }
     };
-}();
+})();
+
+// Função para exportar tabela
+function exportarTabela(formato) {
+    var dt = KTOcorrenciasList.getDatatable();
+    
+    if (!dt) {
+        Swal.fire({
+            title: 'Erro!',
+            text: 'Tabela não inicializada',
+            icon: 'error',
+            confirmButtonText: 'Ok',
+            buttonsStyling: false,
+            customClass: {
+                confirmButton: 'btn fw-bold btn-primary'
+            }
+        });
+        return;
+    }
+    
+    // Carrega bibliotecas de exportação se necessário
+    if (formato === 'excel') {
+        // Verifica se JSZip e Excel estão carregados
+        if (typeof JSZip === 'undefined') {
+            $.getScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', function() {
+                $.getScript('https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js', function() {
+                    dt.button('.buttons-excel').trigger();
+                });
+            });
+        } else {
+            dt.button('.buttons-excel').trigger();
+        }
+    } else if (formato === 'pdf') {
+        // Verifica se pdfMake está carregado
+        if (typeof pdfMake === 'undefined') {
+            $.getScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js', function() {
+                $.getScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js', function() {
+                    $.getScript('https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js', function() {
+                        dt.button('.buttons-pdf').trigger();
+                    });
+                });
+            });
+        } else {
+            dt.button('.buttons-pdf').trigger();
+        }
+    } else if (formato === 'csv') {
+        dt.button('.buttons-csv').trigger();
+    }
+}
 
 // Função para deletar ocorrência
 function deletarOcorrencia(ocorrenciaId) {
@@ -721,21 +903,123 @@ function deletarOcorrencia(ocorrenciaId) {
     });
 }
 
-// Aguarda jQuery estar disponível
+// Aguarda jQuery e DataTables estarem disponíveis
 (function waitForDependencies() {
-    if (typeof jQuery === 'undefined' || typeof $ === 'undefined') {
+    if (typeof jQuery === 'undefined' || typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
         setTimeout(waitForDependencies, 50);
         return;
     }
     
     $(document).ready(function() {
-        // Aguarda um pouco para garantir que todas as tabelas foram renderizadas
+        // Aguarda um pouco para garantir que a tabela foi renderizada
         setTimeout(function() {
-        KTOcorrenciasList.init();
+            KTOcorrenciasList.init();
         }, 300);
     });
 })();
 </script>
+
+<!-- Adiciona bibliotecas necessárias para exportação -->
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/rowgroup/1.4.1/js/dataTables.rowGroup.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/rowgroup/1.4.1/css/rowGroup.dataTables.min.css">
+
+<style>
+/* Estilos para agrupamento de linhas */
+.group-row td {
+    background-color: #f3f6f9 !important;
+    font-weight: 600 !important;
+    font-size: 1.05rem !important;
+    border-top: 2px solid #3699ff !important;
+    border-bottom: 1px solid #e4e6ef !important;
+}
+
+[data-theme="dark"] .group-row td {
+    background-color: #1e1e2d !important;
+    border-top: 2px solid #3699ff !important;
+    border-bottom: 1px solid #2b2b40 !important;
+}
+
+/* Melhora visual dos badges */
+.badge {
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+/* Hover nas linhas da tabela */
+#kt_table_ocorrencias tbody tr:hover {
+    background-color: #f9f9f9 !important;
+}
+
+[data-theme="dark"] #kt_table_ocorrencias tbody tr:hover {
+    background-color: #1e1e2d !important;
+}
+
+/* Avatar círculo perfeito */
+.symbol-circle img,
+.symbol-circle .symbol-label {
+    border-radius: 50% !important;
+}
+
+/* Cards de estatísticas com hover */
+.card-flush:hover {
+    transform: translateY(-5px);
+    transition: all 0.3s ease;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}
+
+/* Menu de ações */
+.menu-link:hover {
+    background-color: #f3f6f9 !important;
+}
+
+[data-theme="dark"] .menu-link:hover {
+    background-color: #1e1e2d !important;
+}
+
+/* Botão de colapsar filtros */
+#kt_filtros_collapse {
+    transition: all 0.3s ease;
+}
+
+/* Responsividade dos cards de estatísticas */
+@media (max-width: 768px) {
+    .col-xl-3 {
+        margin-bottom: 1rem;
+    }
+    
+    .card-flush .fs-2hx {
+        font-size: 2rem !important;
+    }
+}
+
+/* DataTables search input styling */
+.dataTables_filter input {
+    margin-left: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.475rem;
+    border: 1px solid #e4e6ef;
+}
+
+[data-theme="dark"] .dataTables_filter input {
+    background-color: #1e1e2d;
+    border-color: #2b2b40;
+    color: #a1a5b7;
+}
+
+/* Paginação */
+.dataTables_paginate .paginate_button {
+    padding: 0.5rem 1rem;
+    margin: 0 0.25rem;
+    border-radius: 0.475rem;
+}
+
+.dataTables_paginate .paginate_button.current {
+    background: #3699ff !important;
+    color: white !important;
+}
+</style>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
