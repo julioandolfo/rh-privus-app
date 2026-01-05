@@ -231,10 +231,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'delete') {
         $id = (int)($_POST['id'] ?? 0);
         try {
+            require_once __DIR__ . '/../includes/banco_horas_functions.php';
+            
+            // Busca dados da hora extra antes de deletar
+            $stmt = $pdo->prepare("
+                SELECT he.*, c.nome_completo 
+                FROM horas_extras he
+                INNER JOIN colaboradores c ON he.colaborador_id = c.id
+                WHERE he.id = ?
+            ");
+            $stmt->execute([$id]);
+            $hora_extra = $stmt->fetch();
+            
+            if (!$hora_extra) {
+                redirect('horas_extras.php', 'Hora extra não encontrada!', 'error');
+            }
+            
+            $pdo->beginTransaction();
+            
+            // Se a hora extra foi adicionada ao banco de horas, precisa reverter
+            if ($hora_extra['tipo_pagamento'] === 'banco_horas' && !empty($hora_extra['banco_horas_movimentacao_id'])) {
+                // Busca a movimentação
+                $stmt_mov = $pdo->prepare("
+                    SELECT * FROM banco_horas_movimentacoes WHERE id = ?
+                ");
+                $stmt_mov->execute([$hora_extra['banco_horas_movimentacao_id']]);
+                $movimentacao = $stmt_mov->fetch();
+                
+                if ($movimentacao) {
+                    $quantidade_horas = abs($movimentacao['quantidade_horas']);
+                    
+                    // Se foi crédito (adição de horas), remove as horas
+                    if ($movimentacao['tipo'] === 'credito') {
+                        // Remove as horas que foram adicionadas
+                        $resultado = remover_horas_banco(
+                            $hora_extra['colaborador_id'],
+                            $quantidade_horas,
+                            'estorno_hora_extra',
+                            $id,
+                            'Estorno de hora extra excluída - ' . $hora_extra['nome_completo'],
+                            'Hora extra de ' . date('d/m/Y', strtotime($hora_extra['data_trabalho'])) . ' foi excluída',
+                            $usuario['id'],
+                            date('Y-m-d')
+                        );
+                        
+                        if (!$resultado['success']) {
+                            $pdo->rollBack();
+                            redirect('horas_extras.php', 'Erro ao reverter banco de horas: ' . $resultado['error'], 'error');
+                        }
+                    }
+                    // Se foi débito (remoção de horas), adiciona as horas de volta
+                    elseif ($movimentacao['tipo'] === 'debito') {
+                        // Adiciona as horas de volta
+                        $resultado = adicionar_horas_banco(
+                            $hora_extra['colaborador_id'],
+                            $quantidade_horas,
+                            'estorno_remocao',
+                            $id,
+                            'Estorno de remoção de horas excluída - ' . $hora_extra['nome_completo'],
+                            'Remoção de horas de ' . date('d/m/Y', strtotime($hora_extra['data_trabalho'])) . ' foi excluída',
+                            $usuario['id'],
+                            date('Y-m-d')
+                        );
+                        
+                        if (!$resultado['success']) {
+                            $pdo->rollBack();
+                            redirect('horas_extras.php', 'Erro ao reverter banco de horas: ' . $resultado['error'], 'error');
+                        }
+                    }
+                    
+                    // Deleta a movimentação original
+                    $stmt_del_mov = $pdo->prepare("DELETE FROM banco_horas_movimentacoes WHERE id = ?");
+                    $stmt_del_mov->execute([$hora_extra['banco_horas_movimentacao_id']]);
+                }
+            }
+            
+            // Deleta a hora extra
             $stmt = $pdo->prepare("DELETE FROM horas_extras WHERE id = ?");
             $stmt->execute([$id]);
-            redirect('horas_extras.php', 'Hora extra excluída com sucesso!');
+            
+            $pdo->commit();
+            
+            redirect('horas_extras.php', 'Hora extra excluída com sucesso e banco de horas ajustado!');
         } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             redirect('horas_extras.php', 'Erro ao excluir: ' . $e->getMessage(), 'error');
         }
     }
