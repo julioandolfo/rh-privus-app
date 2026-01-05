@@ -463,7 +463,57 @@ require_once __DIR__ . '/../includes/header.php';
                 <!--begin::Card toolbar-->
                 <div class="card-toolbar">
                     <!--begin::Toolbar-->
-                    <div class="d-flex justify-content-end gap-2" data-kt-horaextra-table-toolbar="base">
+                    <div class="d-flex justify-content-end gap-2 flex-wrap" data-kt-horaextra-table-toolbar="base">
+                        <!--begin::Exportar-->
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-light-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="ki-duotone ki-exit-down fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Exportar
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="#" id="exportar_excel">
+                                        <i class="ki-duotone ki-file-sheet fs-2 me-2 text-success">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Exportar para Excel
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#" id="exportar_csv">
+                                        <i class="ki-duotone ki-file fs-2 me-2 text-info">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Exportar para CSV
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#" id="exportar_pdf">
+                                        <i class="ki-duotone ki-file-down fs-2 me-2 text-danger">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Exportar para PDF
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <!--end::Exportar-->
+                        <!--begin::Filtros Avançados-->
+                        <button type="button" class="btn btn-light-primary" id="kt_filtros_avancados_toggle">
+                            <i class="ki-duotone ki-filter fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Filtros Avançados
+                            <span class="badge badge-circle badge-primary ms-2" id="filtros_ativos_count" style="display: none;">0</span>
+                        </button>
+                        <!--end::Filtros Avançados-->
                         <!--begin::Remover horas do banco-->
                         <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#kt_modal_remover_horas">
                             <i class="ki-duotone ki-minus fs-2"></i>
@@ -483,8 +533,162 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <!--end::Card header-->
             
+            <!--begin::Filtros Avançados-->
+            <div class="card-body border-top d-none" id="kt_filtros_avancados_content">
+                <div class="row g-5">
+                    <!--begin::Colaborador-->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Colaborador</label>
+                        <select class="form-select form-select-solid" id="filtro_colaborador" data-placeholder="Todos">
+                            <option value="">Todos os colaboradores</option>
+                            <?php foreach ($colaboradores as $colab): ?>
+                            <option value="<?= $colab['id'] ?>"><?= htmlspecialchars($colab['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <!--end::Colaborador-->
+                    
+                    <!--begin::Período-->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Data Início</label>
+                        <input type="date" class="form-control form-control-solid" id="filtro_data_inicio" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Data Fim</label>
+                        <input type="date" class="form-control form-control-solid" id="filtro_data_fim" />
+                    </div>
+                    <!--end::Período-->
+                    
+                    <!--begin::Tipo de Pagamento-->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Tipo de Pagamento</label>
+                        <select class="form-select form-select-solid" id="filtro_tipo_pagamento">
+                            <option value="">Todos os tipos</option>
+                            <option value="dinheiro">💰 R$ (Dinheiro)</option>
+                            <option value="banco_horas">🏦 Banco de Horas</option>
+                            <option value="remocao">⚠️ Remoção</option>
+                        </select>
+                    </div>
+                    <!--end::Tipo de Pagamento-->
+                    
+                    <!--begin::Quantidade Horas-->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Horas Mínimas</label>
+                        <input type="number" class="form-control form-control-solid" id="filtro_horas_min" placeholder="0" step="0.5" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Horas Máximas</label>
+                        <input type="number" class="form-control form-control-solid" id="filtro_horas_max" placeholder="999" step="0.5" />
+                    </div>
+                    <!--end::Quantidade Horas-->
+                    
+                    <!--begin::Valor Total-->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Valor Mínimo (R$)</label>
+                        <input type="number" class="form-control form-control-solid" id="filtro_valor_min" placeholder="0,00" step="0.01" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Valor Máximo (R$)</label>
+                        <input type="number" class="form-control form-control-solid" id="filtro_valor_max" placeholder="999999,99" step="0.01" />
+                    </div>
+                    <!--end::Valor Total-->
+                    
+                    <!--begin::Ações-->
+                    <div class="col-md-12">
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-light" id="limpar_filtros">
+                                <i class="ki-duotone ki-arrows-circle fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Limpar Filtros
+                            </button>
+                            <button type="button" class="btn btn-primary" id="aplicar_filtros">
+                                <i class="ki-duotone ki-check fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Aplicar Filtros
+                            </button>
+                        </div>
+                    </div>
+                    <!--end::Ações-->
+                </div>
+                
+                <!--begin::Resumo dos Filtros Ativos-->
+                <div class="mt-5 d-none" id="filtros_ativos_resumo">
+                    <div class="alert alert-primary d-flex align-items-center p-5">
+                        <i class="ki-duotone ki-information-5 fs-2hx text-primary me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <h5 class="mb-1">Filtros Ativos</h5>
+                            <span id="filtros_ativos_texto"></span>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Resumo dos Filtros Ativos-->
+            </div>
+            <!--end::Filtros Avançados-->
+            
             <!--begin::Card body-->
             <div class="card-body pt-0">
+                <!--begin::Estatísticas-->
+                <div class="row g-5 mb-7" id="estatisticas_horas_extras">
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card bg-light-success h-100">
+                            <div class="card-body">
+                                <i class="ki-duotone ki-plus-circle fs-2x text-success mb-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div class="fw-bold text-success fs-2" id="stat_total_horas">0h</div>
+                                <div class="fw-semibold text-gray-600 fs-7">Total de Horas</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card bg-light-primary h-100">
+                            <div class="card-body">
+                                <i class="ki-duotone ki-dollar fs-2x text-primary mb-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <div class="fw-bold text-primary fs-2" id="stat_total_valor">R$ 0,00</div>
+                                <div class="fw-semibold text-gray-600 fs-7">Total em R$</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card bg-light-info h-100">
+                            <div class="card-body">
+                                <i class="ki-duotone ki-time fs-2x text-info mb-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div class="fw-bold text-info fs-2" id="stat_banco_horas">0</div>
+                                <div class="fw-semibold text-gray-600 fs-7">Banco de Horas</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card bg-light-warning h-100">
+                            <div class="card-body">
+                                <i class="ki-duotone ki-abstract-26 fs-2x text-warning mb-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div class="fw-bold text-warning fs-2" id="stat_total_registros">0</div>
+                                <div class="fw-semibold text-gray-600 fs-7">Total de Registros</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Estatísticas-->
+                
                 <!--begin::Table-->
                 <table class="table align-middle table-row-dashed fs-6 gy-5" id="kt_horas_extras_table">
                     <thead>
@@ -1020,35 +1224,368 @@ if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
     });
 }
 
-// DataTables
+// DataTables com Filtros Avançados
 var KTHorasExtrasList = function() {
+    var table;
+    var datatable;
+    
     var initDatatable = function() {
-        const table = document.getElementById('kt_horas_extras_table');
+        table = document.getElementById('kt_horas_extras_table');
         if (!table) return;
         
-        const datatable = $(table).DataTable({
+        datatable = $(table).DataTable({
             "info": true,
-            "order": [],
-            "pageLength": 10,
-            "lengthMenu": [[10, 25, 50, 100], [10, 25, 50, 100]],
+            "order": [[3, 'desc']], // Ordena por data (coluna 3) decrescente
+            "pageLength": 25,
+            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
             "language": {
                 "url": "https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json"
-            }
+            },
+            "columnDefs": [
+                { "orderable": false, "targets": 9 } // Desabilita ordenação na coluna de ações
+            ]
         });
         
-        // Filtro de busca
+        // Filtro de busca simples
         const filterSearch = document.querySelector('[data-kt-horaextra-table-filter="search"]');
         if (filterSearch) {
             filterSearch.addEventListener('keyup', function(e) {
                 datatable.search(e.target.value).draw();
             });
         }
+        
+        return datatable;
+    };
+    
+    var initFiltrosAvancados = function() {
+        // Toggle do painel de filtros
+        const toggleBtn = document.getElementById('kt_filtros_avancados_toggle');
+        const contentDiv = document.getElementById('kt_filtros_avancados_content');
+        
+        if (toggleBtn && contentDiv) {
+            toggleBtn.addEventListener('click', function() {
+                contentDiv.classList.toggle('d-none');
+                
+                // Anima o ícone
+                const icon = this.querySelector('i');
+                if (contentDiv.classList.contains('d-none')) {
+                    icon.classList.remove('rotate-180');
+                } else {
+                    icon.classList.add('rotate-180');
+                }
+            });
+        }
+        
+        // Função para aplicar filtros
+        const aplicarFiltros = function() {
+            if (!datatable) return;
+            
+            // Remove filtros anteriores
+            $.fn.dataTable.ext.search = [];
+            
+            // Pega valores dos filtros
+            const colaboradorId = document.getElementById('filtro_colaborador')?.value;
+            const dataInicio = document.getElementById('filtro_data_inicio')?.value;
+            const dataFim = document.getElementById('filtro_data_fim')?.value;
+            const tipoPagamento = document.getElementById('filtro_tipo_pagamento')?.value;
+            const horasMin = parseFloat(document.getElementById('filtro_horas_min')?.value) || null;
+            const horasMax = parseFloat(document.getElementById('filtro_horas_max')?.value) || null;
+            const valorMin = parseFloat(document.getElementById('filtro_valor_min')?.value) || null;
+            const valorMax = parseFloat(document.getElementById('filtro_valor_max')?.value) || null;
+            
+            let filtrosAtivos = 0;
+            let textoFiltros = [];
+            
+            // Adiciona filtro customizado
+            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                // data[1] = colaborador nome
+                // data[3] = data (formato dd/mm/yyyy)
+                // data[4] = quantidade horas
+                // data[5] = tipo (badge HTML)
+                // data[8] = valor total (formato HTML)
+                
+                // Filtro por colaborador
+                if (colaboradorId) {
+                    const row = datatable.row(dataIndex).node();
+                    const linkColaborador = row.querySelector('td:nth-child(2) a');
+                    if (linkColaborador) {
+                        const href = linkColaborador.getAttribute('href');
+                        const match = href.match(/id=(\d+)/);
+                        if (!match || match[1] !== colaboradorId) {
+                            return false;
+                        }
+                    }
+                }
+                
+                // Filtro por data
+                if (dataInicio || dataFim) {
+                    const dataStr = data[3]; // dd/mm/yyyy
+                    const partes = dataStr.split('/');
+                    if (partes.length === 3) {
+                        const dataRegistro = new Date(partes[2], partes[1] - 1, partes[0]);
+                        
+                        if (dataInicio) {
+                            const dtInicio = new Date(dataInicio);
+                            if (dataRegistro < dtInicio) return false;
+                        }
+                        
+                        if (dataFim) {
+                            const dtFim = new Date(dataFim);
+                            dtFim.setHours(23, 59, 59); // Inclui todo o dia final
+                            if (dataRegistro > dtFim) return false;
+                        }
+                    }
+                }
+                
+                // Filtro por tipo de pagamento
+                if (tipoPagamento) {
+                    const tipoHtml = data[5].toLowerCase();
+                    
+                    if (tipoPagamento === 'remocao' && !tipoHtml.includes('remoção')) {
+                        return false;
+                    } else if (tipoPagamento === 'banco_horas' && !tipoHtml.includes('banco de horas')) {
+                        return false;
+                    } else if (tipoPagamento === 'dinheiro' && !tipoHtml.includes('r$')) {
+                        return false;
+                    }
+                }
+                
+                // Filtro por quantidade de horas
+                if (horasMin !== null || horasMax !== null) {
+                    const horasStr = data[4].replace(/[^0-9,\-]/g, ''); // Remove tudo exceto números, vírgula e sinal negativo
+                    const horas = Math.abs(parseFloat(horasStr.replace(',', '.'))); // Pega valor absoluto
+                    
+                    if (horasMin !== null && horas < horasMin) return false;
+                    if (horasMax !== null && horas > horasMax) return false;
+                }
+                
+                // Filtro por valor
+                if (valorMin !== null || valorMax !== null) {
+                    // Extrai valor do HTML (pode ser "R$ 123,45" ou "-" ou span com valor)
+                    const valorHtml = data[8];
+                    const valorMatch = valorHtml.match(/R\$\s*([\d.,]+)/);
+                    
+                    if (valorMatch) {
+                        const valor = parseFloat(valorMatch[1].replace(/\./g, '').replace(',', '.'));
+                        
+                        if (valorMin !== null && valor < valorMin) return false;
+                        if (valorMax !== null && valor > valorMax) return false;
+                    } else {
+                        // Se não tem valor (banco de horas ou remoção), só passa se não tiver filtro de valor
+                        if (valorMin !== null || valorMax !== null) return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            // Monta texto dos filtros ativos
+            if (colaboradorId) {
+                const nomeColaborador = document.getElementById('filtro_colaborador').selectedOptions[0]?.text;
+                textoFiltros.push(`<strong>Colaborador:</strong> ${nomeColaborador}`);
+                filtrosAtivos++;
+            }
+            
+            if (dataInicio) {
+                const dtInicioFormatada = new Date(dataInicio).toLocaleDateString('pt-BR');
+                textoFiltros.push(`<strong>Data Início:</strong> ${dtInicioFormatada}`);
+                filtrosAtivos++;
+            }
+            
+            if (dataFim) {
+                const dtFimFormatada = new Date(dataFim).toLocaleDateString('pt-BR');
+                textoFiltros.push(`<strong>Data Fim:</strong> ${dtFimFormatada}`);
+                filtrosAtivos++;
+            }
+            
+            if (tipoPagamento) {
+                const tipoTexto = document.getElementById('filtro_tipo_pagamento').selectedOptions[0]?.text;
+                textoFiltros.push(`<strong>Tipo:</strong> ${tipoTexto}`);
+                filtrosAtivos++;
+            }
+            
+            if (horasMin !== null) {
+                textoFiltros.push(`<strong>Horas Mínimas:</strong> ${horasMin}h`);
+                filtrosAtivos++;
+            }
+            
+            if (horasMax !== null) {
+                textoFiltros.push(`<strong>Horas Máximas:</strong> ${horasMax}h`);
+                filtrosAtivos++;
+            }
+            
+            if (valorMin !== null) {
+                textoFiltros.push(`<strong>Valor Mínimo:</strong> R$ ${valorMin.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`);
+                filtrosAtivos++;
+            }
+            
+            if (valorMax !== null) {
+                textoFiltros.push(`<strong>Valor Máximo:</strong> R$ ${valorMax.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`);
+                filtrosAtivos++;
+            }
+            
+            // Atualiza contador de filtros
+            const countBadge = document.getElementById('filtros_ativos_count');
+            if (filtrosAtivos > 0) {
+                countBadge.textContent = filtrosAtivos;
+                countBadge.style.display = 'inline-block';
+            } else {
+                countBadge.style.display = 'none';
+            }
+            
+            // Mostra resumo dos filtros
+            const resumoDiv = document.getElementById('filtros_ativos_resumo');
+            const textoDiv = document.getElementById('filtros_ativos_texto');
+            
+            if (filtrosAtivos > 0) {
+                textoDiv.innerHTML = textoFiltros.join(' • ');
+                resumoDiv.classList.remove('d-none');
+            } else {
+                resumoDiv.classList.add('d-none');
+            }
+            
+            // Redesenha tabela
+            datatable.draw();
+            
+            // Fecha painel de filtros após aplicar
+            contentDiv.classList.add('d-none');
+            
+            // Mostra notificação
+            if (filtrosAtivos > 0) {
+                Swal.fire({
+                    text: `${filtrosAtivos} filtro(s) aplicado(s) com sucesso!`,
+                    icon: "success",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    },
+                    timer: 2000
+                });
+            }
+        };
+        
+        // Botão aplicar filtros
+        const btnAplicar = document.getElementById('aplicar_filtros');
+        if (btnAplicar) {
+            btnAplicar.addEventListener('click', aplicarFiltros);
+        }
+        
+        // Botão limpar filtros
+        const btnLimpar = document.getElementById('limpar_filtros');
+        if (btnLimpar) {
+            btnLimpar.addEventListener('click', function() {
+                // Limpa todos os campos
+                document.getElementById('filtro_colaborador').value = '';
+                document.getElementById('filtro_data_inicio').value = '';
+                document.getElementById('filtro_data_fim').value = '';
+                document.getElementById('filtro_tipo_pagamento').value = '';
+                document.getElementById('filtro_horas_min').value = '';
+                document.getElementById('filtro_horas_max').value = '';
+                document.getElementById('filtro_valor_min').value = '';
+                document.getElementById('filtro_valor_max').value = '';
+                
+                // Remove filtros do DataTable
+                $.fn.dataTable.ext.search = [];
+                
+                // Esconde resumo
+                document.getElementById('filtros_ativos_resumo').classList.add('d-none');
+                document.getElementById('filtros_ativos_count').style.display = 'none';
+                
+                // Redesenha tabela
+                datatable.draw();
+                
+                Swal.fire({
+                    text: "Filtros removidos!",
+                    icon: "info",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    },
+                    timer: 1500
+                });
+            });
+        }
+        
+        // Permite aplicar filtros com Enter nos campos
+        const camposFiltro = [
+            'filtro_data_inicio', 'filtro_data_fim', 
+            'filtro_horas_min', 'filtro_horas_max',
+            'filtro_valor_min', 'filtro_valor_max'
+        ];
+        
+        camposFiltro.forEach(function(id) {
+            const campo = document.getElementById(id);
+            if (campo) {
+                campo.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        aplicarFiltros();
+                    }
+                });
+            }
+        });
+    };
+    
+    var atualizarEstatisticas = function() {
+        if (!datatable) return;
+        
+        let totalHoras = 0;
+        let totalValor = 0;
+        let totalBancoHoras = 0;
+        let totalRegistros = 0;
+        
+        // Percorre apenas as linhas visíveis (após filtros)
+        datatable.rows({search: 'applied'}).every(function() {
+            const data = this.data();
+            totalRegistros++;
+            
+            // Extrai quantidade de horas (coluna 4)
+            const horasStr = data[4].replace(/[^0-9,\-]/g, '');
+            const horas = parseFloat(horasStr.replace(',', '.')) || 0;
+            totalHoras += Math.abs(horas); // Soma valor absoluto
+            
+            // Verifica se é banco de horas (coluna 5)
+            const tipoHtml = data[5].toLowerCase();
+            if (tipoHtml.includes('banco de horas') || tipoHtml.includes('remoção')) {
+                totalBancoHoras++;
+            }
+            
+            // Extrai valor total (coluna 8) - apenas se for em R$
+            const valorHtml = data[8];
+            const valorMatch = valorHtml.match(/R\$\s*([\d.,]+)/);
+            if (valorMatch) {
+                const valor = parseFloat(valorMatch[1].replace(/\./g, '').replace(',', '.'));
+                totalValor += valor;
+            }
+        });
+        
+        // Atualiza os cards de estatísticas
+        document.getElementById('stat_total_horas').textContent = 
+            totalHoras.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + 'h';
+        
+        document.getElementById('stat_total_valor').textContent = 
+            'R$ ' + totalValor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        document.getElementById('stat_banco_horas').textContent = totalBancoHoras;
+        
+        document.getElementById('stat_total_registros').textContent = totalRegistros;
     };
     
     return {
         init: function() {
             initDatatable();
-        }
+            initFiltrosAvancados();
+            
+            // Atualiza estatísticas inicialmente e sempre que a tabela for redesenhada
+            if (datatable) {
+                atualizarEstatisticas();
+                datatable.on('draw', function() {
+                    atualizarEstatisticas();
+                });
+            }
+        },
+        atualizarEstatisticas: atualizarEstatisticas
     };
 }();
 
@@ -1085,6 +1622,278 @@ function waitForDependencies() {
     }
 }
 waitForDependencies();
+
+// ========================================
+// FUNÇÕES DE EXPORTAÇÃO
+// ========================================
+
+// Função para obter dados filtrados
+function obterDadosFiltrados() {
+    const table = jQuery('#kt_horas_extras_table').DataTable();
+    const dados = [];
+    
+    // Pega apenas as linhas visíveis (após filtros)
+    table.rows({search: 'applied'}).every(function() {
+        const row = this.node();
+        const data = this.data();
+        
+        // Extrai dados limpos (sem HTML)
+        const colaboradorNome = jQuery(row).find('td:nth-child(2)').text().trim();
+        const empresaNome = jQuery(row).find('td:nth-child(3)').text().trim();
+        const data_trabalho = jQuery(row).find('td:nth-child(4)').text().trim();
+        const quantidade_horas = jQuery(row).find('td:nth-child(5)').text().trim();
+        const tipo = jQuery(row).find('td:nth-child(6)').text().trim();
+        const valor_hora = jQuery(row).find('td:nth-child(7)').text().trim();
+        const percentual = jQuery(row).find('td:nth-child(8)').text().trim();
+        const valor_total = jQuery(row).find('td:nth-child(9)').text().trim();
+        
+        dados.push({
+            colaborador: colaboradorNome,
+            empresa: empresaNome,
+            data: data_trabalho,
+            horas: quantidade_horas,
+            tipo: tipo,
+            valor_hora: valor_hora,
+            percentual: percentual,
+            valor_total: valor_total
+        });
+    });
+    
+    return dados;
+}
+
+// Exportar para CSV
+document.getElementById('exportar_csv')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    
+    const dados = obterDadosFiltrados();
+    
+    if (dados.length === 0) {
+        Swal.fire({
+            text: "Não há dados para exportar!",
+            icon: "warning",
+            buttonsStyling: false,
+            confirmButtonText: "Ok",
+            customClass: {
+                confirmButton: "btn btn-primary"
+            }
+        });
+        return;
+    }
+    
+    // Monta CSV
+    let csv = 'Colaborador;Empresa;Data;Horas;Tipo;Valor Hora;% Adicional;Valor Total\n';
+    
+    dados.forEach(function(linha) {
+        csv += `"${linha.colaborador}";"${linha.empresa}";"${linha.data}";"${linha.horas}";"${linha.tipo}";"${linha.valor_hora}";"${linha.percentual}";"${linha.valor_total}"\n`;
+    });
+    
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `horas_extras_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    Swal.fire({
+        text: `${dados.length} registro(s) exportado(s) com sucesso!`,
+        icon: "success",
+        buttonsStyling: false,
+        confirmButtonText: "Ok",
+        customClass: {
+            confirmButton: "btn btn-success"
+        },
+        timer: 2000
+    });
+});
+
+// Exportar para Excel (usando bibliotecas modernas)
+document.getElementById('exportar_excel')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    
+    const dados = obterDadosFiltrados();
+    
+    if (dados.length === 0) {
+        Swal.fire({
+            text: "Não há dados para exportar!",
+            icon: "warning",
+            buttonsStyling: false,
+            confirmButtonText: "Ok",
+            customClass: {
+                confirmButton: "btn btn-primary"
+            }
+        });
+        return;
+    }
+    
+    // Prepara dados para Excel
+    const dadosExcel = dados.map(function(linha) {
+        return {
+            'Colaborador': linha.colaborador,
+            'Empresa': linha.empresa,
+            'Data': linha.data,
+            'Horas': linha.horas,
+            'Tipo': linha.tipo,
+            'Valor Hora': linha.valor_hora,
+            '% Adicional': linha.percentual,
+            'Valor Total': linha.valor_total
+        };
+    });
+    
+    // Carrega biblioteca SheetJS se não estiver carregada
+    if (typeof XLSX === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js';
+        script.onload = function() {
+            exportarParaExcel(dadosExcel);
+        };
+        document.head.appendChild(script);
+    } else {
+        exportarParaExcel(dadosExcel);
+    }
+});
+
+function exportarParaExcel(dadosExcel) {
+    const ws = XLSX.utils.json_to_sheet(dadosExcel);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Horas Extras');
+    
+    // Ajusta largura das colunas
+    const colWidths = [
+        { wch: 30 }, // Colaborador
+        { wch: 25 }, // Empresa
+        { wch: 12 }, // Data
+        { wch: 10 }, // Horas
+        { wch: 15 }, // Tipo
+        { wch: 15 }, // Valor Hora
+        { wch: 12 }, // % Adicional
+        { wch: 15 }  // Valor Total
+    ];
+    ws['!cols'] = colWidths;
+    
+    XLSX.writeFile(wb, `horas_extras_${new Date().toISOString().split('T')[0]}.xlsx`);
+    
+    Swal.fire({
+        text: `${dadosExcel.length} registro(s) exportado(s) com sucesso!`,
+        icon: "success",
+        buttonsStyling: false,
+        confirmButtonText: "Ok",
+        customClass: {
+            confirmButton: "btn btn-success"
+        },
+        timer: 2000
+    });
+}
+
+// Exportar para PDF
+document.getElementById('exportar_pdf')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    
+    const dados = obterDadosFiltrados();
+    
+    if (dados.length === 0) {
+        Swal.fire({
+            text: "Não há dados para exportar!",
+            icon: "warning",
+            buttonsStyling: false,
+            confirmButtonText: "Ok",
+            customClass: {
+                confirmButton: "btn btn-primary"
+            }
+        });
+        return;
+    }
+    
+    // Carrega jsPDF e autoTable se não estiverem carregadas
+    if (typeof jsPDF === 'undefined') {
+        const script1 = document.createElement('script');
+        script1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        
+        const script2 = document.createElement('script');
+        script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.7.1/jspdf.plugin.autotable.min.js';
+        
+        script1.onload = function() {
+            document.head.appendChild(script2);
+            script2.onload = function() {
+                exportarParaPDF(dados);
+            };
+        };
+        document.head.appendChild(script1);
+    } else {
+        exportarParaPDF(dados);
+    }
+});
+
+function exportarParaPDF(dados) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4'); // Modo paisagem
+    
+    // Título
+    doc.setFontSize(16);
+    doc.text('Relatório de Horas Extras', 14, 15);
+    
+    // Data de geração
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 22);
+    
+    // Prepara dados para tabela
+    const corpo = dados.map(function(linha) {
+        return [
+            linha.colaborador,
+            linha.empresa,
+            linha.data,
+            linha.horas,
+            linha.tipo,
+            linha.valor_hora,
+            linha.percentual,
+            linha.valor_total
+        ];
+    });
+    
+    // Gera tabela
+    doc.autoTable({
+        head: [['Colaborador', 'Empresa', 'Data', 'Horas', 'Tipo', 'Valor Hora', '% Adic.', 'Valor Total']],
+        body: corpo,
+        startY: 28,
+        styles: {
+            fontSize: 8,
+            cellPadding: 2
+        },
+        headStyles: {
+            fillColor: [54, 153, 255],
+            textColor: 255,
+            fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+            fillColor: [245, 245, 245]
+        },
+        margin: { top: 28 }
+    });
+    
+    // Estatísticas no final
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.text(`Total de registros: ${dados.length}`, 14, finalY);
+    
+    // Download
+    doc.save(`horas_extras_${new Date().toISOString().split('T')[0]}.pdf`);
+    
+    Swal.fire({
+        text: `${dados.length} registro(s) exportado(s) com sucesso!`,
+        icon: "success",
+        buttonsStyling: false,
+        confirmButtonText: "Ok",
+        customClass: {
+            confirmButton: "btn btn-success"
+        },
+        timer: 2000
+    });
+}
 </script>
 
 <!--begin::Select2 CSS-->
@@ -1111,6 +1920,65 @@ waitForDependencies();
     .select2-container .select2-selection--single .select2-selection__rendered {
         display: flex !important;
         align-items: center !important;
+    }
+    
+    /* Animação do painel de filtros */
+    #kt_filtros_avancados_content {
+        transition: all 0.3s ease-in-out;
+        max-height: 1000px;
+        overflow: hidden;
+    }
+    
+    #kt_filtros_avancados_content.d-none {
+        max-height: 0;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+        opacity: 0;
+    }
+    
+    /* Animação do ícone de filtro */
+    .rotate-180 {
+        transform: rotate(180deg);
+        transition: transform 0.3s ease-in-out;
+    }
+    
+    /* Destaque nos campos com filtro ativo */
+    .form-control:not(:placeholder-shown),
+    .form-select:not([value=""]) {
+        border-color: #3699ff !important;
+        background-color: #f1faff !important;
+    }
+    
+    /* Estilo do badge de contagem */
+    #filtros_ativos_count {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.1);
+        }
+    }
+    
+    /* Melhora visual da tabela */
+    #kt_horas_extras_table tbody tr {
+        transition: all 0.2s ease;
+    }
+    
+    #kt_horas_extras_table tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: scale(1.01);
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    
+    /* Destaque nas badges */
+    .badge {
+        font-weight: 600;
+        padding: 0.5rem 0.75rem;
     }
 </style>
 <!--end::Select2 CSS-->
