@@ -1932,8 +1932,8 @@ function exportarParaPDF(dados) {
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 <style>
-    /* Ajusta a altura do Select2 */
-    .select2-container .select2-selection--single {
+    /* Ajusta a altura do Select2 (somente nos filtros avançados) */
+    #kt_filtros_avancados_content .select2-container .select2-selection--single {
         height: 44px !important;
         padding: 0.75rem 1rem !important;
         display: flex !important;
@@ -1942,56 +1942,31 @@ function exportarParaPDF(dados) {
         border: 1px solid #e4e6ef !important;
     }
     
-    .select2-container--default .select2-selection--single .select2-selection__rendered {
+    #kt_filtros_avancados_content .select2-container--default .select2-selection--single .select2-selection__rendered {
         line-height: 44px !important;
         padding-left: 0 !important;
         color: #181c32 !important;
         font-weight: 400 !important;
     }
     
-    .select2-container--default .select2-selection--single .select2-selection__arrow {
+    #kt_filtros_avancados_content .select2-container--default .select2-selection--single .select2-selection__arrow {
         height: 42px !important;
     }
     
-    .select2-container .select2-selection--single .select2-selection__rendered {
+    #kt_filtros_avancados_content .select2-container .select2-selection--single .select2-selection__rendered {
         display: flex !important;
         align-items: center !important;
         color: #181c32 !important;
     }
     
-    .select2-container--default .select2-selection--single .select2-selection__placeholder {
+    #kt_filtros_avancados_content .select2-container--default .select2-selection--single .select2-selection__placeholder {
         color: #a1a5b7 !important;
     }
     
-    /* Força cor do texto em todos os Select2 - importante para sobrescrever estilos conflitantes */
-    .select2-selection__rendered,
-    .select2-selection__rendered *,
-    .select2-container--default .select2-selection--single .select2-selection__rendered,
-    .select2-container--default .select2-selection--single .select2-selection__rendered * {
-        color: #181c32 !important;
-    }
-    
-    /* Texto do colaborador selecionado no modal */
-    #kt_modal_horaextra .select2-selection__rendered,
-    #kt_modal_horaextra .select2-selection__rendered * {
-        color: #181c32 !important;
-    }
-    
-    /* Texto do colaborador no filtro */
+    /* Força cor do texto apenas nos Select2 dos filtros */
     #kt_filtros_avancados_content .select2-selection__rendered,
     #kt_filtros_avancados_content .select2-selection__rendered * {
         color: #181c32 !important;
-    }
-    
-    /* Dropdown options - garante texto escuro */
-    .select2-results__option,
-    .select2-results__option * {
-        color: #181c32 !important;
-    }
-    
-    .select2-results__option--highlighted,
-    .select2-results__option--highlighted * {
-        color: #ffffff !important;
     }
     
     /* Animação do painel de filtros */
@@ -2102,58 +2077,54 @@ function exportarParaPDF(dados) {
         font-weight: 500 !important;
     }
     
-    /* Dropdown do Select2 - Fundo e texto */
-    .select2-container--default .select2-results__option {
+    /* Dropdown do Select2 - Fundo e texto (apenas filtros) */
+    #select2-filtro_colaborador-results .select2-results__option,
+    #select2-filtro_tipo_pagamento-results .select2-results__option {
         background-color: #ffffff !important;
         color: #181c32 !important;
         padding: 8px 12px !important;
     }
     
-    .select2-container--default .select2-results__option:hover {
-        background-color: #f5f8fa !important;
-        color: #181c32 !important;
-    }
-    
-    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+    #select2-filtro_colaborador-results .select2-results__option--highlighted[aria-selected],
+    #select2-filtro_tipo_pagamento-results .select2-results__option--highlighted[aria-selected] {
         background-color: #3699ff !important;
         color: #ffffff !important;
     }
     
-    .select2-container--default .select2-results__option[aria-selected="true"] {
+    #select2-filtro_colaborador-results .select2-results__option[aria-selected="true"],
+    #select2-filtro_tipo_pagamento-results .select2-results__option[aria-selected="true"] {
         background-color: #e8f4fc !important;
         color: #3699ff !important;
         font-weight: 500 !important;
     }
     
-    /* Container do dropdown */
-    .select2-container--default .select2-results {
+    /* Container do dropdown dos filtros */
+    #select2-filtro_colaborador-results,
+    #select2-filtro_tipo_pagamento-results {
         background-color: #ffffff !important;
     }
     
-    .select2-dropdown {
-        background-color: #ffffff !important;
-        border: 1px solid #e4e6ef !important;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1) !important;
-    }
-    
-    /* Campo de busca dentro do dropdown */
-    .select2-container--default .select2-search--dropdown .select2-search__field {
+    /* Campo de busca dentro do dropdown (apenas filtros) */
+    input.select2-search__field[aria-controls="select2-filtro_colaborador-results"],
+    input.select2-search__field[aria-controls="select2-filtro_tipo_pagamento-results"] {
         background-color: #f5f8fa !important;
         border: 1px solid #e4e6ef !important;
         color: #181c32 !important;
         padding: 8px 12px !important;
     }
     
-    .select2-container--default .select2-search--dropdown .select2-search__field:focus {
+    input.select2-search__field[aria-controls="select2-filtro_colaborador-results"]:focus,
+    input.select2-search__field[aria-controls="select2-filtro_tipo_pagamento-results"]:focus {
         background-color: #ffffff !important;
         border-color: #3699ff !important;
         outline: none !important;
     }
     
-    /* Mensagem "Nenhum resultado" */
-    .select2-container--default .select2-results__option.select2-results__message {
+    /* Mensagem "Nenhum resultado" (apenas filtros) */
+    #select2-filtro_colaborador-results .select2-results__message,
+    #select2-filtro_tipo_pagamento-results .select2-results__message {
         background-color: #ffffff !important;
-        color: #a1a5b7 !important;
+        color: #181c32 !important;
     }
     
     /* Campos de data com cor de fundo consistente */
