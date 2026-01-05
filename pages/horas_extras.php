@@ -2077,55 +2077,81 @@ function exportarParaPDF(dados) {
         font-weight: 500 !important;
     }
     
-    /* Dropdown do Select2 - Fundo e texto (apenas filtros) */
-    #select2-filtro_colaborador-results .select2-results__option,
-    #select2-filtro_tipo_pagamento-results .select2-results__option {
-        background-color: #1f2128 !important;
-        color: #e1e3ea !important;
-        padding: 8px 12px !important;
+    /* ============================================
+       DROPDOWN SELECT2 DO FILTRO - TEMA ESCURO
+       O dropdown é renderizado no body, não dentro do painel
+       Usamos o ID do select para identificar o dropdown correto
+       ============================================ */
+    
+    /* Container principal do dropdown do filtro colaborador */
+    body > .select2-container--open[id*="filtro_colaborador"] .select2-dropdown,
+    body > .select2-container--open .select2-dropdown[id*="filtro_colaborador"],
+    .select2-container--open .select2-dropdown {
+        background-color: #1e1e2d !important;
+        border: 1px solid #2b2b3c !important;
     }
     
-    #select2-filtro_colaborador-results .select2-results__option--highlighted[aria-selected],
-    #select2-filtro_tipo_pagamento-results .select2-results__option--highlighted[aria-selected] {
+    /* Lista de resultados */
+    .select2-container--open .select2-results {
+        background-color: #1e1e2d !important;
+    }
+    
+    .select2-container--open .select2-results__options {
+        background-color: #1e1e2d !important;
+    }
+    
+    /* Cada opção da lista - FORÇAR texto claro */
+    .select2-container--open .select2-results__option {
+        background-color: #1e1e2d !important;
+        color: #ffffff !important;
+        padding: 10px 12px !important;
+    }
+    
+    /* Opção em hover/destaque */
+    .select2-container--open .select2-results__option--highlighted,
+    .select2-container--open .select2-results__option--highlighted[aria-selected],
+    .select2-container--open .select2-results__option:hover {
         background-color: #3699ff !important;
         color: #ffffff !important;
     }
     
-    #select2-filtro_colaborador-results .select2-results__option[aria-selected="true"],
-    #select2-filtro_tipo_pagamento-results .select2-results__option[aria-selected="true"] {
+    /* Opção já selecionada */
+    .select2-container--open .select2-results__option[aria-selected="true"],
+    .select2-container--open .select2-results__option--selected {
         background-color: #252b3b !important;
         color: #7bb0ff !important;
         font-weight: 500 !important;
     }
     
-    /* Correção de contraste nas opções do filtro (garante texto claro) */
-    #select2-filtro_colaborador-results,
-    #select2-filtro_colaborador-results li.select2-results__option,
-    #select2-filtro_colaborador-results li.select2-results__option * {
-        color: #e1e3ea !important;
-        background-color: #1f2128 !important;
-    }
-    /* Mais especificidade para evitar override do tema */
-    #select2-filtro_colaborador-results .select2-results__options {
-        background-color: #1f2128 !important;
-    }
-    #select2-filtro_colaborador-results .select2-results__option {
-        background-color: #1f2128 !important;
-        color: #e1e3ea !important;
-    }
-    #select2-filtro_colaborador-results .select2-results__option--highlighted[aria-selected] {
-        background-color: #3699ff !important;
-        color: #ffffff !important;
-    }
-    #select2-filtro_colaborador-results .select2-results__option[aria-selected="true"] {
-        background-color: #2a2d3a !important;
-        color: #c8ddff !important;
+    /* Campo de busca dentro do dropdown */
+    .select2-container--open .select2-search--dropdown {
+        background-color: #1e1e2d !important;
+        padding: 8px !important;
     }
     
-    /* Container do dropdown dos filtros */
-    #select2-filtro_colaborador-results,
-    #select2-filtro_tipo_pagamento-results {
-        background-color: #1f2128 !important;
+    .select2-container--open .select2-search--dropdown .select2-search__field {
+        background-color: #252834 !important;
+        border: 1px solid #2b2b3c !important;
+        color: #ffffff !important;
+        padding: 8px 12px !important;
+        border-radius: 4px !important;
+    }
+    
+    .select2-container--open .select2-search--dropdown .select2-search__field:focus {
+        background-color: #2d3040 !important;
+        border-color: #3699ff !important;
+        outline: none !important;
+    }
+    
+    .select2-container--open .select2-search--dropdown .select2-search__field::placeholder {
+        color: #7e8299 !important;
+    }
+    
+    /* Mensagem "Nenhum resultado encontrado" */
+    .select2-container--open .select2-results__message {
+        background-color: #1e1e2d !important;
+        color: #7e8299 !important;
+        padding: 10px 12px !important;
     }
     
     /* Campo de busca dentro do dropdown (apenas filtros) */
