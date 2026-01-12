@@ -93,6 +93,35 @@ function get_colaboradores_disponiveis($pdo, $usuario) {
                 ORDER BY nome_completo
             ");
             $stmt->execute([$setor_id]);
+        } elseif ($usuario['role'] === 'COLABORADOR') {
+            // Colaboradores podem ver outros colaboradores da mesma empresa para enviar feedbacks
+            $colaborador_id = $usuario['colaborador_id'] ?? null;
+            $empresa_id = $usuario['empresa_id'] ?? null;
+            
+            if (empty($colaborador_id)) {
+                return [];
+            }
+            
+            // Busca dados do colaborador logado para obter empresa_id se não estiver na sessão
+            if (empty($empresa_id)) {
+                $stmt_colab = $pdo->prepare("SELECT empresa_id FROM colaboradores WHERE id = ?");
+                $stmt_colab->execute([$colaborador_id]);
+                $colab_data = $stmt_colab->fetch();
+                $empresa_id = $colab_data['empresa_id'] ?? null;
+            }
+            
+            if (empty($empresa_id)) {
+                return [];
+            }
+            
+            // Busca todos os colaboradores da mesma empresa, exceto ele mesmo
+            $stmt = $pdo->prepare("
+                SELECT id, nome_completo, foto 
+                FROM colaboradores 
+                WHERE empresa_id = ? AND id != ? AND status = 'ativo' 
+                ORDER BY nome_completo
+            ");
+            $stmt->execute([$empresa_id, $colaborador_id]);
         } else {
             return [];
         }

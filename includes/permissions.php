@@ -682,6 +682,12 @@ function can_see_dashboard_card($card_key) {
         return true;
     }
     
+    // Cards de emoções sempre visíveis para colaboradores
+    $cards_emocao = ['card_emocao_diaria', 'card_historico_emocoes'];
+    if (in_array($card_key, $cards_emocao) && is_colaborador()) {
+        return true;
+    }
+    
     $card_permissions = get_dashboard_cards_permissions();
     
     // Se não há permissões customizadas, permite acesso (comportamento padrão)
