@@ -51,6 +51,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $e) {
             redirect('promocoes.php', 'Erro ao salvar: ' . $e->getMessage(), 'error');
         }
+    } elseif ($action === 'delete') {
+        $promocao_id = (int)($_POST['promocao_id'] ?? 0);
+        
+        if (empty($promocao_id)) {
+            redirect('promocoes.php', 'ID da promoção não informado!', 'error');
+        }
+        
+        try {
+            // Busca dados da promoção
+            $stmt = $pdo->prepare("
+                SELECT p.*, c.salario as salario_atual 
+                FROM promocoes p
+                INNER JOIN colaboradores c ON p.colaborador_id = c.id
+                WHERE p.id = ?
+            ");
+            $stmt->execute([$promocao_id]);
+            $promocao = $stmt->fetch();
+            
+            if (!$promocao) {
+                redirect('promocoes.php', 'Promoção não encontrada!', 'error');
+            }
+            
+            // Verifica se o salário atual do colaborador corresponde ao salário_novo da promoção
+            // Se sim, reverte para o salário anterior
+            if (abs($promocao['salario_atual'] - $promocao['salario_novo']) < 0.01) {
+                // Reverte salário para o valor anterior
+                $stmt = $pdo->prepare("UPDATE colaboradores SET salario = ? WHERE id = ?");
+                $stmt->execute([$promocao['salario_anterior'], $promocao['colaborador_id']]);
+            }
+            
+            // Deleta a promoção
+            $stmt = $pdo->prepare("DELETE FROM promocoes WHERE id = ?");
+            $stmt->execute([$promocao_id]);
+            
+            redirect('promocoes.php', 'Promoção deletada e salário revertido com sucesso!');
+        } catch (PDOException $e) {
+            redirect('promocoes.php', 'Erro ao deletar: ' . $e->getMessage(), 'error');
+        }
     }
 }
 
@@ -186,6 +224,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <th class="min-w-100px">Data</th>
                             <th class="min-w-200px">Motivo</th>
                             <th class="min-w-150px">Registrado por</th>
+                            <th class="text-end min-w-100px">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="fw-semibold text-gray-600">
@@ -205,6 +244,19 @@ require_once __DIR__ . '/../includes/header.php';
                             <td><?= date('d/m/Y', strtotime($promocao['data_promocao'])) ?></td>
                             <td><?= htmlspecialchars($promocao['motivo']) ?></td>
                             <td><?= htmlspecialchars($promocao['usuario_nome'] ?? '-') ?></td>
+                            <td class="text-end">
+                                <?php if (has_role(['ADMIN', 'RH'])): ?>
+                                <button type="button" class="btn btn-sm btn-light-danger" onclick="deletarPromocao(<?= $promocao['id'] ?>, '<?= htmlspecialchars(addslashes($promocao['colaborador_nome'])) ?>')" title="Deletar/Reverter Promoção">
+                                    <i class="ki-duotone ki-trash fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                        <span class="path4"></span>
+                                        <span class="path5"></span>
+                                    </i>
+                                </button>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -312,8 +364,16 @@ function aplicarMascarasSalario() {
 }
 
 // Carrega salário atual ao selecionar colaborador
-document.getElementById('colaborador_id')?.addEventListener('change', function() {
-    const option = this.options[this.selectedIndex];
+function atualizarSalarioAnterior() {
+    const select = document.getElementById('colaborador_id');
+    if (!select) return;
+    
+    const option = select.options[select.selectedIndex];
+    if (!option || !option.value) {
+        document.getElementById('salario_anterior').value = '';
+        return;
+    }
+    
     const salario = parseFloat(option.dataset.salario || 0);
     const salarioAnterior = document.getElementById('salario_anterior');
     const salarioNovo = document.getElementById('salario_novo');
@@ -329,6 +389,14 @@ document.getElementById('colaborador_id')?.addEventListener('change', function()
     if (salarioNovo) {
         salarioNovo.value = '';
     }
+}
+
+// Listener para mudança no select
+document.getElementById('colaborador_id')?.addEventListener('change', atualizarSalarioAnterior);
+
+// Também atualiza quando Select2 mudar (evento do Select2)
+jQuery(document).on('change', '#colaborador_id', function() {
+    atualizarSalarioAnterior();
 });
 
 // Aplica máscaras quando a página carregar
@@ -430,6 +498,11 @@ document.getElementById('kt_modal_promocao')?.addEventListener('shown.bs.modal',
             });
             
             console.log('Select2 inicializado com sucesso!');
+            
+            // Adiciona listener para mudança no Select2
+            $select.on('change', function() {
+                atualizarSalarioAnterior();
+            });
         }
     }, 350);
 });
@@ -475,6 +548,73 @@ function waitForDependencies() {
     }
 }
 waitForDependencies();
+</script>
+
+<!--begin::SweetAlert2-->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+// Função para deletar/reverter promoção
+function deletarPromocao(promocaoId, colaboradorNome) {
+    if (typeof Swal === 'undefined') {
+        if (confirm('Tem certeza que deseja deletar e reverter esta promoção? O salário será revertido para o valor anterior.')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'promocoes.php';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'delete';
+            
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'promocao_id';
+            idInput.value = promocaoId;
+            
+            form.appendChild(actionInput);
+            form.appendChild(idInput);
+            document.body.appendChild(form);
+            form.submit();
+        }
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Tem certeza?',
+        html: 'Você está prestes a <strong>deletar e reverter</strong> a promoção do colaborador <strong>' + colaboradorNome + '</strong>.<br><br>O salário será revertido para o valor anterior e o registro será removido.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, deletar e reverter!',
+        cancelButtonText: 'Cancelar',
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: 'btn fw-bold btn-danger',
+            cancelButton: 'btn fw-bold btn-light'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Cria formulário para enviar POST
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'promocoes.php';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'delete';
+            
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'promocao_id';
+            idInput.value = promocaoId;
+            
+            form.appendChild(actionInput);
+            form.appendChild(idInput);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
 </script>
 
 <!--begin::Select2 CSS-->

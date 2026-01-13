@@ -230,6 +230,27 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $manuais_individuais = $stmt->fetchAll();
 
+// Busca data de desligamento (se houver)
+$data_desligamento = null;
+$tipo_demissao = null;
+$motivo_demissao = null;
+if ($colaborador['status'] === 'desligado') {
+    $stmt = $pdo->prepare("
+        SELECT data_demissao, tipo_demissao, motivo 
+        FROM demissoes 
+        WHERE colaborador_id = ? 
+        ORDER BY data_demissao DESC, created_at DESC 
+        LIMIT 1
+    ");
+    $stmt->execute([$id]);
+    $demissao = $stmt->fetch();
+    if ($demissao) {
+        $data_desligamento = $demissao['data_demissao'];
+        $tipo_demissao = $demissao['tipo_demissao'];
+        $motivo_demissao = $demissao['motivo'];
+    }
+}
+
 // Calcula percentual geral de conclusão
 $lms_percentual_geral = 0;
 if ($lms_stats['total_aulas_disponiveis'] > 0) {
@@ -591,6 +612,33 @@ require_once __DIR__ . '/../includes/header.php';
                                                                     <th class="text-gray-600 fw-semibold">Email Pessoal</th>
                                                                     <td class="text-gray-800"><?= $colaborador['email_pessoal'] ? htmlspecialchars($colaborador['email_pessoal']) : '-' ?></td>
                                                                 </tr>
+                                                                <?php if ($colaborador['status'] === 'desligado' && $data_desligamento): ?>
+                                                                <tr>
+                                                                    <th class="text-gray-600 fw-semibold">Data de Desligamento</th>
+                                                                    <td class="text-gray-800">
+                                                                        <span class="badge badge-light-danger me-2"><?= formatar_data($data_desligamento) ?></span>
+                                                                        <?php 
+                                                                        $tipos_demissao = [
+                                                                            'sem_justa_causa' => 'Sem Justa Causa',
+                                                                            'justa_causa' => 'Justa Causa',
+                                                                            'pedido_demissao' => 'Pedido de Demissão',
+                                                                            'aposentadoria' => 'Aposentadoria',
+                                                                            'falecimento' => 'Falecimento',
+                                                                            'outro' => 'Outro'
+                                                                        ];
+                                                                        if ($tipo_demissao && isset($tipos_demissao[$tipo_demissao])): 
+                                                                        ?>
+                                                                        <span class="text-muted fs-7">(<?= $tipos_demissao[$tipo_demissao] ?>)</span>
+                                                                        <?php endif; ?>
+                                                                    </td>
+                                                                </tr>
+                                                                <?php if ($motivo_demissao): ?>
+                                                                <tr>
+                                                                    <th class="text-gray-600 fw-semibold">Motivo do Desligamento</th>
+                                                                    <td class="text-gray-800"><?= htmlspecialchars($motivo_demissao) ?></td>
+                                                                </tr>
+                                                                <?php endif; ?>
+                                                                <?php endif; ?>
                                                             </tbody>
                                                         </table>
                                                     </div>
@@ -645,6 +693,27 @@ require_once __DIR__ . '/../includes/header.php';
                                                                     <th class="text-gray-600 fw-semibold">Data de Início</th>
                                                                     <td class="text-gray-800"><?= formatar_data($colaborador['data_inicio']) ?></td>
                                                                 </tr>
+                                                                <?php if ($colaborador['status'] === 'desligado' && $data_desligamento): ?>
+                                                                <tr>
+                                                                    <th class="text-gray-600 fw-semibold">Data de Desligamento</th>
+                                                                    <td class="text-gray-800">
+                                                                        <span class="badge badge-light-danger me-2"><?= formatar_data($data_desligamento) ?></span>
+                                                                        <?php 
+                                                                        $tipos_demissao = [
+                                                                            'sem_justa_causa' => 'Sem Justa Causa',
+                                                                            'justa_causa' => 'Justa Causa',
+                                                                            'pedido_demissao' => 'Pedido de Demissão',
+                                                                            'aposentadoria' => 'Aposentadoria',
+                                                                            'falecimento' => 'Falecimento',
+                                                                            'outro' => 'Outro'
+                                                                        ];
+                                                                        if ($tipo_demissao && isset($tipos_demissao[$tipo_demissao])): 
+                                                                        ?>
+                                                                        <span class="text-muted fs-7">(<?= $tipos_demissao[$tipo_demissao] ?>)</span>
+                                                                        <?php endif; ?>
+                                                                    </td>
+                                                                </tr>
+                                                                <?php endif; ?>
                                                                 <tr>
                                                                     <th class="text-gray-600 fw-semibold">Tipo de Contrato</th>
                                                                     <td class="text-gray-800"><?= htmlspecialchars($colaborador['tipo_contrato']) ?></td>

@@ -153,7 +153,7 @@ function get_colaboradores_disponiveis($pdo, $usuario) {
  * @param string $name Nome do campo (padrão: 'colaborador_id')
  * @param string $id ID do campo (padrão: mesmo que name)
  * @param int|null $selected_id ID do colaborador selecionado
- * @param array $colaboradores Array de colaboradores
+ * @param array $colaboradores Array de colaboradores (pode conter campos extras como 'salario', etc.)
  * @param bool $required Se o campo é obrigatório
  * @param string $class Classes CSS adicionais
  * @return string HTML do select
@@ -178,10 +178,21 @@ function render_select_colaborador($name = 'colaborador_id', $id = null, $select
         $foto_url = !empty($colab['foto']) ? '../' . htmlspecialchars($colab['foto']) : null;
         
         // Armazena dados do colaborador em data attributes para uso no JavaScript
-        $data_foto = $foto_url ? ' data-foto="' . htmlspecialchars($foto_url) . '"' : '';
-        $data_nome = ' data-nome="' . htmlspecialchars($colab['nome_completo']) . '"';
+        $data_attrs = [];
+        $data_attrs[] = $foto_url ? 'data-foto="' . htmlspecialchars($foto_url) . '"' : '';
+        $data_attrs[] = 'data-nome="' . htmlspecialchars($colab['nome_completo']) . '"';
         
-        $html .= '<option value="' . $colab['id'] . '"' . ($selected ? ' ' . $selected : '') . $data_foto . $data_nome . '>';
+        // Adiciona atributos customizados se existirem (ex: salario, empresa_id, etc.)
+        $custom_attrs = ['salario', 'empresa_id', 'setor_id', 'cargo_id'];
+        foreach ($custom_attrs as $attr) {
+            if (isset($colab[$attr]) && $colab[$attr] !== null && $colab[$attr] !== '') {
+                $data_attrs[] = 'data-' . $attr . '="' . htmlspecialchars($colab[$attr]) . '"';
+            }
+        }
+        
+        $data_attrs_str = implode(' ', array_filter($data_attrs));
+        
+        $html .= '<option value="' . $colab['id'] . '"' . ($selected ? ' ' . $selected : '') . ($data_attrs_str ? ' ' . $data_attrs_str : '') . '>';
         $html .= $nome;
         $html .= '</option>';
     }
