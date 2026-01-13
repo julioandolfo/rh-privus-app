@@ -394,14 +394,21 @@ function atualizarSalarioAnterior() {
 // Listener para mudança no select
 document.getElementById('colaborador_id')?.addEventListener('change', atualizarSalarioAnterior);
 
-// Também atualiza quando Select2 mudar (evento do Select2)
-jQuery(document).on('change', '#colaborador_id', function() {
-    atualizarSalarioAnterior();
-});
+// Também atualiza quando Select2 mudar (evento do Select2) - aguarda jQuery
+function initSelect2ChangeListener() {
+    if (typeof jQuery !== 'undefined') {
+        jQuery(document).on('change', '#colaborador_id', function() {
+            atualizarSalarioAnterior();
+        });
+    } else {
+        setTimeout(initSelect2ChangeListener, 100);
+    }
+}
 
 // Aplica máscaras quando a página carregar
 document.addEventListener('DOMContentLoaded', function() {
     aplicarMascarasSalario();
+    initSelect2ChangeListener();
 });
 
 // Também aplica quando o modal for aberto
@@ -513,7 +520,7 @@ var KTPromocoesList = function() {
         const table = document.getElementById('kt_promocoes_table');
         if (!table) return;
         
-        const datatable = $(table).DataTable({
+        const datatable = jQuery(table).DataTable({
             "info": true,
             "order": [],
             "pageLength": 10,
@@ -541,7 +548,7 @@ var KTPromocoesList = function() {
 
 // Inicializa quando jQuery e DataTables estiverem prontos
 function waitForDependencies() {
-    if (typeof jQuery !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
+    if (typeof jQuery !== 'undefined' && typeof jQuery.fn.DataTable !== 'undefined') {
         KTPromocoesList.init();
     } else {
         setTimeout(waitForDependencies, 100);
