@@ -20,7 +20,7 @@ try {
     $usuario_id = $usuario['id'] ?? null;
     $colaborador_id = $usuario['colaborador_id'] ?? null;
     
-    // Busca comunicados publicados que ainda não foram lidos ou que podem ser visualizados novamente após 6 horas
+    // Busca comunicados publicados que ainda não foram lidos
     $stmt = $pdo->prepare("
         SELECT c.*, u.nome as criado_por_nome,
                cl.lido,
@@ -44,7 +44,6 @@ try {
         AND (
             cl.id IS NULL -- Nunca foi visualizado
             OR (cl.lido = 0) -- Não foi marcado como lido
-            OR (cl.lido = 1 AND TIMESTAMPDIFF(HOUR, cl.data_visualizacao, NOW()) >= 6) -- Foi lido mas já passaram 6 horas
         )
         ORDER BY c.data_publicacao DESC, c.created_at DESC
         LIMIT 10

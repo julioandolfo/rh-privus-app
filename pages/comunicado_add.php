@@ -67,7 +67,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data_expiracao
         ]);
         
-        redirect('comunicados.php', 'Comunicado criado com sucesso!', 'success');
+        $comunicado_id = $pdo->lastInsertId();
+        
+        // Se o comunicado foi publicado, envia emails para todos os colaboradores
+        if ($status === 'publicado') {
+            require_once __DIR__ . '/../includes/email_templates.php';
+            
+            // Envia emails em background (não bloqueia a resposta)
+            $resultado_email = enviar_email_novo_comunicado($comunicado_id);
+            
+            if ($resultado_email['success']) {
+                $mensagem = 'Comunicado criado e emails enviados! ';
+                $mensagem .= "({$resultado_email['enviados']} enviados";
+                if ($resultado_email['erros'] > 0) {
+                    $mensagem .= ", {$resultado_email['erros']} erros";
+                }
+                $mensagem .= ")";
+                redirect('comunicados.php', $mensagem, 'success');
+            } else {
+                redirect('comunicados.php', 'Comunicado criado mas houve erro ao enviar emails: ' . $resultado_email['message'], 'warning');
+            }
+        } else {
+            redirect('comunicados.php', 'Comunicado criado com sucesso!', 'success');
+        }
     } catch (PDOException $e) {
         redirect('comunicado_add.php', 'Erro ao criar comunicado: ' . $e->getMessage(), 'error');
     }

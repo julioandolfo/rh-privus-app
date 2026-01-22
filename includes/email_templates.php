@@ -345,6 +345,136 @@ function enviar_email_ocorrencia($ocorrencia_id) {
 }
 
 /**
+ * Envia email de novo comunicado para todos colaboradores
+ */
+function enviar_email_novo_comunicado($comunicado_id) {
+    $pdo = getDB();
+    
+    // Busca dados do comunicado
+    $stmt = $pdo->prepare("
+        SELECT c.*, u.nome as criado_por_nome, u.empresa_id
+        FROM comunicados c
+        LEFT JOIN usuarios u ON c.criado_por_usuario_id = u.id
+        WHERE c.id = ?
+    ");
+    $stmt->execute([$comunicado_id]);
+    $comunicado = $stmt->fetch();
+    
+    if (!$comunicado) {
+        return [
+            'success' => false,
+            'message' => 'Comunicado não encontrado.',
+            'enviados' => 0,
+            'erros' => 0
+        ];
+    }
+    
+    // Busca empresa
+    $empresa_nome = 'Sistema RH';
+    if ($comunicado['empresa_id']) {
+        $stmt_empresa = $pdo->prepare("SELECT nome_fantasia FROM empresas WHERE id = ?");
+        $stmt_empresa->execute([$comunicado['empresa_id']]);
+        $empresa = $stmt_empresa->fetch();
+        if ($empresa) {
+            $empresa_nome = $empresa['nome_fantasia'];
+        }
+    }
+    
+    // Busca todos os colaboradores ativos com email
+    $stmt_colab = $pdo->prepare("
+        SELECT DISTINCT
+            c.id as colaborador_id,
+            c.nome_completo,
+            c.email_pessoal,
+            u.id as usuario_id,
+            u.email as usuario_email
+        FROM colaboradores c
+        LEFT JOIN usuarios u ON c.id = u.colaborador_id
+        WHERE c.status = 'ativo'
+        AND (
+            c.email_pessoal IS NOT NULL AND c.email_pessoal != ''
+            OR u.email IS NOT NULL
+        )
+        ORDER BY c.nome_completo
+    ");
+    $stmt_colab->execute();
+    $colaboradores = $stmt_colab->fetchAll();
+    
+    if (empty($colaboradores)) {
+        return [
+            'success' => false,
+            'message' => 'Nenhum colaborador com email encontrado.',
+            'enviados' => 0,
+            'erros' => 0
+        ];
+    }
+    
+    // Prepara URL do sistema
+    $sistema_url = get_base_url();
+    
+    // Prepara conteúdo (remove HTML para preview e cria versão texto)
+    $conteudo_texto = strip_tags($comunicado['conteudo']);
+    $conteudo_preview = mb_substr($conteudo_texto, 0, 300);
+    if (mb_strlen($conteudo_texto) > 300) {
+        $conteudo_preview .= '...';
+    }
+    
+    // Prepara imagem HTML
+    $imagem_html = '';
+    if (!empty($comunicado['imagem'])) {
+        $imagem_url = rtrim($sistema_url, '/') . '/' . ltrim($comunicado['imagem'], '/');
+        $imagem_html = '<div style="margin: 15px 0; text-center;"><img src="' . htmlspecialchars($imagem_url) . '" alt="' . htmlspecialchars($comunicado['titulo']) . '" style="max-width: 100%; height: auto; border-radius: 4px;" /></div>';
+    }
+    
+    // Formata data de publicação
+    $data_publicacao = $comunicado['data_publicacao'] 
+        ? formatar_data($comunicado['data_publicacao'], 'd/m/Y H:i')
+        : formatar_data($comunicado['created_at'], 'd/m/Y H:i');
+    
+    $enviados = 0;
+    $erros = 0;
+    
+    // Envia email para cada colaborador
+    foreach ($colaboradores as $colab) {
+        $email_destino = $colab['email_pessoal'] ?? $colab['usuario_email'];
+        
+        if (empty($email_destino)) {
+            continue;
+        }
+        
+        // Prepara variáveis para o template
+        $variaveis = [
+            'nome_completo' => $colab['nome_completo'],
+            'titulo' => $comunicado['titulo'],
+            'conteudo_preview' => nl2br(htmlspecialchars($conteudo_preview)),
+            'conteudo_texto' => $conteudo_texto,
+            'imagem_html' => $imagem_html,
+            'criado_por_nome' => $comunicado['criado_por_nome'] ?? 'Administrador',
+            'data_publicacao' => $data_publicacao,
+            'sistema_url' => $sistema_url,
+            'empresa_nome' => $empresa_nome
+        ];
+        
+        // Envia email
+        $resultado = enviar_email_template('novo_comunicado', $email_destino, $variaveis);
+        
+        if ($resultado['success']) {
+            $enviados++;
+        } else {
+            $erros++;
+        }
+    }
+    
+    return [
+        'success' => true,
+        'message' => "Emails enviados: {$enviados}, Erros: {$erros}",
+        'enviados' => $enviados,
+        'erros' => $erros,
+        'total_colaboradores' => count($colaboradores)
+    ];
+}
+
+/**
  * Envia email de horas extras
  */
 function enviar_email_horas_extras($hora_extra_id) {
