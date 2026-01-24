@@ -53,7 +53,10 @@ function enviar_email_template($codigo_template, $email_destinatario, $variaveis
     // Prepara opções
     $opcoes_email = array_merge([
         'nome_destinatario' => $variaveis['nome_completo'] ?? '',
-        'texto_alternativo' => $corpo_texto
+        'texto_alternativo' => $corpo_texto,
+        'template_codigo' => $template['codigo'],
+        'template_nome' => $template['nome'],
+        'origem' => 'template_' . $template['codigo']
     ], $opcoes);
     
     // Remove assunto_customizado das opções antes de passar para enviar_email

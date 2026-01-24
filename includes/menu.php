@@ -1439,7 +1439,7 @@ function getIcon($name) {
                     <?php endif; ?>
                     
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php') || isActive('configuracoes_pontos.php') || isActive('templates_email.php') || isActive('configuracoes_autentique.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php') || isActive('configuracoes_pontos.php') || isActive('templates_email.php') || isActive('email_logs.php') || isActive('configuracoes_autentique.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -1486,6 +1486,18 @@ function getIcon($name) {
                                         <span class="bullet bullet-dot"></span>
                                     </span>
                                     <span class="menu-title">Templates de Email</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('email_logs.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('email_logs.php') ?>" href="email_logs.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Logs de Emails</span>
                                 </a>
                             </div>
                             <!--end:Menu item-->

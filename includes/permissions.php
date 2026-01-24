@@ -100,6 +100,7 @@ function get_page_permissions() {
         'configuracoes_email.php' => ['ADMIN'],
         'configuracoes_onesignal.php' => ['ADMIN'],
         'templates_email.php' => ['ADMIN'],
+        'email_logs.php' => ['ADMIN'],
         
         // Relatórios - ADMIN, RH e GESTOR
         'relatorio_ocorrencias.php' => ['ADMIN', 'RH', 'GESTOR'],

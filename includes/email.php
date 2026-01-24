@@ -11,6 +11,91 @@ use PHPMailer\PHPMailer\Exception;
 require_once __DIR__ . '/functions.php';
 
 /**
+ * Registra log de email enviado
+ * 
+ * @param string $email_destinatario Email do destinatário
+ * @param string $assunto Assunto do email
+ * @param string $status 'sucesso' ou 'erro'
+ * @param array $opcoes Opções adicionais
+ * @return bool
+ */
+function registrar_log_email($email_destinatario, $assunto, $status, $opcoes = []) {
+    try {
+        $pdo = getDB();
+        
+        // Verifica se a tabela existe
+        $stmt = $pdo->query("SHOW TABLES LIKE 'email_logs'");
+        if ($stmt->rowCount() == 0) {
+            // Cria a tabela se não existir
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS email_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    email_destinatario VARCHAR(255) NOT NULL,
+                    nome_destinatario VARCHAR(255) NULL,
+                    assunto VARCHAR(500) NOT NULL,
+                    template_codigo VARCHAR(50) NULL,
+                    template_nome VARCHAR(255) NULL,
+                    status ENUM('sucesso', 'erro') NOT NULL DEFAULT 'sucesso',
+                    erro_mensagem TEXT NULL,
+                    origem VARCHAR(100) NULL,
+                    usuario_id INT NULL,
+                    colaborador_id INT NULL,
+                    empresa_id INT NULL,
+                    ip_origem VARCHAR(45) NULL,
+                    user_agent TEXT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_email_logs_status (status),
+                    INDEX idx_email_logs_destinatario (email_destinatario),
+                    INDEX idx_email_logs_template (template_codigo),
+                    INDEX idx_email_logs_created (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        }
+        
+        // Prepara dados do log
+        $nome_destinatario = $opcoes['nome_destinatario'] ?? null;
+        $template_codigo = $opcoes['template_codigo'] ?? null;
+        $template_nome = $opcoes['template_nome'] ?? null;
+        $erro_mensagem = $opcoes['erro_mensagem'] ?? null;
+        $origem = $opcoes['origem'] ?? null;
+        $usuario_id = $opcoes['usuario_id'] ?? (isset($_SESSION['usuario']['id']) ? $_SESSION['usuario']['id'] : null);
+        $colaborador_id = $opcoes['colaborador_id'] ?? null;
+        $empresa_id = $opcoes['empresa_id'] ?? (isset($_SESSION['usuario']['empresa_id']) ? $_SESSION['usuario']['empresa_id'] : null);
+        $ip_origem = $_SERVER['REMOTE_ADDR'] ?? null;
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO email_logs 
+            (email_destinatario, nome_destinatario, assunto, template_codigo, template_nome, 
+             status, erro_mensagem, origem, usuario_id, colaborador_id, empresa_id, ip_origem, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $stmt->execute([
+            $email_destinatario,
+            $nome_destinatario,
+            mb_substr($assunto, 0, 500),
+            $template_codigo,
+            $template_nome,
+            $status,
+            $erro_mensagem,
+            $origem,
+            $usuario_id,
+            $colaborador_id,
+            $empresa_id,
+            $ip_origem,
+            $user_agent
+        ]);
+        
+        return true;
+    } catch (Exception $e) {
+        // Silencia erros de log para não afetar o envio do email
+        error_log("Erro ao registrar log de email: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * Envia um email usando SMTP
  * 
  * @param string $para Email do destinatário
@@ -139,15 +224,40 @@ function enviar_email($para, $assunto, $mensagem, $opcoes = []) {
         
         $mail->send();
         
+        // Registra log de sucesso
+        registrar_log_email($para, $assunto, 'sucesso', [
+            'nome_destinatario' => $nome_destinatario,
+            'template_codigo' => $opcoes['template_codigo'] ?? null,
+            'template_nome' => $opcoes['template_nome'] ?? null,
+            'origem' => $opcoes['origem'] ?? 'envio_direto',
+            'colaborador_id' => $opcoes['colaborador_id'] ?? null,
+            'empresa_id' => $opcoes['empresa_id'] ?? null,
+            'usuario_id' => $opcoes['usuario_id'] ?? null
+        ]);
+        
         return [
             'success' => true,
             'message' => 'Email enviado com sucesso!'
         ];
         
     } catch (Exception $e) {
+        $erro_info = isset($mail) ? $mail->ErrorInfo : $e->getMessage();
+        
+        // Registra log de erro
+        registrar_log_email($para, $assunto, 'erro', [
+            'nome_destinatario' => $opcoes['nome_destinatario'] ?? '',
+            'template_codigo' => $opcoes['template_codigo'] ?? null,
+            'template_nome' => $opcoes['template_nome'] ?? null,
+            'origem' => $opcoes['origem'] ?? 'envio_direto',
+            'erro_mensagem' => $erro_info,
+            'colaborador_id' => $opcoes['colaborador_id'] ?? null,
+            'empresa_id' => $opcoes['empresa_id'] ?? null,
+            'usuario_id' => $opcoes['usuario_id'] ?? null
+        ]);
+        
         return [
             'success' => false,
-            'message' => 'Erro ao enviar email: ' . $mail->ErrorInfo
+            'message' => 'Erro ao enviar email: ' . $erro_info
         ];
     }
 }
