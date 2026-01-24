@@ -634,12 +634,33 @@ function formatDate(dateStr) {
     return date.toLocaleString('pt-BR');
 }
 
-// Inicializa DataTable
+// Inicializa DataTable apenas se houver dados
 document.addEventListener('DOMContentLoaded', function() {
-    if (typeof $ !== 'undefined' && $.fn.DataTable) {
+    var table = document.getElementById('kt_email_logs_table');
+    if (!table) return;
+    
+    // Verifica se há dados reais (não apenas a linha de "nenhum registro")
+    var rows = table.querySelectorAll('tbody tr');
+    var hasData = rows.length > 0 && !rows[0].querySelector('[colspan]');
+    
+    if (hasData && typeof $ !== 'undefined' && $.fn.DataTable) {
         $('#kt_email_logs_table').DataTable({
             language: {
-                url: '../assets/plugins/custom/datatables/pt-BR.json'
+                processing: "Processando...",
+                search: "Pesquisar:",
+                lengthMenu: "Mostrar _MENU_ registros",
+                info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+                infoEmpty: "Mostrando 0 a 0 de 0 registros",
+                infoFiltered: "(filtrado de _MAX_ registros no total)",
+                loadingRecords: "Carregando...",
+                zeroRecords: "Nenhum registro encontrado",
+                emptyTable: "Nenhum dado disponível na tabela",
+                paginate: {
+                    first: "Primeiro",
+                    previous: "Anterior",
+                    next: "Próximo",
+                    last: "Último"
+                }
             },
             order: [[4, 'desc']],
             pageLength: 25,
