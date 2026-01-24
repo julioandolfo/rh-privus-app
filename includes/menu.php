@@ -176,6 +176,22 @@ function getIcon($name) {
                 </div>
                 <?php endif; ?>
                 
+                <!--begin:Menu item - Eventos-->
+                <?php if (can_access_page('eventos.php') || can_access_page('meus_eventos.php')): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('eventos.php') || isActive('meus_eventos.php') ?>" href="<?= is_colaborador() ? 'meus_eventos.php' : 'eventos.php' ?>">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-calendar fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Eventos</span>
+                    </a>
+                </div>
+                <?php endif; ?>
+                <!--end:Menu item-->
+                
                 <!--begin:Menu item - Chat-->
                 <?php if (can_show_menu(['ADMIN', 'RH']) || is_colaborador()): ?>
                 <div class="menu-item">

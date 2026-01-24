@@ -88,6 +88,11 @@ function get_page_permissions() {
         'enviar_notificacao_push.php' => ['ADMIN', 'RH'],
         'notificacoes_enviadas.php' => ['ADMIN', 'RH'],
         
+        // Eventos - ADMIN, RH e GESTOR para gestão, COLABORADOR para visualização
+        'eventos.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'eventos_api.php' => ['ADMIN', 'RH', 'GESTOR'],
+        'meus_eventos.php' => ['COLABORADOR'],
+        
         // Chat - ADMIN e RH para gestão, COLABORADOR para visualização
         'chat_gestao.php' => ['ADMIN', 'RH'],
         'chat_colaborador.php' => ['COLABORADOR'],

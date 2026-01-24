@@ -624,3 +624,139 @@ function enviar_email_horas_extras($hora_extra_id) {
     return enviar_email_template('horas_extras', $hora_extra['email_pessoal'], $variaveis);
 }
 
+/**
+ * Envia convites de evento para colaboradores
+ * 
+ * @param int $evento_id ID do evento
+ * @param array $colaboradores_ids IDs dos colaboradores para enviar convite
+ * @return array ['enviados' => int, 'erros' => int]
+ */
+function enviar_convites_evento($evento_id, $colaboradores_ids = []) {
+    $pdo = getDB();
+    
+    // Busca dados do evento
+    $stmt = $pdo->prepare("
+        SELECT e.*, emp.nome_fantasia as empresa_nome
+        FROM eventos e
+        LEFT JOIN empresas emp ON e.empresa_id = emp.id
+        WHERE e.id = ?
+    ");
+    $stmt->execute([$evento_id]);
+    $evento = $stmt->fetch();
+    
+    if (!$evento) {
+        return ['enviados' => 0, 'erros' => 0, 'message' => 'Evento não encontrado'];
+    }
+    
+    // Labels de tipo
+    $tipos_evento = [
+        'reuniao' => 'Reunião',
+        'treinamento' => 'Treinamento',
+        'confraternizacao' => 'Confraternização',
+        'palestra' => 'Palestra',
+        'workshop' => 'Workshop',
+        'outro' => 'Outro'
+    ];
+    
+    // Prepara dados do evento
+    $data_formatada = date('d/m/Y', strtotime($evento['data_evento']));
+    $horario = date('H:i', strtotime($evento['hora_inicio']));
+    if ($evento['hora_fim']) {
+        $horario .= ' - ' . date('H:i', strtotime($evento['hora_fim']));
+    }
+    
+    $descricao_html = '';
+    $descricao_texto = '';
+    if ($evento['descricao']) {
+        $descricao_html = '<p style="margin-top: 15px;"><strong>Descrição:</strong><br>' . nl2br(htmlspecialchars($evento['descricao'])) . '</p>';
+        $descricao_texto = "\nDescrição: " . $evento['descricao'];
+    }
+    
+    $link_virtual_html = '';
+    if ($evento['link_virtual']) {
+        $link_virtual_html = '<p style="margin-top: 15px;"><strong>🔗 Link da Reunião:</strong><br><a href="' . htmlspecialchars($evento['link_virtual']) . '">' . htmlspecialchars($evento['link_virtual']) . '</a></p>';
+    }
+    
+    $sistema_url = get_base_url();
+    
+    // Busca participantes para enviar
+    if (empty($colaboradores_ids)) {
+        // Se não especificou, busca todos que ainda não receberam convite
+        $stmt = $pdo->prepare("
+            SELECT ep.*, c.nome_completo, c.email_pessoal
+            FROM eventos_participantes ep
+            INNER JOIN colaboradores c ON ep.colaborador_id = c.id
+            WHERE ep.evento_id = ? AND ep.data_convite_enviado IS NULL
+        ");
+        $stmt->execute([$evento_id]);
+    } else {
+        $placeholders = implode(',', array_fill(0, count($colaboradores_ids), '?'));
+        $stmt = $pdo->prepare("
+            SELECT ep.*, c.nome_completo, c.email_pessoal
+            FROM eventos_participantes ep
+            INNER JOIN colaboradores c ON ep.colaborador_id = c.id
+            WHERE ep.evento_id = ? AND ep.colaborador_id IN ($placeholders)
+        ");
+        $stmt->execute(array_merge([$evento_id], $colaboradores_ids));
+    }
+    
+    $participantes = $stmt->fetchAll();
+    
+    $enviados = 0;
+    $erros = 0;
+    
+    foreach ($participantes as $p) {
+        if (empty($p['email_pessoal'])) {
+            $erros++;
+            continue;
+        }
+        
+        // Monta links de confirmação
+        $link_confirmar = $sistema_url . '/pages/eventos_confirmar.php?token=' . urlencode($p['token_confirmacao']) . '&acao=confirmar';
+        $link_recusar = $sistema_url . '/pages/eventos_confirmar.php?token=' . urlencode($p['token_confirmacao']) . '&acao=recusar';
+        
+        // Prepara variáveis
+        $variaveis = [
+            'nome_completo' => $p['nome_completo'],
+            'titulo_evento' => $evento['titulo'],
+            'data_evento' => $data_formatada,
+            'horario_evento' => $horario,
+            'local_evento' => $evento['local'] ?: 'A definir',
+            'tipo_evento' => $tipos_evento[$evento['tipo']] ?? $evento['tipo'],
+            'descricao_html' => $descricao_html,
+            'descricao_texto' => $descricao_texto,
+            'link_virtual_html' => $link_virtual_html,
+            'link_confirmar' => $link_confirmar,
+            'link_recusar' => $link_recusar,
+            'sistema_url' => $sistema_url,
+            'empresa_nome' => $evento['empresa_nome'] ?? 'RH Privus'
+        ];
+        
+        // Envia email
+        $resultado = enviar_email_template('convite_evento', $p['email_pessoal'], $variaveis, [
+            'origem' => 'convite_evento',
+            'colaborador_id' => $p['colaborador_id']
+        ]);
+        
+        if ($resultado['success']) {
+            $enviados++;
+            
+            // Atualiza data de envio do convite
+            $stmt_update = $pdo->prepare("
+                UPDATE eventos_participantes 
+                SET data_convite_enviado = NOW() 
+                WHERE id = ?
+            ");
+            $stmt_update->execute([$p['id']]);
+        } else {
+            $erros++;
+        }
+    }
+    
+    return [
+        'enviados' => $enviados,
+        'erros' => $erros,
+        'total' => count($participantes)
+    ];
+}
+
