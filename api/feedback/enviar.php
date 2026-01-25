@@ -273,7 +273,16 @@ try {
         
         // Adiciona pontos por enviar feedback
         require_once __DIR__ . '/../../includes/pontuacao.php';
-        adicionar_pontos('enviar_feedback', $remetente_usuario_id, $remetente_colaborador_id, $feedback_id, 'feedback');
+        $pontos_ganhos = adicionar_pontos('enviar_feedback', $remetente_usuario_id, $remetente_colaborador_id, $feedback_id, 'feedback');
+        
+        // Busca quantidade de pontos da ação
+        $stmt_pontos = $pdo->prepare("SELECT pontos FROM pontos_config WHERE acao = 'enviar_feedback' AND ativo = 1");
+        $stmt_pontos->execute();
+        $config_pontos = $stmt_pontos->fetch();
+        $pontos_valor = $config_pontos ? $config_pontos['pontos'] : 30;
+        
+        // Busca novo total de pontos
+        $novos_pontos = obter_pontos($remetente_usuario_id, $remetente_colaborador_id);
         
         logFeedback("✅ Pontos adicionados");
         
@@ -285,10 +294,18 @@ try {
         logFeedback("=== FEEDBACK API FINALIZADA COM SUCESSO ===");
         logFeedback(""); // Linha em branco para separar logs
         
-        echo json_encode([
+        $response = [
             'success' => true,
             'message' => 'Feedback enviado com sucesso!'
-        ]);
+        ];
+        
+        // Adiciona info de pontos se ganhou
+        if ($pontos_ganhos) {
+            $response['pontos_ganhos'] = $pontos_valor;
+            $response['pontos_totais'] = $novos_pontos['pontos_totais'] ?? 0;
+        }
+        
+        echo json_encode($response);
         
     } catch (Exception $e) {
         logFeedback("❌ ERRO na transação: " . $e->getMessage());

@@ -113,7 +113,16 @@ try {
     
         // Adiciona pontos dentro da transação
         require_once __DIR__ . '/../../includes/pontuacao.php';
-        adicionar_pontos('comentar_feed', $usuario_id, $colaborador_id, $comentario_id, 'feed_comentario');
+        $pontos_ganhos = adicionar_pontos('comentar_feed', $usuario_id, $colaborador_id, $comentario_id, 'feed_comentario');
+        
+        // Busca quantidade de pontos da ação
+        $stmt_pontos = $pdo->prepare("SELECT pontos FROM pontos_config WHERE acao = 'comentar_feed' AND ativo = 1");
+        $stmt_pontos->execute();
+        $config_pontos = $stmt_pontos->fetch();
+        $pontos_valor = $config_pontos ? $config_pontos['pontos'] : 5;
+        
+        // Busca novo total de pontos
+        $novos_pontos = obter_pontos($usuario_id, $colaborador_id);
         
         // Atualiza contador de comentários
         $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM feed_comentarios WHERE post_id = ? AND status = 'ativo'");
@@ -164,12 +173,20 @@ try {
     $stmt->execute([$comentario_id]);
     $comentario_data = $stmt->fetch();
     
-    echo json_encode([
+    $response = [
         'success' => true,
         'message' => 'Comentário adicionado com sucesso!',
         'comentario' => $comentario_data,
         'total_comentarios' => $total
-    ]);
+    ];
+    
+    // Adiciona info de pontos se ganhou
+    if (isset($pontos_ganhos) && $pontos_ganhos) {
+        $response['pontos_ganhos'] = $pontos_valor ?? 5;
+        $response['pontos_totais'] = $novos_pontos['pontos_totais'] ?? 0;
+    }
+    
+    echo json_encode($response);
     
 } catch (Exception $e) {
     // Limpa a flag de requisição em caso de erro

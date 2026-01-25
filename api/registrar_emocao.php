@@ -64,13 +64,30 @@ try {
     
     // Adiciona pontos
     require_once __DIR__ . '/../includes/pontuacao.php';
-    adicionar_pontos('registrar_emocao', $usuario_id, $colaborador_id, $emocao_id, 'emocao');
+    $pontos_ganhos = adicionar_pontos('registrar_emocao', $usuario_id, $colaborador_id, $emocao_id, 'emocao');
     
-    echo json_encode([
+    // Busca quantidade de pontos da ação
+    $stmt_pontos = $pdo->prepare("SELECT pontos FROM pontos_config WHERE acao = 'registrar_emocao' AND ativo = 1");
+    $stmt_pontos->execute();
+    $config_pontos = $stmt_pontos->fetch();
+    $pontos_valor = $config_pontos ? $config_pontos['pontos'] : 50;
+    
+    // Busca novo total de pontos
+    $novos_pontos = obter_pontos($usuario_id, $colaborador_id);
+    
+    $response = [
         'success' => true,
         'message' => 'Emoção registrada com sucesso!',
         'emocao_id' => $emocao_id
-    ]);
+    ];
+    
+    // Adiciona info de pontos se ganhou
+    if ($pontos_ganhos) {
+        $response['pontos_ganhos'] = $pontos_valor;
+        $response['pontos_totais'] = $novos_pontos['pontos_totais'] ?? 0;
+    }
+    
+    echo json_encode($response);
     
 } catch (Exception $e) {
     http_response_code(400);

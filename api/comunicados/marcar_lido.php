@@ -53,7 +53,15 @@ try {
     $stmt->execute([$comunicado_id, $usuario_id, $colaborador_id]);
     $leitura = $stmt->fetch();
     
+    $primeira_leitura = false;
+    
     if ($leitura) {
+        // Verifica se é a primeira vez que está marcando como lido
+        $stmt_check = $pdo->prepare("SELECT lido FROM comunicados_leitura WHERE id = ?");
+        $stmt_check->execute([$leitura['id']]);
+        $leitura_atual = $stmt_check->fetch();
+        $primeira_leitura = ($leitura_atual && $leitura_atual['lido'] == 0);
+        
         // Atualiza registro existente
         $stmt = $pdo->prepare("
             UPDATE comunicados_leitura 
@@ -65,7 +73,9 @@ try {
         ");
         $stmt->execute([$leitura['id']]);
     } else {
-        // Cria novo registro
+        // Cria novo registro - é a primeira leitura
+        $primeira_leitura = true;
+        
         $stmt = $pdo->prepare("
             INSERT INTO comunicados_leitura (comunicado_id, usuario_id, colaborador_id, lido, data_leitura, data_visualizacao, vezes_visualizado)
             VALUES (?, ?, ?, 1, NOW(), NOW(), 1)
@@ -73,7 +83,35 @@ try {
         $stmt->execute([$comunicado_id, $usuario_id, $colaborador_id]);
     }
     
-    echo json_encode(['success' => true, 'message' => 'Comunicado marcado como lido']);
+    // Adiciona pontos se for a primeira leitura
+    $pontos_ganhos = 0;
+    $pontos_totais = 0;
+    
+    if ($primeira_leitura) {
+        require_once __DIR__ . '/../../includes/pontuacao.php';
+        $ganhou_pontos = adicionar_pontos('comunicado_lido', $usuario_id, $colaborador_id, $comunicado_id, 'comunicado');
+        
+        if ($ganhou_pontos) {
+            // Busca quantidade de pontos da ação
+            $stmt_pontos = $pdo->prepare("SELECT pontos FROM pontos_config WHERE acao = 'comunicado_lido' AND ativo = 1");
+            $stmt_pontos->execute();
+            $config_pontos = $stmt_pontos->fetch();
+            $pontos_ganhos = $config_pontos ? $config_pontos['pontos'] : 0;
+            
+            // Busca novo total
+            $novos_pontos = obter_pontos($usuario_id, $colaborador_id);
+            $pontos_totais = $novos_pontos['pontos_totais'] ?? 0;
+        }
+    }
+    
+    $response = ['success' => true, 'message' => 'Comunicado marcado como lido'];
+    
+    if ($pontos_ganhos > 0) {
+        $response['pontos_ganhos'] = $pontos_ganhos;
+        $response['pontos_totais'] = $pontos_totais;
+    }
+    
+    echo json_encode($response);
     
 } catch (PDOException $e) {
     http_response_code(500);

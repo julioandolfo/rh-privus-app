@@ -33,6 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $motivo = sanitize($_POST['motivo'] ?? '');
         
         try {
+            // Verifica status atual
+            $stmt_check = $pdo->prepare("SELECT status_confirmacao FROM eventos_participantes WHERE evento_id = ? AND colaborador_id = ?");
+            $stmt_check->execute([$evento_id, $colaborador_id]);
+            $status_atual = $stmt_check->fetch();
+            $ja_confirmado = ($status_atual && $status_atual['status_confirmacao'] === 'confirmado');
+            
             $stmt = $pdo->prepare("
                 UPDATE eventos_participantes 
                 SET status_confirmacao = ?, 
@@ -41,6 +47,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE evento_id = ? AND colaborador_id = ?
             ");
             $stmt->execute([$status, $motivo ?: null, $evento_id, $colaborador_id]);
+            
+            // Adiciona pontos se está confirmando e não estava confirmado antes
+            if ($status === 'confirmado' && !$ja_confirmado) {
+                require_once __DIR__ . '/../includes/pontuacao.php';
+                adicionar_pontos('confirmar_evento', null, $colaborador_id, $evento_id, 'evento');
+            }
             
             $msg = [
                 'confirmado' => 'Presença confirmada com sucesso!',

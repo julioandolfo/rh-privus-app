@@ -145,7 +145,16 @@ try {
         
         // Adiciona pontos dentro da transação
         require_once __DIR__ . '/../../includes/pontuacao.php';
-        adicionar_pontos('postar_feed', $usuario_id, $colaborador_id, $post_id, 'feed_post');
+        $pontos_ganhos = adicionar_pontos('postar_feed', $usuario_id, $colaborador_id, $post_id, 'feed_post');
+        
+        // Busca quantidade de pontos da ação
+        $stmt_pontos = $pdo->prepare("SELECT pontos FROM pontos_config WHERE acao = 'postar_feed' AND ativo = 1");
+        $stmt_pontos->execute();
+        $config_pontos = $stmt_pontos->fetch();
+        $pontos_valor = $config_pontos ? $config_pontos['pontos'] : 20;
+        
+        // Busca novo total de pontos
+        $novos_pontos = obter_pontos($usuario_id, $colaborador_id);
         
         $pdo->commit();
         
@@ -167,7 +176,9 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Post publicado com sucesso!',
-        'post_id' => $post_id
+        'post_id' => $post_id,
+        'pontos_ganhos' => $pontos_ganhos ? $pontos_valor : 0,
+        'pontos_totais' => $novos_pontos['pontos_totais'] ?? 0
     ]);
     
 } catch (Exception $e) {

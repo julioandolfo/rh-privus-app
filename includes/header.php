@@ -22,6 +22,10 @@ if (!isset($_SESSION['usuario'])) {
 }
 
 $usuario = $_SESSION['usuario'];
+
+// Carrega pontos do usuário para exibir no header
+require_once __DIR__ . '/pontuacao.php';
+$_header_pontos = obter_pontos($usuario['id'] ?? null, $usuario['colaborador_id'] ?? null);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -317,6 +321,22 @@ $usuario = $_SESSION['usuario'];
                                 <!--end::Menu-->
                             </div>
                             <!--end::Theme mode-->
+                            <!--begin::Pontos-->
+                            <div class="d-flex align-items-center ms-1 ms-lg-3">
+                                <!--begin::Pontos Badge-->
+                                <a href="ranking_pontos.php" class="btn btn-sm btn-light-warning d-flex align-items-center gap-2 px-3 py-2" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Seus pontos acumulados">
+                                    <i class="ki-duotone ki-medal-star fs-3 text-warning">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                        <span class="path4"></span>
+                                    </i>
+                                    <span class="fw-bold text-gray-800" id="header_pontos_total"><?= number_format($_header_pontos['pontos_totais'] ?? 0, 0, ',', '.') ?></span>
+                                    <span class="d-none d-lg-inline text-muted fs-8">pts</span>
+                                </a>
+                                <!--end::Pontos Badge-->
+                            </div>
+                            <!--end::Pontos-->
                             <!--begin::Notifications-->
                             <div class="d-flex align-items-center ms-1 ms-lg-3">
                                 <!--begin::Menu wrapper-->

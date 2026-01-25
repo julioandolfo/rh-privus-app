@@ -82,7 +82,12 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
     
     // Dados do contrato
     $variaveis['{{contrato.titulo}}'] = $contrato_data['titulo'] ?? '';
-    $variaveis['{{contrato.descricao_funcao}}'] = $contrato_data['descricao_funcao'] ?? '';
+    // Descrição da função: primeiro tenta usar do contrato, depois do cadastro do colaborador
+    $variaveis['{{contrato.descricao_funcao}}'] = !empty($contrato_data['descricao_funcao']) 
+        ? $contrato_data['descricao_funcao'] 
+        : ($colaborador['descricao_funcao'] ?? '');
+    // Também disponibiliza como variável do colaborador
+    $variaveis['{{colaborador.descricao_funcao}}'] = $colaborador['descricao_funcao'] ?? '';
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';
@@ -229,8 +234,13 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
         'empresa.cep' => ['valor' => $empresa['cep'] ?? '', 'label' => 'CEP da Empresa', 'tipo' => 'text'],
         'empresa.bairro' => ['valor' => $empresa['bairro'] ?? '', 'label' => 'Bairro da Empresa', 'tipo' => 'text'],
         
-        // Contrato
-        'contrato.descricao_funcao' => ['valor' => $contrato_data['descricao_funcao'] ?? '', 'label' => 'Descrição da Função', 'tipo' => 'textarea'],
+        // Contrato (descrição da função pode vir do contrato ou do cadastro do colaborador)
+        'contrato.descricao_funcao' => [
+            'valor' => !empty($contrato_data['descricao_funcao']) ? $contrato_data['descricao_funcao'] : ($colaborador['descricao_funcao'] ?? ''), 
+            'label' => 'Descrição da Função', 
+            'tipo' => 'textarea'
+        ],
+        'colaborador.descricao_funcao' => ['valor' => $colaborador['descricao_funcao'] ?? '', 'label' => 'Descrição da Função do Colaborador', 'tipo' => 'textarea'],
     ];
     
     // Extrai variáveis usadas no template
@@ -357,7 +367,12 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
     
     // Dados do contrato
     $variaveis['{{contrato.titulo}}'] = $contrato_data['titulo'] ?? '';
-    $variaveis['{{contrato.descricao_funcao}}'] = $contrato_data['descricao_funcao'] ?? '';
+    // Descrição da função: primeiro tenta usar do contrato, depois do cadastro do colaborador
+    $variaveis['{{contrato.descricao_funcao}}'] = !empty($contrato_data['descricao_funcao']) 
+        ? $contrato_data['descricao_funcao'] 
+        : ($colaborador['descricao_funcao'] ?? '');
+    // Também disponibiliza como variável do colaborador
+    $variaveis['{{colaborador.descricao_funcao}}'] = $colaborador['descricao_funcao'] ?? '';
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';

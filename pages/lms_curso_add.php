@@ -33,6 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $prazo_tipo = $_POST['prazo_tipo'] ?? 'dias_apos_atribuicao';
     $data_limite = !empty($_POST['data_limite']) ? $_POST['data_limite'] : null;
     
+    // Pontos de recompensa
+    $pontos_recompensa = !empty($_POST['pontos_recompensa']) ? (int)$_POST['pontos_recompensa'] : 0;
+    
     if (empty($titulo)) {
         redirect('lms_curso_add.php', 'Preencha o título do curso!', 'error');
     }
@@ -70,8 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $stmt = $pdo->prepare("
             INSERT INTO cursos 
-            (empresa_id, setor_id, cargo_id, categoria_id, titulo, descricao, imagem_capa, duracao_estimada, nivel_dificuldade, status, data_inicio, data_fim, obrigatorio, prazo_dias, prazo_tipo, data_limite, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, setor_id, cargo_id, categoria_id, titulo, descricao, imagem_capa, duracao_estimada, nivel_dificuldade, status, data_inicio, data_fim, obrigatorio, prazo_dias, prazo_tipo, data_limite, pontos_recompensa, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -91,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $prazo_dias,
             $prazo_tipo,
             $data_limite ?: null,
+            $pontos_recompensa,
             $usuario['id']
         ]);
         
@@ -199,6 +203,21 @@ require_once __DIR__ . '/../includes/header.php';
                             <option value="intermediario">Intermediário</option>
                             <option value="avancado">Avançado</option>
                         </select>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <label class="form-label">
+                            <i class="ki-duotone ki-medal-star text-warning me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                            </i>
+                            Pontos de Recompensa
+                        </label>
+                        <input type="number" name="pontos_recompensa" class="form-control" min="0" 
+                               value="0" placeholder="Ex: 100">
+                        <small class="text-muted">Pontos que o colaborador ganha ao concluir este curso</small>
                     </div>
                     
                     <div class="col-md-4">

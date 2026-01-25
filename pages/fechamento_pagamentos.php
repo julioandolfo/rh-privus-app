@@ -1128,6 +1128,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao fechar: ' . $e->getMessage(), 'error');
         }
+    } elseif ($action === 'marcar_pago') {
+        // Marca fechamento como pago (útil para bônus sem nota fiscal)
+        $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
+        try {
+            // Verifica permissão
+            $stmt = $pdo->prepare("SELECT empresa_id, status FROM fechamentos_pagamento WHERE id = ?");
+            $stmt->execute([$fechamento_id]);
+            $fechamento = $stmt->fetch();
+            
+            if (!$fechamento) {
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para alterar este fechamento!', 'error');
+            }
+            
+            // Só pode marcar como pago se estiver fechado
+            if ($fechamento['status'] !== 'fechado') {
+                redirect('fechamento_pagamentos.php', 'Apenas fechamentos com status "Fechado" podem ser marcados como pago!', 'error');
+            }
+            
+            $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'pago' WHERE id = ?");
+            $stmt->execute([$fechamento_id]);
+            
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento marcado como pago com sucesso!');
+        } catch (PDOException $e) {
+            redirect('fechamento_pagamentos.php', 'Erro ao marcar como pago: ' . $e->getMessage(), 'error');
+        }
     } elseif ($action === 'delete') {
         $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
         try {
@@ -2501,6 +2530,18 @@ require_once __DIR__ . '/../includes/header.php';
                             Fechar Fechamento
                         </button>
                     </form>
+                    <?php elseif ($fechamento_view['status'] === 'fechado'): ?>
+                    <form method="POST" style="display: inline;" id="form_marcar_pago_<?= $fechamento_view['id'] ?>">
+                        <input type="hidden" name="action" value="marcar_pago">
+                        <input type="hidden" name="fechamento_id" value="<?= $fechamento_view['id'] ?>">
+                        <button type="button" class="btn btn-success" onclick="marcarComoPago(<?= $fechamento_view['id'] ?>)">
+                            <i class="ki-duotone ki-check-circle fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Marcar como Pago
+                        </button>
+                    </form>
                     <?php endif; ?>
                     <div class="btn-group ms-2">
                         <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
@@ -3231,6 +3272,14 @@ require_once __DIR__ . '/../includes/header.php';
                                 <a href="fechamento_pagamentos.php?view=<?= $fechamento['id'] ?>" class="btn btn-sm btn-light-primary me-2">
                                     Ver
                                 </a>
+                                <?php if ($fechamento['status'] === 'fechado'): ?>
+                                <button type="button" class="btn btn-sm btn-light-success me-2" onclick="marcarComoPagoLista(<?= $fechamento['id'] ?>, '<?= date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')) ?>')" title="Marcar como Pago">
+                                    <i class="ki-duotone ki-check-circle fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </button>
+                                <?php endif; ?>
                                 <button type="button" class="btn btn-sm btn-light-danger" onclick="deletarFechamento(<?= $fechamento['id'] ?>, '<?= date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')) ?>')">
                                     <i class="ki-duotone ki-trash fs-5">
                                         <span class="path1"></span>
@@ -5861,6 +5910,52 @@ function fecharFechamento(id) {
     }).then(function(result) {
         if (result.value) {
             document.getElementById('form_fechar_' + id).submit();
+        }
+    });
+}
+
+// Marcar como pago (dentro da visualização do fechamento)
+function marcarComoPago(id) {
+    Swal.fire({
+        title: "Marcar como Pago?",
+        text: "Confirma que este fechamento já foi pago? Esta ação é útil para bônus que não precisam de nota fiscal.",
+        icon: "question",
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: "Sim, marcar como pago!",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn fw-bold btn-success",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then(function(result) {
+        if (result.value) {
+            document.getElementById('form_marcar_pago_' + id).submit();
+        }
+    });
+}
+
+// Marcar como pago (a partir da listagem)
+function marcarComoPagoLista(id, mesAno) {
+    Swal.fire({
+        title: "Marcar como Pago?",
+        text: `Confirma que o fechamento de ${mesAno} já foi pago?`,
+        icon: "question",
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: "Sim, marcar como pago!",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn fw-bold btn-success",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then(function(result) {
+        if (result.value) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = '<input type="hidden" name="action" value="marcar_pago"><input type="hidden" name="fechamento_id" value="' + id + '">';
+            document.body.appendChild(form);
+            form.submit();
         }
     });
 }

@@ -178,6 +178,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         header.querySelector('.card-title').appendChild(badge);
                     }
                 }
+                
+                // Mostra toast de pontos se ganhou
+                if (data.pontos_ganhos && window.processarRespostaPontos) {
+                    window.processarRespostaPontos(data, 'comunicado_lido');
+                }
             } else {
                 alert('Erro ao marcar como lido: ' + (data.message || 'Erro desconhecido'));
                 button.disabled = false;

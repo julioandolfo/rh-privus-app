@@ -72,7 +72,16 @@ try {
             
             // Adiciona pontos apenas na primeira curtida
             require_once __DIR__ . '/../../includes/pontuacao.php';
-            adicionar_pontos('curtir_feed', $usuario_id, $colaborador_id, $post_id, 'feed_post');
+            $pontos_ganhos = adicionar_pontos('curtir_feed', $usuario_id, $colaborador_id, $post_id, 'feed_post');
+            
+            // Busca quantidade de pontos da ação
+            $stmt_pontos = $pdo->prepare("SELECT pontos FROM pontos_config WHERE acao = 'curtir_feed' AND ativo = 1");
+            $stmt_pontos->execute();
+            $config_pontos = $stmt_pontos->fetch();
+            $pontos_valor = $config_pontos ? $config_pontos['pontos'] : 2;
+            
+            // Busca novo total de pontos
+            $novos_pontos = obter_pontos($usuario_id, $colaborador_id);
             
             // Cria notificação para o autor do post
             require_once __DIR__ . '/../../includes/notificacoes.php';
@@ -95,12 +104,20 @@ try {
         throw $e;
     }
     
-    echo json_encode([
+    $response = [
         'success' => true,
         'message' => "Post $acao com sucesso!",
         'curtido' => !$curtida_existente,
         'total_curtidas' => $total
-    ]);
+    ];
+    
+    // Adiciona info de pontos se ganhou
+    if (!$curtida_existente && isset($pontos_ganhos) && $pontos_ganhos) {
+        $response['pontos_ganhos'] = $pontos_valor ?? 2;
+        $response['pontos_totais'] = $novos_pontos['pontos_totais'] ?? 0;
+    }
+    
+    echo json_encode($response);
     
 } catch (Exception $e) {
     http_response_code(400);

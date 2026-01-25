@@ -454,6 +454,18 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="d-md-none">LMS</span>
                             </a>
                         </li>
+                        <li class="nav-item mt-2 flex-shrink-0">
+                            <a class="nav-link text-active-primary py-5" data-bs-toggle="tab" href="#kt_tab_pane_pontos">
+                                <i class="ki-duotone ki-medal-star fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                <span class="d-none d-md-inline">Pontos</span>
+                                <span class="d-md-none">Pts</span>
+                            </a>
+                        </li>
                     </ul>
                     </div>
                     <!--end::Tabs-->
@@ -1758,6 +1770,179 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php endif; ?>
                     </div>
                     <!--end::Tab Pane - Escola Privus-->
+                    
+                    <!--begin::Tab Pane - Pontos-->
+                    <div class="tab-pane fade" id="kt_tab_pane_pontos" role="tabpanel">
+                        <?php
+                        // Busca pontos do colaborador
+                        require_once __DIR__ . '/../includes/pontuacao.php';
+                        $pontos_colaborador = obter_pontos(null, $id);
+                        $historico_pontos = obter_historico_pontos($id, 50);
+                        ?>
+                        
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-7 gap-3">
+                            <h3 class="fw-bold text-gray-800 mb-0">Gerenciar Pontos</h3>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modal_adicionar_pontos">
+                                    <i class="ki-duotone ki-plus fs-6">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Adicionar Pontos
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modal_remover_pontos">
+                                    <i class="ki-duotone ki-minus fs-6">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Remover Pontos
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Cards de Estatísticas -->
+                        <div class="row g-4 mb-7">
+                            <div class="col-md-3">
+                                <div class="card card-flush bg-light-warning border-warning border border-dashed h-100">
+                                    <div class="card-body text-center p-5">
+                                        <i class="ki-duotone ki-medal-star fs-3x text-warning mb-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                            <span class="path4"></span>
+                                        </i>
+                                        <div class="fs-2hx fw-bold text-warning" id="pontos_total_display"><?= number_format($pontos_colaborador['pontos_totais'], 0, ',', '.') ?></div>
+                                        <div class="text-gray-600 fw-semibold fs-6">Pontos Totais</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card card-flush bg-light-primary border-primary border border-dashed h-100">
+                                    <div class="card-body text-center p-5">
+                                        <i class="ki-duotone ki-calendar fs-3x text-primary mb-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <div class="fs-2hx fw-bold text-primary"><?= number_format($pontos_colaborador['pontos_mes'], 0, ',', '.') ?></div>
+                                        <div class="text-gray-600 fw-semibold fs-6">Pontos no Mês</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card card-flush bg-light-success border-success border border-dashed h-100">
+                                    <div class="card-body text-center p-5">
+                                        <i class="ki-duotone ki-time fs-3x text-success mb-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <div class="fs-2hx fw-bold text-success"><?= number_format($pontos_colaborador['pontos_semana'], 0, ',', '.') ?></div>
+                                        <div class="text-gray-600 fw-semibold fs-6">Pontos na Semana</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card card-flush bg-light-info border-info border border-dashed h-100">
+                                    <div class="card-body text-center p-5">
+                                        <i class="ki-duotone ki-sun fs-3x text-info mb-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                            <span class="path4"></span>
+                                            <span class="path5"></span>
+                                            <span class="path6"></span>
+                                            <span class="path7"></span>
+                                            <span class="path8"></span>
+                                        </i>
+                                        <div class="fs-2hx fw-bold text-info"><?= number_format($pontos_colaborador['pontos_dia'], 0, ',', '.') ?></div>
+                                        <div class="text-gray-600 fw-semibold fs-6">Pontos Hoje</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Histórico de Pontos -->
+                        <div class="card card-flush">
+                            <div class="card-header pt-7">
+                                <h3 class="card-title align-items-start flex-column">
+                                    <span class="card-label fw-bold text-gray-800">Histórico de Pontos</span>
+                                    <span class="text-muted mt-1 fw-semibold fs-7">Últimas 50 movimentações</span>
+                                </h3>
+                            </div>
+                            <div class="card-body pt-5">
+                                <?php if (empty($historico_pontos)): ?>
+                                    <div class="text-center text-muted py-10">
+                                        <i class="ki-duotone ki-document fs-3x text-gray-300 mb-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <p>Nenhum registro de pontos ainda.</p>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                            <thead>
+                                                <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase">
+                                                    <th class="min-w-100px">Data</th>
+                                                    <th class="min-w-150px">Ação</th>
+                                                    <th class="min-w-100px text-center">Pontos</th>
+                                                    <th class="min-w-150px">Observação</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($historico_pontos as $hp): 
+                                                    $is_positivo = $hp['pontos'] > 0;
+                                                    
+                                                    // Descrição da ação
+                                                    $acao_desc = $hp['acao_descricao'] ?? '';
+                                                    if (empty($acao_desc)) {
+                                                        switch ($hp['acao']) {
+                                                            case 'ajuste_manual_credito': $acao_desc = 'Crédito Manual'; break;
+                                                            case 'ajuste_manual_debito': $acao_desc = 'Débito Manual'; break;
+                                                            case 'concluir_curso': $acao_desc = 'Conclusão de Curso'; break;
+                                                            case 'comunicado_lido': $acao_desc = 'Leitura de Comunicado'; break;
+                                                            case 'confirmar_evento': $acao_desc = 'Confirmação de Evento'; break;
+                                                            default: $acao_desc = ucfirst(str_replace('_', ' ', $hp['acao']));
+                                                        }
+                                                    }
+                                                    
+                                                    // Observação do ajuste manual
+                                                    $obs = '';
+                                                    if (strpos($hp['referencia_tipo'] ?? '', 'ajuste_manual:') === 0) {
+                                                        $obs = substr($hp['referencia_tipo'], strlen('ajuste_manual:'));
+                                                    }
+                                                ?>
+                                                <tr>
+                                                    <td>
+                                                        <span class="text-gray-800 fw-semibold"><?= date('d/m/Y', strtotime($hp['data_registro'])) ?></span>
+                                                        <br><span class="text-muted fs-8"><?= date('H:i', strtotime($hp['created_at'])) ?></span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge badge-light-<?= $is_positivo ? 'success' : 'danger' ?> fs-7">
+                                                            <?= htmlspecialchars($acao_desc) ?>
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span class="fw-bold fs-5 text-<?= $is_positivo ? 'success' : 'danger' ?>">
+                                                            <?= $is_positivo ? '+' : '' ?><?= number_format($hp['pontos'], 0, ',', '.') ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <?php if (!empty($obs)): ?>
+                                                            <span class="text-gray-600 fs-7"><?= htmlspecialchars($obs) ?></span>
+                                                        <?php else: ?>
+                                                            <span class="text-muted fs-8">-</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Tab Pane - Pontos-->
                 </div>
                 <!--end::Tab Content-->
             </div>
@@ -1840,6 +2025,140 @@ require_once __DIR__ . '/../includes/header.php';
                     <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">
                         <span class="indicator-label">Salvar</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Pontos -->
+<div class="modal fade" id="modal_adicionar_pontos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold text-success">
+                    <i class="ki-duotone ki-plus-circle fs-2x text-success me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Adicionar Pontos
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="form_adicionar_pontos">
+                <div class="modal-body py-10 px-lg-17">
+                    <input type="hidden" name="action" value="adicionar">
+                    <input type="hidden" name="colaborador_id" value="<?= $id ?>">
+                    
+                    <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-4 mb-7">
+                        <i class="ki-duotone ki-information fs-2x text-success me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <span class="fw-semibold text-gray-800">Adicionar pontos manualmente</span>
+                            <span class="text-gray-600 fs-7">Use para campanhas, bonificações especiais ou correções.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-7">
+                        <label class="fw-semibold fs-6 mb-2 required">Quantidade de Pontos</label>
+                        <input type="number" name="pontos" class="form-control form-control-solid" min="1" placeholder="Ex: 100" required>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="fw-semibold fs-6 mb-2 required">Motivo/Descrição</label>
+                        <textarea name="descricao" class="form-control form-control-solid" rows="3" placeholder="Ex: Campanha de Natal 2025, Bônus por indicação, etc." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <span class="indicator-label">
+                            <i class="ki-duotone ki-plus fs-4 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Adicionar Pontos
+                        </span>
+                        <span class="indicator-progress">Processando...
+                            <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Remover Pontos -->
+<div class="modal fade" id="modal_remover_pontos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold text-danger">
+                    <i class="ki-duotone ki-minus-circle fs-2x text-danger me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Remover Pontos
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="form_remover_pontos">
+                <div class="modal-body py-10 px-lg-17">
+                    <input type="hidden" name="action" value="remover">
+                    <input type="hidden" name="colaborador_id" value="<?= $id ?>">
+                    
+                    <div class="notice d-flex bg-light-danger rounded border-danger border border-dashed p-4 mb-7">
+                        <i class="ki-duotone ki-information fs-2x text-danger me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <span class="fw-semibold text-gray-800">Remover pontos</span>
+                            <span class="text-gray-600 fs-7">Use para correções, penalidades ou ajustes necessários.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-7">
+                        <label class="fw-semibold fs-6 mb-2 required">Quantidade de Pontos</label>
+                        <input type="number" name="pontos" class="form-control form-control-solid" min="1" placeholder="Ex: 50" required>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="fw-semibold fs-6 mb-2 required">Motivo/Descrição</label>
+                        <textarea name="descricao" class="form-control form-control-solid" rows="3" placeholder="Ex: Correção de pontos duplicados, etc." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <span class="indicator-label">
+                            <i class="ki-duotone ki-minus fs-4 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Remover Pontos
+                        </span>
+                        <span class="indicator-progress">Processando...
+                            <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                        </span>
                     </button>
                 </div>
             </form>
@@ -2928,6 +3247,154 @@ document.getElementById('kt_modal_bonus_form')?.addEventListener('submit', funct
             }
         });
     });
+});
+
+// === Gerenciamento de Pontos ===
+// Adicionar Pontos
+document.getElementById('form_adicionar_pontos').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const form = this;
+    const btn = form.querySelector('button[type="submit"]');
+    const formData = new FormData(form);
+    
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+    
+    fetch('../api/pontos/gerenciar.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        if (data.success) {
+            // Fecha o modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modal_adicionar_pontos'));
+            if (modal) modal.hide();
+            
+            // Atualiza o total exibido
+            const totalDisplay = document.getElementById('pontos_total_display');
+            if (totalDisplay && data.pontos_totais !== undefined) {
+                totalDisplay.textContent = data.pontos_totais.toLocaleString('pt-BR');
+            }
+            
+            Swal.fire({
+                text: data.message,
+                icon: "success",
+                buttonsStyling: false,
+                confirmButtonText: "OK",
+                customClass: {
+                    confirmButton: "btn fw-bold btn-primary"
+                }
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire({
+                text: data.message || 'Erro ao adicionar pontos',
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "OK",
+                customClass: {
+                    confirmButton: "btn fw-bold btn-primary"
+                }
+            });
+        }
+    })
+    .catch(error => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        Swal.fire({
+            text: 'Erro ao conectar com o servidor',
+            icon: "error",
+            buttonsStyling: false,
+            confirmButtonText: "OK",
+            customClass: {
+                confirmButton: "btn fw-bold btn-primary"
+            }
+        });
+    });
+});
+
+// Remover Pontos
+document.getElementById('form_remover_pontos').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const form = this;
+    const btn = form.querySelector('button[type="submit"]');
+    const formData = new FormData(form);
+    
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+    
+    fetch('../api/pontos/gerenciar.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        if (data.success) {
+            // Fecha o modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modal_remover_pontos'));
+            if (modal) modal.hide();
+            
+            // Atualiza o total exibido
+            const totalDisplay = document.getElementById('pontos_total_display');
+            if (totalDisplay && data.pontos_totais !== undefined) {
+                totalDisplay.textContent = data.pontos_totais.toLocaleString('pt-BR');
+            }
+            
+            Swal.fire({
+                text: data.message,
+                icon: "success",
+                buttonsStyling: false,
+                confirmButtonText: "OK",
+                customClass: {
+                    confirmButton: "btn fw-bold btn-primary"
+                }
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire({
+                text: data.message || 'Erro ao remover pontos',
+                icon: "error",
+                buttonsStyling: false,
+                confirmButtonText: "OK",
+                customClass: {
+                    confirmButton: "btn fw-bold btn-primary"
+                }
+            });
+        }
+    })
+    .catch(error => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        Swal.fire({
+            text: 'Erro ao conectar com o servidor',
+            icon: "error",
+            buttonsStyling: false,
+            confirmButtonText: "OK",
+            customClass: {
+                confirmButton: "btn fw-bold btn-primary"
+            }
+        });
+    });
+});
+
+// Limpa formulários ao fechar modais
+document.getElementById('modal_adicionar_pontos').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('form_adicionar_pontos').reset();
+});
+
+document.getElementById('modal_remover_pontos').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('form_remover_pontos').reset();
 });
 </script>
 <?php endif; ?>

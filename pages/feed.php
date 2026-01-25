@@ -34,6 +34,33 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="col-xl-12">
                 <!--begin::Card - Criar Post-->
                 <div class="card card-flush mb-5">
+                    <div class="card-header pt-5 pb-0 border-0">
+                        <div class="d-flex align-items-center">
+                            <span class="badge badge-light-success fs-7 fw-semibold me-2">
+                                <i class="ki-duotone ki-medal-star fs-6 me-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                +20 pts ao publicar
+                            </span>
+                            <span class="badge badge-light-primary fs-7 fw-semibold me-2">
+                                <i class="ki-duotone ki-heart fs-6 me-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                +2 pts ao curtir
+                            </span>
+                            <span class="badge badge-light-info fs-7 fw-semibold">
+                                <i class="ki-duotone ki-message-text fs-6 me-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                +5 pts ao comentar
+                            </span>
+                        </div>
+                    </div>
                     <div class="card-body pt-6">
                         <form id="form_post" enctype="multipart/form-data">
                             <div class="mb-5">
@@ -420,6 +447,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 console.log('Dados recebidos:', data);
                 if (data.success) {
+                    // Mostra toast de pontos se ganhou
+                    if (data.pontos_ganhos && window.processarRespostaPontos) {
+                        window.processarRespostaPontos(data, 'postar_feed');
+                    }
+                    
                     Swal.fire({
                         text: data.message,
                         icon: "success",
@@ -517,6 +549,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.curtido) {
                     btn.classList.add('btn-active');
                     btn.querySelector('i').classList.add('text-danger');
+                    
+                    // Mostra toast de pontos se ganhou
+                    if (data.pontos_ganhos && window.processarRespostaPontos) {
+                        window.processarRespostaPontos(data, 'curtir_feed');
+                    }
                 } else {
                     btn.classList.remove('btn-active');
                     btn.querySelector('i').classList.remove('text-danger');
@@ -589,6 +626,12 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 input.value = '';
+                
+                // Mostra toast de pontos se ganhou
+                if (data.pontos_ganhos && window.processarRespostaPontos) {
+                    window.processarRespostaPontos(data, 'comentar_feed');
+                }
+                
                 carregarPosts();
             } else {
                 Swal.fire({

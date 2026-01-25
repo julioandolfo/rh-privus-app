@@ -495,6 +495,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('📨 Resposta da API:', data);
                 if (data.success) {
                     console.log('✅ Feedback enviado com sucesso!');
+                    
+                    // Mostra toast de pontos se ganhou
+                    if (data.pontos_ganhos && window.processarRespostaPontos) {
+                        window.processarRespostaPontos(data, 'enviar_feedback');
+                    }
+                    
                     Swal.fire({
                         text: data.message,
                         icon: "success",

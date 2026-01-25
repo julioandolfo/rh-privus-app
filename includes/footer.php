@@ -1128,6 +1128,117 @@
     </script>
     <!--end::Atualização Badge Chat Menu-->
     
+<!--begin::Sistema de Toast de Pontos-->
+<script>
+// Sistema Global de Pontos - Toast e Atualização do Header
+window.RHPrivusPontos = {
+    // Mostra toast de pontos ganhos
+    mostrarToastPontos: function(pontosGanhos, novoPontosTotal, acao) {
+        if (!pontosGanhos || pontosGanhos <= 0) return;
+        
+        // Atualiza o contador de pontos no header
+        this.atualizarHeaderPontos(novoPontosTotal);
+        
+        // Descrições das ações
+        const descricoes = {
+            'postar_feed': 'publicação',
+            'curtir_feed': 'curtida',
+            'comentar_feed': 'comentário',
+            'registrar_emocao': 'registro de emoção',
+            'enviar_feedback': 'feedback enviado',
+            'acesso_diario': 'acesso diário',
+            'comunicado_lido': 'leitura de comunicado',
+            'confirmar_evento': 'confirmação de presença',
+            'concluir_curso': 'conclusão de curso'
+        };
+        
+        const descricaoAcao = descricoes[acao] || 'ação';
+        
+        // Toast usando Toastr se disponível, senão usa SweetAlert2
+        if (typeof toastr !== 'undefined') {
+            toastr.success(
+                `<div class="d-flex align-items-center">
+                    <i class="ki-duotone ki-medal-star fs-2x text-warning me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                    </i>
+                    <div>
+                        <strong>+${pontosGanhos} pontos!</strong><br>
+                        <small>Por ${descricaoAcao}</small>
+                    </div>
+                </div>`,
+                'Parabéns!',
+                {
+                    timeOut: 3000,
+                    progressBar: true,
+                    closeButton: true,
+                    positionClass: 'toast-top-right',
+                    enableHtml: true
+                }
+            );
+        } else if (typeof Swal !== 'undefined') {
+            // Toast usando SweetAlert2
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            });
+            
+            Toast.fire({
+                icon: 'success',
+                title: `<span class="text-success fw-bold">+${pontosGanhos} pontos!</span>`,
+                html: `<small class="text-muted">Por ${descricaoAcao}</small>`
+            });
+        }
+    },
+    
+    // Atualiza o contador de pontos no header
+    atualizarHeaderPontos: function(novoPontosTotal) {
+        const headerPontos = document.getElementById('header_pontos_total');
+        if (headerPontos && novoPontosTotal !== undefined) {
+            // Animação de destaque
+            headerPontos.classList.add('text-success');
+            headerPontos.style.transition = 'all 0.3s ease';
+            headerPontos.style.transform = 'scale(1.3)';
+            
+            // Atualiza o valor
+            headerPontos.textContent = novoPontosTotal.toLocaleString('pt-BR');
+            
+            // Remove animação após 500ms
+            setTimeout(() => {
+                headerPontos.classList.remove('text-success');
+                headerPontos.style.transform = 'scale(1)';
+            }, 500);
+        }
+    },
+    
+    // Processa resposta de API que contém pontos
+    processarRespostaPontos: function(data, acao) {
+        if (data && data.pontos_ganhos && data.pontos_ganhos > 0) {
+            this.mostrarToastPontos(data.pontos_ganhos, data.pontos_totais, acao);
+        }
+    }
+};
+
+// Alias global para facilitar o uso
+window.mostrarToastPontos = function(pontosGanhos, novoPontosTotal, acao) {
+    window.RHPrivusPontos.mostrarToastPontos(pontosGanhos, novoPontosTotal, acao);
+};
+
+window.processarRespostaPontos = function(data, acao) {
+    window.RHPrivusPontos.processarRespostaPontos(data, acao);
+};
+</script>
+<!--end::Sistema de Toast de Pontos-->
+
 <script>
 // Função para voltar ao usuário original após impersonation
 function voltarUsuarioOriginal() {

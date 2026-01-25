@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bairro = sanitize($_POST['bairro'] ?? '');
     $cidade_endereco = sanitize($_POST['cidade_endereco'] ?? '');
     $estado_endereco = strtoupper(sanitize($_POST['estado_endereco'] ?? ''));
+    $descricao_funcao = sanitize($_POST['descricao_funcao'] ?? '');
     
     // Validação: não pode ser líder de si mesmo
     if ($lider_id == $id) {
@@ -113,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 nome_completo = ?, cpf = ?, cnpj = ?, rg = ?, data_nascimento = ?, estado_civil = ?, telefone = ?, email_pessoal = ?, 
                 data_inicio = ?, status = ?, tipo_contrato = ?, salario = ?, pix = ?, banco = ?, agencia = ?, conta = ?, tipo_conta = ?, 
                 cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade_endereco = ?, estado_endereco = ?, 
-                observacoes = ?, foto = ?, senha_hash = ?
+                descricao_funcao = ?, observacoes = ?, foto = ?, senha_hash = ?
             WHERE id = ?
         ");
         $stmt->execute([
@@ -121,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $estado_civil ?: null, $telefone, $email_pessoal, $data_inicio, 
             $status, $tipo_contrato, $salario, $pix, $banco, $agencia, $conta, $tipo_conta, 
             !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco, 
-            !empty($estado_endereco) ? $estado_endereco : null, $observacoes, $foto_path, $senha_hash, $id
+            !empty($estado_endereco) ? $estado_endereco : null, $descricao_funcao, $observacoes, $foto_path, $senha_hash, $id
         ]);
         
         // Processa filhos (remove todos e adiciona novamente)
@@ -270,6 +271,14 @@ require_once __DIR__ . '/../includes/header.php';
                                     </option>
                                     <?php endforeach; ?>
                                 </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Descrição da Função</label>
+                                <textarea name="descricao_funcao" id="descricao_funcao" class="form-control" rows="3" placeholder="Descreva as atividades e responsabilidades do colaborador (usado em contratos)"><?= htmlspecialchars($colaborador['descricao_funcao'] ?? '') ?></textarea>
+                                <small class="text-muted">Esta descrição será utilizada nos contratos gerados para este colaborador</small>
                             </div>
                         </div>
                         

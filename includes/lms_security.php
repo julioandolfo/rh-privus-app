@@ -476,6 +476,18 @@ function marcar_aula_concluida($progresso_id, $colaborador_id, $aula_id, $curso_
             
             // Verifica badges
             verificar_badges_curso($colaborador_id, $curso_id);
+            
+            // Adiciona pontos pela conclusão do curso
+            require_once __DIR__ . '/pontuacao.php';
+            
+            // Busca pontos de recompensa configurados no curso
+            $stmt_curso = $pdo->prepare("SELECT pontos_recompensa FROM cursos WHERE id = ?");
+            $stmt_curso->execute([$curso_id]);
+            $curso_dados = $stmt_curso->fetch();
+            
+            if ($curso_dados && $curso_dados['pontos_recompensa'] > 0) {
+                adicionar_pontos_curso($colaborador_id, $curso_id, $curso_dados['pontos_recompensa']);
+            }
         }
         
         $pdo->commit();

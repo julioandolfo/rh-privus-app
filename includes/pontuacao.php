@@ -190,6 +190,125 @@ function obter_pontos($usuario_id = null, $colaborador_id = null) {
 }
 
 /**
+ * Adiciona pontos manualmente (para uso administrativo)
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @param int $pontos Quantidade de pontos (positivo para adicionar, negativo para remover)
+ * @param string $descricao Descrição/motivo da alteração
+ * @param int $usuario_admin_id ID do usuário admin que fez a alteração
+ * @return array Array com success e message
+ */
+function adicionar_pontos_manual($colaborador_id, $pontos, $descricao, $usuario_admin_id) {
+    try {
+        $pdo = getDB();
+        
+        if (empty($pontos) || $pontos == 0) {
+            return ['success' => false, 'message' => 'Quantidade de pontos inválida'];
+        }
+        
+        if (empty($descricao)) {
+            return ['success' => false, 'message' => 'Descrição é obrigatória'];
+        }
+        
+        $data_registro = date('Y-m-d');
+        $acao = $pontos > 0 ? 'ajuste_manual_credito' : 'ajuste_manual_debito';
+        
+        // Insere no histórico
+        $stmt = $pdo->prepare("
+            INSERT INTO pontos_historico (usuario_id, colaborador_id, acao, pontos, referencia_id, referencia_tipo, data_registro)
+            VALUES (NULL, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$colaborador_id, $acao, $pontos, $usuario_admin_id, 'ajuste_manual:' . $descricao, $data_registro]);
+        
+        // Atualiza total de pontos
+        atualizar_total_pontos(null, $colaborador_id);
+        
+        // Busca novo total
+        $novos_pontos = obter_pontos(null, $colaborador_id);
+        
+        return [
+            'success' => true, 
+            'message' => $pontos > 0 ? "Adicionados $pontos pontos com sucesso!" : "Removidos " . abs($pontos) . " pontos com sucesso!",
+            'pontos_totais' => $novos_pontos['pontos_totais']
+        ];
+        
+    } catch (PDOException $e) {
+        error_log("Erro ao adicionar pontos manualmente: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Erro ao processar a operação'];
+    }
+}
+
+/**
+ * Adiciona pontos para conclusão de curso (com valor específico do curso)
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @param int $curso_id ID do curso
+ * @param int $pontos_recompensa Quantidade de pontos configurada no curso
+ * @return bool True se pontos foram adicionados
+ */
+function adicionar_pontos_curso($colaborador_id, $curso_id, $pontos_recompensa) {
+    try {
+        if ($pontos_recompensa <= 0) {
+            return false;
+        }
+        
+        $pdo = getDB();
+        $data_registro = date('Y-m-d');
+        
+        // Verifica se já ganhou pontos por este curso
+        $stmt = $pdo->prepare("
+            SELECT id FROM pontos_historico 
+            WHERE colaborador_id = ? AND acao = 'concluir_curso' AND referencia_id = ? AND referencia_tipo = 'curso'
+        ");
+        $stmt->execute([$colaborador_id, $curso_id]);
+        if ($stmt->fetch()) {
+            return false; // Já ganhou pontos por este curso
+        }
+        
+        // Insere no histórico
+        $stmt = $pdo->prepare("
+            INSERT INTO pontos_historico (usuario_id, colaborador_id, acao, pontos, referencia_id, referencia_tipo, data_registro)
+            VALUES (NULL, ?, 'concluir_curso', ?, ?, 'curso', ?)
+        ");
+        $stmt->execute([$colaborador_id, $pontos_recompensa, $curso_id, $data_registro]);
+        
+        // Atualiza total de pontos
+        atualizar_total_pontos(null, $colaborador_id);
+        
+        return true;
+        
+    } catch (PDOException $e) {
+        error_log("Erro ao adicionar pontos de curso: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Obtém histórico de pontos de um colaborador
+ */
+function obter_historico_pontos($colaborador_id, $limite = 30) {
+    try {
+        $pdo = getDB();
+        
+        $stmt = $pdo->prepare("
+            SELECT ph.*, pc.descricao as acao_descricao
+            FROM pontos_historico ph
+            LEFT JOIN pontos_config pc ON ph.acao = pc.acao
+            WHERE ph.colaborador_id = ?
+            ORDER BY ph.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$colaborador_id, $limite]);
+        
+        return $stmt->fetchAll();
+        
+    } catch (PDOException $e) {
+        error_log("Erro ao obter histórico de pontos: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
  * Obtém ranking de pontos
  */
 function obter_ranking_pontos($periodo = 'mes', $limite = 10) {

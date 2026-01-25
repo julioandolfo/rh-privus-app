@@ -45,6 +45,9 @@ if (empty($token)) {
             $motivo = isset($_POST['motivo']) ? sanitize($_POST['motivo']) : null;
             
             try {
+                // Verifica se já estava confirmado antes
+                $ja_confirmado = ($participante['status_confirmacao'] === 'confirmado');
+                
                 $stmt = $pdo->prepare("
                     UPDATE eventos_participantes 
                     SET status_confirmacao = ?, 
@@ -53,6 +56,12 @@ if (empty($token)) {
                     WHERE token_confirmacao = ?
                 ");
                 $stmt->execute([$status, $motivo, $token]);
+                
+                // Adiciona pontos se está confirmando e não estava confirmado antes
+                if ($status === 'confirmado' && !$ja_confirmado) {
+                    require_once __DIR__ . '/../includes/pontuacao.php';
+                    adicionar_pontos('confirmar_evento', null, $participante['colaborador_id'], $participante['evento_id'], 'evento');
+                }
                 
                 $sucesso = [
                     'confirmado' => 'Sua presença foi confirmada com sucesso!',

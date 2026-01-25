@@ -870,8 +870,21 @@ if (is_colaborador() && !empty($colaborador_id)) {
                     <div class="card-header pt-7">
                         <h3 class="card-title align-items-start flex-column">
                             <span class="card-label fw-bold text-gray-800">Como você está se sentindo?</span>
-                            <span class="text-muted mt-1 fw-semibold fs-7">Registre sua emoção diária e ganhe 50 pontos!</span>
+                            <span class="text-muted mt-1 fw-semibold fs-7">Registre sua emoção diária</span>
                         </h3>
+                        <?php if (!$ja_registrou_emocao): ?>
+                        <div class="card-toolbar">
+                            <span class="badge badge-light-success fs-6 fw-bold py-3 px-4">
+                                <i class="ki-duotone ki-medal-star fs-3 text-success me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                +50 pontos
+                            </span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <div class="card-body pt-6">
                         <?php if ($ja_registrou_emocao): ?>
@@ -965,13 +978,18 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                 </div>
                             </form>
                             
-                            <div class="text-center text-muted small">
-                                <i class="ki-duotone ki-information-5 fs-4">
+                            <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-4 mt-5">
+                                <i class="ki-duotone ki-medal-star fs-2x text-success me-4">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                     <span class="path3"></span>
+                                    <span class="path4"></span>
                                 </i>
-                                <span class="ms-2">Ganhe 50 pontos ao registrar sua emoção!</span>
+                                <div class="d-flex flex-stack flex-grow-1">
+                                    <div class="fw-semibold">
+                                        <div class="fs-6 text-gray-700">Ganhe <strong class="text-success">+50 pontos</strong> ao registrar como você está se sentindo hoje!</div>
+                                    </div>
+                                </div>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -1461,8 +1479,21 @@ if (is_colaborador() && !empty($colaborador_id)) {
                     <div class="card-header pt-7">
                         <h3 class="card-title align-items-start flex-column">
                             <span class="card-label fw-bold text-gray-800">Como você está se sentindo?</span>
-                            <span class="text-muted mt-1 fw-semibold fs-7">Registre sua emoção diária e ganhe 50 pontos!</span>
+                            <span class="text-muted mt-1 fw-semibold fs-7">Registre sua emoção diária</span>
                         </h3>
+                        <?php if (!$ja_registrou_emocao): ?>
+                        <div class="card-toolbar">
+                            <span class="badge badge-light-success fs-6 fw-bold py-3 px-4">
+                                <i class="ki-duotone ki-medal-star fs-3 text-success me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                +50 pontos
+                            </span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <div class="card-body pt-6">
                         <?php if ($ja_registrou_emocao): ?>
@@ -1556,13 +1587,18 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                 </div>
                             </form>
                             
-                            <div class="text-center text-muted small">
-                                <i class="ki-duotone ki-information-5 fs-4">
+                            <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-4 mt-5">
+                                <i class="ki-duotone ki-medal-star fs-2x text-success me-4">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                     <span class="path3"></span>
+                                    <span class="path4"></span>
                                 </i>
-                                <span class="ms-2">Ganhe 50 pontos ao registrar sua emoção!</span>
+                                <div class="d-flex flex-stack flex-grow-1">
+                                    <div class="fw-semibold">
+                                        <div class="fs-6 text-gray-700">Ganhe <strong class="text-success">+50 pontos</strong> ao registrar como você está se sentindo hoje!</div>
+                                    </div>
+                                </div>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -7021,6 +7057,11 @@ window.enviarHumorColab = function() {
     .then(data => {
         console.log('Dados:', data);
         if (data.success) {
+            // Mostra toast de pontos se ganhou
+            if (data.pontos_ganhos && window.processarRespostaPontos) {
+                window.processarRespostaPontos(data, 'registrar_emocao');
+            }
+            
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     text: data.message,
@@ -7139,6 +7180,11 @@ window.enviarHumorAdmin = function() {
     .then(data => {
         console.log('Dados:', data);
         if (data.success) {
+            // Mostra toast de pontos se ganhou
+            if (data.pontos_ganhos && window.processarRespostaPontos) {
+                window.processarRespostaPontos(data, 'registrar_emocao');
+            }
+            
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     text: data.message,

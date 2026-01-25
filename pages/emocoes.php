@@ -174,13 +174,18 @@ require_once __DIR__ . '/../includes/header.php';
                                 </div>
                             </form>
                             
-                            <div class="text-center text-muted small">
-                                <i class="ki-duotone ki-information-5 fs-4">
+                            <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-4 mt-5">
+                                <i class="ki-duotone ki-medal-star fs-2x text-success me-4">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                     <span class="path3"></span>
+                                    <span class="path4"></span>
                                 </i>
-                                <span class="ms-2">Ganhe 50 pontos ao registrar sua emoção!</span>
+                                <div class="d-flex flex-stack flex-grow-1">
+                                    <div class="fw-semibold">
+                                        <div class="fs-6 text-gray-700">Ganhe <strong class="text-success">+50 pontos</strong> ao registrar como você está se sentindo hoje!</div>
+                                    </div>
+                                </div>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -303,6 +308,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // Mostra toast de pontos se ganhou
+                    if (data.pontos_ganhos && window.processarRespostaPontos) {
+                        window.processarRespostaPontos(data, 'registrar_emocao');
+                    }
+                    
                     Swal.fire({
                         text: data.message,
                         icon: "success",
