@@ -257,13 +257,14 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="col-md-4">
                             <div class="mb-5">
                                 <label class="form-label">Imagem</label>
-                                <div class="image-input image-input-outline" id="produto_imagem_container">
+                                <div class="image-input image-input-outline" id="produto_imagem_container" data-kt-image-input="true">
                                     <div class="image-input-wrapper w-125px h-125px" id="produto_imagem_preview" style="background-image: url('../assets/media/svg/files/blank-image.svg'); background-size: 50%; background-position: center;"></div>
-                                    <label class="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-body shadow" title="Alterar imagem">
+                                    <label class="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-body shadow" data-kt-image-input-action="change" title="Alterar imagem">
                                         <i class="ki-duotone ki-pencil fs-7"><span class="path1"></span><span class="path2"></span></i>
-                                        <input type="file" name="imagem" accept=".png,.jpg,.jpeg,.gif,.webp" onchange="previewImagem(this)">
+                                        <input type="file" name="imagem" accept=".png,.jpg,.jpeg,.gif,.webp" onchange="previewImagem(this)" hidden>
                                     </label>
                                 </div>
+                                <div class="form-text">Clique no ícone para selecionar</div>
                             </div>
                             
                             <div class="mb-5">

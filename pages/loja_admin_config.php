@@ -21,7 +21,7 @@ $pdo = getDB();
 // Processa formulário
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $configs = [
+        $configs_post = [
             'loja_ativa' => isset($_POST['loja_ativa']) ? '1' : '0',
             'aprovacao_obrigatoria' => isset($_POST['aprovacao_obrigatoria']) ? '1' : '0',
             'limite_resgates_mes' => intval($_POST['limite_resgates_mes'] ?? 0),
@@ -32,15 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'estoque_baixo_limite' => intval($_POST['estoque_baixo_limite'] ?? 5)
         ];
         
-        foreach ($configs as $chave => $valor) {
+        foreach ($configs_post as $chave => $valor) {
             loja_config_set($chave, $valor);
         }
         
-        set_flash('success', 'Configurações salvas com sucesso!');
-        redirect('loja_admin_config.php');
+        redirect('loja_admin_config.php', 'Configurações salvas com sucesso!', 'success');
         
     } catch (Exception $e) {
-        set_flash('danger', 'Erro ao salvar configurações: ' . $e->getMessage());
+        $_SESSION['alert'] = ['tipo' => 'danger', 'mensagem' => 'Erro ao salvar configurações: ' . $e->getMessage()];
     }
 }
 
