@@ -939,6 +939,94 @@ function getIcon($name) {
                     <!--end:Menu item-->
                 <?php endif; ?>
                 
+                <!--begin:Menu item - Loja de Pontos-->
+                <?php if (is_colaborador()): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= (isActive('loja.php') || isActive('loja_meus_resgates.php')) ? 'active' : '' ?>" href="loja.php">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-shop fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Loja de Pontos</span>
+                    </a>
+                </div>
+                <?php elseif (can_show_menu(['ADMIN', 'RH', 'GESTOR'])): ?>
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('loja_admin_produtos.php') || isActive('loja_admin_categorias.php') || isActive('loja_admin_resgates.php') || isActive('loja_admin_config.php')) ? 'here show' : '' ?>">
+                    <!--begin:Menu link-->
+                    <span class="menu-link">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-shop fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Loja de Pontos</span>
+                        <?php
+                        // Conta resgates pendentes para badge
+                        try {
+                            $stmt_loja = $pdo->query("SELECT COUNT(*) as total FROM loja_resgates WHERE status = 'pendente'");
+                            $total_pendentes_loja = $stmt_loja->fetch()['total'] ?? 0;
+                            if ($total_pendentes_loja > 0) {
+                                echo '<span class="badge badge-circle badge-warning ms-auto">' . ($total_pendentes_loja > 99 ? '99+' : $total_pendentes_loja) . '</span>';
+                            }
+                        } catch (Exception $e) {}
+                        ?>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <!--end:Menu link-->
+                    <!--begin:Menu sub-->
+                    <div class="menu-sub menu-sub-accordion">
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('loja_admin_produtos.php') ?>" href="loja_admin_produtos.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Produtos</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('loja_admin_categorias.php') ?>" href="loja_admin_categorias.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Categorias</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('loja_admin_resgates.php') ?>" href="loja_admin_resgates.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Resgates</span>
+                                <?php if ($total_pendentes_loja > 0): ?>
+                                <span class="badge badge-sm badge-warning ms-auto"><?= $total_pendentes_loja ?></span>
+                                <?php endif; ?>
+                            </a>
+                        </div>
+                        <?php if (can_show_menu(['ADMIN', 'RH'])): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('loja_admin_config.php') ?>" href="loja_admin_config.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Configurações</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <!--end:Menu sub-->
+                </div>
+                <?php endif; ?>
+                <!--end:Menu item-->
+                
                 <?php if (can_access_page('comunicados.php') || can_access_page('comunicado_add.php')): ?>
                     <!--begin:Menu item - Comunicados-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('comunicados.php') || isActive('comunicado_add.php') || isActive('comunicado_view.php')) ? 'here show' : '' ?>">
