@@ -1,7 +1,7 @@
 <?php
 /**
  * Script para processar alertas de inatividade
- * Envia email para colaboradores que não acessam o sistema há X dias
+ * Envia email e push para colaboradores que não acessam o sistema há X dias
  * 
  * Deve ser executado via cron diariamente
  * 
@@ -11,6 +11,7 @@
 
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/email_templates.php';
+require_once __DIR__ . '/../includes/push_notifications.php';
 
 // Define timezone
 date_default_timezone_set('America/Sao_Paulo');
@@ -18,6 +19,7 @@ date_default_timezone_set('America/Sao_Paulo');
 // Configurações
 $DIAS_INATIVIDADE = 7; // Dias sem acessar para enviar alerta
 $LIMITE_ALERTAS_POR_EXECUCAO = 50; // Limite de emails por execução
+$ENVIAR_PUSH = true; // Envia notificação push via OneSignal
 
 try {
     $pdo = getDB();
@@ -119,6 +121,8 @@ try {
     
     $alertas_enviados = 0;
     $alertas_erro = 0;
+    $push_enviados = 0;
+    $push_erros = 0;
     
     foreach ($inativos as $inativo) {
         $usuario_id = $inativo['usuario_id'] ?? null;
@@ -174,12 +178,37 @@ try {
             echo "  [ERRO] Falha ao enviar email: " . ($resultado['message'] ?? 'Erro desconhecido') . "\n";
         }
         
+        // Envia push notification via OneSignal
+        if ($ENVIAR_PUSH) {
+            $titulo_push = "Sentimos sua falta!";
+            $mensagem_push = "Você não acessa o sistema há {$dias_inativo} dias. Volte para conferir as novidades!";
+            $url_push = $sistema_url . '/pages/dashboard.php';
+            
+            $resultado_push = null;
+            if ($usuario_id) {
+                $resultado_push = enviar_push_usuario($usuario_id, $titulo_push, $mensagem_push, $url_push);
+            } elseif ($colaborador_id) {
+                $resultado_push = enviar_push_colaborador($colaborador_id, $titulo_push, $mensagem_push, $url_push);
+            }
+            
+            if ($resultado_push && $resultado_push['success']) {
+                $push_enviados++;
+                echo "  [OK] Push enviado com sucesso\n";
+            } else {
+                $push_erros++;
+                $msg_erro = $resultado_push['message'] ?? 'Usuário sem dispositivo registrado';
+                echo "  [PUSH] Não enviado: {$msg_erro}\n";
+            }
+        }
+        
         echo "\n";
     }
     
     echo "\n=== RESUMO ===\n";
-    echo "Alertas enviados: {$alertas_enviados}\n";
-    echo "Erros: {$alertas_erro}\n";
+    echo "Emails enviados: {$alertas_enviados}\n";
+    echo "Emails com erro: {$alertas_erro}\n";
+    echo "Push enviados: {$push_enviados}\n";
+    echo "Push não enviados: {$push_erros}\n";
     echo "\nProcessamento concluído com sucesso!\n";
     
 } catch (Exception $e) {

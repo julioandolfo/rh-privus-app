@@ -49,6 +49,20 @@ require_once __DIR__ . '/../includes/header.php';
     background: #f5f8fa;
     border-radius: 8px;
 }
+.upload-image-box {
+    border: 2px dashed var(--bs-gray-300) !important;
+    transition: all 0.3s ease;
+}
+.upload-image-box:hover {
+    border-color: var(--bs-primary) !important;
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+}
+[data-bs-theme="dark"] .upload-image-box {
+    border-color: var(--bs-gray-600) !important;
+}
+[data-bs-theme="dark"] .upload-image-box:hover {
+    border-color: var(--bs-primary) !important;
+}
 </style>
 
 <!--begin::Toolbar-->
@@ -256,15 +270,15 @@ require_once __DIR__ . '/../includes/header.php';
                         
                         <div class="col-md-4">
                             <div class="mb-5">
-                                <label class="form-label">Imagem</label>
-                                <div class="image-input image-input-outline" id="produto_imagem_container" data-kt-image-input="true">
-                                    <div class="image-input-wrapper w-125px h-125px" id="produto_imagem_preview" style="background-image: url('../assets/media/svg/files/blank-image.svg'); background-size: 50%; background-position: center;"></div>
-                                    <label class="btn btn-icon btn-circle btn-active-color-primary w-25px h-25px bg-body shadow" data-kt-image-input-action="change" title="Alterar imagem">
-                                        <i class="ki-duotone ki-pencil fs-7"><span class="path1"></span><span class="path2"></span></i>
-                                        <input type="file" name="imagem" accept=".png,.jpg,.jpeg,.gif,.webp" onchange="previewImagem(this)" hidden>
-                                    </label>
+                                <label class="form-label">Imagem do Produto</label>
+                                <div class="upload-image-box rounded p-4 text-center" style="cursor: pointer;" onclick="document.getElementById('input_imagem_produto').click()">
+                                    <div id="produto_imagem_preview" class="mb-3" style="width: 120px; height: 120px; margin: 0 auto; background-image: url('../assets/media/svg/files/blank-image.svg'); background-size: 50%; background-position: center; background-repeat: no-repeat; background-color: #f5f8fa; border-radius: 8px;"></div>
+                                    <div class="text-gray-600 fs-7">
+                                        <i class="ki-duotone ki-picture fs-2 text-primary me-1"><span class="path1"></span><span class="path2"></span></i>
+                                        Clique para selecionar
+                                    </div>
+                                    <input type="file" name="imagem" id="input_imagem_produto" accept=".png,.jpg,.jpeg,.gif,.webp" onchange="previewImagem(this)" hidden>
                                 </div>
-                                <div class="form-text">Clique no ícone para selecionar</div>
                             </div>
                             
                             <div class="mb-5">
