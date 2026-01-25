@@ -73,12 +73,20 @@ try {
         'observacoes' => $input['observacoes'] ?? ''
     ];
     
-    // Substitui variáveis
-    $html = substituir_variaveis_contrato($template_html, $colaborador, $contrato_data);
+    // Campos manuais preenchidos pelo usuário
+    $campos_manuais = $input['campos_manuais'] ?? [];
+    
+    // Verifica campos faltantes
+    $campos_faltantes = verificar_campos_faltantes_contrato($template_html, $colaborador, $contrato_data, $campos_manuais);
+    
+    // Substitui variáveis (usando campos manuais quando disponíveis)
+    $html = substituir_variaveis_contrato_com_manuais($template_html, $colaborador, $contrato_data, $campos_manuais);
     
     echo json_encode([
         'success' => true,
-        'html' => $html
+        'html' => $html,
+        'campos_faltantes' => array_values($campos_faltantes),
+        'pode_enviar' => empty($campos_faltantes)
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     
 } catch (Exception $e) {

@@ -83,7 +83,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'observacoes' => $observacoes
     ];
     
-    $conteudo_final = substituir_variaveis_contrato($template_html, $colaborador, $contrato_data);
+    // Campos manuais preenchidos pelo usuário
+    $campos_manuais = $_POST['campos_manuais'] ?? [];
+    
+    // Se for enviar, valida campos obrigatórios
+    if ($acao === 'enviar') {
+        $campos_faltantes = verificar_campos_faltantes_contrato($template_html, $colaborador, $contrato_data, $campos_manuais);
+        if (!empty($campos_faltantes)) {
+            $nomes_campos = array_map(function($c) { return $c['label']; }, $campos_faltantes);
+            redirect('contrato_add.php?colaborador_id=' . $colaborador_id, 
+                'Campos obrigatórios faltando: ' . implode(', ', $nomes_campos), 'error');
+        }
+    }
+    
+    // Usa a função que aceita campos manuais
+    $conteudo_final = substituir_variaveis_contrato_com_manuais($template_html, $colaborador, $contrato_data, $campos_manuais);
     
     try {
         $pdo->beginTransaction();
@@ -331,6 +345,38 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     <!--end::Card-->
                     
+                    <!--begin::Card - Campos Faltantes-->
+                    <div class="card mb-5" id="card_campos_faltantes" style="display: none;">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1 text-warning">
+                                    <i class="ki-duotone ki-information-5 text-warning fs-2 me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Campos Faltantes
+                                </span>
+                                <span class="text-muted fw-semibold fs-7">Preencha os campos abaixo para poder enviar o contrato</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <div class="alert alert-warning d-flex align-items-center mb-5">
+                                <i class="ki-duotone ki-shield-tick fs-2hx text-warning me-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div class="d-flex flex-column">
+                                    <span>Os dados abaixo estão faltando no cadastro. Preencha manualmente para este contrato ou atualize o cadastro do colaborador/empresa.</span>
+                                </div>
+                            </div>
+                            <div id="campos_faltantes_container">
+                                <!-- Campos faltantes serão adicionados aqui via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Card-->
+                    
                     <!--begin::Card - Testemunhas-->
                     <div class="card mb-5">
                         <div class="card-header border-0 pt-5">
@@ -390,16 +436,21 @@ require_once __DIR__ . '/../includes/header.php';
             
             <!--begin::Actions-->
             <div class="card">
-                <div class="card-footer d-flex justify-content-end py-6 px-9">
-                    <a href="contratos.php" class="btn btn-light btn-active-light-primary me-2">Cancelar</a>
-                    <button type="submit" name="acao" value="rascunho" class="btn btn-light-warning me-2">
-                        Salvar como Rascunho
-                    </button>
-                    <button type="submit" name="acao" value="enviar" class="btn btn-primary">
-                        <span class="indicator-label">Enviar para Assinatura</span>
-                        <span class="indicator-progress">Enviando...
-                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
-                    </button>
+                <div class="card-footer d-flex justify-content-between py-6 px-9">
+                    <div id="status_envio" class="d-flex align-items-center" style="display: none !important;">
+                        <!-- Status será atualizado via JavaScript -->
+                    </div>
+                    <div class="d-flex">
+                        <a href="contratos.php" class="btn btn-light btn-active-light-primary me-2">Cancelar</a>
+                        <button type="submit" name="acao" value="rascunho" class="btn btn-light-warning me-2">
+                            Salvar como Rascunho
+                        </button>
+                        <button type="submit" name="acao" value="enviar" id="btn_enviar" class="btn btn-primary" disabled>
+                            <span class="indicator-label">Enviar para Assinatura</span>
+                            <span class="indicator-progress">Enviando...
+                            <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                        </button>
+                    </div>
                 </div>
             </div>
             <!--end::Actions-->
@@ -411,6 +462,8 @@ require_once __DIR__ . '/../includes/header.php';
 
 <script>
 let testemunhaIndex = 0;
+let camposFaltantes = [];
+let podeEnviar = false;
 
 // Adiciona testemunha
 document.getElementById('btn_adicionar_testemunha')?.addEventListener('click', function() {
@@ -470,7 +523,7 @@ document.getElementById('template_id')?.addEventListener('change', function() {
     const colaboradorId = document.getElementById('colaborador_id').value;
     
     if (templateId && colaboradorId) {
-        carregarTemplate(templateId, colaboradorId);
+        atualizarPreview();
     } else {
         document.getElementById('conteudo_customizado_container').style.display = templateId ? 'none' : 'block';
     }
@@ -488,6 +541,126 @@ document.getElementById('colaborador_id')?.addEventListener('change', function()
     atualizarPreview();
 });
 
+// Coleta campos manuais preenchidos
+function coletarCamposManuais() {
+    const campos = {};
+    document.querySelectorAll('[data-campo-manual]').forEach(input => {
+        const variavel = input.getAttribute('data-campo-manual');
+        if (input.value && input.value.trim() !== '') {
+            campos[variavel] = input.value.trim();
+        }
+    });
+    return campos;
+}
+
+// Atualiza interface de campos faltantes
+function atualizarCamposFaltantes(campos) {
+    camposFaltantes = campos || [];
+    const container = document.getElementById('campos_faltantes_container');
+    const card = document.getElementById('card_campos_faltantes');
+    const btnEnviar = document.getElementById('btn_enviar');
+    const statusEnvio = document.getElementById('status_envio');
+    
+    if (camposFaltantes.length === 0) {
+        card.style.display = 'none';
+        btnEnviar.disabled = false;
+        btnEnviar.classList.remove('btn-secondary');
+        btnEnviar.classList.add('btn-primary');
+        podeEnviar = true;
+        
+        // Mostra status de OK
+        statusEnvio.style.display = 'flex !important';
+        statusEnvio.innerHTML = `
+            <span class="badge badge-light-success fs-7">
+                <i class="ki-duotone ki-check-circle fs-4 text-success me-1">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Pronto para enviar
+            </span>
+        `;
+    } else {
+        card.style.display = 'block';
+        btnEnviar.disabled = true;
+        btnEnviar.classList.remove('btn-primary');
+        btnEnviar.classList.add('btn-secondary');
+        podeEnviar = false;
+        
+        // Mostra status de pendência
+        statusEnvio.style.display = 'flex !important';
+        statusEnvio.innerHTML = `
+            <span class="badge badge-light-warning fs-7">
+                <i class="ki-duotone ki-information-5 fs-4 text-warning me-1">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+                ${camposFaltantes.length} campo(s) faltante(s)
+            </span>
+        `;
+        
+        // Gera formulário de campos faltantes
+        let html = '<div class="row">';
+        camposFaltantes.forEach((campo, index) => {
+            const colSize = campo.tipo === 'textarea' ? '12' : '6';
+            const inputType = campo.tipo === 'number' ? 'text' : campo.tipo;
+            const valorAtual = document.querySelector(`[data-campo-manual="${campo.variavel}"]`)?.value || '';
+            
+            html += `
+                <div class="col-md-${colSize} mb-5">
+                    <label class="form-label required">${campo.label}</label>
+                    ${campo.tipo === 'textarea' ? 
+                        `<textarea 
+                            class="form-control form-control-solid campo-manual-input" 
+                            data-campo-manual="${campo.variavel}"
+                            rows="3"
+                            placeholder="${campo.placeholder}"
+                        >${valorAtual}</textarea>` :
+                        `<input 
+                            type="${inputType}" 
+                            class="form-control form-control-solid campo-manual-input" 
+                            data-campo-manual="${campo.variavel}"
+                            placeholder="${campo.placeholder}"
+                            value="${valorAtual}"
+                        />`
+                    }
+                    <div class="form-text text-muted">Variável: <code>${campo.placeholder}</code></div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        
+        html += `
+            <div class="d-flex justify-content-end mt-5">
+                <button type="button" class="btn btn-light-primary" id="btn_aplicar_campos">
+                    <i class="ki-duotone ki-check fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Aplicar e Atualizar Preview
+                </button>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+        // Adiciona evento ao botão de aplicar
+        document.getElementById('btn_aplicar_campos')?.addEventListener('click', function() {
+            atualizarPreview();
+        });
+        
+        // Adiciona evento de Enter nos campos
+        container.querySelectorAll('.campo-manual-input').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && this.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    atualizarPreview();
+                }
+            });
+        });
+    }
+}
+
 function atualizarPreview() {
     const colaboradorId = document.getElementById('colaborador_id').value;
     const templateId = document.getElementById('template_id').value;
@@ -500,11 +673,21 @@ function atualizarPreview() {
     
     if (!colaboradorId) {
         document.getElementById('preview_contrato').innerHTML = '<p class="text-muted text-center py-10">Selecione um colaborador</p>';
+        atualizarCamposFaltantes([]);
+        return;
+    }
+    
+    if (!templateId && !conteudoCustomizado) {
+        document.getElementById('preview_contrato').innerHTML = '<p class="text-muted text-center py-10">Selecione um template</p>';
+        atualizarCamposFaltantes([]);
         return;
     }
     
     const preview = document.getElementById('preview_contrato');
     preview.innerHTML = '<div class="text-center py-10"><div class="spinner-border text-primary"></div><p class="mt-3">Carregando preview...</p></div>';
+    
+    // Coleta campos manuais
+    const camposManuais = coletarCamposManuais();
     
     fetch(`../api/contratos/preview.php?colaborador_id=${colaboradorId}&template_id=${templateId}`, {
         method: 'POST',
@@ -517,7 +700,8 @@ function atualizarPreview() {
             data_criacao: dataCriacao,
             data_vencimento: dataVencimento,
             observacoes: observacoes,
-            conteudo_customizado: conteudoCustomizado
+            conteudo_customizado: conteudoCustomizado,
+            campos_manuais: camposManuais
         })
     })
     .then(response => {
@@ -533,12 +717,17 @@ function atualizarPreview() {
     .then(data => {
         if (data.success) {
             preview.innerHTML = data.html;
+            
+            // Atualiza campos faltantes
+            atualizarCamposFaltantes(data.campos_faltantes || []);
+            podeEnviar = data.pode_enviar || false;
         } else {
             preview.innerHTML = `<div class="alert alert-danger">
                 <strong>Erro ao gerar preview:</strong><br>
                 ${data.message || 'Erro desconhecido'}
                 ${data.error ? '<br><small>' + data.error + '</small>' : ''}
             </div>`;
+            atualizarCamposFaltantes([]);
         }
     })
     .catch(error => {
@@ -547,6 +736,7 @@ function atualizarPreview() {
             <strong>Erro ao gerar preview:</strong><br>
             ${error.message || 'Erro desconhecido'}
         </div>`;
+        atualizarCamposFaltantes([]);
     });
 }
 
@@ -560,10 +750,55 @@ function carregarTemplate(templateId, colaboradorId) {
         });
 }
 
-// Submit com loading
+// Submit com validação e loading
 document.getElementById('form_contrato')?.addEventListener('submit', function(e) {
+    const acao = e.submitter?.value || 'rascunho';
+    
+    // Se for enviar e há campos faltantes, bloqueia
+    if (acao === 'enviar' && !podeEnviar) {
+        e.preventDefault();
+        
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Campos Faltantes',
+                html: `<p>Existem <strong>${camposFaltantes.length}</strong> campo(s) obrigatório(s) não preenchido(s).</p>
+                       <p>Preencha os campos faltantes na seção "Campos Faltantes" antes de enviar.</p>`,
+                icon: 'warning',
+                confirmButtonText: 'Entendi',
+                customClass: {
+                    confirmButton: 'btn btn-primary'
+                },
+                buttonsStyling: false
+            });
+        } else {
+            alert('Existem campos obrigatórios não preenchidos. Preencha os campos faltantes antes de enviar.');
+        }
+        
+        // Scroll até a seção de campos faltantes
+        document.getElementById('card_campos_faltantes')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return false;
+    }
+    
+    // Se for enviar, adiciona campos manuais ao formulário
+    if (acao === 'enviar') {
+        const camposManuais = coletarCamposManuais();
+        
+        // Remove inputs anteriores
+        document.querySelectorAll('input[name^="campos_manuais["]').forEach(el => el.remove());
+        
+        // Adiciona novos inputs hidden
+        Object.keys(camposManuais).forEach(variavel => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = `campos_manuais[${variavel}]`;
+            input.value = camposManuais[variavel];
+            this.appendChild(input);
+        });
+    }
+    
+    // Loading no botão
     const submitBtn = this.querySelector('button[type="submit"][value="enviar"]');
-    if (submitBtn && this.querySelector('[name="acao"]:checked, button[type="submit"]:focus')?.value === 'enviar') {
+    if (submitBtn && acao === 'enviar') {
         submitBtn.setAttribute('data-kt-indicator', 'on');
         submitBtn.disabled = true;
     }

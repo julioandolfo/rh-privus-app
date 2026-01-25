@@ -221,6 +221,7 @@ function get_page_permissions() {
         'contratos.php' => ['ADMIN', 'RH'],
         'contrato_add.php' => ['ADMIN', 'RH'],
         'contrato_view.php' => ['ADMIN', 'RH'],
+        'contrato_enviar.php' => ['ADMIN', 'RH'],
         'contrato_templates.php' => ['ADMIN', 'RH'],
         'contrato_template_add.php' => ['ADMIN', 'RH'],
         'contrato_template_edit.php' => ['ADMIN', 'RH'],
