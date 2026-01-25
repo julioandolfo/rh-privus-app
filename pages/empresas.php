@@ -22,6 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cnpj = preg_replace('/[^0-9]/', '', $_POST['cnpj'] ?? '');
         $telefone = sanitize($_POST['telefone'] ?? '');
         $email = sanitize($_POST['email'] ?? '');
+        $endereco = sanitize($_POST['endereco'] ?? '');
+        $bairro = sanitize($_POST['bairro'] ?? '');
+        $cep = preg_replace('/[^0-9]/', '', $_POST['cep'] ?? '');
         $cidade = sanitize($_POST['cidade'] ?? '');
         $estado = strtoupper(sanitize($_POST['estado'] ?? ''));
         $status = $_POST['status'] ?? 'ativo';
@@ -34,19 +37,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($action === 'add') {
                 $stmt = $pdo->prepare("
-                    INSERT INTO empresas (nome_fantasia, razao_social, cnpj, telefone, email, cidade, estado, status, percentual_hora_extra)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO empresas (nome_fantasia, razao_social, cnpj, telefone, email, endereco, bairro, cep, cidade, estado, status, percentual_hora_extra)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$nome_fantasia, $razao_social, $cnpj, $telefone, $email, $cidade, $estado, $status, $percentual_hora_extra]);
+                $stmt->execute([$nome_fantasia, $razao_social, $cnpj, $telefone, $email, $endereco, $bairro, $cep, $cidade, $estado, $status, $percentual_hora_extra]);
                 redirect('empresas.php', 'Empresa cadastrada com sucesso!');
             } else {
                 $id = $_POST['id'] ?? 0;
                 $stmt = $pdo->prepare("
                     UPDATE empresas 
-                    SET nome_fantasia = ?, razao_social = ?, cnpj = ?, telefone = ?, email = ?, cidade = ?, estado = ?, status = ?, percentual_hora_extra = ?
+                    SET nome_fantasia = ?, razao_social = ?, cnpj = ?, telefone = ?, email = ?, endereco = ?, bairro = ?, cep = ?, cidade = ?, estado = ?, status = ?, percentual_hora_extra = ?
                     WHERE id = ?
                 ");
-                $stmt->execute([$nome_fantasia, $razao_social, $cnpj, $telefone, $email, $cidade, $estado, $status, $percentual_hora_extra, $id]);
+                $stmt->execute([$nome_fantasia, $razao_social, $cnpj, $telefone, $email, $endereco, $bairro, $cep, $cidade, $estado, $status, $percentual_hora_extra, $id]);
                 redirect('empresas.php', 'Empresa atualizada com sucesso!');
             }
         } catch (PDOException $e) {
@@ -235,7 +238,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <!--begin::Modal - Empresa-->
 <div class="modal fade" id="kt_modal_empresa" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-650px">
+    <div class="modal-dialog modal-dialog-centered mw-750px">
         <div class="modal-content">
             <div class="modal-header" id="kt_modal_empresa_header">
                 <h2 class="fw-bold">Nova Empresa</h2>
@@ -274,19 +277,44 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     
                     <div class="row mb-7">
-                        <div class="col-md-4">
+                        <div class="col-md-12">
                             <label class="fw-semibold fs-6 mb-2">Email</label>
                             <input type="email" name="email" id="email" class="form-control form-control-solid mb-3 mb-lg-0" />
                         </div>
+                    </div>
+                    
+                    <!--begin::Seção Endereço-->
+                    <div class="separator separator-dashed my-5"></div>
+                    <h4 class="fw-bold text-gray-700 mb-5">Endereço</h4>
+                    
+                    <div class="row mb-7">
+                        <div class="col-md-3">
+                            <label class="fw-semibold fs-6 mb-2">CEP</label>
+                            <input type="text" name="cep" id="cep" class="form-control form-control-solid mb-3 mb-lg-0" placeholder="00000-000" />
+                        </div>
+                        <div class="col-md-9">
+                            <label class="fw-semibold fs-6 mb-2">Endereço (Rua, Número, Complemento)</label>
+                            <input type="text" name="endereco" id="endereco" class="form-control form-control-solid mb-3 mb-lg-0" placeholder="Rua Exemplo, 123, Sala 01" />
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-7">
                         <div class="col-md-4">
+                            <label class="fw-semibold fs-6 mb-2">Bairro</label>
+                            <input type="text" name="bairro" id="bairro" class="form-control form-control-solid mb-3 mb-lg-0" />
+                        </div>
+                        <div class="col-md-5">
                             <label class="fw-semibold fs-6 mb-2">Cidade</label>
                             <input type="text" name="cidade" id="cidade" class="form-control form-control-solid mb-3 mb-lg-0" />
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="fw-semibold fs-6 mb-2">Estado (UF)</label>
                             <input type="text" name="estado" id="estado" class="form-control form-control-solid mb-3 mb-lg-0" maxlength="2" placeholder="SP" />
                         </div>
                     </div>
+                    <!--end::Seção Endereço-->
+                    
+                    <div class="separator separator-dashed my-5"></div>
                     
                     <div class="row mb-7">
                         <div class="col-md-6">
@@ -466,6 +494,9 @@ function editarEmpresa(empresa) {
     document.getElementById('cnpj').value = empresa.cnpj || '';
     document.getElementById('telefone').value = empresa.telefone || '';
     document.getElementById('email').value = empresa.email || '';
+    document.getElementById('endereco').value = empresa.endereco || '';
+    document.getElementById('bairro').value = empresa.bairro || '';
+    document.getElementById('cep').value = empresa.cep || '';
     document.getElementById('cidade').value = empresa.cidade || '';
     document.getElementById('estado').value = empresa.estado || '';
     document.getElementById('status').value = empresa.status || 'ativo';
@@ -510,6 +541,9 @@ document.getElementById('kt_modal_empresa').addEventListener('hidden.bs.modal', 
             // Máscara para percentual hora extra
             $('#percentual_hora_extra').mask('#0,00', {reverse: true});
             
+            // Máscara para CEP
+            $('#cep').mask('00000-000');
+            
             // Máscara para Estado (UF) - apenas letras maiúsculas
             $('#estado').mask('AA', {
                 translation: {
@@ -519,10 +553,26 @@ document.getElementById('kt_modal_empresa').addEventListener('hidden.bs.modal', 
                 this.value = this.value.toUpperCase();
             });
             
+            // Busca endereço pelo CEP (ViaCEP)
+            $('#cep').on('blur', function() {
+                var cep = $(this).val().replace(/\D/g, '');
+                if (cep.length === 8) {
+                    $.getJSON('https://viacep.com.br/ws/' + cep + '/json/', function(data) {
+                        if (!data.erro) {
+                            $('#endereco').val(data.logradouro || '');
+                            $('#bairro').val(data.bairro || '');
+                            $('#cidade').val(data.localidade || '');
+                            $('#estado').val(data.uf || '');
+                        }
+                    });
+                }
+            });
+            
             // Reaplica máscaras quando o modal é aberto
             $('#kt_modal_empresa').on('shown.bs.modal', function() {
                 $('#cnpj').mask('00.000.000/0000-00');
                 $('#telefone').mask(SPMaskBehavior, spOptions);
+                $('#cep').mask('00000-000');
             });
         } else {
             setTimeout(waitForDependencies, 100);
