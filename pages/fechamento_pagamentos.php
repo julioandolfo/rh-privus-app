@@ -3812,12 +3812,12 @@ require_once __DIR__ . '/../includes/header.php';
         }
         
         // Event listeners
-        document.getElementById('filtro_resumo_tipo').addEventListener('change', function() {
+        document.getElementById('filtro_resumo_tipo')?.addEventListener('change', function() {
             atualizarSelectFiltro();
         });
         
-        document.getElementById('filtro_resumo_id').addEventListener('change', function() {
-            const tipo = document.getElementById('filtro_resumo_tipo').value;
+        document.getElementById('filtro_resumo_id')?.addEventListener('change', function() {
+            const tipo = document.getElementById('filtro_resumo_tipo')?.value || 'total';
             const filtroId = this.value || null;
             carregarResumo(tipo, filtroId);
         });
@@ -5986,15 +5986,15 @@ function mostrarDetalhesBonus(dados) {
         html += '</tr>';
         html += '</thead>';
         html += '<tbody>';
-        
+
         dados.bonus_somam.forEach(function(bonus) {
             const tipoValor = bonus.tipo_valor || 'variavel';
-            const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : 'Variável';
+            const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : 'Variavel';
             const tipoBadge = tipoValor === 'fixo' ? 'primary' : 'success';
             const valorOriginal = parseFloat(bonus.valor_original || bonus.valor || 0);
             const descontoOcorrencias = parseFloat(bonus.desconto_ocorrencias || 0);
             const valorFinal = parseFloat(bonus.valor || 0);
-            
+
             html += '<tr>';
             html += '<td><span class="fw-bold text-gray-800">' + (bonus.tipo_bonus_nome || '-') + '</span></td>';
             html += '<td><span class="badge badge-light-' + tipoBadge + '">' + tipoLabel + '</span></td>';
@@ -6014,7 +6014,7 @@ function mostrarDetalhesBonus(dados) {
             html += '<td>' + (bonus.observacoes || '-') + '</td>';
             html += '</tr>';
         });
-        
+
         html += '</tbody>';
         html += '</table>';
         html += '</div>';
