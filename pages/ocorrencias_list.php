@@ -830,7 +830,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* Cards de Colaboradores */
 .card-colaborador {
-    border: 1px solid #e4e6ef;
+    border: none !important;
     border-radius: 0.625rem;
     overflow: hidden;
     transition: all 0.3s ease;
@@ -841,7 +841,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 [data-theme="dark"] .card-colaborador {
-    border-color: #2b2b40;
+    border: none !important;
 }
 
 [data-theme="dark"] .card-colaborador:hover {
@@ -883,13 +883,35 @@ document.addEventListener('DOMContentLoaded', function() {
     transform: translateY(-5px);
 }
 
-/* Tabelas dentro dos cards de colaborador */
+/* Tabelas dentro dos cards de colaborador - Hover mais escuro */
+.card-colaborador .table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
 .card-colaborador .table tbody tr:hover {
-    background-color: #f9f9f9;
+    background-color: #e8e8e8 !important;
 }
 
 [data-theme="dark"] .card-colaborador .table tbody tr:hover {
-    background-color: #1e1e2d;
+    background-color: #0d0d14 !important;
+}
+
+/* Remove bordas das tabelas */
+.card-colaborador .table {
+    border: none !important;
+}
+
+.card-colaborador .table thead th {
+    border: none !important;
+    border-bottom: 1px solid #e4e6ef !important;
+}
+
+[data-theme="dark"] .card-colaborador .table thead th {
+    border-bottom: 1px solid #2b2b40 !important;
+}
+
+.card-colaborador .table tbody td {
+    border: none !important;
 }
 
 /* Responsividade */
