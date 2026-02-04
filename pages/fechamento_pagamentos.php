@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Fechamento de Pagamentos - Metronic Theme
  */
@@ -10,7 +10,7 @@ require_once __DIR__ . '/../includes/permissions.php';
 require_page_permission('fechamento_pagamentos.php');
 
 /**
- * FunÃ§Ã£o auxiliar para log de fechamentos de bÃ´nus
+ * Função auxiliar para log de fechamentos de bônus
  */
 function log_fechamento_bonus($mensagem, $contexto = []) {
     $log_dir = __DIR__ . '/../logs';
@@ -27,7 +27,7 @@ function log_fechamento_bonus($mensagem, $contexto = []) {
 }
 
 /**
- * FunÃ§Ã£o auxiliar para log de fechamentos individuais
+ * Função auxiliar para log de fechamentos individuais
  */
 function log_fechamento_individual($mensagem, $contexto = []) {
     $log_dir = __DIR__ . '/../logs';
@@ -44,41 +44,41 @@ function log_fechamento_individual($mensagem, $contexto = []) {
 }
 
 /**
- * Verifica se o usuÃ¡rio tem permissÃ£o para acessar uma empresa especÃ­fica
- * Considera tanto empresa_id quanto empresas_ids (para RH com mÃºltiplas empresas)
+ * Verifica se o usuário tem permissão para acessar uma empresa específica
+ * Considera tanto empresa_id quanto empresas_ids (para RH com múltiplas empresas)
  * 
- * @param array $usuario Array com dados do usuÃ¡rio
+ * @param array $usuario Array com dados do usuário
  * @param int $empresa_id ID da empresa a verificar
- * @return bool True se tem permissÃ£o, False caso contrÃ¡rio
+ * @return bool True se tem permissão, False caso contrário
  */
 function usuario_tem_permissao_empresa($usuario, $empresa_id) {
-    // ADMIN sempre tem permissÃ£o
+    // ADMIN sempre tem permissão
     if ($usuario['role'] === 'ADMIN') {
         return true;
     }
     
-    // RH pode ter mÃºltiplas empresas
+    // RH pode ter múltiplas empresas
     if ($usuario['role'] === 'RH') {
         // Verifica empresas_ids (array de empresas)
         if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
             return in_array($empresa_id, $usuario['empresas_ids']);
         }
-        // Fallback para empresa_id Ãºnico
+        // Fallback para empresa_id único
         return ($usuario['empresa_id'] ?? 0) == $empresa_id;
     }
     
-    // Outros roles: apenas sua prÃ³pria empresa
+    // Outros roles: apenas sua própria empresa
     return ($usuario['empresa_id'] ?? 0) == $empresa_id;
 }
 
 /**
- * Verifica se um bÃ´nus jÃ¡ foi pago em fechamento extra no mesmo mÃªs
- * Retorna array com IDs dos fechamentos extras que pagaram este bÃ´nus
- * Considera apenas fechamentos com status 'fechado' ou 'pago' (nÃ£o considera 'aberto' ou 'cancelado')
+ * Verifica se um bônus já foi pago em fechamento extra no mesmo mês
+ * Retorna array com IDs dos fechamentos extras que pagaram este bônus
+ * Considera apenas fechamentos com status 'fechado' ou 'pago' (não considera 'aberto' ou 'cancelado')
  */
 function verificar_bonus_ja_pago_extra($pdo, $tipo_bonus_id, $colaborador_id, $mes_referencia) {
-    // Busca fechamentos extras FECHADOS/PAGOS que pagaram este tipo de bÃ´nus especÃ­fico
-    // Apenas fechamentos fechados/pagos devem excluir o bÃ´nus do fechamento regular
+    // Busca fechamentos extras FECHADOS/PAGOS que pagaram este tipo de bônus específico
+    // Apenas fechamentos fechados/pagos devem excluir o bônus do fechamento regular
     $stmt = $pdo->prepare("
         SELECT DISTINCT fp.id as fechamento_id, fp.mes_referencia, fp.data_pagamento, fp.referencia_externa,
                tb.nome as tipo_bonus_nome, fb.valor as valor_pago
@@ -96,10 +96,10 @@ function verificar_bonus_ja_pago_extra($pdo, $tipo_bonus_id, $colaborador_id, $m
 }
 
 /**
- * Calcula desconto de bÃ´nus baseado nas ocorrÃªncias configuradas
+ * Calcula desconto de bônus baseado nas ocorrências configuradas
  */
 function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_id, $valor_bonus, $data_inicio, $data_fim) {
-    // Busca configuraÃ§Ãµes de desconto por ocorrÃªncias para este tipo de bÃ´nus
+    // Busca configurações de desconto por ocorrências para este tipo de bônus
     $stmt = $pdo->prepare("
         SELECT tbo.*, to_cod.codigo as tipo_ocorrencia_codigo
         FROM tipos_bonus_ocorrencias tbo
@@ -117,20 +117,20 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
     $detalhes_desconto = [];
     
     foreach ($configuracoes as $config) {
-        // Verifica perÃ­odo anterior primeiro (se configurado)
+        // Verifica período anterior primeiro (se configurado)
         $verificar_periodo_anterior = !empty($config['verificar_periodo_anterior']);
         $periodo_anterior_meses = (int)($config['periodo_anterior_meses'] ?? 1);
         
         $total_ocorrencias_periodo_anterior = 0;
         $total_ocorrencias_periodo_atual = 0;
         
-        // Se deve verificar perÃ­odo anterior
+        // Se deve verificar período anterior
         if ($verificar_periodo_anterior) {
-            // Calcula perÃ­odo anterior (meses anteriores ao inÃ­cio do fechamento)
+            // Calcula período anterior (meses anteriores ao início do fechamento)
             $data_inicio_anterior = date('Y-m-01', strtotime($data_inicio . ' -' . $periodo_anterior_meses . ' months'));
             $data_fim_anterior = date('Y-m-t', strtotime($data_inicio_anterior));
             
-            // Busca ocorrÃªncias no perÃ­odo anterior
+            // Busca ocorrências no período anterior
             $where_conditions_anterior = [
                 "o.colaborador_id = ?",
                 "o.data_ocorrencia >= ?",
@@ -147,7 +147,7 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
                 $where_conditions_anterior[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
             }
             
-            // Ignora ocorrÃªncias apenas informativas
+            // Ignora ocorrências apenas informativas
             $where_conditions_anterior[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
             
             $sql_anterior = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_conditions_anterior);
@@ -156,22 +156,22 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
             $resultado_anterior = $stmt_anterior->fetch();
             $total_ocorrencias_periodo_anterior = (int)($resultado_anterior['total'] ?? 0);
             
-            // Se encontrou ocorrÃªncia no perÃ­odo anterior e tipo Ã© 'total', zera o bÃ´nus completamente
+            // Se encontrou ocorrência no período anterior e tipo é 'total', zera o bônus completamente
             if ($total_ocorrencias_periodo_anterior > 0 && $config['tipo_desconto'] === 'total') {
-                return $valor_bonus; // Retorna o valor total do bÃ´nus como desconto
+                return $valor_bonus; // Retorna o valor total do bônus como desconto
             }
         }
         
-        // Define perÃ­odo de busca (perÃ­odo atual do fechamento)
+        // Define período de busca (período atual do fechamento)
         $periodo_inicio = $data_inicio;
         $periodo_fim = $data_fim;
         
         if (!empty($config['periodo_dias'])) {
-            // Se tem perÃ­odo especÃ­fico, calcula a partir da data fim
+            // Se tem período específico, calcula a partir da data fim
             $periodo_inicio = date('Y-m-d', strtotime($data_fim . ' -' . $config['periodo_dias'] . ' days'));
         }
         
-        // Monta condiÃ§Ãµes da query para perÃ­odo atual
+        // Monta condições da query para período atual
         $where_conditions = [
             "o.colaborador_id = ?",
             "o.data_ocorrencia >= ?",
@@ -180,7 +180,7 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
         ];
         $params = [$colaborador_id, $periodo_inicio, $periodo_fim, $config['tipo_ocorrencia_id']];
         
-        // Filtro de aprovaÃ§Ã£o
+        // Filtro de aprovação
         if ($config['desconta_apenas_aprovadas']) {
             $where_conditions[] = "o.status_aprovacao = 'aprovada'";
         }
@@ -190,10 +190,10 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
             $where_conditions[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
         }
         
-        // Ignora ocorrÃªncias apenas informativas
+        // Ignora ocorrências apenas informativas
         $where_conditions[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
         
-        // Busca ocorrÃªncias do tipo configurado no perÃ­odo atual
+        // Busca ocorrências do tipo configurado no período atual
         $sql = "
             SELECT COUNT(*) as total_ocorrencias
             FROM ocorrencias o
@@ -204,30 +204,30 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
         $resultado = $stmt_ocorrencias->fetch();
         $total_ocorrencias_periodo_atual = (int)($resultado['total_ocorrencias'] ?? 0);
         
-        // Se tipo Ã© 'total' e encontrou ocorrÃªncia no perÃ­odo atual, zera o bÃ´nus completamente
+        // Se tipo é 'total' e encontrou ocorrência no período atual, zera o bônus completamente
         if ($total_ocorrencias_periodo_atual > 0 && $config['tipo_desconto'] === 'total') {
-            return $valor_bonus; // Retorna o valor total do bÃ´nus como desconto
+            return $valor_bonus; // Retorna o valor total do bônus como desconto
         }
         
-        // Se encontrou ocorrÃªncia no perÃ­odo anterior (mesmo que nÃ£o seja tipo 'total'), tambÃ©m zera
+        // Se encontrou ocorrência no período anterior (mesmo que não seja tipo 'total'), também zera
         if ($total_ocorrencias_periodo_anterior > 0) {
-            return $valor_bonus; // Retorna o valor total do bÃ´nus como desconto
+            return $valor_bonus; // Retorna o valor total do bônus como desconto
         }
         
-        // Se nÃ£o encontrou ocorrÃªncias ou nÃ£o Ã© tipo 'total', calcula desconto normalmente
+        // Se não encontrou ocorrências ou não é tipo 'total', calcula desconto normalmente
         if ($total_ocorrencias_periodo_atual > 0) {
             $desconto_config = 0;
             
             // Calcula desconto baseado no tipo
             if ($config['tipo_desconto'] === 'fixo' && !empty($config['valor_desconto'])) {
-                // Desconto fixo por ocorrÃªncia
+                // Desconto fixo por ocorrência
                 $desconto_config = (float)$config['valor_desconto'] * $total_ocorrencias_periodo_atual;
             } elseif ($config['tipo_desconto'] === 'percentual' && !empty($config['valor_desconto'])) {
-                // Desconto percentual do valor do bÃ´nus
+                // Desconto percentual do valor do bônus
                 $percentual = (float)$config['valor_desconto'] / 100;
                 $desconto_config = $valor_bonus * $percentual * $total_ocorrencias_periodo_atual;
             } else {
-                // Desconto proporcional (divide por dias Ãºteis do perÃ­odo)
+                // Desconto proporcional (divide por dias úteis do período)
                 $dias_uteis_periodo = calcular_dias_uteis($periodo_inicio, $periodo_fim);
                 if ($dias_uteis_periodo > 0) {
                     $valor_por_dia = $valor_bonus / $dias_uteis_periodo;
@@ -253,7 +253,7 @@ function calcular_desconto_bonus_ocorrencias($pdo, $tipo_bonus_id, $colaborador_
 }
 
 /**
- * Calcula dias Ãºteis entre duas datas (exclui sÃ¡bados e domingos)
+ * Calcula dias úteis entre duas datas (exclui sábados e domingos)
  */
 function calcular_dias_uteis($data_inicio, $data_fim) {
     $inicio = new DateTime($data_inicio);
@@ -262,20 +262,20 @@ function calcular_dias_uteis($data_inicio, $data_fim) {
     
     while ($inicio <= $fim) {
         $dia_semana = (int)$inicio->format('w');
-        // 0 = domingo, 6 = sÃ¡bado
+        // 0 = domingo, 6 = sábado
         if ($dia_semana != 0 && $dia_semana != 6) {
             $dias_uteis++;
         }
         $inicio->modify('+1 day');
     }
     
-    return $dias_uteis > 0 ? $dias_uteis : 20; // Fallback para 20 dias se cÃ¡lculo der 0
+    return $dias_uteis > 0 ? $dias_uteis : 20; // Fallback para 20 dias se cálculo der 0
 }
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
-// Processa aÃ§Ãµes ANTES de incluir o header
+// Processa ações ANTES de incluir o header
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
@@ -285,15 +285,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $colaboradores_ids = $_POST['colaboradores'] ?? [];
         
         if (empty($empresa_id) || empty($mes_referencia) || empty($colaboradores_ids)) {
-            redirect('fechamento_pagamentos.php', 'Preencha todos os campos obrigatÃ³rios!', 'error');
+            redirect('fechamento_pagamentos.php', 'Preencha todos os campos obrigatórios!', 'error');
         }
         
         try {
-            // Verifica se jÃ¡ existe fechamento REGULAR para este mÃªs (permite mÃºltiplos extras)
+            // Verifica se já existe fechamento REGULAR para este mês (permite múltiplos extras)
             $stmt = $pdo->prepare("SELECT id FROM fechamentos_pagamento WHERE empresa_id = ? AND mes_referencia = ? AND tipo_fechamento = 'regular'");
             $stmt->execute([$empresa_id, $mes_referencia]);
             if ($stmt->fetch()) {
-                redirect('fechamento_pagamentos.php', 'JÃ¡ existe um fechamento regular para este mÃªs!', 'error');
+                redirect('fechamento_pagamentos.php', 'Já existe um fechamento regular para este mês!', 'error');
             }
             
             // Cria fechamento regular
@@ -304,49 +304,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$empresa_id, $mes_referencia, count($colaboradores_ids), $usuario['id']]);
             $fechamento_id = $pdo->lastInsertId();
             
-            // Busca perÃ­odo (primeiro e Ãºltimo dia do mÃªs)
+            // Busca período (primeiro e último dia do mês)
             $ano_mes = explode('-', $mes_referencia);
             $data_inicio = $ano_mes[0] . '-' . $ano_mes[1] . '-01';
             $data_fim = date('Y-m-t', strtotime($data_inicio));
             
             $total_pagamento = 0;
             $total_horas_extras = 0;
-            $bonus_excluidos_geral = []; // Armazena informaÃ§Ãµes sobre bÃ´nus excluÃ­dos para mensagem
+            $bonus_excluidos_geral = []; // Armazena informações sobre bônus excluídos para mensagem
             
             // Adiciona colaboradores ao fechamento
             foreach ($colaboradores_ids as $colab_id) {
                 $colab_id = (int)$colab_id;
                 
-                // Busca dados do colaborador incluindo data de admissÃ£o
+                // Busca dados do colaborador incluindo data de admissão
                 $stmt = $pdo->prepare("SELECT salario, data_admissao FROM colaboradores WHERE id = ?");
                 $stmt->execute([$colab_id]);
                 $colab = $stmt->fetch();
                 
                 if (!$colab || !$colab['salario']) continue;
                 
-                // Calcula salÃ¡rio proporcional baseado na data de admissÃ£o
+                // Calcula salário proporcional baseado na data de admissão
                 $salario_base = $colab['salario'];
                 
-                // Se o colaborador foi admitido durante o mÃªs de referÃªncia, calcular proporcional
+                // Se o colaborador foi admitido durante o mês de referência, calcular proporcional
                 if (!empty($colab['data_admissao'])) {
                     $data_admissao = strtotime($colab['data_admissao']);
                     $inicio_mes = strtotime($data_inicio);
                     $fim_mes = strtotime($data_fim);
                     
-                    // Se a admissÃ£o foi dentro do perÃ­odo do fechamento
+                    // Se a admissão foi dentro do período do fechamento
                     if ($data_admissao >= $inicio_mes && $data_admissao <= $fim_mes) {
-                        // Calcula dias trabalhados no mÃªs
-                        $total_dias_mes = (int)date('t', $inicio_mes); // Total de dias do mÃªs
+                        // Calcula dias trabalhados no mês
+                        $total_dias_mes = (int)date('t', $inicio_mes); // Total de dias do mês
                         $dias_trabalhados = (int)date('d', $fim_mes) - (int)date('d', $data_admissao) + 1;
                         
-                        // Calcula salÃ¡rio proporcional
+                        // Calcula salário proporcional
                         $salario_base = ($colab['salario'] / $total_dias_mes) * $dias_trabalhados;
                     }
                 }
                 
-                // Busca horas extras do perÃ­odo (separando por tipo de pagamento)
+                // Busca horas extras do período (separando por tipo de pagamento)
                 // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
-                // Busca apenas horas extras NÃƒO PAGAS (fechamento_pagamento_id IS NULL)
+                // Busca apenas horas extras NÃO PAGAS (fechamento_pagamento_id IS NULL)
                 $stmt = $pdo->prepare("
                     SELECT 
                         COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN quantidade_horas ELSE 0 END), 0) as total_horas_dinheiro,
@@ -368,8 +368,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $horas_extras_banco = (float)($he_data['total_horas_banco'] ?? 0);
                 $valor_horas_extras = (float)($he_data['total_valor'] ?? 0);
                 
-                // Busca bÃ´nus ativos do colaborador no perÃ­odo
-                // Considera o tipo de bÃ´nus: fixo (usa valor_fixo), variavel (usa valor do colaborador), informativo (nÃ£o soma)
+                // Busca bônus ativos do colaborador no período
+                // Considera o tipo de bônus: fixo (usa valor_fixo), variavel (usa valor do colaborador), informativo (não soma)
                 $stmt = $pdo->prepare("
                     SELECT 
                         cb.*,
@@ -390,7 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$colab_id, $data_fim, $data_inicio]);
                 $bonus_list_calc = $stmt->fetchAll();
                 
-                // Se deve excluir bÃ´nus jÃ¡ pagos em extras, verifica cada bÃ´nus
+                // Se deve excluir bônus já pagos em extras, verifica cada bônus
                 $bonus_ja_pagos_info = [];
                 $bonus_excluidos_colab = [];
                 if ($excluir_bonus_ja_pagos) {
@@ -417,7 +417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'fechamentos' => $bonus_pagos
                             ];
                             
-                            // Adiciona Ã  lista geral para mensagem
+                            // Adiciona à lista geral para mensagem
                             $bonus_excluidos_geral[] = [
                                 'colaborador' => $colab_nome,
                                 'tipo_bonus' => $bonus_calc['tipo_bonus_nome'],
@@ -425,7 +425,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'fechamento_id' => $bonus_pagos[0]['fechamento_id'] ?? null
                             ];
                             
-                            // Remove da lista de cÃ¡lculo
+                            // Remove da lista de cálculo
                             unset($bonus_list_calc[$idx]);
                         }
                     }
@@ -433,17 +433,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $bonus_list_calc = array_values($bonus_list_calc);
                 }
                 
-                // Calcula total de bÃ´nus considerando o tipo e desconto por ocorrÃªncias configuradas
+                // Calcula total de bônus considerando o tipo e desconto por ocorrências configuradas
                 $total_bonus = 0;
                 foreach ($bonus_list_calc as $bonus_calc) {
                     $tipo_valor = $bonus_calc['tipo_valor'] ?? 'variavel';
                     
                     if ($tipo_valor === 'informativo') {
-                        // Informativo nÃ£o soma no total
+                        // Informativo não soma no total
                         continue;
                     }
                     
-                    // Determina valor base do bÃ´nus
+                    // Determina valor base do bônus
                     $valor_base = 0;
                     if ($tipo_valor === 'fixo') {
                         $valor_base = (float)($bonus_calc['valor_fixo'] ?? 0);
@@ -451,7 +451,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $valor_base = (float)($bonus_calc['valor'] ?? 0);
                     }
                     
-                    // Calcula desconto por ocorrÃªncias configuradas
+                    // Calcula desconto por ocorrências configuradas
                     $desconto_ocorrencias = calcular_desconto_bonus_ocorrencias(
                         $pdo,
                         $bonus_calc['tipo_bonus_id'],
@@ -461,7 +461,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $data_fim
                     );
                     
-                    // Limita desconto ao valor do bÃ´nus (nÃ£o pode ficar negativo)
+                    // Limita desconto ao valor do bônus (não pode ficar negativo)
                     if ($desconto_ocorrencias > $valor_base) {
                         $desconto_ocorrencias = $valor_base;
                     }
@@ -469,9 +469,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $total_bonus += ($valor_base - $desconto_ocorrencias);
                 }
                 
-                // Busca ocorrÃªncias com desconto em R$ do perÃ­odo
-                // Apenas ocorrÃªncias que tÃªm valor_desconto > 0 e nÃ£o desconta do banco de horas
-                // Ignora ocorrÃªncias apenas informativas
+                // Busca ocorrências com desconto em R$ do período
+                // Apenas ocorrências que têm valor_desconto > 0 e não desconta do banco de horas
+                // Ignora ocorrências apenas informativas
                 $stmt = $pdo->prepare("
                     SELECT SUM(valor_desconto) as total_descontos
                     FROM ocorrencias
@@ -486,8 +486,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ocorrencias_data = $stmt->fetch();
                 $total_descontos_ocorrencias = $ocorrencias_data['total_descontos'] ?? 0;
                 
-                // Busca TODOS os adiantamentos nÃ£o descontados para este colaborador (para exibiÃ§Ã£o)
-                // Mas descontar apenas os que tÃªm mes_desconto igual ao mÃªs de referÃªncia
+                // Busca TODOS os adiantamentos não descontados para este colaborador (para exibição)
+                // Mas descontar apenas os que têm mes_desconto igual ao mês de referência
                 $stmt = $pdo->prepare("
                     SELECT id, valor_descontar, observacoes, mes_desconto
                     FROM fechamentos_pagamento_adiantamentos
@@ -498,13 +498,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$colab_id]);
                 $adiantamentos_todos = $stmt->fetchAll();
                 
-                // Filtra apenas os que devem ser descontados neste mÃªs
+                // Filtra apenas os que devem ser descontados neste mês
                 $adiantamentos_para_descontar = [];
                 $adiantamentos_ids = [];
                 $total_adiantamentos = 0;
                 
                 foreach ($adiantamentos_todos as $adiantamento) {
-                    // Se o mes_desconto Ã© igual ao mÃªs de referÃªncia, deve ser descontado
+                    // Se o mes_desconto é igual ao mês de referência, deve ser descontado
                     if ($adiantamento['mes_desconto'] === $mes_referencia) {
                     $total_adiantamentos += (float)$adiantamento['valor_descontar'];
                     $adiantamentos_ids[] = $adiantamento['id'];
@@ -512,24 +512,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                // Adiciona adiantamentos aos descontos (apenas os do mÃªs de referÃªncia)
+                // Adiciona adiantamentos aos descontos (apenas os do mês de referência)
                 $total_descontos_ocorrencias += $total_adiantamentos;
                 
-                // Insere bÃ´nus no fechamento (incluindo informativos para registro)
+                // Insere bônus no fechamento (incluindo informativos para registro)
                 foreach ($bonus_list_calc as $bonus) {
                     $tipo_valor = $bonus['tipo_valor'] ?? 'variavel';
                     $valor_original = 0;
                     
                     if ($tipo_valor === 'fixo') {
-                        // Usa valor fixo do tipo de bÃ´nus
+                        // Usa valor fixo do tipo de bônus
                         $valor_original = (float)($bonus['valor_fixo'] ?? 0);
                     } elseif ($tipo_valor === 'variavel') {
                         // Usa valor do colaborador
                         $valor_original = (float)($bonus['valor'] ?? 0);
                     }
-                    // Informativo: valor_original = 0 (nÃ£o soma, mas registra)
+                    // Informativo: valor_original = 0 (não soma, mas registra)
                     
-                    // Calcula desconto por ocorrÃªncias configuradas
+                    // Calcula desconto por ocorrências configuradas
                     $desconto_ocorrencias = calcular_desconto_bonus_ocorrencias(
                         $pdo,
                         $bonus['tipo_bonus_id'],
@@ -539,7 +539,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $data_fim
                     );
                     
-                    // Limita desconto ao valor do bÃ´nus (nÃ£o pode ficar negativo)
+                    // Limita desconto ao valor do bônus (não pode ficar negativo)
                     if ($desconto_ocorrencias > $valor_original) {
                         $desconto_ocorrencias = $valor_original;
                     }
@@ -547,10 +547,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $valor_a_usar = $valor_original - $desconto_ocorrencias;
                     
                     // Busca detalhes do desconto para salvar em JSON
-                    // Usa a mesma funÃ§Ã£o de cÃ¡lculo que jÃ¡ retorna os detalhes
+                    // Usa a mesma função de cálculo que já retorna os detalhes
                     $detalhes_array = [];
                     
-                    // Busca configuraÃ§Ãµes
+                    // Busca configurações
                     $stmt_configs = $pdo->prepare("
                         SELECT tbo.*, to_cod.codigo as tipo_ocorrencia_codigo, to_cod.nome as tipo_ocorrencia_nome
                         FROM tipos_bonus_ocorrencias tbo
@@ -567,7 +567,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $total_periodo_anterior = 0;
                         $total_periodo_atual = 0;
                         
-                        // Verifica perÃ­odo anterior se configurado
+                        // Verifica período anterior se configurado
                         if ($verificar_periodo_anterior) {
                             $data_inicio_anterior = date('Y-m-01', strtotime($data_inicio . ' -' . $periodo_anterior_meses . ' months'));
                             $data_fim_anterior = date('Y-m-t', strtotime($data_inicio_anterior));
@@ -588,7 +588,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $where_anterior[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
                             }
                             
-                            // Ignora ocorrÃªncias apenas informativas
+                            // Ignora ocorrências apenas informativas
                             $where_anterior[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
                             
                             $sql_anterior = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_anterior);
@@ -598,7 +598,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $total_periodo_anterior = (int)($result_anterior['total'] ?? 0);
                         }
                         
-                        // Verifica perÃ­odo atual
+                        // Verifica período atual
                         $where_atual = [
                             "o.colaborador_id = ?",
                             "o.data_ocorrencia >= ?",
@@ -615,7 +615,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $where_atual[] = "(o.desconta_banco_horas = 0 OR o.desconta_banco_horas IS NULL)";
                         }
                         
-                        // Ignora ocorrÃªncias apenas informativas
+                        // Ignora ocorrências apenas informativas
                         $where_atual[] = "(o.apenas_informativa = 0 OR o.apenas_informativa IS NULL)";
                         
                         $sql_atual = "SELECT COUNT(*) as total FROM ocorrencias o WHERE " . implode(' AND ', $where_atual);
@@ -624,7 +624,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $result_atual = $stmt_atual->fetch();
                         $total_periodo_atual = (int)($result_atual['total'] ?? 0);
                         
-                        // Adiciona aos detalhes se encontrou ocorrÃªncias
+                        // Adiciona aos detalhes se encontrou ocorrências
                         if ($total_periodo_anterior > 0 || $total_periodo_atual > 0) {
                             $detalhes_array[] = [
                                 'tipo_ocorrencia_id' => $config_det['tipo_ocorrencia_id'],
@@ -649,26 +649,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ");
                     
                     $observacao = $tipo_valor === 'fixo' 
-                        ? 'BÃ´nus automÃ¡tico (valor fixo do tipo)' 
+                        ? 'Bônus automático (valor fixo do tipo)' 
                         : ($tipo_valor === 'informativo' 
-                            ? 'BÃ´nus informativo (nÃ£o soma no total)' 
-                            : 'BÃ´nus automÃ¡tico do fechamento');
+                            ? 'Bônus informativo (não soma no total)' 
+                            : 'Bônus automático do fechamento');
                     
                     if ($desconto_ocorrencias > 0) {
                         $total_ocorrencias_atual = array_sum(array_column($detalhes_array, 'total_ocorrencias_periodo_atual'));
                         $total_ocorrencias_anterior = array_sum(array_column($detalhes_array, 'total_ocorrencias_periodo_anterior'));
                         
                         if ($desconto_ocorrencias >= $valor_original) {
-                            $observacao .= ' | BÃ´nus zerado completamente';
+                            $observacao .= ' | Bônus zerado completamente';
                             if ($total_ocorrencias_anterior > 0) {
-                                $observacao .= ' (ocorrÃªncia no perÃ­odo anterior)';
+                                $observacao .= ' (ocorrência no período anterior)';
                             } elseif ($total_ocorrencias_atual > 0) {
-                                $observacao .= ' (ocorrÃªncia no perÃ­odo atual)';
+                                $observacao .= ' (ocorrência no período atual)';
                             }
                         } else {
-                            $observacao .= ' | Desconto por ' . $total_ocorrencias_atual . ' ocorrÃªncia(s) no perÃ­odo atual';
+                            $observacao .= ' | Desconto por ' . $total_ocorrencias_atual . ' ocorrência(s) no período atual';
                             if ($total_ocorrencias_anterior > 0) {
-                                $observacao .= ' e ' . $total_ocorrencias_anterior . ' no perÃ­odo anterior';
+                                $observacao .= ' e ' . $total_ocorrencias_anterior . ' no período anterior';
                             }
                             $observacao .= ': R$ ' . number_format($desconto_ocorrencias, 2, ',', '.');
                         }
@@ -688,7 +688,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $valor_total = $salario_base + $valor_horas_extras + $total_bonus - $total_descontos_ocorrencias;
                 
-                // Insere item (salva tambÃ©m informaÃ§Ãµes sobre tipo de horas extras)
+                // Insere item (salva também informações sobre tipo de horas extras)
                 $stmt = $pdo->prepare("
                     INSERT INTO fechamentos_pagamento_itens 
                     (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total)
@@ -704,7 +704,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $valor_total
                 ]);
                 
-                // Salva detalhes das horas extras (para exibiÃ§Ã£o)
+                // Salva detalhes das horas extras (para exibição)
                 $item_id = $pdo->lastInsertId();
                 
                 // Marca adiantamentos como descontados
@@ -731,7 +731,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ");
                     $stmt->execute([$fechamento_id, $colab_id, $data_inicio, $data_fim]);
                     
-                    // Busca detalhes das horas extras para salvar em JSON (se necessÃ¡rio no futuro)
+                    // Busca detalhes das horas extras para salvar em JSON (se necessário no futuro)
                     $stmt_he_detalhes = $pdo->prepare("
                         SELECT tipo_pagamento, SUM(quantidade_horas) as total_horas, SUM(valor_total) as total_valor
                         FROM horas_extras
@@ -759,7 +759,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mensagem_sucesso = 'Fechamento criado com sucesso!';
             if ($excluir_bonus_ja_pagos && !empty($bonus_excluidos_geral)) {
                 $total_excluidos = count($bonus_excluidos_geral);
-                $mensagem_sucesso .= " {$total_excluidos} bÃ´nus jÃ¡ pagos em fechamentos extras foram excluÃ­dos automaticamente.";
+                $mensagem_sucesso .= " {$total_excluidos} bônus já pagos em fechamentos extras foram excluídos automaticamente.";
             }
             
             redirect('fechamento_pagamentos.php?view=' . $fechamento_id, $mensagem_sucesso);
@@ -775,7 +775,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bonus_editados = $_POST['bonus_editados'] ?? [];
         
         try {
-            // Busca item atual e verifica permissÃ£o
+            // Busca item atual e verifica permissão
             $stmt = $pdo->prepare("
                 SELECT i.*, f.empresa_id 
                 FROM fechamentos_pagamento_itens i
@@ -786,24 +786,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $item = $stmt->fetch();
             
             if (!$item) {
-                redirect('fechamento_pagamentos.php', 'Item nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
             }
             
             if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
-                redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para atualizar este item!', 'error');
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
-            // Processa bÃ´nus editados
+            // Processa bônus editados
             $total_bonus = 0;
             if (!empty($bonus_editados) && is_array($bonus_editados)) {
-                // Remove bÃ´nus antigos do fechamento para este colaborador
+                // Remove bônus antigos do fechamento para este colaborador
                 $stmt = $pdo->prepare("DELETE FROM fechamentos_pagamento_bonus WHERE fechamento_pagamento_id = ? AND colaborador_id = ?");
                 $stmt->execute([$item['fechamento_id'], $item['colaborador_id']]);
                 
-                // Insere bÃ´nus editados
+                // Insere bônus editados
                 foreach ($bonus_editados as $bonus_data) {
                     if (!empty($bonus_data['tipo_bonus_id']) && !empty($bonus_data['valor'])) {
-                        // O valor jÃ¡ vem formatado do JavaScript (ex: "290.00")
+                        // O valor já vem formatado do JavaScript (ex: "290.00")
                         // Apenas converte para float
                         $valor_bonus = (float)$bonus_data['valor'];
                         $total_bonus += $valor_bonus;
@@ -818,7 +818,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $item['colaborador_id'],
                             (int)$bonus_data['tipo_bonus_id'],
                             $valor_bonus,
-                            $bonus_data['observacoes'] ?? 'BÃ´nus editado manualmente'
+                            $bonus_data['observacoes'] ?? 'Bônus editado manualmente'
                         ]);
                     }
                 }
@@ -855,7 +855,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $motivo = trim($_POST['motivo'] ?? '');
         
         try {
-            // Busca item atual e verifica permissÃ£o
+            // Busca item atual e verifica permissão
             $stmt = $pdo->prepare("
                 SELECT i.*, f.empresa_id 
                 FROM fechamentos_pagamento_itens i
@@ -866,32 +866,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $item = $stmt->fetch();
             
             if (!$item) {
-                redirect('fechamento_pagamentos.php', 'Item nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
             }
             
             if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
-                redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para atualizar este item!', 'error');
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
             if (!$tipo_bonus_id) {
-                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Selecione um tipo de bÃ´nus!', 'error');
+                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Selecione um tipo de bônus!', 'error');
             }
             
-            // Busca tipo de bÃ´nus
+            // Busca tipo de bônus
             $stmt = $pdo->prepare("SELECT * FROM tipos_bonus WHERE id = ?");
             $stmt->execute([$tipo_bonus_id]);
             $tipo_bonus = $stmt->fetch();
             
             if (!$tipo_bonus) {
-                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Tipo de bÃ´nus nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Tipo de bônus não encontrado!', 'error');
             }
             
-            // Calcula valor do bÃ´nus
+            // Calcula valor do bônus
             $valor_bonus = 0;
             if ($tipo_bonus['tipo_valor'] === 'fixo') {
                 $valor_bonus = (float)($tipo_bonus['valor_fixo'] ?? 0);
             } else {
-                // Busca salÃ¡rio do colaborador para calcular valor variÃ¡vel
+                // Busca salário do colaborador para calcular valor variável
                 $stmt = $pdo->prepare("SELECT salario FROM colaboradores WHERE id = ?");
                 $stmt->execute([$item['colaborador_id']]);
                 $colab = $stmt->fetch();
@@ -900,11 +900,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
-            // Remove bÃ´nus antigo
+            // Remove bônus antigo
             $stmt = $pdo->prepare("DELETE FROM fechamentos_pagamento_bonus WHERE fechamento_pagamento_id = ? AND colaborador_id = ?");
             $stmt->execute([$fechamento_id, $item['colaborador_id']]);
             
-            // Insere novo bÃ´nus
+            // Insere novo bônus
             $stmt = $pdo->prepare("
                 INSERT INTO fechamentos_pagamento_bonus 
                 (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, observacoes)
@@ -915,7 +915,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $item['colaborador_id'],
                 $tipo_bonus_id,
                 $valor_bonus,
-                $motivo ?: 'BÃ´nus especÃ­fico editado'
+                $motivo ?: 'Bônus específico editado'
             ]);
             
             // Atualiza item
@@ -936,7 +936,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET total_pagamento = ? WHERE id = ?");
             $stmt->execute([$total, $fechamento_id]);
             
-            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'BÃ´nus especÃ­fico atualizado com sucesso!');
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Bônus específico atualizado com sucesso!');
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao atualizar: ' . $e->getMessage(), 'error');
         }
@@ -948,7 +948,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $motivo = trim($_POST['motivo'] ?? '');
         
         try {
-            // Busca item atual e verifica permissÃ£o
+            // Busca item atual e verifica permissão
             $stmt = $pdo->prepare("
                 SELECT i.*, f.empresa_id 
                 FROM fechamentos_pagamento_itens i
@@ -959,15 +959,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $item = $stmt->fetch();
             
             if (!$item) {
-                redirect('fechamento_pagamentos.php', 'Item nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
             }
             
             if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
-                redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para atualizar este item!', 'error');
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
             if (empty($valor_manual) || (float)$valor_manual <= 0) {
-                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Informe um valor vÃ¡lido!', 'error');
+                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Informe um valor válido!', 'error');
             }
             
             if (empty($motivo)) {
@@ -976,11 +976,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $valor_final = (float)$valor_manual;
             
-            // Remove bÃ´nus antigo se existir
+            // Remove bônus antigo se existir
             $stmt = $pdo->prepare("DELETE FROM fechamentos_pagamento_bonus WHERE fechamento_pagamento_id = ? AND colaborador_id = ?");
             $stmt->execute([$fechamento_id, $item['colaborador_id']]);
             
-            // Insere novo bÃ´nus se tiver tipo
+            // Insere novo bônus se tiver tipo
             if ($tipo_bonus_id) {
                 $stmt = $pdo->prepare("
                     INSERT INTO fechamentos_pagamento_bonus 
@@ -1014,7 +1014,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET total_pagamento = ? WHERE id = ?");
             $stmt->execute([$total, $fechamento_id]);
             
-            $tipo_label = $action === 'atualizar_item_bonus_grupal' ? 'BÃ´nus Grupal' : 'BÃ´nus Individual';
+            $tipo_label = $action === 'atualizar_item_bonus_grupal' ? 'Bônus Grupal' : 'Bônus Individual';
             redirect('fechamento_pagamentos.php?view=' . $fechamento_id, $tipo_label . ' atualizado com sucesso!');
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao atualizar: ' . $e->getMessage(), 'error');
@@ -1027,7 +1027,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $motivo = trim($_POST['motivo'] ?? '');
         
         try {
-            // Busca item atual e verifica permissÃ£o
+            // Busca item atual e verifica permissão
             $stmt = $pdo->prepare("
                 SELECT i.*, f.empresa_id 
                 FROM fechamentos_pagamento_itens i
@@ -1038,19 +1038,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $item = $stmt->fetch();
             
             if (!$item) {
-                redirect('fechamento_pagamentos.php', 'Item nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
             }
             
             if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
-                redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para atualizar este item!', 'error');
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
             if (empty($valor_adiantamento) || (float)$valor_adiantamento <= 0) {
-                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Informe um valor vÃ¡lido!', 'error');
+                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Informe um valor válido!', 'error');
             }
             
             if (empty($mes_desconto)) {
-                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Informe o mÃªs de desconto!', 'error');
+                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Informe o mês de desconto!', 'error');
             }
             
             if (empty($motivo)) {
@@ -1075,14 +1075,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $stmt->execute([
                 $valor_final,
-                $valor_final, // Por padrÃ£o desconta o valor total
+                $valor_final, // Por padrão desconta o valor total
                 $mes_desconto,
                 $motivo,
                 $fechamento_id,
                 $item['colaborador_id']
             ]);
             
-            // Se nÃ£o encontrou registro, cria um novo
+            // Se não encontrou registro, cria um novo
             if ($stmt->rowCount() === 0) {
                 $stmt = $pdo->prepare("
                     INSERT INTO fechamentos_pagamento_adiantamentos 
@@ -1116,17 +1116,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'fechar') {
         $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
         try {
-            // Verifica permissÃ£o
+            // Verifica permissão
             $stmt = $pdo->prepare("SELECT empresa_id FROM fechamentos_pagamento WHERE id = ?");
             $stmt->execute([$fechamento_id]);
             $fechamento = $stmt->fetch();
             
             if (!$fechamento) {
-                redirect('fechamento_pagamentos.php', 'Fechamento nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
             }
             
             if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
-                redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para fechar este fechamento!', 'error');
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para fechar este fechamento!', 'error');
             }
             
             $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'fechado' WHERE id = ?");
@@ -1142,28 +1142,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 enviar_email_fechamento_pagamento($fechamento_id, $item['colaborador_id']);
             }
             
-            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento concluÃ­do!');
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento concluído!');
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao fechar: ' . $e->getMessage(), 'error');
         }
     } elseif ($action === 'marcar_pago') {
-        // Marca fechamento como pago (Ãºtil para bÃ´nus sem nota fiscal)
+        // Marca fechamento como pago (útil para bônus sem nota fiscal)
         $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
         try {
-            // Verifica permissÃ£o
+            // Verifica permissão
             $stmt = $pdo->prepare("SELECT empresa_id, status FROM fechamentos_pagamento WHERE id = ?");
             $stmt->execute([$fechamento_id]);
             $fechamento = $stmt->fetch();
             
             if (!$fechamento) {
-                redirect('fechamento_pagamentos.php', 'Fechamento nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
             }
             
             if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
-                redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para alterar este fechamento!', 'error');
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para alterar este fechamento!', 'error');
             }
             
-            // SÃ³ pode marcar como pago se estiver fechado
+            // Só pode marcar como pago se estiver fechado
             if ($fechamento['status'] !== 'fechado') {
                 redirect('fechamento_pagamentos.php', 'Apenas fechamentos com status "Fechado" podem ser marcados como pago!', 'error');
             }
@@ -1181,20 +1181,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $motivo_reabertura = trim($_POST['motivo_reabertura'] ?? '');
         
         try {
-            // Verifica permissÃ£o
+            // Verifica permissão
             $stmt = $pdo->prepare("SELECT empresa_id, status FROM fechamentos_pagamento WHERE id = ?");
             $stmt->execute([$fechamento_id]);
             $fechamento = $stmt->fetch();
             
             if (!$fechamento) {
-                redirect('fechamento_pagamentos.php', 'Fechamento nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
             }
             
             if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
-                redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para reabrir este fechamento!', 'error');
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para reabrir este fechamento!', 'error');
             }
             
-            // SÃ³ pode reabrir se estiver fechado (nÃ£o permite reabrir se jÃ¡ foi pago)
+            // Só pode reabrir se estiver fechado (não permite reabrir se já foi pago)
             if ($fechamento['status'] !== 'fechado') {
                 redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Apenas fechamentos com status "Fechado" podem ser reabertos!', 'error');
             }
@@ -1214,31 +1214,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $stmt->execute([$log_msg, $fechamento_id]);
             
-            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento reaberto com sucesso! Agora vocÃª pode editar os itens.');
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento reaberto com sucesso! Agora você pode editar os itens.');
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao reabrir fechamento: ' . $e->getMessage(), 'error');
         }
     } elseif ($action === 'delete') {
         $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
         try {
-            // Verifica permissÃ£o
+            // Verifica permissão
             $stmt = $pdo->prepare("SELECT empresa_id, status FROM fechamentos_pagamento WHERE id = ?");
             $stmt->execute([$fechamento_id]);
             $fechamento = $stmt->fetch();
             
             if (!$fechamento) {
-                redirect('fechamento_pagamentos.php', 'Fechamento nÃ£o encontrado!', 'error');
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
             }
             
             if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
-                redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para excluir este fechamento!', 'error');
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para excluir este fechamento!', 'error');
             }
             
-            // Deleta fechamento (os itens serÃ£o deletados automaticamente por CASCADE)
+            // Deleta fechamento (os itens serão deletados automaticamente por CASCADE)
             $stmt = $pdo->prepare("DELETE FROM fechamentos_pagamento WHERE id = ?");
             $stmt->execute([$fechamento_id]);
             
-            redirect('fechamento_pagamentos.php', 'Fechamento excluÃ­do com sucesso!');
+            redirect('fechamento_pagamentos.php', 'Fechamento excluído com sucesso!');
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao excluir: ' . $e->getMessage(), 'error');
         }
@@ -1251,22 +1251,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $referencia_externa = $_POST['referencia_externa'] ?? '';
         $mes_referencia = $_POST['mes_referencia'] ?? date('Y-m');
         
-        // ValidaÃ§Ãµes bÃ¡sicas
+        // Validações básicas
         if (empty($empresa_id_input) || $empresa_id_input === '' || empty($subtipo_fechamento) || empty($data_pagamento)) {
-            redirect('fechamento_pagamentos.php', 'Preencha todos os campos obrigatÃ³rios!', 'error');
+            redirect('fechamento_pagamentos.php', 'Preencha todos os campos obrigatórios!', 'error');
         }
         
-        // Se for "todas", empresa_id serÃ¡ determinado pelos colaboradores selecionados
+        // Se for "todas", empresa_id será determinado pelos colaboradores selecionados
         $todas_empresas = ($empresa_id_input === 'todas');
         $empresa_id = $todas_empresas ? null : (int)$empresa_id_input;
         
         // Valida subtipo
         $subtipos_validos = ['bonus_especifico', 'individual', 'grupal', 'adiantamento'];
         if (!in_array($subtipo_fechamento, $subtipos_validos)) {
-            redirect('fechamento_pagamentos.php', 'Subtipo de fechamento invÃ¡lido!', 'error');
+            redirect('fechamento_pagamentos.php', 'Subtipo de fechamento inválido!', 'error');
         }
         
-        $fechamentos_criados = []; // Inicializa para estar disponÃ­vel no catch
+        $fechamentos_criados = []; // Inicializa para estar disponível no catch
         
         try {
             // Se for "todas empresas", precisa agrupar colaboradores por empresa
@@ -1303,23 +1303,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if (empty($colaboradores_por_empresa)) {
-                    redirect('fechamento_pagamentos.php', 'Nenhum colaborador vÃ¡lido encontrado!', 'error');
+                    redirect('fechamento_pagamentos.php', 'Nenhum colaborador válido encontrado!', 'error');
                 }
                 
-                // Valida permissÃµes: filtra apenas empresas que o usuÃ¡rio tem permissÃ£o
+                // Valida permissões: filtra apenas empresas que o usuário tem permissão
                 $empresas_permitidas = [];
                 if ($usuario['role'] === 'ADMIN') {
                     // ADMIN pode ver todas as empresas
                     $empresas_permitidas = array_keys($colaboradores_por_empresa);
                 } elseif ($usuario['role'] === 'RH') {
-                    // RH pode ter mÃºltiplas empresas
+                    // RH pode ter múltiplas empresas
                     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
                         $empresas_permitidas = array_intersect(array_keys($colaboradores_por_empresa), $usuario['empresas_ids']);
                     } else {
                         $empresas_permitidas = [($usuario['empresa_id'] ?? 0)];
                     }
                 } else {
-                    // Outros usuÃ¡rios sÃ³ podem ver sua prÃ³pria empresa
+                    // Outros usuários só podem ver sua própria empresa
                     $empresas_permitidas = [($usuario['empresa_id'] ?? 0)];
                 }
                 
@@ -1332,7 +1332,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if (empty($colaboradores_por_empresa_filtrado)) {
-                    redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para criar fechamentos para essas empresas!', 'error');
+                    redirect('fechamento_pagamentos.php', 'Você não tem permissão para criar fechamentos para essas empresas!', 'error');
                 }
                 
                 // Cria um fechamento para cada empresa permitida
@@ -1356,13 +1356,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                     $fechamento_id = $pdo->lastInsertId();
                     if (!$fechamento_id) {
-                        throw new Exception("Erro ao criar fechamento: nÃ£o foi possÃ­vel obter o ID do fechamento criado");
+                        throw new Exception("Erro ao criar fechamento: não foi possível obter o ID do fechamento criado");
                     }
                     
                     $fechamentos_criados[$fechamento_id] = $colabs_empresa; // Armazena colaboradores junto com fechamento_id
                 }
             } else {
-                // Cria fechamento Ãºnico
+                // Cria fechamento único
             $stmt = $pdo->prepare("
                 INSERT INTO fechamentos_pagamento 
                 (empresa_id, tipo_fechamento, subtipo_fechamento, mes_referencia, data_fechamento, data_pagamento, descricao, referencia_externa, total_colaboradores, usuario_id, status)
@@ -1380,7 +1380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $fechamento_id = $pdo->lastInsertId();
                 if (!$fechamento_id) {
-                    throw new Exception("Erro ao criar fechamento: nÃ£o foi possÃ­vel obter o ID do fechamento criado");
+                    throw new Exception("Erro ao criar fechamento: não foi possível obter o ID do fechamento criado");
                 }
                 
                 $fechamentos_criados = [$fechamento_id => null]; // null indica que deve usar $_POST
@@ -1389,8 +1389,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Processa cada fechamento criado
             foreach ($fechamentos_criados as $fechamento_id => $colabs_fechamento) {
                 try {
-                    // $fechamento_id jÃ¡ Ã© o ID correto (chave do array associativo)
-                    // $colabs_fechamento serÃ¡ null se nÃ£o for "todas empresas", ou serÃ¡ um array de colaboradores se for "todas"
+                    // $fechamento_id já é o ID correto (chave do array associativo)
+                    // $colabs_fechamento será null se não for "todas empresas", ou será um array de colaboradores se for "todas"
                     
                     // Busca empresa_id do fechamento (caso tenha sido criado com "todas")
                     $stmt = $pdo->prepare("SELECT empresa_id FROM fechamentos_pagamento WHERE id = ?");
@@ -1398,7 +1398,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $fechamento_data = $stmt->fetch();
                     
                     if (!$fechamento_data) {
-                        // Fechamento nÃ£o encontrado, pula
+                        // Fechamento não encontrado, pula
                         continue;
                     }
                 
@@ -1409,7 +1409,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Processa conforme o subtipo
             if ($subtipo_fechamento === 'bonus_especifico') {
-                // BÃ´nus EspecÃ­fico: mÃºltiplos colaboradores, um tipo de bÃ´nus
+                // Bônus Específico: múltiplos colaboradores, um tipo de bônus
                     // Tenta usar o campo normal primeiro, depois o hidden
                     $tipo_bonus_id_raw = $_POST['tipo_bonus_id'] ?? '';
                     if (empty($tipo_bonus_id_raw)) {
@@ -1417,7 +1417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $tipo_bonus_id = !empty($tipo_bonus_id_raw) ? (int)$tipo_bonus_id_raw : 0;
                     
-                    // Coleta colaboradores: primeiro tenta usar os armazenados (caso "todas"), senÃ£o usa $_POST
+                    // Coleta colaboradores: primeiro tenta usar os armazenados (caso "todas"), senão usa $_POST
                     if ($colabs_fechamento !== null && is_array($colabs_fechamento) && !empty($colabs_fechamento)) {
                         $colaboradores_ids = $colabs_fechamento;
                     } else {
@@ -1435,26 +1435,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $aplicar_descontos = isset($_POST['aplicar_descontos']) && $_POST['aplicar_descontos'] == '1';
                 
                 if (empty($tipo_bonus_id) || empty($colaboradores_ids)) {
-                        // NÃ£o deleta o fechamento - apenas registra erro e continua
-                        // Atualiza descriÃ§Ã£o do fechamento com erro
-                        $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Fechamento criado mas sem colaboradores vÃ¡lidos ou tipo de bÃ´nus') WHERE id = ?");
+                        // Não deleta o fechamento - apenas registra erro e continua
+                        // Atualiza descrição do fechamento com erro
+                        $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Fechamento criado mas sem colaboradores válidos ou tipo de bônus') WHERE id = ?");
                         $stmt->execute([$fechamento_id]);
                         continue;
                 }
                 
-                // Busca informaÃ§Ãµes do tipo de bÃ´nus
+                // Busca informações do tipo de bônus
                 $stmt = $pdo->prepare("SELECT tipo_valor, valor_fixo, nome FROM tipos_bonus WHERE id = ?");
                 $stmt->execute([$tipo_bonus_id]);
                 $tipo_bonus = $stmt->fetch();
                 
                 if (!$tipo_bonus) {
-                    // NÃ£o deleta - apenas atualiza descriÃ§Ã£o com erro
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Tipo de bÃ´nus nÃ£o encontrado') WHERE id = ?");
+                    // Não deleta - apenas atualiza descrição com erro
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Tipo de bônus não encontrado') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue; // Continua processando outros fechamentos
                 }
                 
-                // Calcula perÃ­odo (mÃªs de referÃªncia)
+                // Calcula período (mês de referência)
                 $ano_mes = explode('-', $mes_referencia);
                 $data_inicio = $ano_mes[0] . '-' . $ano_mes[1] . '-01';
                 $data_fim = date('Y-m-t', strtotime($data_inicio));
@@ -1469,7 +1469,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if (!$colab) continue;
                     
-                    // Determina valor do bÃ´nus
+                    // Determina valor do bônus
                     $valor_bonus = 0;
                     if ($tipo_bonus['tipo_valor'] === 'fixo') {
                         $valor_bonus = (float)($tipo_bonus['valor_fixo'] ?? 0);
@@ -1481,7 +1481,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $valor_bonus = $colab_bonus ? (float)$colab_bonus['valor'] : 0;
                     }
                     
-                    // Calcula desconto por ocorrÃªncias se solicitado
+                    // Calcula desconto por ocorrências se solicitado
                     $desconto_ocorrencias = 0;
                     $detalhes_desconto = [];
                     if ($aplicar_descontos && $valor_bonus > 0) {
@@ -1493,7 +1493,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $valor_final = $valor_bonus - $desconto_ocorrencias;
                     
-                    // Insere item (sem salÃ¡rio, sem horas extras, apenas bÃ´nus)
+                    // Insere item (sem salário, sem horas extras, apenas bônus)
                     $stmt = $pdo->prepare("
                         INSERT INTO fechamentos_pagamento_itens 
                         (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total, inclui_salario, inclui_horas_extras, inclui_bonus_automaticos, motivo)
@@ -1503,18 +1503,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $fechamento_id,
                         $colab_id,
                         $valor_final,
-                        $descricao ?: 'BÃ´nus especÃ­fico: ' . $tipo_bonus['nome']
+                        $descricao ?: 'Bônus específico: ' . $tipo_bonus['nome']
                     ]);
                     
-                    // Insere bÃ´nus
+                    // Insere bônus
                     $stmt = $pdo->prepare("
                         INSERT INTO fechamentos_pagamento_bonus 
                         (fechamento_pagamento_id, colaborador_id, tipo_bonus_id, valor, valor_original, desconto_ocorrencias, observacoes)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     ");
-                    $obs = 'BÃ´nus especÃ­fico - Fechamento extra';
+                    $obs = 'Bônus específico - Fechamento extra';
                     if ($desconto_ocorrencias > 0) {
-                        $obs .= ' | Desconto por ocorrÃªncias: R$ ' . number_format($desconto_ocorrencias, 2, ',', '.');
+                        $obs .= ' | Desconto por ocorrências: R$ ' . number_format($desconto_ocorrencias, 2, ',', '.');
                     }
                     $stmt->execute([
                         $fechamento_id,
@@ -1530,8 +1530,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
             } elseif ($subtipo_fechamento === 'individual') {
-                // Log inicial do que estÃ¡ sendo recebido
-                log_fechamento_individual("INÃCIO - Processar fechamento individual", [
+                // Log inicial do que está sendo recebido
+                log_fechamento_individual("INÍCIO - Processar fechamento individual", [
                     'fechamento_id' => $fechamento_id,
                     'POST_colaborador_id' => $_POST['colaborador_id'] ?? null,
                     'POST_colaborador_id_hidden' => $_POST['colaborador_id_hidden'] ?? null,
@@ -1544,8 +1544,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'POST_keys' => array_keys($_POST)
                 ]);
                 
-                // Individual: um colaborador, valor livre ou tipo de bÃ´nus
-                // Se tem colaboradores armazenados (caso "todas"), usa o primeiro, senÃ£o usa $_POST
+                // Individual: um colaborador, valor livre ou tipo de bônus
+                // Se tem colaboradores armazenados (caso "todas"), usa o primeiro, senão usa $_POST
                 $colab_id = ($colabs_fechamento !== null && is_array($colabs_fechamento) && !empty($colabs_fechamento)) 
                     ? (int)$colabs_fechamento[0] 
                     : (int)($_POST['colaborador_id'] ?? 0);
@@ -1562,7 +1562,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (empty($tipo_bonus_id_raw) || $tipo_bonus_id_raw === '') {
                     $tipo_bonus_id_raw = $_POST['tipo_bonus_id_hidden_individual'] ?? '';
                 }
-                // Se ainda estiver vazio, tenta buscar diretamente do campo do formulÃ¡rio individual
+                // Se ainda estiver vazio, tenta buscar diretamente do campo do formulário individual
                 if (empty($tipo_bonus_id_raw) || $tipo_bonus_id_raw === '') {
                     // Pode estar vindo com outro nome no POST, verifica todas as possibilidades
                     foreach ($_POST as $key => $value) {
@@ -1587,11 +1587,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $motivo = trim($_POST['motivo_hidden'] ?? '');
                 }
                 
-                // Verifica se valor_manual Ã© maior que 0 apÃ³s conversÃ£o
+                // Verifica se valor_manual é maior que 0 após conversão
                 $valor_manual_float = (float)$valor_manual;
                 
-                // Debug: verifica o que estÃ¡ sendo recebido
-                // Se colab_id estÃ¡ vazio, tenta buscar do POST novamente (incluindo hidden)
+                // Debug: verifica o que está sendo recebido
+                // Se colab_id está vazio, tenta buscar do POST novamente (incluindo hidden)
                 if (empty($colab_id)) {
                 $colab_id = (int)($_POST['colaborador_id'] ?? 0);
                     if (empty($colab_id)) {
@@ -1604,7 +1604,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $colab_id = (int)$colabs_fechamento[0];
                 }
                 
-                log_fechamento_individual("Valores coletados antes da validaÃ§Ã£o", [
+                log_fechamento_individual("Valores coletados antes da validação", [
                     'fechamento_id' => $fechamento_id,
                     'colab_id' => $colab_id,
                     'colab_id_empty' => empty($colab_id),
@@ -1619,7 +1619,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 
                 if (empty($colab_id) || (empty($tipo_bonus_id) && ($valor_manual_float <= 0))) {
-                    log_fechamento_individual("ERRO - ValidaÃ§Ã£o falhou", [
+                    log_fechamento_individual("ERRO - Validação falhou", [
                         'fechamento_id' => $fechamento_id,
                         'colab_id' => $colab_id,
                         'tipo_bonus_id' => $tipo_bonus_id,
@@ -1628,12 +1628,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'erro_valor_tipo' => (empty($tipo_bonus_id) && ($valor_manual_float <= 0))
                     ]);
                     
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Preencha colaborador e valor ou tipo de bÃ´nus') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Preencha colaborador e valor ou tipo de bônus') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
                 
-                log_fechamento_individual("ValidaÃ§Ã£o OK - Continuando processamento", [
+                log_fechamento_individual("Validação OK - Continuando processamento", [
                     'fechamento_id' => $fechamento_id,
                     'colab_id' => $colab_id,
                     'tipo_bonus_id' => $tipo_bonus_id,
@@ -1641,7 +1641,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 
                 if (empty($motivo)) {
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Campo motivo Ã© obrigatÃ³rio') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Campo motivo é obrigatório') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
@@ -1654,7 +1654,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $colab = $stmt->fetch();
                 
                 if (!$colab) {
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Colaborador nÃ£o encontrado') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Colaborador não encontrado') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
@@ -1663,14 +1663,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $valor_original = 0;
                 
                 if ($tipo_bonus_id) {
-                    // Usa tipo de bÃ´nus
+                    // Usa tipo de bônus
                     $stmt = $pdo->prepare("SELECT tipo_valor, valor_fixo, nome FROM tipos_bonus WHERE id = ?");
                     $stmt->execute([$tipo_bonus_id]);
                     $tipo_bonus = $stmt->fetch();
                     
                     if ($tipo_bonus) {
                         if ($tipo_bonus['tipo_valor'] === 'fixo') {
-                            // Para tipo fixo, usa valor_fixo do tipo de bÃ´nus
+                            // Para tipo fixo, usa valor_fixo do tipo de bônus
                             $valor_original = (float)($tipo_bonus['valor_fixo'] ?? 0);
                             // Se valor_fixo for 0 ou NULL, tenta usar valor_manual se fornecido
                             if ($valor_original <= 0 && $valor_manual > 0) {
@@ -1678,7 +1678,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                             $valor_final = $valor_original;
                         } else {
-                            // Para tipo variÃ¡vel, busca valor do colaborador ou usa valor manual se fornecido
+                            // Para tipo variável, busca valor do colaborador ou usa valor manual se fornecido
                             if ($valor_manual > 0) {
                                 $valor_original = (float)$valor_manual;
                                 $valor_final = $valor_original;
@@ -1694,19 +1694,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
                     } else {
-                        // Tipo de bÃ´nus nÃ£o encontrado, usa valor manual se fornecido
+                        // Tipo de bônus não encontrado, usa valor manual se fornecido
                         $valor_original = (float)$valor_manual;
                         $valor_final = $valor_original;
                     }
                 } else {
-                    // Valor livre (sem tipo de bÃ´nus)
+                    // Valor livre (sem tipo de bônus)
                     $valor_original = (float)$valor_manual;
                     $valor_final = $valor_original;
                 }
                 
                 // Garante que valor_final seja maior que 0
                 if ($valor_final <= 0) {
-                    log_fechamento_individual("ERRO - Valor final Ã© zero ou negativo", [
+                    log_fechamento_individual("ERRO - Valor final é zero ou negativo", [
                         'fechamento_id' => $fechamento_id,
                         'colab_id' => $colab_id,
                         'tipo_bonus_id' => $tipo_bonus_id,
@@ -1714,7 +1714,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'valor_final' => $valor_final,
                         'valor_manual' => $valor_manual
                     ]);
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Valor do bÃ´nus Ã© zero ou invÃ¡lido') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Valor do bônus é zero ou inválido') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
@@ -1733,11 +1733,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $motivo
                 ]);
                 
-                // Insere bÃ´nus se tiver tipo (sempre salva para aparecer na listagem)
+                // Insere bônus se tiver tipo (sempre salva para aparecer na listagem)
                 // IMPORTANTE: Mesmo que o tipo seja fixo e o valor venha do valor_fixo,
-                // sempre salva o bÃ´nus na tabela para aparecer na listagem
+                // sempre salva o bônus na tabela para aparecer na listagem
                 if ($tipo_bonus_id && $tipo_bonus_id > 0) {
-                    // Garante que valor_original e valor_final estÃ£o definidos
+                    // Garante que valor_original e valor_final estão definidos
                     if (!isset($valor_original) || $valor_original <= 0) {
                         $valor_original = $valor_final;
                     }
@@ -1745,7 +1745,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $valor_final = $valor_original;
                     }
                     
-                    // Verifica se jÃ¡ existe um bÃ´nus para este fechamento e colaborador
+                    // Verifica se já existe um bônus para este fechamento e colaborador
                     $stmt_check = $pdo->prepare("
                         SELECT id FROM fechamentos_pagamento_bonus 
                         WHERE fechamento_pagamento_id = ? AND colaborador_id = ? AND tipo_bonus_id = ?
@@ -1768,7 +1768,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $motivo
                         ]);
                         
-                        log_fechamento_individual("BÃ´nus inserido com sucesso", [
+                        log_fechamento_individual("Bônus inserido com sucesso", [
                             'fechamento_id' => $fechamento_id,
                             'colab_id' => $colab_id,
                             'tipo_bonus_id' => $tipo_bonus_id,
@@ -1776,7 +1776,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'valor_original' => $valor_original
                         ]);
                     } else {
-                        // Atualiza o bÃ´nus existente
+                        // Atualiza o bônus existente
                         $stmt = $pdo->prepare("
                             UPDATE fechamentos_pagamento_bonus 
                             SET valor = ?, valor_original = ?, observacoes = ?
@@ -1791,7 +1791,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $tipo_bonus_id
                         ]);
                         
-                        log_fechamento_individual("BÃ´nus atualizado com sucesso", [
+                        log_fechamento_individual("Bônus atualizado com sucesso", [
                             'fechamento_id' => $fechamento_id,
                             'colab_id' => $colab_id,
                             'tipo_bonus_id' => $tipo_bonus_id,
@@ -1800,7 +1800,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ]);
                     }
                 } else {
-                    log_fechamento_individual("AVISO - BÃ´nus nÃ£o inserido: tipo_bonus_id estÃ¡ vazio ou invÃ¡lido", [
+                    log_fechamento_individual("AVISO - Bônus não inserido: tipo_bonus_id está vazio ou inválido", [
                         'fechamento_id' => $fechamento_id,
                         'colab_id' => $colab_id,
                         'tipo_bonus_id' => $tipo_bonus_id,
@@ -1814,8 +1814,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $total_pagamento = $valor_final;
                 
             } elseif ($subtipo_fechamento === 'grupal') {
-                // Grupal: mÃºltiplos colaboradores, mesmo valor
-                // Se tem colaboradores armazenados (caso "todas"), usa eles, senÃ£o usa $_POST
+                // Grupal: múltiplos colaboradores, mesmo valor
+                // Se tem colaboradores armazenados (caso "todas"), usa eles, senão usa $_POST
                 $colaboradores_ids = ($colabs_fechamento !== null && is_array($colabs_fechamento)) 
                     ? $colabs_fechamento 
                     : ($_POST['colaboradores'] ?? []);
@@ -1833,13 +1833,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if (empty($colaboradores_ids) || (empty($tipo_bonus_id) && empty($valor_manual))) {
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Selecione colaboradores e informe valor ou tipo de bÃ´nus') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Selecione colaboradores e informe valor ou tipo de bônus') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
                 
                 if (empty($motivo)) {
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Campo motivo Ã© obrigatÃ³rio') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Campo motivo é obrigatório') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
@@ -1847,7 +1847,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $valor_final = 0;
                 
                 if ($tipo_bonus_id) {
-                    // Usa tipo de bÃ´nus (mesmo valor para todos)
+                    // Usa tipo de bônus (mesmo valor para todos)
                     $stmt = $pdo->prepare("SELECT tipo_valor, valor_fixo, nome FROM tipos_bonus WHERE id = ?");
                     $stmt->execute([$tipo_bonus_id]);
                     $tipo_bonus = $stmt->fetch();
@@ -1888,7 +1888,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $motivo
                     ]);
                     
-                    // Insere bÃ´nus se tiver tipo
+                    // Insere bônus se tiver tipo
                     if ($tipo_bonus_id) {
                         $stmt = $pdo->prepare("
                             INSERT INTO fechamentos_pagamento_bonus 
@@ -1908,8 +1908,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
             } elseif ($subtipo_fechamento === 'adiantamento') {
-                // Adiantamento: um colaborador, valor livre, mÃªs de desconto
-                // Se tem colaboradores armazenados (caso "todas"), usa o primeiro, senÃ£o usa $_POST
+                // Adiantamento: um colaborador, valor livre, mês de desconto
+                // Se tem colaboradores armazenados (caso "todas"), usa o primeiro, senão usa $_POST
                 $colab_id = ($colabs_fechamento !== null && is_array($colabs_fechamento) && !empty($colabs_fechamento)) 
                     ? (int)$colabs_fechamento[0] 
                     : (int)($_POST['colaborador_id'] ?? 0);
@@ -1922,13 +1922,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if (empty($colab_id) || empty($valor_adiantamento) || empty($mes_desconto)) {
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Preencha colaborador, valor e mÃªs de desconto') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Preencha colaborador, valor e mês de desconto') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
                 
                 if (empty($motivo)) {
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Campo motivo Ã© obrigatÃ³rio') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Campo motivo é obrigatório') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
@@ -1942,7 +1942,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $colab = $stmt->fetch();
                 
                 if (!$colab) {
-                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Colaborador nÃ£o encontrado') WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Colaborador não encontrado') WHERE id = ?");
                     $stmt->execute([$fechamento_id]);
                     continue;
                 }
@@ -1971,7 +1971,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $fechamento_id,
                     $colab_id,
                     $valor_adiantamento,
-                    $valor_adiantamento, // Por padrÃ£o desconta o valor total
+                    $valor_adiantamento, // Por padrão desconta o valor total
                     $mes_desconto,
                     $motivo
                 ]);
@@ -1980,12 +1980,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
             // Atualiza fechamento com totais
-                // Garante que colaboradores_ids seja um array vÃ¡lido
+                // Garante que colaboradores_ids seja um array válido
                 if (!is_array($colaboradores_ids)) {
                     $colaboradores_ids = [];
                 }
                 
-                // Garante que total_pagamento seja um nÃºmero vÃ¡lido
+                // Garante que total_pagamento seja um número válido
                 $total_pagamento = (float)$total_pagamento;
                 
             $stmt = $pdo->prepare("
@@ -1995,12 +1995,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $stmt->execute([count($colaboradores_ids), $total_pagamento, $fechamento_id]);
             
-            // Envia notificaÃ§Ãµes para colaboradores
+            // Envia notificações para colaboradores
             require_once __DIR__ . '/../includes/notificacoes.php';
             $subtipo_labels = [
-                'bonus_especifico' => 'BÃ´nus EspecÃ­fico',
-                'individual' => 'BÃ´nus Individual',
-                'grupal' => 'BÃ´nus Grupal',
+                'bonus_especifico' => 'Bônus Específico',
+                'individual' => 'Bônus Individual',
+                'grupal' => 'Bônus Grupal',
                 'adiantamento' => 'Adiantamento'
             ];
             $subtipo_label = $subtipo_labels[$subtipo_fechamento] ?? 'Pagamento Extra';
@@ -2008,17 +2008,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($colaboradores_ids as $colab_id) {
                 try {
                     criar_notificacao(
-                        null, // usuario_id serÃ¡ buscado internamente
+                        null, // usuario_id será buscado internamente
                         $colab_id,
                         'fechamento_pagamento_extra',
                         'Novo Pagamento Extra',
-                        "VocÃª recebeu um {$subtipo_label} no valor de R$ " . number_format($total_pagamento / count($colaboradores_ids), 2, ',', '.'),
+                        "Você recebeu um {$subtipo_label} no valor de R$ " . number_format($total_pagamento / count($colaboradores_ids), 2, ',', '.'),
                         '../pages/meus_pagamentos.php',
                         $fechamento_id,
                         'pagamento'
                     );
                 } catch (Exception $e) {
-                        // Erro ao criar notificaÃ§Ã£o nÃ£o bloqueia criaÃ§Ã£o do fechamento
+                        // Erro ao criar notificação não bloqueia criação do fechamento
                     }
                 }
                 } catch (Exception $e) {
@@ -2043,7 +2043,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($check_result) {
                     redirect('fechamento_pagamentos.php?view=' . $primeiro_fechamento, $mensagem);
                 } else {
-                    // Se nÃ£o encontrou, tenta redirecionar mesmo assim (pode ser problema de timing)
+                    // Se não encontrou, tenta redirecionar mesmo assim (pode ser problema de timing)
                     redirect('fechamento_pagamentos.php?view=' . $primeiro_fechamento, $mensagem);
                 }
             } else {
@@ -2051,7 +2051,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
         } catch (PDOException $e) {
-            // NÃ£o deleta fechamentos criados - deixa para o usuÃ¡rio decidir
+            // Não deleta fechamentos criados - deixa para o usuário decidir
             // Se houver fechamentos criados, tenta redirecionar para o primeiro
             if (!empty($fechamentos_criados)) {
                 $fechamentos_ids = array_keys($fechamentos_criados);
@@ -2063,7 +2063,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             redirect('fechamento_pagamentos.php', 'Erro ao criar fechamento extra: ' . $e->getMessage(), 'error');
         } catch (Exception $e) {
-            // NÃ£o deleta fechamentos criados - deixa para o usuÃ¡rio decidir
+            // Não deleta fechamentos criados - deixa para o usuário decidir
             // Se houver fechamentos criados, tenta redirecionar para o primeiro
             if (!empty($fechamentos_criados)) {
                 $fechamentos_ids = array_keys($fechamentos_criados);
@@ -2088,7 +2088,7 @@ $filtro_subtipo = $_GET['filtro_subtipo'] ?? '';
 $filtro_data_pagamento = $_GET['filtro_data_pagamento'] ?? '';
 
 if ($usuario['role'] === 'RH') {
-    // RH pode ter mÃºltiplas empresas
+    // RH pode ter múltiplas empresas
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
         $where[] = "f.empresa_id IN ($placeholders)";
@@ -2131,18 +2131,18 @@ $stmt = $pdo->prepare("
 $stmt->execute($params);
 $fechamentos = $stmt->fetchAll();
 
-// Calcula totais de pagamento para o card de informaÃ§Ãµes
+// Calcula totais de pagamento para o card de informações
 $total_folha = 0;
 $total_bonus = 0;
 $total_extras = 0;
 $total_folha_bonus = 0;
 
-// Busca total de folha (soma de salÃ¡rios de todos os colaboradores ativos)
+// Busca total de folha (soma de salários de todos os colaboradores ativos)
 $where_colaboradores = [];
 $params_colaboradores = [];
 
 if ($usuario['role'] === 'ADMIN') {
-    // ADMIN vÃª todos
+    // ADMIN vê todos
 } elseif ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
@@ -2171,12 +2171,12 @@ $stmt->execute($params_colaboradores);
 $result_folha = $stmt->fetch();
 $total_folha = (float)($result_folha['total_folha'] ?? 0);
 
-// Busca total de bÃ´nus cadastrados nos colaboradores (ativos e nÃ£o informativos)
+// Busca total de bônus cadastrados nos colaboradores (ativos e não informativos)
 $where_bonus = [];
 $params_bonus = [];
 
 if ($usuario['role'] === 'ADMIN') {
-    // ADMIN vÃª todos
+    // ADMIN vê todos
 } elseif ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
@@ -2193,7 +2193,7 @@ if ($usuario['role'] === 'ADMIN') {
 
 $where_bonus[] = "c.status = 'ativo'";
 $where_bonus[] = "tb.tipo_valor != 'informativo'";
-// Verifica se o bÃ´nus estÃ¡ ativo (data_inicio e data_fim vÃ¡lidas ou NULL)
+// Verifica se o bônus está ativo (data_inicio e data_fim válidas ou NULL)
 $where_bonus[] = "(cb.data_inicio IS NULL OR cb.data_inicio <= CURDATE())";
 $where_bonus[] = "(cb.data_fim IS NULL OR cb.data_fim >= CURDATE())";
 $where_bonus_sql = !empty($where_bonus) ? 'WHERE ' . implode(' AND ', $where_bonus) : '';
@@ -2214,13 +2214,13 @@ $stmt->execute($params_bonus);
 $result_bonus = $stmt->fetch();
 $total_bonus = (float)($result_bonus['total_bonus'] ?? 0);
 
-// Busca total de horas extras cadastradas que ainda nÃ£o foram pagas
-// Horas extras nÃ£o pagas sÃ£o aquelas cuja data_trabalho nÃ£o estÃ¡ dentro do perÃ­odo de nenhum fechamento fechado/pago
+// Busca total de horas extras cadastradas que ainda não foram pagas
+// Horas extras não pagas são aquelas cuja data_trabalho não está dentro do período de nenhum fechamento fechado/pago
 $where_extras = [];
 $params_extras = [];
 
 if ($usuario['role'] === 'ADMIN') {
-    // ADMIN vÃª todos
+    // ADMIN vê todos
 } elseif ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
@@ -2243,7 +2243,7 @@ $where_fechamentos = ["fp.status IN ('fechado', 'pago')", "fp.tipo_fechamento = 
 $params_fechamentos = [];
 
 if ($usuario['role'] === 'ADMIN') {
-    // ADMIN vÃª todos
+    // ADMIN vê todos
 } elseif ($usuario['role'] === 'RH') {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders_fp = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
@@ -2261,7 +2261,7 @@ if ($usuario['role'] === 'ADMIN') {
 $where_extras_sql = !empty($where_extras) ? 'WHERE ' . implode(' AND ', $where_extras) : '';
 $where_fechamentos_sql = 'WHERE ' . implode(' AND ', $where_fechamentos);
 
-// Busca horas extras nÃ£o pagas (tipo dinheiro e nÃ£o incluÃ­das em nenhum fechamento)
+// Busca horas extras não pagas (tipo dinheiro e não incluídas em nenhum fechamento)
 $stmt = $pdo->prepare("
     SELECT COALESCE(SUM(he.valor_total), 0) as total_extras
     FROM horas_extras he
@@ -2274,7 +2274,7 @@ $stmt->execute($params_extras);
 $result_extras = $stmt->fetch();
 $total_extras = (float)($result_extras['total_extras'] ?? 0);
 
-// Calcula folha + bÃ´nus
+// Calcula folha + bônus
 $total_folha_bonus = $total_folha + $total_bonus;
 
 // Busca empresas para o select
@@ -2282,7 +2282,7 @@ if ($usuario['role'] === 'ADMIN') {
     $stmt = $pdo->query("SELECT id, nome_fantasia FROM empresas WHERE status = 'ativo' ORDER BY nome_fantasia");
     $empresas = $stmt->fetchAll();
 } elseif ($usuario['role'] === 'RH') {
-    // RH pode ter mÃºltiplas empresas
+    // RH pode ter múltiplas empresas
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
         $stmt = $pdo->prepare("SELECT id, nome_fantasia FROM empresas WHERE id IN ($placeholders) AND status = 'ativo' ORDER BY nome_fantasia");
@@ -2299,7 +2299,7 @@ if ($usuario['role'] === 'ADMIN') {
     $empresas = $stmt->fetchAll();
 }
 
-// Se estÃ¡ visualizando um fechamento especÃ­fico
+// Se está visualizando um fechamento específico
 $fechamento_view = null;
 $itens_fechamento = [];
 $bonus_por_colaborador = [];
@@ -2317,9 +2317,9 @@ if (isset($_GET['view'])) {
     $fechamento_view = $stmt->fetch();
     
     if ($fechamento_view) {
-        // Verifica permissÃ£o
+        // Verifica permissão
         if (!usuario_tem_permissao_empresa($usuario, $fechamento_view['empresa_id'])) {
-            redirect('fechamento_pagamentos.php', 'VocÃª nÃ£o tem permissÃ£o para visualizar este fechamento!', 'error');
+            redirect('fechamento_pagamentos.php', 'Você não tem permissão para visualizar este fechamento!', 'error');
         }
         
         // Busca itens (incluindo campos de documento)
@@ -2372,7 +2372,7 @@ if (isset($_GET['view'])) {
         // Busca adiantamentos descontados para cada colaborador neste fechamento
         $adiantamentos_por_colaborador = [];
         if ($fechamento_view['tipo_fechamento'] === 'regular') {
-            // Busca adiantamentos que foram descontados neste fechamento especÃ­fico
+            // Busca adiantamentos que foram descontados neste fechamento específico
             $stmt = $pdo->prepare("
                 SELECT colaborador_id, SUM(valor_descontar) as total_adiantamentos
                 FROM fechamentos_pagamento_adiantamentos
@@ -2386,9 +2386,9 @@ if (isset($_GET['view'])) {
                 $adiantamentos_por_colaborador[$ad['colaborador_id']] = (float)$ad['total_adiantamentos'];
             }
             
-            // Debug: Se nÃ£o encontrou adiantamentos pelo fechamento_desconto_id,
-            // tenta buscar pelos colaboradores do fechamento e mÃªs de referÃªncia
-            // (para fechamentos criados antes da implementaÃ§Ã£o completa)
+            // Debug: Se não encontrou adiantamentos pelo fechamento_desconto_id,
+            // tenta buscar pelos colaboradores do fechamento e mês de referência
+            // (para fechamentos criados antes da implementação completa)
             if (empty($adiantamentos_por_colaborador)) {
                 $colaboradores_ids = array_column($itens_fechamento, 'colaborador_id');
                 if (!empty($colaboradores_ids)) {
@@ -2413,7 +2413,7 @@ if (isset($_GET['view'])) {
             }
         }
         
-        // Calcula estatÃ­sticas de documentos
+        // Calcula estatísticas de documentos
         $stats_pendentes = 0;
         $stats_enviados = 0;
         $stats_aprovados = 0;
@@ -2427,13 +2427,13 @@ if (isset($_GET['view'])) {
             elseif ($status === 'rejeitado') $stats_rejeitados++;
         }
         
-        // Busca perÃ­odo do fechamento para buscar bÃ´nus ativos
+        // Busca período do fechamento para buscar bônus ativos
         $ano_mes = explode('-', $fechamento_view['mes_referencia']);
         $data_inicio_periodo = $ano_mes[0] . '-' . $ano_mes[1] . '-01';
         $data_fim_periodo = date('Y-m-t', strtotime($data_inicio_periodo));
         
-        // Busca bÃ´nus de cada colaborador no fechamento
-        // Primeiro tenta buscar dos bÃ´nus salvos no fechamento (incluindo fechamentos extras individuais/grupais)
+        // Busca bônus de cada colaborador no fechamento
+        // Primeiro tenta buscar dos bônus salvos no fechamento (incluindo fechamentos extras individuais/grupais)
         foreach ($itens_fechamento as $item) {
             $stmt = $pdo->prepare("
                 SELECT fb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo,
@@ -2447,14 +2447,14 @@ if (isset($_GET['view'])) {
             $stmt->execute([$fechamento_id, $item['colaborador_id']]);
             $bonus_salvos = $stmt->fetchAll();
             
-            // Para fechamentos extras individuais/grupais sem tipo de bÃ´nus, cria um registro virtual
+            // Para fechamentos extras individuais/grupais sem tipo de bônus, cria um registro virtual
             // usando o valor_manual do item para aparecer na listagem
             $is_fechamento_extra = ($fechamento_view['tipo_fechamento'] === 'extra');
             $subtipo_fechamento_view = $fechamento_view['subtipo_fechamento'] ?? '';
             if (empty($bonus_salvos) && $is_fechamento_extra && ($subtipo_fechamento_view === 'individual' || $subtipo_fechamento_view === 'grupal')) {
                 $valor_manual = (float)($item['valor_manual'] ?? $item['valor_total'] ?? 0);
                 if ($valor_manual > 0) {
-                    // Cria um registro virtual de bÃ´nus para exibiÃ§Ã£o
+                    // Cria um registro virtual de bônus para exibição
                     $bonus_salvos[] = [
                         'id' => null,
                         'fechamento_pagamento_id' => $fechamento_id,
@@ -2470,16 +2470,16 @@ if (isset($_GET['view'])) {
                 }
             }
             
-            // Se nÃ£o encontrou bÃ´nus salvos no fechamento, busca bÃ´nus ativos do colaborador
-            // Mas apenas se o fechamento inclui bÃ´nus automÃ¡ticos (fechamentos extras podem nÃ£o incluir)
-            // IMPORTANTE: Para fechamentos extras individuais/grupais, os bÃ´nus jÃ¡ devem estar salvos
-            // na tabela fechamentos_pagamento_bonus, entÃ£o nÃ£o precisa buscar bÃ´nus automÃ¡ticos
+            // Se não encontrou bônus salvos no fechamento, busca bônus ativos do colaborador
+            // Mas apenas se o fechamento inclui bônus automáticos (fechamentos extras podem não incluir)
+            // IMPORTANTE: Para fechamentos extras individuais/grupais, os bônus já devem estar salvos
+            // na tabela fechamentos_pagamento_bonus, então não precisa buscar bônus automáticos
             $inclui_bonus_automaticos_item = $item['inclui_bonus_automaticos'] ?? true;
             
-            // Para fechamentos regulares, busca tambÃ©m fechamentos extras individuais/grupais abertos
-            // que ainda nÃ£o foram pagos e devem aparecer como bÃ´nus
+            // Para fechamentos regulares, busca também fechamentos extras individuais/grupais abertos
+            // que ainda não foram pagos e devem aparecer como bônus
             if (!$is_fechamento_extra && $inclui_bonus_automaticos_item) {
-                // Busca fechamentos extras individuais/grupais abertos para este colaborador no mesmo perÃ­odo
+                // Busca fechamentos extras individuais/grupais abertos para este colaborador no mesmo período
                 $stmt_extras = $pdo->prepare("
                     SELECT fp.id, fp.subtipo_fechamento, fp.mes_referencia, fp.data_fechamento,
                            fpi.valor_total, fpi.valor_manual, fpi.motivo
@@ -2495,17 +2495,17 @@ if (isset($_GET['view'])) {
                 $stmt_extras->execute([$item['colaborador_id'], $fechamento_view['mes_referencia']]);
                 $fechamentos_extras = $stmt_extras->fetchAll();
                 
-                // Para cada fechamento extra aberto, adiciona como bÃ´nus virtual
+                // Para cada fechamento extra aberto, adiciona como bônus virtual
                 foreach ($fechamentos_extras as $extra) {
                     $valor_extra = (float)($extra['valor_total'] ?? 0);
                     if ($valor_extra > 0) {
-                        // Adiciona um registro virtual de bÃ´nus para este fechamento extra
+                        // Adiciona um registro virtual de bônus para este fechamento extra
                         $bonus_salvos[] = [
                             'id' => null,
                             'fechamento_pagamento_id' => $fechamento_id,
                             'colaborador_id' => $item['colaborador_id'],
                             'tipo_bonus_id' => null,
-                            'tipo_bonus_nome' => 'BÃ´nus Extra (' . ucfirst($extra['subtipo_fechamento']) . ')',
+                            'tipo_bonus_nome' => 'Bônus Extra (' . ucfirst($extra['subtipo_fechamento']) . ')',
                             'tipo_valor' => 'variavel',
                             'valor' => $valor_extra,
                             'valor_original' => $valor_extra,
@@ -2518,8 +2518,8 @@ if (isset($_GET['view'])) {
                 }
             }
             
-            // Para fechamentos extras, nÃ£o busca bÃ´nus automÃ¡ticos (jÃ¡ devem estar salvos)
-            // Para fechamentos regulares, busca bÃ´nus automÃ¡ticos se nÃ£o encontrou salvos
+            // Para fechamentos extras, não busca bônus automáticos (já devem estar salvos)
+            // Para fechamentos regulares, busca bônus automáticos se não encontrou salvos
             if (empty($bonus_salvos) && $inclui_bonus_automaticos_item && !$is_fechamento_extra) {
                 $stmt = $pdo->prepare("
                     SELECT cb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo
@@ -2537,19 +2537,19 @@ if (isset($_GET['view'])) {
                 $stmt->execute([$item['colaborador_id'], $data_fim_periodo, $data_inicio_periodo]);
                 $bonus_salvos = $stmt->fetchAll();
                 
-                // Ajusta valores baseado no tipo e calcula desconto se necessÃ¡rio
+                // Ajusta valores baseado no tipo e calcula desconto se necessário
                 foreach ($bonus_salvos as &$bonus) {
                     $tipo_valor = $bonus['tipo_valor'] ?? 'variavel';
                     if ($tipo_valor === 'fixo') {
                         $bonus['valor'] = $bonus['valor_fixo'] ?? 0;
                     }
                     
-                    // Inicializa campos de desconto se nÃ£o existirem
+                    // Inicializa campos de desconto se não existirem
                     if (!isset($bonus['valor_original']) || $bonus['valor_original'] === null) {
                         $bonus['valor_original'] = $bonus['valor'] ?? 0;
                     }
                     if (!isset($bonus['desconto_ocorrencias']) || $bonus['desconto_ocorrencias'] === null) {
-                        // Se nÃ£o tem desconto salvo, calcula agora (para fechamentos antigos)
+                        // Se não tem desconto salvo, calcula agora (para fechamentos antigos)
                         $bonus['desconto_ocorrencias'] = calcular_desconto_bonus_ocorrencias(
                             $pdo,
                             $bonus['tipo_bonus_id'],
@@ -2569,7 +2569,7 @@ if (isset($_GET['view'])) {
     }
 }
 
-// Busca tipos de bÃ´nus para o modal de ediÃ§Ã£o
+// Busca tipos de bônus para o modal de edição
 $stmt = $pdo->query("SELECT * FROM tipos_bonus WHERE status = 'ativo' ORDER BY nome");
 $tipos_bonus = $stmt->fetchAll();
 
@@ -2610,7 +2610,7 @@ require_once __DIR__ . '/../includes/header.php';
         
         
         <?php if ($fechamento_view): ?>
-        <!-- VisualizaÃ§Ã£o de fechamento especÃ­fico -->
+        <!-- Visualização de fechamento específico -->
         <div class="card mb-5">
             <div class="card-header">
                 <h3 class="card-title">Fechamento - <?= date('m/Y', strtotime($fechamento_view['mes_referencia'] . '-01')) ?></h3>
@@ -2685,7 +2685,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <strong>Empresa:</strong> <?= htmlspecialchars($fechamento_view['empresa_nome']) ?>
                     </div>
                     <div class="col-md-3">
-                        <strong>MÃªs/Ano:</strong> <?= date('m/Y', strtotime($fechamento_view['mes_referencia'] . '-01')) ?>
+                        <strong>Mês/Ano:</strong> <?= date('m/Y', strtotime($fechamento_view['mes_referencia'] . '-01')) ?>
                     </div>
                     <div class="col-md-3">
                         <strong>Status:</strong> 
@@ -2722,9 +2722,9 @@ require_once __DIR__ . '/../includes/header.php';
                             <span class="badge badge-primary me-2">FECHAMENTO EXTRA</span>
                             <?php
                             $subtipo_labels = [
-                                'bonus_especifico' => 'BÃ´nus EspecÃ­fico',
-                                'individual' => 'BÃ´nus Individual',
-                                'grupal' => 'BÃ´nus Grupal',
+                                'bonus_especifico' => 'Bônus Específico',
+                                'individual' => 'Bônus Individual',
+                                'grupal' => 'Bônus Grupal',
                                 'adiantamento' => 'Adiantamento'
                             ];
                             echo '<span class="badge badge-light-primary">' . htmlspecialchars($subtipo_labels[$subtipo_fechamento_view] ?? $subtipo_fechamento_view) . '</span>';
@@ -2734,10 +2734,10 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="text-gray-700"><strong>Data de Pagamento:</strong> <?= date('d/m/Y', strtotime($data_pagamento_view)) ?></div>
                         <?php endif; ?>
                         <?php if ($referencia_externa_view): ?>
-                            <div class="text-gray-700"><strong>ReferÃªncia:</strong> <?= htmlspecialchars($referencia_externa_view) ?></div>
+                            <div class="text-gray-700"><strong>Referência:</strong> <?= htmlspecialchars($referencia_externa_view) ?></div>
                         <?php endif; ?>
                         <?php if ($descricao_view): ?>
-                            <div class="text-gray-700 mt-2"><strong>DescriÃ§Ã£o:</strong> <?= nl2br(htmlspecialchars($descricao_view)) ?></div>
+                            <div class="text-gray-700 mt-2"><strong>Descrição:</strong> <?= nl2br(htmlspecialchars($descricao_view)) ?></div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -2754,14 +2754,14 @@ require_once __DIR__ . '/../includes/header.php';
                         <span class="path3"></span>
                     </i>
                     <div class="flex-grow-1">
-                        <div class="fw-bold mb-1">âš ï¸ HistÃ³rico de Reaberturas</div>
+                        <div class="fw-bold mb-1">⚠️ Histórico de Reaberturas</div>
                         <div class="text-gray-700 fs-7"><?= nl2br(htmlspecialchars($descricao_view)) ?></div>
                     </div>
                 </div>
                 <?php endif; ?>
                 
                 <?php if ($fechamento_view['status'] === 'fechado'): ?>
-                <!--begin::EstatÃ­sticas de Documentos-->
+                <!--begin::Estatísticas de Documentos-->
                 <div class="row g-3 mb-7">
                     <div class="col-md-3">
                         <div class="card bg-light-danger">
@@ -2828,12 +2828,12 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                 </div>
-                <!--end::EstatÃ­sticas de Documentos-->
+                <!--end::Estatísticas de Documentos-->
                 <?php endif; ?>
                 
                 <?php 
                 $is_fechamento_extra = ($tipo_fechamento_view === 'extra');
-                // Determina quais colunas mostrar baseado no primeiro item (todos tÃªm mesma configuraÃ§Ã£o)
+                // Determina quais colunas mostrar baseado no primeiro item (todos têm mesma configuração)
                 $primeiro_item = !empty($itens_fechamento) ? $itens_fechamento[0] : null;
                 $inclui_salario = !$is_fechamento_extra || ($primeiro_item && ($primeiro_item['inclui_salario'] ?? true));
                 $inclui_horas_extras = !$is_fechamento_extra || ($primeiro_item && ($primeiro_item['inclui_horas_extras'] ?? true));
@@ -2843,13 +2843,13 @@ require_once __DIR__ . '/../includes/header.php';
                         <tr>
                             <th>Colaborador</th>
                             <?php if ($inclui_salario): ?>
-                            <th>SalÃ¡rio Base</th>
+                            <th>Salário Base</th>
                             <?php endif; ?>
                             <?php if ($inclui_horas_extras): ?>
                             <th>Horas Extras</th>
                             <th>Valor H.E.</th>
                             <?php endif; ?>
-                            <th>BÃ´nus</th>
+                            <th>Bônus</th>
                             <?php if ($inclui_salario): ?>
                             <th>Descontos</th>
                             <th>Adicionais</th>
@@ -2862,20 +2862,20 @@ require_once __DIR__ . '/../includes/header.php';
                             <th>Documento</th>
                             <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'aberto'): ?>
-                            <th>AÃ§Ãµes</th>
+                            <th>Ações</th>
                             <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($itens_fechamento as $item): 
                             $bonus_colab = $bonus_por_colaborador[$item['colaborador_id']] ?? [];
-                            // Calcula total de bÃ´nus considerando apenas os que nÃ£o sÃ£o informativos
-                            // O valor jÃ¡ vem com desconto aplicado se houver
+                            // Calcula total de bônus considerando apenas os que não são informativos
+                            // O valor já vem com desconto aplicado se houver
                             $total_bonus = 0;
                             foreach ($bonus_colab as $bonus_item) {
                                 $tipo_valor = $bonus_item['tipo_valor'] ?? 'variavel';
                                 if ($tipo_valor !== 'informativo') {
-                                    // Usa o valor jÃ¡ descontado (se houver desconto por faltas, jÃ¡ estÃ¡ aplicado)
+                                    // Usa o valor já descontado (se houver desconto por faltas, já está aplicado)
                                     $total_bonus += (float)($bonus_item['valor'] ?? 0);
                                 }
                             }
@@ -2888,7 +2888,7 @@ require_once __DIR__ . '/../includes/header.php';
                             if ($inclui_horas_extras && !$is_fechamento_extra) {
                                 // Busca detalhes das horas extras para mostrar tipo de pagamento
                                 // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
-                                // Busca apenas as horas extras incluÃ­das NESTE fechamento especÃ­fico
+                                // Busca apenas as horas extras incluídas NESTE fechamento específico
                                 $stmt_he = $pdo->prepare("
                                     SELECT 
                                         COALESCE(SUM(CASE WHEN (tipo_pagamento = 'dinheiro' OR tipo_pagamento IS NULL) THEN quantidade_horas ELSE 0 END), 0) as horas_dinheiro,
@@ -2922,7 +2922,7 @@ require_once __DIR__ . '/../includes/header.php';
                             
                             // Calcula valor total
                             if ($is_fechamento_extra) {
-                                // Para fechamentos extras, usa valor_total diretamente (jÃ¡ calculado)
+                                // Para fechamentos extras, usa valor_total diretamente (já calculado)
                                 $valor_total_com_bonus = $item['valor_total'];
                             } else {
                                 $valor_total_com_bonus = $item['salario_base'] + $item['valor_horas_extras'] + $total_bonus + ($item['adicionais'] ?? 0) - ($item['descontos'] ?? 0);
@@ -2936,24 +2936,24 @@ require_once __DIR__ . '/../includes/header.php';
                                 if (!empty($flags_colab)):
                                     foreach ($flags_colab as $flag):
                                         $flag_badge_class = 'badge-danger';
-                                        $flag_icon = 'âš ï¸';
+                                        $flag_icon = '⚠️';
                                         $flag_titulo = '';
                                         
                                         switch($flag['tipo_flag']) {
                                             case 'falta_nao_justificada':
                                                 $flag_badge_class = 'badge-danger';
-                                                $flag_icon = 'ðŸš«';
-                                                $flag_titulo = 'Falta nÃ£o justificada';
+                                                $flag_icon = '🚫';
+                                                $flag_titulo = 'Falta não justificada';
                                                 break;
                                             case 'falta_compromisso_pessoal':
                                                 $flag_badge_class = 'badge-warning';
-                                                $flag_icon = 'âš ï¸';
+                                                $flag_icon = '⚠️';
                                                 $flag_titulo = 'Falta compromisso pessoal';
                                                 break;
                                             case 'ma_conduta':
                                                 $flag_badge_class = 'badge-dark';
-                                                $flag_icon = 'â›”';
-                                                $flag_titulo = 'MÃ¡ conduta';
+                                                $flag_icon = '⛔';
+                                                $flag_titulo = 'Má conduta';
                                                 break;
                                         }
                                 ?>
@@ -3027,7 +3027,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                             <td>
                                 <?php 
-                                // Separa bÃ´nus informativos dos que somam
+                                // Separa bônus informativos dos que somam
                                 $bonus_somam = [];
                                 $bonus_informativos = [];
                                 foreach ($bonus_colab as $bonus_item) {
@@ -3040,7 +3040,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 }
                                 ?>
                                 <?php 
-                                // Verifica se hÃ¡ descontos por ocorrÃªncias
+                                // Verifica se há descontos por ocorrências
                                 $tem_desconto_ocorrencias = false;
                                 $total_desconto_ocorrencias = 0;
                                 foreach ($bonus_colab as $bonus_item) {
@@ -3059,13 +3059,13 @@ require_once __DIR__ . '/../includes/header.php';
                                         'bonus_somam' => $bonus_somam,
                                         'bonus_informativos' => $bonus_informativos,
                                         'total_desconto_ocorrencias' => $total_desconto_ocorrencias
-                                    ])) ?>); return false;" title="Clique para ver detalhes dos bÃ´nus">
+                                    ])) ?>); return false;" title="Clique para ver detalhes dos bônus">
                                         R$ <?= number_format($total_bonus, 2, ',', '.') ?>
                                         <?php if ($tem_desconto_ocorrencias): ?>
-                                            <br><small class="text-danger">Desconto ocorrÃªncias: -R$ <?= number_format($total_desconto_ocorrencias, 2, ',', '.') ?></small>
+                                            <br><small class="text-danger">Desconto ocorrências: -R$ <?= number_format($total_desconto_ocorrencias, 2, ',', '.') ?></small>
                                         <?php endif; ?>
                                         <?php if (!empty($bonus_informativos)): ?>
-                                            <span class="badge badge-light-info ms-1" title="Possui bÃ´nus informativos"><?= count($bonus_informativos) ?> info</span>
+                                            <span class="badge badge-light-info ms-1" title="Possui bônus informativos"><?= count($bonus_informativos) ?> info</span>
                                         <?php endif; ?>
                                     </a>
                                     <?php else: ?>
@@ -3081,15 +3081,15 @@ require_once __DIR__ . '/../includes/header.php';
                                 
                                 // Calcula total de descontos exibido
                                 // Se encontrou adiantamentos descontados, sempre inclui no total exibido
-                                // (mesmo que jÃ¡ estejam incluÃ­dos no campo descontos do banco)
-                                // Isso garante que sempre apareÃ§am visÃ­veis na coluna
+                                // (mesmo que já estejam incluídos no campo descontos do banco)
+                                // Isso garante que sempre apareçam visíveis na coluna
                                 if ($adiantamentos_colab > 0) {
-                                    // Se o campo descontos Ã© menor que os adiantamentos, significa que nÃ£o estÃ£o incluÃ­dos
+                                    // Se o campo descontos é menor que os adiantamentos, significa que não estão incluídos
                                     // Nesse caso, soma ao total
                                     if ($descontos_ocorrencias < $adiantamentos_colab) {
                                         $total_descontos = $descontos_ocorrencias + $adiantamentos_colab;
                                     } else {
-                                        // JÃ¡ estÃ£o incluÃ­dos, usa o valor do campo (que jÃ¡ contÃ©m os adiantamentos)
+                                        // Já estão incluídos, usa o valor do campo (que já contém os adiantamentos)
                                         $total_descontos = $descontos_ocorrencias;
                                     }
                                 } else {
@@ -3119,7 +3119,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <td>
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-light-primary dropdown-toggle" type="button" id="dropdownAcoes_<?= $item['id'] ?>" data-bs-toggle="dropdown" aria-expanded="false">
-                                        AÃ§Ãµes
+                                        Ações
                                     </button>
                                     <ul class="dropdown-menu" aria-labelledby="dropdownAcoes_<?= $item['id'] ?>">
                                         <li>
@@ -3130,7 +3130,7 @@ require_once __DIR__ . '/../includes/header.php';
                                                             <span class="path1"></span>
                                                             <span class="path2"></span>
                                                         </i>
-                                                        Editar BÃ´nus
+                                                        Editar Bônus
                                                     </a>
                                                 <?php elseif ($subtipo_fechamento_view === 'grupal'): ?>
                                                     <a class="dropdown-item" href="#" onclick="editarItemBonusGrupal(<?= htmlspecialchars(json_encode($item)) ?>, '<?= $subtipo_fechamento_view ?>'); return false;">
@@ -3202,7 +3202,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 ?>
                                 
                                 <?php 
-                                // Verifica se hÃ¡ aÃ§Ãµes disponÃ­veis
+                                // Verifica se há ações disponíveis
                                 $tem_acoes = false;
                                 if (!empty($item['documento_anexo'])) $tem_acoes = true;
                                 if ($status_doc === 'enviado') $tem_acoes = true;
@@ -3223,11 +3223,11 @@ require_once __DIR__ . '/../includes/header.php';
                                 <?php endif; ?>
                                     
                                 <?php if ($status_doc === 'enviado'): ?>
-                                        <!-- Dropdown de aÃ§Ãµes -->
+                                        <!-- Dropdown de ações -->
                                         <div class="dropdown">
                                             <button class="btn btn-sm btn-light-primary dropdown-toggle" type="button" 
                                                     id="dropdownAcoes_<?= $item['id'] ?>" data-bs-toggle="dropdown" 
-                                                    aria-expanded="false" title="AÃ§Ãµes">
+                                                    aria-expanded="false" title="Ações">
                                                 <i class="ki-duotone ki-setting fs-5">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
@@ -3309,7 +3309,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </select>
                         <select class="form-select form-select-solid w-180px" id="filtro_subtipo" onchange="aplicarFiltros()">
                             <option value="">Todos os Subtipos</option>
-                            <option value="bonus_especifico" <?= ($filtro_subtipo ?? '') === 'bonus_especifico' ? 'selected' : '' ?>>BÃ´nus EspecÃ­fico</option>
+                            <option value="bonus_especifico" <?= ($filtro_subtipo ?? '') === 'bonus_especifico' ? 'selected' : '' ?>>Bônus Específico</option>
                             <option value="individual" <?= ($filtro_subtipo ?? '') === 'individual' ? 'selected' : '' ?>>Individual</option>
                             <option value="grupal" <?= ($filtro_subtipo ?? '') === 'grupal' ? 'selected' : '' ?>>Grupal</option>
                             <option value="adiantamento" <?= ($filtro_subtipo ?? '') === 'adiantamento' ? 'selected' : '' ?>>Adiantamento</option>
@@ -3332,21 +3332,21 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                BÃ´nus EspecÃ­fico
+                                Bônus Específico
                             </a></li>
                             <li><a class="dropdown-item" href="#" onclick="abrirModalFechamentoExtra('individual'); return false;">
                                 <i class="ki-duotone ki-user fs-5 me-2">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                BÃ´nus Individual
+                                Bônus Individual
                             </a></li>
                             <li><a class="dropdown-item" href="#" onclick="abrirModalFechamentoExtra('grupal'); return false;">
                                 <i class="ki-duotone ki-people fs-5 me-2">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                BÃ´nus Grupal
+                                Bônus Grupal
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="#" onclick="abrirModalFechamentoExtra('adiantamento'); return false;">
@@ -3367,13 +3367,13 @@ require_once __DIR__ . '/../includes/header.php';
                             <th class="min-w-50px">ID</th>
                             <th class="min-w-150px">Tipo</th>
                             <th class="min-w-150px">Empresa</th>
-                            <th class="min-w-100px">MÃªs/Ano</th>
+                            <th class="min-w-100px">Mês/Ano</th>
                             <th class="min-w-100px">Data Pagamento</th>
                             <th class="min-w-100px">Colaboradores</th>
                             <th class="min-w-120px">Total Pagamento</th>
                             <th class="min-w-120px">Total H.E.</th>
                             <th class="min-w-100px">Status</th>
-                            <th class="text-end min-w-70px">AÃ§Ãµes</th>
+                            <th class="text-end min-w-70px">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="fw-semibold text-gray-600">
@@ -3392,7 +3392,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <br><small class="text-muted">
                                             <?php
                                             $subtipo_labels = [
-                                                'bonus_especifico' => 'BÃ´nus EspecÃ­fico',
+                                                'bonus_especifico' => 'Bônus Específico',
                                                 'individual' => 'Individual',
                                                 'grupal' => 'Grupal',
                                                 'adiantamento' => 'Adiantamento'
@@ -3462,12 +3462,12 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
         
-        <!-- Card de InformaÃ§Ãµes de Pagamento -->
+        <!-- Card de Informações de Pagamento -->
         <div class="card mt-5">
             <div class="card-header">
                 <div class="card-title d-flex justify-content-between align-items-center flex-wrap">
                     <div class="align-items-start flex-column">
-                        <span class="card-label fw-bold fs-3 mb-1">InformaÃ§Ãµes de Pagamento</span>
+                        <span class="card-label fw-bold fs-3 mb-1">Informações de Pagamento</span>
                         <span class="text-muted mt-1 fw-semibold fs-7">Resumo financeiro dos pagamentos</span>
                     </div>
                     <div class="d-flex align-items-center gap-3">
@@ -3493,22 +3493,22 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_folha, 2, ',', '.') ?></span>
                                 </div>
                                 <div class="mt-3">
-                                    <span class="text-gray-500 fs-7">Soma de todos os salÃ¡rios</span>
+                                    <span class="text-gray-500 fs-7">Soma de todos os salários</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Apenas BÃ´nus -->
+                    <!-- Apenas Bônus -->
                     <div class="col-xl-3">
                         <div class="card bg-light-success h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
                                 <div>
-                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Apenas BÃ´nus</span>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Apenas Bônus</span>
                                     <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_bonus, 2, ',', '.') ?></span>
                                 </div>
                                 <div class="mt-3">
-                                    <span class="text-gray-500 fs-7">Total de bÃ´nus pagos</span>
+                                    <span class="text-gray-500 fs-7">Total de bônus pagos</span>
                                 </div>
                             </div>
                         </div>
@@ -3529,16 +3529,16 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     
-                    <!-- Folha + BÃ´nus -->
+                    <!-- Folha + Bônus -->
                     <div class="col-xl-3">
                         <div class="card bg-light-warning h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
                                 <div>
-                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Folha + BÃ´nus</span>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Folha + Bônus</span>
                                     <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_folha_bonus, 2, ',', '.') ?></span>
                                 </div>
                                 <div class="mt-3">
-                                    <span class="text-gray-500 fs-7">Total de folha com bÃ´nus</span>
+                                    <span class="text-gray-500 fs-7">Total de folha com bônus</span>
                                 </div>
                             </div>
                         </div>
@@ -3553,7 +3553,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <span class="text-white fw-semibold fs-6 d-block mb-1">Total Geral</span>
-                                        <span class="text-white-50 fs-7">Folha + BÃ´nus + Extras</span>
+                                        <span class="text-white-50 fs-7">Folha + Bônus + Extras</span>
                                     </div>
                                     <div class="text-end">
                                         <span class="text-white fw-bold fs-2x">R$ <?= number_format($total_folha_bonus + $total_extras, 2, ',', '.') ?></span>
@@ -3565,7 +3565,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
             </div>
         </div>
-        <!-- End Card de InformaÃ§Ãµes de Pagamento -->
+        <!-- End Card de Informações de Pagamento -->
         
         <?php endif; ?>
         
@@ -3574,7 +3574,7 @@ require_once __DIR__ . '/../includes/header.php';
         const empresasData = <?= json_encode($empresas ?? []) ?>;
         let setoresData = [];
         
-        // Busca setores quando necessÃ¡rio
+        // Busca setores quando necessário
         function buscarSetores(empresaId = null) {
             const url = empresaId 
                 ? `../api/get_setores.php?empresa_id=${empresaId}`
@@ -3664,7 +3664,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <span class="text-gray-800 fw-bold fs-2x">R$ ${formatarMoeda(dados.total_folha)}</span>
                                     </div>
                                     <div class="mt-3">
-                                        <span class="text-gray-500 fs-7">Soma de todos os salÃ¡rios</span>
+                                        <span class="text-gray-500 fs-7">Soma de todos os salários</span>
                                     </div>
                                 </div>
                             </div>
@@ -3673,11 +3673,11 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="card bg-light-success h-100">
                                 <div class="card-body d-flex flex-column justify-content-between">
                                     <div>
-                                        <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Apenas BÃ´nus</span>
+                                        <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Apenas Bônus</span>
                                         <span class="text-gray-800 fw-bold fs-2x">R$ ${formatarMoeda(dados.total_bonus)}</span>
                                     </div>
                                     <div class="mt-3">
-                                        <span class="text-gray-500 fs-7">Total de bÃ´nus cadastrados</span>
+                                        <span class="text-gray-500 fs-7">Total de bônus cadastrados</span>
                                     </div>
                                 </div>
                             </div>
@@ -3690,7 +3690,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <span class="text-gray-800 fw-bold fs-2x">R$ ${formatarMoeda(dados.total_extras)}</span>
                                     </div>
                                     <div class="mt-3">
-                                        <span class="text-gray-500 fs-7">Total de horas extras nÃ£o pagas</span>
+                                        <span class="text-gray-500 fs-7">Total de horas extras não pagas</span>
                                     </div>
                                 </div>
                             </div>
@@ -3699,11 +3699,11 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="card bg-light-warning h-100">
                                 <div class="card-body d-flex flex-column justify-content-between">
                                     <div>
-                                        <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Folha + BÃ´nus</span>
+                                        <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Folha + Bônus</span>
                                         <span class="text-gray-800 fw-bold fs-2x">R$ ${formatarMoeda(dados.total_folha_bonus)}</span>
                                     </div>
                                     <div class="mt-3">
-                                        <span class="text-gray-500 fs-7">Total de folha com bÃ´nus</span>
+                                        <span class="text-gray-500 fs-7">Total de folha com bônus</span>
                                     </div>
                                 </div>
                             </div>
@@ -3716,7 +3716,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
                                             <span class="text-white fw-semibold fs-6 d-block mb-1">Total Geral</span>
-                                            <span class="text-white-50 fs-7">Folha + BÃ´nus + Extras</span>
+                                            <span class="text-white-50 fs-7">Folha + Bônus + Extras</span>
                                         </div>
                                         <div class="text-end">
                                             <span class="text-white fw-bold fs-2x">R$ ${formatarMoeda(dados.total_geral)}</span>
@@ -3760,7 +3760,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <div class="col-6">
                                             <div class="card bg-light-success">
                                                 <div class="card-body p-3">
-                                                    <span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Apenas BÃ´nus</span>
+                                                    <span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Apenas Bônus</span>
                                                     <span class="text-gray-800 fw-bold fs-3">R$ ${formatarMoeda(bonus)}</span>
                                                 </div>
                                             </div>
@@ -3776,7 +3776,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <div class="col-6">
                                             <div class="card bg-light-warning">
                                                 <div class="card-body p-3">
-                                                    <span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Folha + BÃ´nus</span>
+                                                    <span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Folha + Bônus</span>
                                                     <span class="text-gray-800 fw-bold fs-3">R$ ${formatarMoeda(item.valor)}</span>
                                                 </div>
                                             </div>
@@ -3803,7 +3803,7 @@ require_once __DIR__ . '/../includes/header.php';
             }
         }
         
-        // Formata valor monetÃ¡rio
+        // Formata valor monetário
         function formatarMoeda(valor) {
             return parseFloat(valor || 0).toLocaleString('pt-BR', {
                 minimumFractionDigits: 2,
@@ -3822,7 +3822,7 @@ require_once __DIR__ . '/../includes/header.php';
             carregarResumo(tipo, filtroId);
         });
         
-        // Inicializa ao carregar a pÃ¡gina
+        // Inicializa ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
             atualizarSelectFiltro();
         });
@@ -3833,12 +3833,12 @@ require_once __DIR__ . '/../includes/header.php';
 <!--end::Post-->
 
 <?php if (isset($fechamento_view) && $fechamento_view): ?>
-<!-- Modal Detalhes BÃ´nus -->
+<!-- Modal Detalhes Bônus -->
 <div class="modal fade" id="kt_modal_detalhes_bonus" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold" id="kt_modal_detalhes_bonus_titulo">Detalhes dos BÃ´nus</h2>
+                <h2 class="fw-bold" id="kt_modal_detalhes_bonus_titulo">Detalhes dos Bônus</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -3848,7 +3848,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
                 <div id="kt_modal_detalhes_bonus_conteudo">
-                    <!-- ConteÃºdo serÃ¡ preenchido via JavaScript -->
+                    <!-- Conteúdo será preenchido via JavaScript -->
                 </div>
             </div>
             <div class="modal-footer flex-center">
@@ -3917,7 +3917,7 @@ require_once __DIR__ . '/../includes/header.php';
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="required fw-semibold fs-6 mb-2">MÃªs/Ano de ReferÃªncia</label>
+                            <label class="required fw-semibold fs-6 mb-2">Mês/Ano de Referência</label>
                             <input type="month" name="mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m', strtotime('first day of last month')) ?>" required />
                         </div>
                     </div>
@@ -3936,7 +3936,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="form-check form-check-custom form-check-solid">
                                 <input class="form-check-input" type="checkbox" name="excluir_bonus_ja_pagos" id="excluir_bonus_ja_pagos" value="1" />
                                 <label class="form-check-label fw-semibold fs-6" for="excluir_bonus_ja_pagos">
-                                    Excluir bÃ´nus jÃ¡ pagos em fechamentos extras deste mÃªs
+                                    Excluir bônus já pagos em fechamentos extras deste mês
                                 </label>
                             </div>
                             <div class="form-text text-muted mt-2">
@@ -3945,7 +3945,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="path2"></span>
                                     <span class="path3"></span>
                                 </i>
-                                Se marcado, bÃ´nus que jÃ¡ foram pagos em fechamentos extras do mesmo mÃªs serÃ£o automaticamente excluÃ­dos deste fechamento regular, evitando pagamento duplicado.
+                                Se marcado, bônus que já foram pagos em fechamentos extras do mesmo mês serão automaticamente excluídos deste fechamento regular, evitando pagamento duplicado.
                             </div>
                         </div>
                     </div>
@@ -3990,7 +3990,7 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-6">
-                            <label class="fw-semibold fs-6 mb-2">SalÃ¡rio Base</label>
+                            <label class="fw-semibold fs-6 mb-2">Salário Base</label>
                             <input type="text" id="item_salario_base" class="form-control form-control-solid" readonly />
                         </div>
                         <div class="col-md-6">
@@ -4019,17 +4019,17 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="mb-7">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <label class="fw-semibold fs-6 mb-0">BÃ´nus</label>
+                            <label class="fw-semibold fs-6 mb-0">Bônus</label>
                             <button type="button" class="btn btn-sm btn-primary" onclick="adicionarBonusItem()">
                                 <i class="ki-duotone ki-plus fs-5">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                Adicionar BÃ´nus
+                                Adicionar Bônus
                             </button>
                         </div>
                         <div id="bonus_container" class="border rounded p-4">
-                            <p class="text-muted mb-0">Nenhum bÃ´nus adicionado</p>
+                            <p class="text-muted mb-0">Nenhum bônus adicionado</p>
                         </div>
                         <input type="hidden" name="bonus_editados" id="bonus_editados_json" value="[]">
                     </div>
@@ -4047,12 +4047,12 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 <!--end::Modal-->
 
-<!--begin::Modal - Editar Item Bonus EspecÃ­fico-->
+<!--begin::Modal - Editar Item Bonus Específico-->
 <div class="modal fade" id="kt_modal_item_bonus_especifico" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold">Editar BÃ´nus EspecÃ­fico</h2>
+                <h2 class="fw-bold">Editar Bônus Específico</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -4075,7 +4075,7 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-12">
-                            <label class="required fw-semibold fs-6 mb-2">Tipo de BÃ´nus</label>
+                            <label class="required fw-semibold fs-6 mb-2">Tipo de Bônus</label>
                             <select name="tipo_bonus_id" id="item_bonus_especifico_tipo_bonus" class="form-select form-select-solid" required>
                                 <option value="">Selecione...</option>
                                 <?php foreach ($tipos_bonus as $tipo): ?>
@@ -4087,9 +4087,9 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-12">
-                            <label class="fw-semibold fs-6 mb-2">Valor do BÃ´nus</label>
+                            <label class="fw-semibold fs-6 mb-2">Valor do Bônus</label>
                             <input type="text" id="item_bonus_especifico_valor" class="form-control form-control-solid" readonly />
-                            <div class="form-text text-muted">O valor Ã© calculado automaticamente baseado no tipo de bÃ´nus selecionado.</div>
+                            <div class="form-text text-muted">O valor é calculado automaticamente baseado no tipo de bônus selecionado.</div>
                         </div>
                     </div>
                     
@@ -4145,7 +4145,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <input type="text" name="valor_adiantamento" id="item_adiantamento_valor" class="form-control form-control-solid" placeholder="0,00" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="required fw-semibold fs-6 mb-2">Descontar em (MÃªs/Ano)</label>
+                            <label class="required fw-semibold fs-6 mb-2">Descontar em (Mês/Ano)</label>
                             <input type="month" name="mes_desconto" id="item_adiantamento_mes_desconto" class="form-control form-control-solid" required />
                         </div>
                     </div>
@@ -4198,7 +4198,7 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-6">
-                            <label class="fw-semibold fs-6 mb-2">Tipo de BÃ´nus (opcional)</label>
+                            <label class="fw-semibold fs-6 mb-2">Tipo de Bônus (opcional)</label>
                             <select name="tipo_bonus_id" id="item_bonus_valor_tipo_bonus" class="form-select form-select-solid">
                                 <option value="">Valor Livre</option>
                                 <?php foreach ($tipos_bonus as $tipo): ?>
@@ -4232,12 +4232,12 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 <!--end::Modal-->
 
-<!--begin::Modal - Editar Item Bonus EspecÃ­fico-->
+<!--begin::Modal - Editar Item Bonus Específico-->
 <div class="modal fade" id="kt_modal_item_bonus_especifico" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold">Editar BÃ´nus EspecÃ­fico</h2>
+                <h2 class="fw-bold">Editar Bônus Específico</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -4260,7 +4260,7 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-12">
-                            <label class="required fw-semibold fs-6 mb-2">Tipo de BÃ´nus</label>
+                            <label class="required fw-semibold fs-6 mb-2">Tipo de Bônus</label>
                             <select name="tipo_bonus_id" id="item_bonus_especifico_tipo_bonus" class="form-select form-select-solid" required>
                                 <option value="">Selecione...</option>
                                 <?php foreach ($tipos_bonus as $tipo): ?>
@@ -4272,9 +4272,9 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-12">
-                            <label class="fw-semibold fs-6 mb-2">Valor do BÃ´nus</label>
+                            <label class="fw-semibold fs-6 mb-2">Valor do Bônus</label>
                             <input type="text" id="item_bonus_especifico_valor" class="form-control form-control-solid" readonly />
-                            <div class="form-text text-muted">O valor Ã© calculado automaticamente baseado no tipo de bÃ´nus selecionado.</div>
+                            <div class="form-text text-muted">O valor é calculado automaticamente baseado no tipo de bônus selecionado.</div>
                         </div>
                     </div>
                     
@@ -4330,7 +4330,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <input type="text" name="valor_adiantamento" id="item_adiantamento_valor" class="form-control form-control-solid" placeholder="0,00" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="required fw-semibold fs-6 mb-2">Descontar em (MÃªs/Ano)</label>
+                            <label class="required fw-semibold fs-6 mb-2">Descontar em (Mês/Ano)</label>
                             <input type="month" name="mes_desconto" id="item_adiantamento_mes_desconto" class="form-control form-control-solid" required />
                         </div>
                     </div>
@@ -4383,7 +4383,7 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-6">
-                            <label class="fw-semibold fs-6 mb-2">Tipo de BÃ´nus (opcional)</label>
+                            <label class="fw-semibold fs-6 mb-2">Tipo de Bônus (opcional)</label>
                             <select name="tipo_bonus_id" id="item_bonus_valor_tipo_bonus" class="form-select form-select-solid">
                                 <option value="">Valor Livre</option>
                                 <?php foreach ($tipos_bonus as $tipo): ?>
@@ -4484,7 +4484,7 @@ require_once __DIR__ . '/../includes/header.php';
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="required fw-semibold fs-6 mb-2">MÃªs/Ano de ReferÃªncia</label>
+                            <label class="required fw-semibold fs-6 mb-2">Mês/Ano de Referência</label>
                             <input type="month" name="mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m', strtotime('first day of last month')) ?>" required />
                         </div>
                     </div>
@@ -4495,16 +4495,16 @@ require_once __DIR__ . '/../includes/header.php';
                             <input type="date" name="data_pagamento" class="form-control form-control-solid" value="<?= date('Y-m-d') ?>" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="fw-semibold fs-6 mb-2">ReferÃªncia Externa</label>
+                            <label class="fw-semibold fs-6 mb-2">Referência Externa</label>
                             <input type="text" name="referencia_externa" class="form-control form-control-solid" placeholder="Ex: Meta Q1 2024, Adiantamento Dezembro" />
                         </div>
                     </div>
                     
-                    <!-- Campos BÃ´nus EspecÃ­fico -->
+                    <!-- Campos Bônus Específico -->
                     <div class="campo-bonus-especifico" style="display: none;">
                         <div class="row mb-7">
                             <div class="col-md-12">
-                                <label class="required fw-semibold fs-6 mb-2">Tipo de BÃ´nus</label>
+                                <label class="required fw-semibold fs-6 mb-2">Tipo de Bônus</label>
                                 <select name="tipo_bonus_id" id="extra_tipo_bonus_id" class="form-select form-select-solid" required>
                                     <option value="">Selecione...</option>
                                     <?php foreach ($tipos_bonus as $tipo): ?>
@@ -4528,7 +4528,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="aplicar_descontos" value="1" id="aplicar_descontos">
                                     <label class="form-check-label" for="aplicar_descontos">
-                                        Aplicar descontos por ocorrÃªncias configuradas
+                                        Aplicar descontos por ocorrências configuradas
                                     </label>
                                 </div>
                                 <div class="form-text text-muted mt-2">
@@ -4537,7 +4537,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <span class="path2"></span>
                                         <span class="path3"></span>
                                     </i>
-                                    Se marcado, o sistema aplicarÃ¡ automaticamente descontos no valor do bÃ´nus baseado nas ocorrÃªncias (faltas, atrasos, etc.) configuradas para este tipo de bÃ´nus. Os descontos podem ser proporcionais, fixos, percentuais ou totais, conforme configurado no cadastro do tipo de bÃ´nus.
+                                    Se marcado, o sistema aplicará automaticamente descontos no valor do bônus baseado nas ocorrências (faltas, atrasos, etc.) configuradas para este tipo de bônus. Os descontos podem ser proporcionais, fixos, percentuais ou totais, conforme configurado no cadastro do tipo de bônus.
                                 </div>
                             </div>
                         </div>
@@ -4555,7 +4555,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <div class="row mb-7">
                             <div class="col-md-6">
-                                <label class="fw-semibold fs-6 mb-2">Tipo de BÃ´nus (opcional)</label>
+                                <label class="fw-semibold fs-6 mb-2">Tipo de Bônus (opcional)</label>
                                 <select name="tipo_bonus_id" id="extra_tipo_bonus_id_individual" class="form-select form-select-solid">
                                     <option value="">Valor Livre</option>
                                     <?php foreach ($tipos_bonus as $tipo): ?>
@@ -4594,7 +4594,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <div class="row mb-7">
                             <div class="col-md-6">
-                                <label class="fw-semibold fs-6 mb-2">Tipo de BÃ´nus (opcional)</label>
+                                <label class="fw-semibold fs-6 mb-2">Tipo de Bônus (opcional)</label>
                                 <select name="tipo_bonus_id" id="extra_tipo_bonus_id_grupal" class="form-select form-select-solid">
                                     <option value="">Valor Livre</option>
                                     <?php foreach ($tipos_bonus as $tipo): ?>
@@ -4635,7 +4635,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <input type="text" name="valor_adiantamento" class="form-control form-control-solid" placeholder="0,00" required />
                             </div>
                             <div class="col-md-6">
-                                <label class="required fw-semibold fs-6 mb-2">Descontar em (MÃªs/Ano)</label>
+                                <label class="required fw-semibold fs-6 mb-2">Descontar em (Mês/Ano)</label>
                                 <input type="month" name="mes_desconto" class="form-control form-control-solid" required />
                             </div>
                         </div>
@@ -4651,7 +4651,7 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <div class="row mb-7">
                         <div class="col-md-12">
-                            <label class="fw-semibold fs-6 mb-2">DescriÃ§Ã£o/ObservaÃ§Ãµes</label>
+                            <label class="fw-semibold fs-6 mb-2">Descrição/Observações</label>
                             <textarea name="descricao" class="form-control form-control-solid" rows="3"></textarea>
                         </div>
                     </div>
@@ -4704,7 +4704,7 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
                     <div class="form-check mb-3">
                         <input class="form-check-input colaborador-checkbox" type="checkbox" name="colaboradores[]" value="${colab.id}" id="colab_${colab.id}">
                         <label class="form-check-label" for="colab_${colab.id}">
-                            ${colab.nome_completo} - SalÃ¡rio: R$ ${parseFloat(colab.salario || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                            ${colab.nome_completo} - Salário: R$ ${parseFloat(colab.salario || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                         </label>
                     </div>
                 `;
@@ -4738,7 +4738,7 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
         });
 });
 
-// VariÃ¡vel global para armazenar bÃ´nus do item
+// Variável global para armazenar bônus do item
 let bonusItemAtual = [];
 
 // Editar item
@@ -4751,12 +4751,12 @@ function editarItem(item) {
     document.getElementById('item_descontos').value = parseFloat(item.descontos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('item_adicionais').value = parseFloat(item.adicionais || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
-    // Busca bÃ´nus do colaborador no fechamento
+    // Busca bônus do colaborador no fechamento
     const colaboradorId = item.colaborador_id;
     const fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
     
     if (fechamentoId && colaboradorId) {
-        // Busca bÃ´nus salvos no fechamento
+        // Busca bônus salvos no fechamento
         fetch(`../api/get_bonus_fechamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
             .then(response => response.json())
             .then(data => {
@@ -4780,13 +4780,13 @@ function editarItem(item) {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_item'));
     modal.show();
     
-    // Aplica mÃ¡scaras apÃ³s o modal ser exibido
+    // Aplica máscaras após o modal ser exibido
     setTimeout(() => {
         aplicarMascarasItem();
     }, 300);
 }
 
-// Aplicar mÃ¡scaras nos campos do modal de editar item
+// Aplicar máscaras nos campos do modal de editar item
 function aplicarMascarasItem() {
     if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
         jQuery('#item_valor_horas_extras').mask('#.##0,00', {reverse: true});
@@ -4796,7 +4796,7 @@ function aplicarMascarasItem() {
     }
 }
 
-// Editar item Bonus EspecÃ­fico
+// Editar item Bonus Específico
 function editarItemBonusEspecifico(item, subtipo) {
     const fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
     
@@ -4804,7 +4804,7 @@ function editarItemBonusEspecifico(item, subtipo) {
     document.getElementById('item_bonus_especifico_fechamento_id').value = fechamentoId;
     document.getElementById('item_bonus_especifico_colaborador').value = item.colaborador_nome;
     
-    // Busca bÃ´nus do colaborador no fechamento
+    // Busca bônus do colaborador no fechamento
     if (fechamentoId && item.colaborador_id) {
         fetch(`../api/get_bonus_fechamento.php?fechamento_id=${fechamentoId}&colaborador_id=${item.colaborador_id}`)
             .then(response => response.json())
@@ -4816,7 +4816,7 @@ function editarItemBonusEspecifico(item, subtipo) {
                 }
             })
             .catch(() => {
-                // Erro ao buscar bÃ´nus
+                // Erro ao buscar bônus
             });
     }
     
@@ -4837,7 +4837,7 @@ function editarItemBonusGrupal(item, subtipo) {
     document.getElementById('item_bonus_valor_id').value = item.id;
     document.getElementById('item_bonus_valor_fechamento_id').value = fechamentoId;
     document.getElementById('item_bonus_valor_colaborador').value = item.colaborador_nome;
-    document.getElementById('item_bonus_valor_titulo').textContent = 'Editar BÃ´nus Grupal';
+    document.getElementById('item_bonus_valor_titulo').textContent = 'Editar Bônus Grupal';
     
     // Preenche valor manual
     if (item.valor_manual) {
@@ -4845,7 +4845,7 @@ function editarItemBonusGrupal(item, subtipo) {
         document.getElementById('item_bonus_valor_valor').value = valorFormatado;
     }
     
-    // Busca tipo de bÃ´nus se existir
+    // Busca tipo de bônus se existir
     if (fechamentoId && item.colaborador_id) {
         fetch(`../api/get_bonus_fechamento.php?fechamento_id=${fechamentoId}&colaborador_id=${item.colaborador_id}`)
             .then(response => response.json())
@@ -4858,7 +4858,7 @@ function editarItemBonusGrupal(item, subtipo) {
                 }
             })
             .catch(() => {
-                // Erro ao buscar bÃ´nus
+                // Erro ao buscar bônus
             });
     }
     
@@ -4870,7 +4870,7 @@ function editarItemBonusGrupal(item, subtipo) {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_item_bonus_valor'));
     modal.show();
     
-    // Aplica mÃ¡scara
+    // Aplica máscara
     setTimeout(() => {
         if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
             jQuery('#item_bonus_valor_valor').mask('#.##0,00', {reverse: true});
@@ -4886,7 +4886,7 @@ function editarItemBonusIndividual(item, subtipo) {
     document.getElementById('item_bonus_valor_id').value = item.id;
     document.getElementById('item_bonus_valor_fechamento_id').value = fechamentoId;
     document.getElementById('item_bonus_valor_colaborador').value = item.colaborador_nome;
-    document.getElementById('item_bonus_valor_titulo').textContent = 'Editar BÃ´nus Individual';
+    document.getElementById('item_bonus_valor_titulo').textContent = 'Editar Bônus Individual';
     
     // Preenche valor manual
     if (item.valor_manual) {
@@ -4894,7 +4894,7 @@ function editarItemBonusIndividual(item, subtipo) {
         document.getElementById('item_bonus_valor_valor').value = valorFormatado;
     }
     
-    // Busca tipo de bÃ´nus se existir
+    // Busca tipo de bônus se existir
     if (fechamentoId && item.colaborador_id) {
         fetch(`../api/get_bonus_fechamento.php?fechamento_id=${fechamentoId}&colaborador_id=${item.colaborador_id}`)
             .then(response => response.json())
@@ -4907,7 +4907,7 @@ function editarItemBonusIndividual(item, subtipo) {
                 }
             })
             .catch(() => {
-                // Erro ao buscar bÃ´nus
+                // Erro ao buscar bônus
             });
     }
     
@@ -4919,7 +4919,7 @@ function editarItemBonusIndividual(item, subtipo) {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_item_bonus_valor'));
     modal.show();
     
-    // Aplica mÃ¡scara
+    // Aplica máscara
     setTimeout(() => {
         if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
             jQuery('#item_bonus_valor_valor').mask('#.##0,00', {reverse: true});
@@ -4953,7 +4953,7 @@ function editarItemAdiantamento(item, subtipo) {
             })
             .catch((error) => {
                 console.error('Erro ao buscar mes_desconto:', error);
-                // Erro ao buscar - deixa vazio para o usuÃ¡rio preencher
+                // Erro ao buscar - deixa vazio para o usuário preencher
             });
     }
     
@@ -4965,7 +4965,7 @@ function editarItemAdiantamento(item, subtipo) {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_item_adiantamento'));
     modal.show();
     
-    // Aplica mÃ¡scara
+    // Aplica máscara
     setTimeout(() => {
         if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
             jQuery('#item_adiantamento_valor').mask('#.##0,00', {reverse: true});
@@ -4973,13 +4973,13 @@ function editarItemAdiantamento(item, subtipo) {
     }, 300);
 }
 
-// Renderizar container de bÃ´nus
+// Renderizar container de bônus
 function renderizarBonusContainer() {
     const container = document.getElementById('bonus_container');
     if (!container) return;
     
     if (bonusItemAtual.length === 0) {
-        container.innerHTML = '<p class="text-muted mb-0">Nenhum bÃ´nus adicionado</p>';
+        container.innerHTML = '<p class="text-muted mb-0">Nenhum bônus adicionado</p>';
         document.getElementById('bonus_editados_json').value = '[]';
         return;
     }
@@ -5013,7 +5013,7 @@ function renderizarBonusContainer() {
                             <strong>Valor Original:</strong> R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                         </small>
                         <small class="d-block text-danger">
-                            <strong>Desconto por OcorrÃªncias:</strong> -R$ ${descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            <strong>Desconto por Ocorrências:</strong> -R$ ${descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                         </small>
                     </div>
                     ` : ''}
@@ -5034,7 +5034,7 @@ function renderizarBonusContainer() {
     aplicarMascarasBonus();
 }
 
-// Adicionar novo bÃ´nus
+// Adicionar novo bônus
 function adicionarBonusItem() {
     bonusItemAtual.push({
         tipo_bonus_id: '',
@@ -5044,29 +5044,29 @@ function adicionarBonusItem() {
     renderizarBonusContainer();
 }
 
-// Remover bÃ´nus
+// Remover bônus
 function removerBonusItem(index) {
     bonusItemAtual.splice(index, 1);
     renderizarBonusContainer();
 }
 
-// Atualizar JSON de bÃ´nus
+// Atualizar JSON de bônus
 function atualizarBonusJSON() {
     const bonusData = bonusItemAtual.map((bonus, index) => {
         const tipoSelect = document.querySelector(`.bonus_tipo[data-index="${index}"]`);
         const valorInput = document.querySelector(`.bonus_valor[data-index="${index}"]`);
         
-        // Remove formataÃ§Ã£o e converte para nÃºmero
+        // Remove formatação e converte para número
         let valor = '0';
         if (valorInput && valorInput.value) {
-            // Remove tudo exceto nÃºmeros e vÃ­rgula
+            // Remove tudo exceto números e vírgula
             valor = valorInput.value.replace(/[^0-9,]/g, '');
-            // Converte vÃ­rgula para ponto
+            // Converte vírgula para ponto
             valor = valor.replace(',', '.');
             // Remove pontos de milhar (se houver mais de um ponto)
             const partes = valor.split('.');
             if (partes.length > 2) {
-                // Tem separador de milhar, junta tudo menos o Ãºltimo ponto
+                // Tem separador de milhar, junta tudo menos o último ponto
                 valor = partes.slice(0, -1).join('') + '.' + partes[partes.length - 1];
             }
         }
@@ -5081,7 +5081,7 @@ function atualizarBonusJSON() {
     document.getElementById('bonus_editados_json').value = JSON.stringify(bonusData);
 }
 
-// Aplicar mÃ¡scaras nos campos de bÃ´nus
+// Aplicar máscaras nos campos de bônus
 function aplicarMascarasBonus() {
     if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
         document.querySelectorAll('.bonus_valor').forEach(input => {
@@ -5094,11 +5094,11 @@ function aplicarMascarasBonus() {
     }
 }
 
-// Atualizar JSON ao submeter formulÃ¡rio
+// Atualizar JSON ao submeter formulário
 document.getElementById('kt_modal_item_form')?.addEventListener('submit', function(e) {
     atualizarBonusJSON();
     
-    // Adiciona os bÃ´nus como campos hidden
+    // Adiciona os bônus como campos hidden
     const bonusData = JSON.parse(document.getElementById('bonus_editados_json').value || '[]');
     bonusData.forEach((bonus, index) => {
         const input = document.createElement('input');
@@ -5135,9 +5135,9 @@ function aplicarFiltros() {
     window.location.href = 'fechamento_pagamentos.php' + (params.toString() ? '?' + params.toString() : '');
 }
 
-// FunÃ§Ã£o para gerenciar atributos required baseado no subtipo
+// Função para gerenciar atributos required baseado no subtipo
 function gerenciarRequiredCampos(subtipo) {
-    // Remove required de TODOS os campos primeiro (incluindo os que estÃ£o em divs ocultas)
+    // Remove required de TODOS os campos primeiro (incluindo os que estão em divs ocultas)
     document.querySelectorAll('input[name="valor_manual"], input[name="valor_adiantamento"], input[name="mes_desconto"], textarea[name="motivo"]').forEach(input => {
         input.removeAttribute('required');
     });
@@ -5151,9 +5151,9 @@ function gerenciarRequiredCampos(subtipo) {
         }
     });
     
-    // Adiciona required apenas nos campos visÃ­veis conforme o subtipo
+    // Adiciona required apenas nos campos visíveis conforme o subtipo
     if (subtipo === 'individual') {
-        // Individual: valor_manual e motivo sÃ£o obrigatÃ³rios
+        // Individual: valor_manual e motivo são obrigatórios
         document.querySelectorAll('.campo-individual input[name="valor_manual"]').forEach(input => {
             if (input.closest('.campo-individual').style.display !== 'none') {
                 input.setAttribute('required', 'required');
@@ -5165,7 +5165,7 @@ function gerenciarRequiredCampos(subtipo) {
             }
         });
     } else if (subtipo === 'grupal') {
-        // Grupal: valor_manual e motivo sÃ£o obrigatÃ³rios
+        // Grupal: valor_manual e motivo são obrigatórios
         document.querySelectorAll('.campo-grupal input[name="valor_manual"]').forEach(input => {
             if (input.closest('.campo-grupal').style.display !== 'none') {
                 input.setAttribute('required', 'required');
@@ -5177,7 +5177,7 @@ function gerenciarRequiredCampos(subtipo) {
             }
         });
     } else if (subtipo === 'adiantamento') {
-        // Adiantamento: valor_adiantamento, mes_desconto e motivo sÃ£o obrigatÃ³rios
+        // Adiantamento: valor_adiantamento, mes_desconto e motivo são obrigatórios
         document.querySelectorAll('.campo-adiantamento input[name="valor_adiantamento"]').forEach(input => {
             if (input.closest('.campo-adiantamento').style.display !== 'none') {
                 input.setAttribute('required', 'required');
@@ -5194,12 +5194,12 @@ function gerenciarRequiredCampos(subtipo) {
             }
         });
     }
-    // bonus_especifico nÃ£o precisa de required em valor_manual, valor_adiantamento ou mes_desconto
+    // bonus_especifico não precisa de required em valor_manual, valor_adiantamento ou mes_desconto
 }
 
 // Abrir modal de fechamento extra
 function abrirModalFechamentoExtra(subtipo) {
-    // Esconde todos os campos especÃ­ficos
+    // Esconde todos os campos específicos
     document.querySelectorAll('.campo-bonus-especifico, .campo-individual, .campo-grupal, .campo-adiantamento').forEach(el => {
         el.style.display = 'none';
     });
@@ -5207,7 +5207,7 @@ function abrirModalFechamentoExtra(subtipo) {
     // Mostra campos conforme subtipo
     if (subtipo === 'bonus_especifico') {
         document.querySelectorAll('.campo-bonus-especifico').forEach(el => el.style.display = 'block');
-        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - BÃ´nus EspecÃ­fico';
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Bônus Específico';
     } else if (subtipo === 'individual') {
         document.querySelectorAll('.campo-individual').forEach(el => el.style.display = 'block');
         document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Individual';
@@ -5222,15 +5222,15 @@ function abrirModalFechamentoExtra(subtipo) {
     // Gerencia atributos required
     gerenciarRequiredCampos(subtipo);
     
-    // Limpa formulÃ¡rio
+    // Limpa formulário
     document.getElementById('kt_modal_fechamento_extra_form').reset();
     
-    // Define o subtipo novamente apÃ³s o reset (para nÃ£o perder o valor)
+    // Define o subtipo novamente após o reset (para não perder o valor)
     document.getElementById('extra_subtipo').value = subtipo;
     document.getElementById('extra_template_id').value = '';
     document.getElementById('extra_template_select').value = '';
     
-    // Limpa todos os containers de colaboradores (existem mÃºltiplos)
+    // Limpa todos os containers de colaboradores (existem múltiplos)
     document.querySelectorAll('#extra_colaboradores_container').forEach(container => {
         container.innerHTML = '<p class="text-muted">Selecione uma empresa primeiro</p>';
     });
@@ -5239,7 +5239,7 @@ function abrirModalFechamentoExtra(subtipo) {
     modal.show();
 }
 
-// Quando template Ã© selecionado, preenche campos automaticamente
+// Quando template é selecionado, preenche campos automaticamente
 document.getElementById('extra_template_select')?.addEventListener('change', function() {
     const templateId = this.value;
     const option = this.options[this.selectedIndex];
@@ -5267,7 +5267,7 @@ document.getElementById('extra_template_select')?.addEventListener('change', fun
     document.getElementById('extra_subtipo').value = subtipo;
     document.getElementById('extra_template_id').value = templateId;
     
-    // Esconde todos os campos especÃ­ficos
+    // Esconde todos os campos específicos
     document.querySelectorAll('.campo-bonus-especifico, .campo-individual, .campo-grupal, .campo-adiantamento').forEach(el => {
         el.style.display = 'none';
     });
@@ -5275,7 +5275,7 @@ document.getElementById('extra_template_select')?.addEventListener('change', fun
     // Mostra campos conforme subtipo do template
     if (subtipo === 'bonus_especifico') {
         document.querySelectorAll('.campo-bonus-especifico').forEach(el => el.style.display = 'block');
-        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - BÃ´nus EspecÃ­fico';
+        document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Bônus Específico';
     } else if (subtipo === 'individual') {
         document.querySelectorAll('.campo-individual').forEach(el => el.style.display = 'block');
         document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Individual';
@@ -5297,7 +5297,7 @@ document.getElementById('extra_template_select')?.addEventListener('change', fun
         document.getElementById('extra_empresa_id').dispatchEvent(new Event('change'));
     }
     
-    // Preenche tipo de bÃ´nus se definido
+    // Preenche tipo de bônus se definido
     if (tipoBonusId) {
         const tipoBonusSelects = document.querySelectorAll('select[name="tipo_bonus_id"]');
         tipoBonusSelects.forEach(select => {
@@ -5322,20 +5322,20 @@ document.getElementById('extra_template_select')?.addEventListener('change', fun
         });
     }
     
-    // Preenche valor padrÃ£o se definido
+    // Preenche valor padrão se definido
     if (valorPadrao) {
         const valorInputs = document.querySelectorAll('input[name="valor_manual"], input[name="valor_adiantamento"]');
         valorInputs.forEach(input => {
             const valorFormatado = parseFloat(valorPadrao).toFixed(2).replace('.', ',');
             input.value = valorFormatado;
-            // Aplica mÃ¡scara se disponÃ­vel
+            // Aplica máscara se disponível
             if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
                 jQuery(input).mask('#.##0,00', {reverse: true});
             }
         });
     }
     
-    // Preenche observaÃ§Ãµes/descriÃ§Ã£o se definida
+    // Preenche observações/descrição se definida
     if (observacoes) {
         const descricaoInput = document.querySelector('textarea[name="descricao"]');
         if (descricaoInput) {
@@ -5344,7 +5344,7 @@ document.getElementById('extra_template_select')?.addEventListener('change', fun
     }
 });
 
-// Aplicar mÃ¡scaras nos campos de valor do modal extra
+// Aplicar máscaras nos campos de valor do modal extra
 function aplicarMascarasExtra() {
     if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
         jQuery('input[name="valor_manual"]').mask('#.##0,00', {reverse: true});
@@ -5352,29 +5352,29 @@ function aplicarMascarasExtra() {
     }
 }
 
-// Aplicar mÃ¡scaras quando o modal for aberto
+// Aplicar máscaras quando o modal for aberto
 document.getElementById('kt_modal_fechamento_extra')?.addEventListener('shown.bs.modal', function() {
     setTimeout(aplicarMascarasExtra, 300);
 });
 
-// Garantir que campos ocultos nÃ£o sejam validados ao submeter o formulÃ¡rio
+// Garantir que campos ocultos não sejam validados ao submeter o formulário
 document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('submit', function(e) {
-    // Remove required de todos os campos ocultos antes da validaÃ§Ã£o
+    // Remove required de todos os campos ocultos antes da validação
     const subtipo = document.getElementById('extra_subtipo')?.value || '';
     
-    // PRIMEIRO: ValidaÃ§Ã£o para bonus_especifico ANTES de remover required
+    // PRIMEIRO: Validação para bonus_especifico ANTES de remover required
     if (subtipo === 'bonus_especifico') {
-        // Tenta encontrar o campo de vÃ¡rias formas
+        // Tenta encontrar o campo de várias formas
         let tipoBonusSelect = document.getElementById('extra_tipo_bonus_id');
         if (!tipoBonusSelect) {
             tipoBonusSelect = document.querySelector('.campo-bonus-especifico select[name="tipo_bonus_id"]');
         }
         if (!tipoBonusSelect) {
-            // Fallback: busca em todo o formulÃ¡rio
+            // Fallback: busca em todo o formulário
             tipoBonusSelect = document.querySelector('#kt_modal_fechamento_extra_form select[name="tipo_bonus_id"]');
         }
         
-        // Verifica tambÃ©m o campo hidden
+        // Verifica também o campo hidden
         const tipoBonusHidden = document.getElementById('extra_tipo_bonus_id_hidden');
         const valorSelect = tipoBonusSelect?.value || '';
         const valorHidden = tipoBonusHidden?.value || '';
@@ -5384,13 +5384,13 @@ document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('sub
             const campoBonusEspecifico = tipoBonusSelect.closest('.campo-bonus-especifico');
             const campoVisivel = campoBonusEspecifico && campoBonusEspecifico.style.display !== 'none' && campoBonusEspecifico.offsetParent !== null;
             
-            // Se o campo estÃ¡ visÃ­vel mas vazio, impede o envio IMEDIATAMENTE
+            // Se o campo está visível mas vazio, impede o envio IMEDIATAMENTE
             if (campoVisivel && (!valorFinal || valorFinal === '' || valorFinal === '0')) {
                 e.preventDefault();
                 e.stopPropagation();
                 Swal.fire({
-                    title: 'AtenÃ§Ã£o',
-                    text: 'Selecione o tipo de bÃ´nus antes de continuar!',
+                    title: 'Atenção',
+                    text: 'Selecione o tipo de bônus antes de continuar!',
                     icon: 'warning',
                     confirmButtonText: 'OK'
                 });
@@ -5404,7 +5404,7 @@ document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('sub
         }
     }
     
-    // Remove required de campos que nÃ£o pertencem ao subtipo atual
+    // Remove required de campos que não pertencem ao subtipo atual
     if (subtipo !== 'individual') {
         document.querySelectorAll('.campo-individual input[required], .campo-individual textarea[required]').forEach(input => {
             input.removeAttribute('required');
@@ -5430,13 +5430,13 @@ document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('sub
         }
     });
     
-    // ValidaÃ§Ã£o manual: verifica se colaboradores foram selecionados
+    // Validação manual: verifica se colaboradores foram selecionados
     if (subtipo === 'bonus_especifico' || subtipo === 'grupal') {
         const colaboradoresSelecionados = document.querySelectorAll('input[name="colaboradores[]"]:checked');
         if (colaboradoresSelecionados.length === 0) {
             e.preventDefault();
             Swal.fire({
-                title: 'AtenÃ§Ã£o',
+                title: 'Atenção',
                 text: 'Selecione pelo menos um colaborador!',
                 icon: 'warning',
                 confirmButtonText: 'OK'
@@ -5456,7 +5456,7 @@ document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('sub
         if (!colaboradorSelecionado) {
             e.preventDefault();
             Swal.fire({
-                title: 'AtenÃ§Ã£o',
+                title: 'Atenção',
                 text: 'Selecione um colaborador!',
                 icon: 'warning',
                 confirmButtonText: 'OK'
@@ -5465,19 +5465,19 @@ document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('sub
         }
     }
     
-    // ValidaÃ§Ã£o FINAL para bonus_especifico: verifica novamente antes de enviar
+    // Validação FINAL para bonus_especifico: verifica novamente antes de enviar
     if (subtipo === 'bonus_especifico') {
-        // Tenta encontrar o campo de vÃ¡rias formas
+        // Tenta encontrar o campo de várias formas
         let tipoBonusSelect = document.getElementById('extra_tipo_bonus_id');
         if (!tipoBonusSelect) {
             tipoBonusSelect = document.querySelector('.campo-bonus-especifico select[name="tipo_bonus_id"]');
         }
         if (!tipoBonusSelect) {
-            // Fallback: busca em todo o formulÃ¡rio
+            // Fallback: busca em todo o formulário
             tipoBonusSelect = document.querySelector('#kt_modal_fechamento_extra_form select[name="tipo_bonus_id"]');
         }
         
-        // Verifica tambÃ©m o campo hidden
+        // Verifica também o campo hidden
         const tipoBonusHidden = document.getElementById('extra_tipo_bonus_id_hidden');
         const valorSelect = tipoBonusSelect?.value || '';
         const valorHidden = tipoBonusHidden?.value || '';
@@ -5492,13 +5492,13 @@ document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('sub
                 tipoBonusHidden.value = valorSelect;
             }
             
-            // Se o campo estÃ¡ visÃ­vel mas vazio, impede o envio
+            // Se o campo está visível mas vazio, impede o envio
             if (campoVisivel && (!valorFinal || valorFinal === '' || valorFinal === '0')) {
                 e.preventDefault();
                 e.stopPropagation();
                 Swal.fire({
-                    title: 'AtenÃ§Ã£o',
-                    text: 'Selecione o tipo de bÃ´nus!',
+                    title: 'Atenção',
+                    text: 'Selecione o tipo de bônus!',
                     icon: 'warning',
                     confirmButtonText: 'OK'
                 });
@@ -5507,7 +5507,7 @@ document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('sub
         }
     }
     
-    // Atualiza campo hidden do individual antes de enviar (tipo_bonus_id Ã© opcional no individual)
+    // Atualiza campo hidden do individual antes de enviar (tipo_bonus_id é opcional no individual)
     if (subtipo === 'individual') {
         const tipoBonusSelectIndividual = document.getElementById('extra_tipo_bonus_id_individual');
         const tipoBonusHiddenIndividual = document.getElementById('extra_tipo_bonus_id_hidden_individual');
@@ -5518,7 +5518,7 @@ document.getElementById('kt_modal_fechamento_extra_form')?.addEventListener('sub
         }
     }
     
-    // Atualiza campo hidden do grupal antes de enviar (tipo_bonus_id Ã© opcional no grupal)
+    // Atualiza campo hidden do grupal antes de enviar (tipo_bonus_id é opcional no grupal)
     if (subtipo === 'grupal') {
         const tipoBonusSelectGrupal = document.getElementById('extra_tipo_bonus_id_grupal');
         const tipoBonusHiddenGrupal = document.getElementById('extra_tipo_bonus_id_hidden_grupal');
@@ -5575,7 +5575,7 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
     const subtipo = document.getElementById('extra_subtipo').value;
     
     if (!empresaId || empresaId === '') {
-        // Limpa todos os containers visÃ­veis
+        // Limpa todos os containers visíveis
         document.querySelectorAll('#extra_colaboradores_container').forEach(container => {
             if (container.closest('.campo-individual, .campo-adiantamento, .campo-bonus-especifico, .campo-grupal')?.style.display !== 'none') {
                 container.innerHTML = '<p class="text-muted">Selecione uma empresa primeiro</p>';
@@ -5584,7 +5584,7 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
         return;
     }
     
-    // Encontra o container correto baseado no subtipo e campo visÃ­vel
+    // Encontra o container correto baseado no subtipo e campo visível
     let container = null;
     if (subtipo === 'individual') {
         container = document.querySelector('.campo-individual #extra_colaboradores_container');
@@ -5594,7 +5594,7 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
         container = document.querySelector(`.campo-${subtipo === 'bonus_especifico' ? 'bonus-especifico' : 'grupal'} #extra_colaboradores_container`);
     }
     
-    // Fallback: pega o primeiro container visÃ­vel
+    // Fallback: pega o primeiro container visível
     if (!container) {
         const containers = document.querySelectorAll('#extra_colaboradores_container');
         for (let c of containers) {
@@ -5611,7 +5611,7 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
     
     container.innerHTML = '<p class="text-muted">Carregando...</p>';
     
-    // Se selecionou "Todas Empresas", nÃ£o passa empresa_id na requisiÃ§Ã£o
+    // Se selecionou "Todas Empresas", não passa empresa_id na requisição
     const url = empresaId === 'todas' 
         ? '../api/get_colaboradores.php?status=ativo'
         : `../api/get_colaboradores.php?empresa_id=${empresaId}&status=ativo`;
@@ -5621,7 +5621,7 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
         .then(data => {
             let html = '';
             if (subtipo === 'individual' || subtipo === 'adiantamento') {
-                // Select Ãºnico
+                // Select único
                 html = '<select name="colaborador_id" id="extra_colaborador_id" class="form-select form-select-solid" required>';
                 html += '<option value="">Selecione...</option>';
                 data.forEach(colab => {
@@ -5631,7 +5631,7 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
                 // Campo hidden para garantir que o valor seja enviado
                 html += '<input type="hidden" name="colaborador_id_hidden" id="extra_colaborador_id_hidden" value="">';
             } else {
-                // Checkboxes mÃºltiplos
+                // Checkboxes múltiplos
                 // Adiciona checkbox "Selecionar Todos"
                 if (data.length > 0) {
                     html += `
@@ -5657,7 +5657,7 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
             }
             container.innerHTML = html || '<p class="text-muted">Nenhum colaborador encontrado</p>';
             
-            // Adiciona evento ao checkbox "Selecionar Todos" (apenas para checkboxes mÃºltiplos)
+            // Adiciona evento ao checkbox "Selecionar Todos" (apenas para checkboxes múltiplos)
             if (subtipo === 'grupal') {
                 const selecionarTodos = document.getElementById('selecionar_todos_colaboradores_extra');
                 if (selecionarTodos) {
@@ -5681,7 +5681,7 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
                 }
             }
             
-            // Verifica duplicaÃ§Ãµes apÃ³s carregar colaboradores
+            // Verifica duplicações após carregar colaboradores
             verificarDuplicacoes();
         })
         .catch((error) => {
@@ -5713,7 +5713,7 @@ document.getElementById('extra_tipo_bonus_id_grupal')?.addEventListener('change'
     }
 });
 
-// Atualiza campo hidden quando template Ã© selecionado
+// Atualiza campo hidden quando template é selecionado
 document.getElementById('extra_template_select')?.addEventListener('change', function() {
     setTimeout(() => {
         // Atualiza campo bonus_especifico
@@ -5777,7 +5777,7 @@ document.getElementById('extra_motivo_adiantamento')?.addEventListener('input', 
     }
 });
 
-// FunÃ§Ã£o para verificar duplicaÃ§Ãµes de bÃ´nus
+// Função para verificar duplicações de bônus
 function verificarDuplicacoes() {
     const mesReferencia = document.querySelector('input[name="mes_referencia"]')?.value;
     const subtipo = document.getElementById('extra_subtipo')?.value;
@@ -5803,15 +5803,15 @@ function verificarDuplicacoes() {
         .then(r => r.json())
         .then(data => {
             if (data.duplicacoes && data.duplicacoes.length > 0) {
-                let mensagem = 'âš ï¸ AtenÃ§Ã£o: Foram encontrados fechamentos extras similares neste mÃªs:\n\n';
+                let mensagem = '⚠️ Atenção: Foram encontrados fechamentos extras similares neste mês:\n\n';
                 data.duplicacoes.forEach(dup => {
-                    mensagem += `â€¢ ${dup.tipo_bonus_nome || 'BÃ´nus'} - ${dup.colaborador_nome}\n`;
+                    mensagem += `• ${dup.tipo_bonus_nome || 'Bônus'} - ${dup.colaborador_nome}\n`;
                     mensagem += `  Fechamento #${dup.fechamento_id} - R$ ${parseFloat(dup.valor).toFixed(2).replace('.', ',')}\n\n`;
                 });
                 mensagem += 'Deseja continuar mesmo assim?';
                 
                 Swal.fire({
-                    title: 'PossÃ­vel DuplicaÃ§Ã£o',
+                    title: 'Possível Duplicação',
                     text: mensagem,
                     icon: 'warning',
                     showCancelButton: true,
@@ -5821,24 +5821,24 @@ function verificarDuplicacoes() {
                     cancelButtonColor: '#d33'
                 }).then((result) => {
                     if (!result.isConfirmed) {
-                        // UsuÃ¡rio cancelou, pode limpar campos ou manter
+                        // Usuário cancelou, pode limpar campos ou manter
                     }
                 });
             }
         })
         .catch(() => {
-            // Erro silencioso - nÃ£o bloqueia criaÃ§Ã£o
+            // Erro silencioso - não bloqueia criação
         });
 }
 
-// Adiciona listener para verificar duplicaÃ§Ãµes quando campos mudam
+// Adiciona listener para verificar duplicações quando campos mudam
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('kt_modal_fechamento_extra_form');
     if (form) {
-        // Verifica ao mudar mÃªs de referÃªncia
+        // Verifica ao mudar mês de referência
         form.querySelector('input[name="mes_referencia"]')?.addEventListener('change', verificarDuplicacoes);
         
-        // Verifica ao mudar tipo de bÃ´nus
+        // Verifica ao mudar tipo de bônus
         form.querySelectorAll('select[name="tipo_bonus_id"]').forEach(select => {
             select.addEventListener('change', verificarDuplicacoes);
         });
@@ -5846,7 +5846,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Verifica ao selecionar/desselecionar colaboradores
         form.addEventListener('change', function(e) {
             if (e.target.matches('input[name="colaboradores[]"], #extra_colaborador_id')) {
-                setTimeout(verificarDuplicacoes, 500); // Delay para evitar muitas requisiÃ§Ãµes
+                setTimeout(verificarDuplicacoes, 500); // Delay para evitar muitas requisições
             }
         });
     }
@@ -5895,7 +5895,7 @@ waitForDependencies();
 // Deletar fechamento
 function deletarFechamento(id, mesAno) {
     Swal.fire({
-        text: `Tem certeza que deseja excluir o fechamento de ${mesAno}? Esta aÃ§Ã£o nÃ£o pode ser desfeita!`,
+        text: `Tem certeza que deseja excluir o fechamento de ${mesAno}? Esta ação não pode ser desfeita!`,
         icon: "warning",
         showCancelButton: true,
         buttonsStyling: false,
@@ -5942,20 +5942,20 @@ function exportarFechamento(fechamentoId, formato) {
     });
 }
 
-// Mostrar detalhes dos bÃ´nus
+// Mostrar detalhes dos bônus
 function mostrarDetalhesBonus(dados) {
     const titulo = document.getElementById('kt_modal_detalhes_bonus_titulo');
     const conteudo = document.getElementById('kt_modal_detalhes_bonus_conteudo');
     
-    titulo.textContent = `BÃ´nus de ${dados.colaborador_nome}`;
+    titulo.textContent = `Bônus de ${dados.colaborador_nome}`;
     
     let html = '<div class="mb-7">';
     html += '<div class="d-flex justify-content-between align-items-center mb-5">';
-    html += '<h4 class="fw-bold text-gray-800">Total de BÃ´nus (somados)</h4>';
+    html += '<h4 class="fw-bold text-gray-800">Total de Bônus (somados)</h4>';
     html += '<span class="text-success fw-bold fs-2">R$ ' + parseFloat(dados.total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
     html += '</div>';
     
-    // Mostra total de desconto por ocorrÃªncias se houver
+    // Mostra total de desconto por ocorrências se houver
     if (dados.total_desconto_ocorrencias && dados.total_desconto_ocorrencias > 0) {
         html += '<div class="alert alert-warning d-flex align-items-center mb-5">';
         html += '<i class="ki-duotone ki-information-5 fs-2x text-warning me-3">';
@@ -5964,32 +5964,32 @@ function mostrarDetalhesBonus(dados) {
         html += '<span class="path3"></span>';
         html += '</i>';
         html += '<div>';
-        html += '<strong>Desconto Total por OcorrÃªncias:</strong> ';
+        html += '<strong>Desconto Total por Ocorrências:</strong> ';
         html += '<span class="fw-bold text-danger fs-3">-R$ ' + parseFloat(dados.total_desconto_ocorrencias || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
         html += '</div>';
         html += '</div>';
     }
     
-    // Mostra bÃ´nus que somam no total
+    // Mostra bônus que somam no total
     if (dados.bonus_somam && dados.bonus_somam.length > 0) {
-        html += '<h5 class="fw-bold mb-3">BÃ´nus que Somam no Total</h5>';
+        html += '<h5 class="fw-bold mb-3">Bônus que Somam no Total</h5>';
         html += '<div class="table-responsive mb-5">';
         html += '<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
         html += '<thead>';
         html += '<tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">';
-        html += '<th class="min-w-150px">Tipo de BÃ´nus</th>';
+        html += '<th class="min-w-150px">Tipo de Bônus</th>';
         html += '<th class="min-w-100px">Tipo</th>';
         html += '<th class="min-w-100px text-end">Valor</th>';
-        html += '<th class="min-w-100px">Data InÃ­cio</th>';
+        html += '<th class="min-w-100px">Data Início</th>';
         html += '<th class="min-w-100px">Data Fim</th>';
-        html += '<th class="min-w-200px">ObservaÃ§Ãµes</th>';
+        html += '<th class="min-w-200px">Observações</th>';
         html += '</tr>';
         html += '</thead>';
         html += '<tbody>';
         
         dados.bonus_somam.forEach(function(bonus) {
             const tipoValor = bonus.tipo_valor || 'variavel';
-            const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : 'VariÃ¡vel';
+            const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : 'Variável';
             const tipoBadge = tipoValor === 'fixo' ? 'primary' : 'success';
             const valorOriginal = parseFloat(bonus.valor_original || bonus.valor || 0);
             const descontoOcorrencias = parseFloat(bonus.desconto_ocorrencias || 0);
@@ -6020,17 +6020,17 @@ function mostrarDetalhesBonus(dados) {
         html += '</div>';
     }
     
-    // Mostra bÃ´nus informativos
+    // Mostra bônus informativos
     if (dados.bonus_informativos && dados.bonus_informativos.length > 0) {
-        html += '<h5 class="fw-bold mb-3 text-info">BÃ´nus Informativos (nÃ£o somam no total)</h5>';
+        html += '<h5 class="fw-bold mb-3 text-info">Bônus Informativos (não somam no total)</h5>';
         html += '<div class="table-responsive mb-5">';
         html += '<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
         html += '<thead>';
         html += '<tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">';
-        html += '<th class="min-w-150px">Tipo de BÃ´nus</th>';
-        html += '<th class="min-w-100px">Data InÃ­cio</th>';
+        html += '<th class="min-w-150px">Tipo de Bônus</th>';
+        html += '<th class="min-w-100px">Data Início</th>';
         html += '<th class="min-w-100px">Data Fim</th>';
-        html += '<th class="min-w-200px">ObservaÃ§Ãµes</th>';
+        html += '<th class="min-w-200px">Observações</th>';
         html += '</tr>';
         html += '</thead>';
         html += '<tbody>';
@@ -6050,7 +6050,7 @@ function mostrarDetalhesBonus(dados) {
     }
     
     if ((!dados.bonus_somam || dados.bonus_somam.length === 0) && (!dados.bonus_informativos || dados.bonus_informativos.length === 0)) {
-        html += '<div class="alert alert-info">Nenhum bÃ´nus encontrado.</div>';
+        html += '<div class="alert alert-info">Nenhum bônus encontrado.</div>';
     }
     
     html += '</div>';
@@ -6081,11 +6081,11 @@ function fecharFechamento(id) {
     });
 }
 
-// Marcar como pago (dentro da visualizaÃ§Ã£o do fechamento)
+// Marcar como pago (dentro da visualização do fechamento)
 function marcarComoPago(id) {
     Swal.fire({
         title: "Marcar como Pago?",
-        text: "Confirma que este fechamento jÃ¡ foi pago? Esta aÃ§Ã£o Ã© Ãºtil para bÃ´nus que nÃ£o precisam de nota fiscal.",
+        text: "Confirma que este fechamento já foi pago? Esta ação é útil para bônus que não precisam de nota fiscal.",
         icon: "question",
         showCancelButton: true,
         buttonsStyling: false,
@@ -6107,7 +6107,7 @@ function reabrirFechamento(id) {
     Swal.fire({
         title: "Reabrir Fechamento?",
         html: `
-            <p class="mb-3">Ao reabrir este fechamento, ele voltarÃ¡ ao status "Aberto" e permitirÃ¡ ediÃ§Ãµes.</p>
+            <p class="mb-3">Ao reabrir este fechamento, ele voltará ao status "Aberto" e permitirá edições.</p>
             <div class="mb-3">
                 <label class="form-label fw-bold">Motivo da reabertura (opcional):</label>
                 <textarea id="motivo_reabertura" class="form-control" rows="3" placeholder="Ex: Colaborador questionou valor de hora extra..."></textarea>
@@ -6159,7 +6159,7 @@ function reabrirFechamento(id) {
 function marcarComoPagoLista(id, mesAno) {
     Swal.fire({
         title: "Marcar como Pago?",
-        text: `Confirma que o fechamento de ${mesAno} jÃ¡ foi pago?`,
+        text: `Confirma que o fechamento de ${mesAno} já foi pago?`,
         icon: "question",
         showCancelButton: true,
         buttonsStyling: false,
@@ -6216,7 +6216,7 @@ function aprovarDocumento(itemId) {
                 }
             })
             .catch(error => {
-                Swal.fire('Erro', 'Erro ao processar solicitaÃ§Ã£o', 'error');
+                Swal.fire('Erro', 'Erro ao processar solicitação', 'error');
             });
         }
     });
@@ -6227,10 +6227,10 @@ function rejeitarDocumento(itemId) {
     Swal.fire({
         title: 'Rejeitar Documento',
         input: 'textarea',
-        inputLabel: 'Motivo da rejeiÃ§Ã£o',
-        inputPlaceholder: 'Digite o motivo da rejeiÃ§Ã£o...',
+        inputLabel: 'Motivo da rejeição',
+        inputPlaceholder: 'Digite o motivo da rejeição...',
         inputAttributes: {
-            'aria-label': 'Digite o motivo da rejeiÃ§Ã£o'
+            'aria-label': 'Digite o motivo da rejeição'
         },
         showCancelButton: true,
         confirmButtonText: 'Rejeitar',
@@ -6242,7 +6242,7 @@ function rejeitarDocumento(itemId) {
         },
         inputValidator: (value) => {
             if (!value) {
-                return 'O motivo da rejeiÃ§Ã£o Ã© obrigatÃ³rio!';
+                return 'O motivo da rejeição é obrigatório!';
             }
         }
     }).then((result) => {
@@ -6267,7 +6267,7 @@ function rejeitarDocumento(itemId) {
                 }
             })
             .catch(error => {
-                Swal.fire('Erro', 'Erro ao processar solicitaÃ§Ã£o', 'error');
+                Swal.fire('Erro', 'Erro ao processar solicitação', 'error');
             });
         }
     });
@@ -6302,15 +6302,15 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                 
                 let html = `
                     <div class="mb-10">
-                        <!-- InformaÃ§Ãµes do Fechamento -->
+                        <!-- Informações do Fechamento -->
                         <div class="card card-flush mb-5">
                             <div class="card-header">
-                                <h3 class="card-title">InformaÃ§Ãµes do Fechamento</h3>
+                                <h3 class="card-title">Informações do Fechamento</h3>
                             </div>
                             <div class="card-body">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <strong>MÃªs/Ano de ReferÃªncia:</strong><br>
+                                        <strong>Mês/Ano de Referência:</strong><br>
                                         <span class="text-gray-800">${d.fechamento.mes_referencia_formatado}</span>
                                     </div>
                                     <div class="col-md-6 mb-3">
@@ -6322,14 +6322,14 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                         <span class="text-gray-800">${d.fechamento.empresa_nome}</span>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <strong>PerÃ­odo:</strong><br>
-                                        <span class="text-gray-800">${d.periodo.inicio_formatado} atÃ© ${d.periodo.fim_formatado}</span>
+                                        <strong>Período:</strong><br>
+                                        <span class="text-gray-800">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- InformaÃ§Ãµes do Colaborador -->
+                        <!-- Informações do Colaborador -->
                         <div class="card card-flush mb-5">
                             <div class="card-header">
                                 <h3 class="card-title">Colaborador</h3>
@@ -6362,7 +6362,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                     <table class="table table-row-bordered table-row-dashed gy-4">
                                         <tbody>
                                             <tr>
-                                                <td class="fw-bold">SalÃ¡rio Base</td>
+                                                <td class="fw-bold">Salário Base</td>
                                                 <td class="text-end">
                                                     <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
@@ -6380,14 +6380,14 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td class="fw-bold">Total de BÃ´nus</td>
+                                                <td class="fw-bold">Total de Bônus</td>
                                                 <td class="text-end">
                                                     <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
                                             </tr>
                                             ${d.bonus.total_desconto_ocorrencias > 0 ? `
                                             <tr>
-                                                <td class="fw-bold text-danger">Desconto por OcorrÃªncias (BÃ´nus)</td>
+                                                <td class="fw-bold text-danger">Desconto por Ocorrências (Bônus)</td>
                                                 <td class="text-end">
                                                     <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                 </td>
@@ -6400,7 +6400,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                     <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                     ${d.ocorrencias.total_descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
                                                     <br><small class="text-muted fs-8">
-                                                        ${d.ocorrencias.total_descontos > 0 ? 'OcorrÃªncias: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                        ${d.ocorrencias.total_descontos > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
                                                         ${d.ocorrencias.total_descontos > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
                                                         ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
                                                     </small>
@@ -6489,7 +6489,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                 <th>% Adicional</th>
                                                 <th>Valor Total</th>
                                                 <th>Tipo</th>
-                                                <th>ObservaÃ§Ãµes</th>
+                                                <th>Observações</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -6511,33 +6511,33 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                         </tbody>
                                     </table>
                                 </div>
-                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste perÃ­odo.</p>'}
+                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste período.</p>'}
                             </div>
                         </div>
                         
-                        <!-- Detalhes de BÃ´nus -->
+                        <!-- Detalhes de Bônus -->
                         ${d.bonus.lista.length > 0 ? `
                         <div class="card card-flush mb-5">
                             <div class="card-header">
-                                <h3 class="card-title">Detalhes de BÃ´nus</h3>
+                                <h3 class="card-title">Detalhes de Bônus</h3>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-row-bordered table-row-dashed gy-4">
                                         <thead>
                                             <tr class="fw-bold">
-                                                <th>Tipo de BÃ´nus</th>
+                                                <th>Tipo de Bônus</th>
                                                 <th>Tipo</th>
                                                 <th>Valor Original</th>
-                                                <th>Desconto OcorrÃªncias</th>
+                                                <th>Desconto Ocorrências</th>
                                                 <th>Valor Final</th>
-                                                <th>ObservaÃ§Ãµes</th>
+                                                <th>Observações</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             ${d.bonus.lista.map(b => {
                                                 const tipoValor = b.tipo_valor || 'variavel';
-                                                const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : tipoValor === 'informativo' ? 'Informativo' : 'VariÃ¡vel';
+                                                const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : tipoValor === 'informativo' ? 'Informativo' : 'Variável';
                                                 const tipoBadge = tipoValor === 'fixo' ? 'primary' : tipoValor === 'informativo' ? 'info' : 'success';
                                                 const valorOriginal = parseFloat(b.valor_original || b.valor || 0);
                                                 const descontoOcorrencias = parseFloat(b.desconto_ocorrencias || 0);
@@ -6560,7 +6560,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                 
                                 ${d.bonus.lista.some(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0) ? `
                                 <div class="separator separator-dashed my-5"></div>
-                                <h5 class="fw-bold mb-3">Detalhes de Descontos por OcorrÃªncias</h5>
+                                <h5 class="fw-bold mb-3">Detalhes de Descontos por Ocorrências</h5>
                                 ${d.bonus.lista.filter(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0).map(b => `
                                     <div class="mb-5">
                                         <h6 class="fw-bold text-gray-800 mb-3">${b.tipo_bonus_nome}</h6>
@@ -6568,9 +6568,9 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             <table class="table table-sm table-row-bordered">
                                                 <thead>
                                                     <tr class="fw-bold fs-7">
-                                                        <th>OcorrÃªncia</th>
-                                                        <th>PerÃ­odo Atual</th>
-                                                        <th>PerÃ­odo Anterior</th>
+                                                        <th>Ocorrência</th>
+                                                        <th>Período Atual</th>
+                                                        <th>Período Anterior</th>
                                                         <th>Tipo Desconto</th>
                                                         <th>Desconto Aplicado</th>
                                                     </tr>
@@ -6579,8 +6579,8 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                     ${b.detalhes_desconto_array.map(det => `
                                                         <tr>
                                                             <td>${det.tipo_ocorrencia_nome || det.tipo_ocorrencia_codigo || '-'}</td>
-                                                            <td>${det.total_ocorrencias_periodo_atual || 0} ocorrÃªncia(s)</td>
-                                                            <td>${det.total_ocorrencias_periodo_anterior || 0} ocorrÃªncia(s)</td>
+                                                            <td>${det.total_ocorrencias_periodo_atual || 0} ocorrência(s)</td>
+                                                            <td>${det.total_ocorrencias_periodo_anterior || 0} ocorrência(s)</td>
                                                             <td>
                                                                 ${det.tipo_desconto === 'total' ? '<span class="badge badge-light-danger">Valor Total</span>' : 
                                                                   det.tipo_desconto === 'fixo' ? '<span class="badge badge-light-warning">Fixo</span>' :
@@ -6600,11 +6600,11 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                         </div>
                         ` : ''}
                         
-                        <!-- OcorrÃªncias com Desconto -->
+                        <!-- Ocorrências com Desconto -->
                         ${d.ocorrencias.descontos.length > 0 ? `
                         <div class="card card-flush mb-5">
                             <div class="card-header">
-                                <h3 class="card-title">OcorrÃªncias com Desconto em R$</h3>
+                                <h3 class="card-title">Ocorrências com Desconto em R$</h3>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
@@ -6613,7 +6613,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             <tr class="fw-bold">
                                                 <th>Data</th>
                                                 <th>Tipo</th>
-                                                <th>DescriÃ§Ã£o</th>
+                                                <th>Descrição</th>
                                                 <th>Valor Desconto</th>
                                             </tr>
                                         </thead>
@@ -6656,9 +6656,9 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                         <thead>
                                             <tr class="fw-bold text-muted">
                                                 <th class="min-w-100px">Data do Adiantamento</th>
-                                                <th class="min-w-100px">MÃªs de Desconto</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
                                                 <th class="min-w-150px">Valor</th>
-                                                <th class="min-w-200px">ObservaÃ§Ãµes</th>
+                                                <th class="min-w-200px">Observações</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -6701,8 +6701,8 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                         <span class="path3"></span>
                                     </i>
                                     <div class="d-flex flex-column">
-                                        <span class="fw-bold">AtenÃ§Ã£o:</span>
-                                        <span>Estes adiantamentos ainda nÃ£o foram descontados. SerÃ£o descontados automaticamente quando o fechamento do mÃªs de desconto for criado.</span>
+                                        <span class="fw-bold">Atenção:</span>
+                                        <span>Estes adiantamentos ainda não foram descontados. Serão descontados automaticamente quando o fechamento do mês de desconto for criado.</span>
                                     </div>
                                 </div>
                                 <div class="table-responsive">
@@ -6710,9 +6710,9 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                         <thead>
                                             <tr class="fw-bold text-muted">
                                                 <th class="min-w-100px">Data do Adiantamento</th>
-                                                <th class="min-w-100px">MÃªs de Desconto</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
                                                 <th class="min-w-150px">Valor a Descontar</th>
-                                                <th class="min-w-200px">ObservaÃ§Ãµes</th>
+                                                <th class="min-w-200px">Observações</th>
                                                 <th class="min-w-100px text-center">Status</th>
                                             </tr>
                                         </thead>
@@ -6724,13 +6724,13 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                         <span class="badge ${ad.mes_desconto === d.fechamento.mes_referencia ? 'badge-light-success' : 'badge-light-warning'}">
                                                             ${ad.mes_desconto_formatado || ad.mes_desconto || '-'}
                                                         </span>
-                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? '<span class="badge badge-light-success ms-1">SerÃ¡ descontado</span>' : ''}
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? '<span class="badge badge-light-success ms-1">Será descontado</span>' : ''}
                                                     </td>
                                                     <td class="fw-bold">R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                                     <td>${ad.observacoes || '-'}</td>
                                                     <td class="text-center">
                                                         ${ad.mes_desconto === d.fechamento.mes_referencia ? 
-                                                            '<span class="badge badge-light-success">SerÃ¡ descontado</span>' : 
+                                                            '<span class="badge badge-light-success">Será descontado</span>' : 
                                                             '<span class="badge badge-light-warning">Aguardando</span>'}
                                                     </td>
                                                 </tr>
@@ -6772,13 +6772,13 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                     ` : ''}
                                     ${d.documento.data_aprovacao ? `
                                     <div class="col-md-6 mb-3">
-                                        <strong>Data de AprovaÃ§Ã£o:</strong><br>
+                                        <strong>Data de Aprovação:</strong><br>
                                         <span class="text-gray-800">${new Date(d.documento.data_aprovacao).toLocaleString('pt-BR')}</span>
                                     </div>
                                     ` : ''}
                                     ${d.documento.observacoes ? `
                                     <div class="col-md-12 mb-3">
-                                        <strong>ObservaÃ§Ãµes:</strong><br>
+                                        <strong>Observações:</strong><br>
                                         <span class="text-gray-800">${d.documento.observacoes}</span>
                                     </div>
                                     ` : ''}
@@ -6800,14 +6800,14 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                     Flags do Colaborador
                                 </h3>
                                 <div class="card-toolbar">
-                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">âš ï¸ ${d.flags.total_ativas} Ativa(s)</span>` : ''}
+                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">⚠️ ${d.flags.total_ativas} Ativa(s)</span>` : ''}
                                     ${d.flags.total_expiradas > 0 ? `<span class="badge badge-light-secondary fs-7">${d.flags.total_expiradas} Expirada(s)</span>` : ''}
                                 </div>
                             </div>
                             <div class="card-body">
                                 ${d.flags.ativas.length > 0 ? `
                                 <div class="mb-5">
-                                    <h5 class="fw-bold text-danger mb-3">ðŸš© Flags Ativas</h5>
+                                    <h5 class="fw-bold text-danger mb-3">🚩 Flags Ativas</h5>
                                     <div class="table-responsive">
                                         <table class="table table-row-bordered table-row-dashed gy-4">
                                             <thead>
@@ -6823,17 +6823,17 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             <tbody>
                                                 ${d.flags.ativas.map(flag => {
                                                     let flagBadgeClass = 'badge-danger';
-                                                    let flagIcon = 'âš ï¸';
+                                                    let flagIcon = '⚠️';
                                                     
                                                     if (flag.tipo_flag === 'falta_nao_justificada') {
                                                         flagBadgeClass = 'badge-danger';
-                                                        flagIcon = 'ðŸš«';
+                                                        flagIcon = '🚫';
                                                     } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
                                                         flagBadgeClass = 'badge-warning';
-                                                        flagIcon = 'âš ï¸';
+                                                        flagIcon = '⚠️';
                                                     } else if (flag.tipo_flag === 'ma_conduta') {
                                                         flagBadgeClass = 'badge-dark';
-                                                        flagIcon = 'â›”';
+                                                        flagIcon = '⛔';
                                                     }
                                                     
                                                     const diasRestantes = Math.ceil(flag.dias_para_expirar || 0);
@@ -6848,7 +6848,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                             <td>\${flag.data_validade_formatada}</td>
                                                             <td><span class="badge \${diasBadge}">\${diasRestantes} dia(s)</span></td>
                                                             <td>
-                                                                \${flag.tipo_ocorrencia_nome ? \`<strong>OcorrÃªncia:</strong> \${flag.tipo_ocorrencia_nome}\` : '-'}
+                                                                \${flag.tipo_ocorrencia_nome ? \`<strong>Ocorrência:</strong> \${flag.tipo_ocorrencia_nome}\` : '-'}
                                                                 \${flag.data_ocorrencia_formatada ? \`<br><small class="text-muted">Data: \${flag.data_ocorrencia_formatada}</small>\` : ''}
                                                                 \${flag.observacoes ? \`<br><small class="text-muted">\${flag.observacoes}</small>\` : ''}
                                                             </td>
@@ -6865,23 +6865,687 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                 ${d.flags.expiradas.length > 0 ? `
                                 <div class="separator separator-dashed my-5"></div>
                                 <div>
-                                    <h5 class="fw-bold text-muted mb-3">ðŸ“‹ HistÃ³rico de Flags Expiradas</h5>
+                                    <h5 class="fw-bold text-muted mb-3">📋 Histórico de Flags Expiradas</h5>
                                     <div class="table-responsive">
                                         <table class="table table-row-bordered table-row-dashed gy-4">
                                             <thead>
                                                 <tr class="fw-bold text-muted">
                                                     <th>Tipo</th>
                                                     <th>Data Recebida</th>
-                                                    <th>Data ExpiraÃ§Ã£o</th>
+                                                    <th>Data Expiração</th>
                                                     <th>Motivo</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 ${d.flags.expiradas.map(flag => {
-                                                    let flagIcon = 'âš ï¸';
-                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = 'ðŸš«';
-                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = 'âš ï¸';
-                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = 'â›”';
+                                                    let flagIcon = '⚠️';
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = '🚫';
+                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '⚠️';
+                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = '⛔';
+                                                    
+                                                    return \`
+                                                        <tr class="text-muted">
+                                                            <td>
+                                                                <span class="badge badge-light-secondary">\${flagIcon} \${flag.tipo_flag_label}</span>
+                                                            </td>
+                                                            <td>\${flag.data_flag_formatada}</td>
+                                                            <td>\${flag.data_validade_formatada}</td>
+                                                            <td>
+                                                                \${flag.tipo_ocorrencia_nome ? \`\${flag.tipo_ocorrencia_nome}\` : '-'}
+                                                                \${flag.data_ocorrencia_formatada ? \` (\${flag.data_ocorrencia_formatada})\` : ''}
+                                                                \${flag.observacoes ? \`<br><small>\${flag.observacoes}</small>\` : ''}
+                                                            </td>
+                                                        </tr>
+                                                    \`;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                conteudo.innerHTML = html;
+            } else {
+                conteudo.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="ki-duotone ki-information-5 fs-2x me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        ${data.message || 'Erro ao carregar detalhes do pagamento'}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            conteudo.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ki-duotone ki-information-5 fs-2x me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Erro ao carregar detalhes do pagamento
+                </div>
+            `;
+        });
+}
+
+// Ver detalhes completos do pagamento
+function verDetalhesPagamento(fechamentoId, colaboradorId) {
+    const titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
+    const conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
+    
+    // Mostra loading
+    conteudo.innerHTML = `
+        <div class="text-center py-10">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <div class="text-muted mt-3">Carregando detalhes...</div>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_pagamento'));
+    modal.show();
+    
+    // Busca dados via API
+    fetch(`../api/get_detalhes_pagamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const d = data.data;
+                
+                titulo.textContent = `Detalhes do Pagamento - ${d.colaborador.nome_completo}`;
+                
+                let html = `
+                    <div class="mb-10">
+                        <!-- Informações do Fechamento -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Informações do Fechamento</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Mês/Ano de Referência:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.mes_referencia_formatado}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Fechamento:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.data_fechamento_formatada}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Empresa:</strong><br>
+                                        <span class="text-gray-800">${d.fechamento.empresa_nome}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Período:</strong><br>
+                                        <span class="text-gray-800">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Informações do Colaborador -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Colaborador</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Nome:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.nome_completo}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>CPF:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.cpf || '-'}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Cargo:</strong><br>
+                                        <span class="text-gray-800">${d.colaborador.cargo || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Resumo Financeiro -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Resumo Financeiro</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <tbody>
+                                            <tr>
+                                                <td class="fw-bold">Salário Base</td>
+                                                <td class="text-end">
+                                                    <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Horas Extras (Total)</td>
+                                                <td class="text-end">
+                                                    <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Valor Horas Extras</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="fw-bold">Total de Bônus</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ${d.bonus.total_desconto_ocorrencias > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Desconto por Ocorrências (Bônus)</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.item.descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
+                                            <tr>
+                                                <td class="fw-bold text-danger">Descontos</td>
+                                                <td class="text-end">
+                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                    ${d.ocorrencias.total_descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
+                                                    <br><small class="text-muted fs-8">
+                                                        ${d.ocorrencias.total_descontos > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                        ${d.ocorrencias.total_descontos > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
+                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
+                                                    </small>
+                                                    ` : ''}
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            ${d.item.adicionais > 0 ? `
+                                            <tr>
+                                                <td class="fw-bold text-success">Adicionais</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold">+R$ ${parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                            ` : ''}
+                                            <tr class="border-top border-2">
+                                                <td class="fw-bold fs-4">Valor Total</td>
+                                                <td class="text-end">
+                                                    <span class="text-success fw-bold fs-3">R$ ${parseFloat(d.item.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes de Horas Extras -->
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Detalhes de Horas Extras</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-5">
+                                    <h5 class="fw-bold mb-3">Resumo</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-success rounded">
+                                                <i class="ki-duotone ki-money fs-2x text-success me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Horas Pagas em R$</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                    <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-info rounded">
+                                                <i class="ki-duotone ki-time fs-2x text-info me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Horas em Banco</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_banco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light-primary rounded">
+                                                <i class="ki-duotone ki-chart-simple fs-2x text-primary me-3">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <div>
+                                                    <div class="text-muted fs-7">Total de Horas</div>
+                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.total_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${d.horas_extras.registros.length > 0 ? `
+                                <h5 class="fw-bold mb-3">Registros Individuais</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Data</th>
+                                                <th>Quantidade</th>
+                                                <th>Valor/Hora</th>
+                                                <th>% Adicional</th>
+                                                <th>Valor Total</th>
+                                                <th>Tipo</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.horas_extras.registros.map(he => `
+                                                <tr>
+                                                    <td>${new Date(he.data_trabalho + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                                                    <td>${parseFloat(he.quantidade_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</td>
+                                                    <td>R$ ${parseFloat(he.valor_hora || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${parseFloat(he.percentual_adicional || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</td>
+                                                    <td class="fw-bold">R$ ${parseFloat(he.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>
+                                                        ${he.tipo_pagamento === 'banco_horas' 
+                                                            ? '<span class="badge badge-light-info">Banco de Horas</span>' 
+                                                            : '<span class="badge badge-light-success">Dinheiro</span>'}
+                                                    </td>
+                                                    <td>${he.observacoes || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste período.</p>'}
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes de Bônus -->
+                        ${d.bonus.lista.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Detalhes de Bônus</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Tipo de Bônus</th>
+                                                <th>Tipo</th>
+                                                <th>Valor Original</th>
+                                                <th>Desconto Ocorrências</th>
+                                                <th>Valor Final</th>
+                                                <th>Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.bonus.lista.map(b => {
+                                                const tipoValor = b.tipo_valor || 'variavel';
+                                                const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : tipoValor === 'informativo' ? 'Informativo' : 'Variável';
+                                                const tipoBadge = tipoValor === 'fixo' ? 'primary' : tipoValor === 'informativo' ? 'info' : 'success';
+                                                const valorOriginal = parseFloat(b.valor_original || b.valor || 0);
+                                                const descontoOcorrencias = parseFloat(b.desconto_ocorrencias || 0);
+                                                const valorFinal = parseFloat(b.valor || 0);
+                                                
+                                                return `
+                                                    <tr>
+                                                        <td class="fw-bold">${b.tipo_bonus_nome}</td>
+                                                        <td><span class="badge badge-light-${tipoBadge}">${tipoLabel}</span></td>
+                                                        <td>R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        <td class="text-danger">${descontoOcorrencias > 0 ? '-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</td>
+                                                        <td class="fw-bold text-success">R$ ${valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        <td>${b.observacoes || '-'}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                ${d.bonus.lista.some(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0) ? `
+                                <div class="separator separator-dashed my-5"></div>
+                                <h5 class="fw-bold mb-3">Detalhes de Descontos por Ocorrências</h5>
+                                ${d.bonus.lista.filter(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0).map(b => `
+                                    <div class="mb-5">
+                                        <h6 class="fw-bold text-gray-800 mb-3">${b.tipo_bonus_nome}</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-row-bordered">
+                                                <thead>
+                                                    <tr class="fw-bold fs-7">
+                                                        <th>Ocorrência</th>
+                                                        <th>Período Atual</th>
+                                                        <th>Período Anterior</th>
+                                                        <th>Tipo Desconto</th>
+                                                        <th>Desconto Aplicado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    ${b.detalhes_desconto_array.map(det => `
+                                                        <tr>
+                                                            <td>${det.tipo_ocorrencia_nome || det.tipo_ocorrencia_codigo || '-'}</td>
+                                                            <td>${det.total_ocorrencias_periodo_atual || 0} ocorrência(s)</td>
+                                                            <td>${det.total_ocorrencias_periodo_anterior || 0} ocorrência(s)</td>
+                                                            <td>
+                                                                ${det.tipo_desconto === 'total' ? '<span class="badge badge-light-danger">Valor Total</span>' : 
+                                                                  det.tipo_desconto === 'fixo' ? '<span class="badge badge-light-warning">Fixo</span>' :
+                                                                  det.tipo_desconto === 'percentual' ? '<span class="badge badge-light-info">Percentual</span>' :
+                                                                  '<span class="badge badge-light-primary">Proporcional</span>'}
+                                                            </td>
+                                                            <td class="text-danger fw-bold">-R$ ${parseFloat(det.desconto_aplicado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                        </tr>
+                                                    `).join('')}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Ocorrências com Desconto -->
+                        ${d.ocorrencias.descontos.length > 0 ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">Ocorrências com Desconto em R$</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-dashed gy-4">
+                                        <thead>
+                                            <tr class="fw-bold">
+                                                <th>Data</th>
+                                                <th>Tipo</th>
+                                                <th>Descrição</th>
+                                                <th>Valor Desconto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.ocorrencias.descontos.map(occ => `
+                                                <tr>
+                                                    <td>${new Date(occ.data_ocorrencia + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                                                    <td><span class="badge badge-light-danger">${occ.tipo_ocorrencia_nome || occ.tipo_ocorrencia_codigo || '-'}</span></td>
+                                                    <td>${occ.descricao || '-'}</td>
+                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(occ.valor_desconto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Adiantamentos Descontados -->
+                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-wallet fs-2 text-primary me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Adiantamentos Descontados
+                                </h3>
+                                <div class="card-toolbar">
+                                    <span class="badge badge-light-danger fs-4 fw-bold">
+                                        Total: -R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                                        <thead>
+                                            <tr class="fw-bold text-muted">
+                                                <th class="min-w-100px">Data do Adiantamento</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
+                                                <th class="min-w-150px">Valor</th>
+                                                <th class="min-w-200px">Observações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.adiantamentos_descontados.map(ad => `
+                                                <tr>
+                                                    <td>${ad.fechamento_data || '-'}</td>
+                                                    <td>
+                                                        <span class="badge badge-light-info">${ad.mes_desconto_formatado || ad.mes_desconto || '-'}</span>
+                                                    </td>
+                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${ad.observacoes || '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Adiantamentos Pendentes -->
+                        ${d.adiantamentos_pendentes && d.adiantamentos_pendentes.length > 0 ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-time fs-2 text-warning me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Adiantamentos Pendentes
+                                    <span class="badge badge-light-warning ms-2">${d.adiantamentos_pendentes.length}</span>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info d-flex align-items-center p-3 mb-5">
+                                    <i class="ki-duotone ki-information-5 fs-2hx text-info me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">Atenção:</span>
+                                        <span>Estes adiantamentos ainda não foram descontados. Serão descontados automaticamente quando o fechamento do mês de desconto for criado.</span>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                                        <thead>
+                                            <tr class="fw-bold text-muted">
+                                                <th class="min-w-100px">Data do Adiantamento</th>
+                                                <th class="min-w-100px">Mês de Desconto</th>
+                                                <th class="min-w-150px">Valor a Descontar</th>
+                                                <th class="min-w-200px">Observações</th>
+                                                <th class="min-w-100px text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${d.adiantamentos_pendentes.map(ad => `
+                                                <tr>
+                                                    <td>${ad.fechamento_data || '-'}</td>
+                                                    <td>
+                                                        <span class="badge ${ad.mes_desconto === d.fechamento.mes_referencia ? 'badge-light-success' : 'badge-light-warning'}">
+                                                            ${ad.mes_desconto_formatado || ad.mes_desconto || '-'}
+                                                        </span>
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? '<span class="badge badge-light-success ms-1">Será descontado</span>' : ''}
+                                                    </td>
+                                                    <td class="fw-bold">R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                    <td>${ad.observacoes || '-'}</td>
+                                                    <td class="text-center">
+                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? 
+                                                            '<span class="badge badge-light-success">Será descontado</span>' : 
+                                                            '<span class="badge badge-light-warning">Aguardando</span>'}
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold">
+                                                <td colspan="2" class="text-end">Total Pendente:</td>
+                                                <td class="text-warning">R$ ${parseFloat(d.adiantamentos_pendentes.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                <td colspan="2"></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Status do Documento -->
+                        ${d.documento.status ? `
+                        <div class="card card-flush">
+                            <div class="card-header">
+                                <h3 class="card-title">Status do Documento</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Status:</strong><br>
+                                        ${d.documento.status === 'aprovado' ? '<span class="badge badge-light-success">Aprovado</span>' :
+                                          d.documento.status === 'enviado' ? '<span class="badge badge-light-warning">Enviado</span>' :
+                                          d.documento.status === 'rejeitado' ? '<span class="badge badge-light-danger">Rejeitado</span>' :
+                                          '<span class="badge badge-light-secondary">Pendente</span>'}
+                                    </div>
+                                    ${d.documento.data_envio ? `
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Envio:</strong><br>
+                                        <span class="text-gray-800">${new Date(d.documento.data_envio).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${d.documento.data_aprovacao ? `
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Data de Aprovação:</strong><br>
+                                        <span class="text-gray-800">${new Date(d.documento.data_aprovacao).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${d.documento.observacoes ? `
+                                    <div class="col-md-12 mb-3">
+                                        <strong>Observações:</strong><br>
+                                        <span class="text-gray-800">${d.documento.observacoes}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Flags do Colaborador -->
+                        ${d.flags && (d.flags.ativas.length > 0 || d.flags.expiradas.length > 0) ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-information-5 fs-2 text-warning me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Flags do Colaborador
+                                </h3>
+                                <div class="card-toolbar">
+                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">⚠️ ${d.flags.total_ativas} Ativa(s)</span>` : ''}
+                                    ${d.flags.total_expiradas > 0 ? `<span class="badge badge-light-secondary fs-7">${d.flags.total_expiradas} Expirada(s)</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                ${d.flags.ativas.length > 0 ? `
+                                <div class="mb-5">
+                                    <h5 class="fw-bold text-danger mb-3">🚩 Flags Ativas</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-row-bordered table-row-dashed gy-4">
+                                            <thead>
+                                                <tr class="fw-bold">
+                                                    <th>Tipo</th>
+                                                    <th>Data Recebida</th>
+                                                    <th>Validade</th>
+                                                    <th>Dias Restantes</th>
+                                                    <th>Motivo</th>
+                                                    <th>Adicionada Por</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${d.flags.ativas.map(flag => {
+                                                    let flagBadgeClass = 'badge-danger';
+                                                    let flagIcon = '⚠️';
+                                                    
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') {
+                                                        flagBadgeClass = 'badge-danger';
+                                                        flagIcon = '🚫';
+                                                    } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
+                                                        flagBadgeClass = 'badge-warning';
+                                                        flagIcon = '⚠️';
+                                                    } else if (flag.tipo_flag === 'ma_conduta') {
+                                                        flagBadgeClass = 'badge-dark';
+                                                        flagIcon = '⛔';
+                                                    }
+                                                    
+                                                    const diasRestantes = Math.ceil(flag.dias_para_expirar || 0);
+                                                    const diasBadge = diasRestantes <= 5 ? 'badge-danger' : diasRestantes <= 10 ? 'badge-warning' : 'badge-info';
+                                                    
+                                                    return \`
+                                                        <tr>
+                                                            <td>
+                                                                <span class="badge \${flagBadgeClass} fw-bold">\${flagIcon} \${flag.tipo_flag_label}</span>
+                                                            </td>
+                                                            <td>\${flag.data_flag_formatada}</td>
+                                                            <td>\${flag.data_validade_formatada}</td>
+                                                            <td><span class="badge \${diasBadge}">\${diasRestantes} dia(s)</span></td>
+                                                            <td>
+                                                                \${flag.tipo_ocorrencia_nome ? \`<strong>Ocorrência:</strong> \${flag.tipo_ocorrencia_nome}\` : '-'}
+                                                                \${flag.data_ocorrencia_formatada ? \`<br><small class="text-muted">Data: \${flag.data_ocorrencia_formatada}</small>\` : ''}
+                                                                \${flag.observacoes ? \`<br><small class="text-muted">\${flag.observacoes}</small>\` : ''}
+                                                            </td>
+                                                            <td>\${flag.created_by_nome || '-'}</td>
+                                                        </tr>
+                                                    \`;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                ${d.flags.expiradas.length > 0 ? `
+                                <div class="separator separator-dashed my-5"></div>
+                                <div>
+                                    <h5 class="fw-bold text-muted mb-3">📋 Histórico de Flags Expiradas</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-row-bordered table-row-dashed gy-4">
+                                            <thead>
+                                                <tr class="fw-bold text-muted">
+                                                    <th>Tipo</th>
+                                                    <th>Data Recebida</th>
+                                                    <th>Data Expiração</th>
+                                                    <th>Motivo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${d.flags.expiradas.map(flag => {
+                                                    let flagIcon = '⚠️';
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = '🚫';
+                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '⚠️';
+                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = '⛔';
                                                     
                                                     return \`
                                                         <tr class="text-muted">
@@ -6958,8 +7622,8 @@ function verDocumentoAdmin(fechamentoId, itemId) {
                                 <span class="fw-bold">${doc.documento_status === 'aprovado' ? 'Aprovado' : doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado'}</span>
                             </div>
                             ${doc.documento_data_envio ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>${new Date(doc.documento_data_envio).toLocaleString('pt-BR')}</span></div>` : ''}
-                            ${doc.documento_data_aprovacao ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data AprovaÃ§Ã£o:</span><span>${new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR')}</span></div>` : ''}
-                            ${doc.documento_observacoes ? `<div class="mt-3"><strong>ObservaÃ§Ãµes:</strong><div class="text-gray-600">${doc.documento_observacoes}</div></div>` : ''}
+                            ${doc.documento_data_aprovacao ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovação:</span><span>${new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR')}</span></div>` : ''}
+                            ${doc.documento_observacoes ? `<div class="mt-3"><strong>Observações:</strong><div class="text-gray-600">${doc.documento_observacoes}</div></div>` : ''}
                         </div>
                     `;
                 } else {
@@ -6977,8 +7641,8 @@ function verDocumentoAdmin(fechamentoId, itemId) {
                                     <span class="fw-bold">${doc.documento_status === 'aprovado' ? 'Aprovado' : doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado'}</span>
                                 </div>
                                 ${doc.documento_data_envio ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>${new Date(doc.documento_data_envio).toLocaleString('pt-BR')}</span></div>` : ''}
-                                ${doc.documento_data_aprovacao ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data AprovaÃ§Ã£o:</span><span>${new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR')}</span></div>` : ''}
-                                ${doc.documento_observacoes ? `<div class="mt-3"><strong>ObservaÃ§Ãµes:</strong><div class="text-gray-600">${doc.documento_observacoes}</div></div>` : ''}
+                                ${doc.documento_data_aprovacao ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovação:</span><span>${new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR')}</span></div>` : ''}
+                                ${doc.documento_observacoes ? `<div class="mt-3"><strong>Observações:</strong><div class="text-gray-600">${doc.documento_observacoes}</div></div>` : ''}
                             </div>
                         </div>
                     `;
