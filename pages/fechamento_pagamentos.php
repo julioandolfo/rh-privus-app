@@ -5850,122 +5850,47 @@ function exportarFechamento(fechamentoId, formato) {
 
 console.log('[DEBUG] Ponto 3 - Antes de mostrarDetalhesBonus');
 
-// Mostrar detalhes dos bonus
 function mostrarDetalhesBonus(dados) {
-    const titulo = document.getElementById('kt_modal_detalhes_bonus_titulo');
-    const conteudo = document.getElementById('kt_modal_detalhes_bonus_conteudo');
-    if (!titulo || !conteudo) {
-        return;
-    }
-
+    var titulo = document.getElementById('kt_modal_detalhes_bonus_titulo');
+    var conteudo = document.getElementById('kt_modal_detalhes_bonus_conteudo');
+    if (!titulo || !conteudo) { return; }
     titulo.textContent = 'Bonus de ' + (dados.colaborador_nome || '-');
-
-    let html = '';
-    html += '<div class="mb-7">';
-    html += '<div class="d-flex justify-content-between align-items-center mb-5">';
-    html += '<h4 class="fw-bold text-gray-800">Total de Bonus (somados)</h4>';
-    html += '<span class="text-success fw-bold fs-2">R$ ' + parseFloat(dados.total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
-    html += '</div>';
-
+    var html = '<div class="mb-7"><div class="d-flex justify-content-between align-items-center mb-5"><h4 class="fw-bold text-gray-800">Total de Bonus (somados)</h4><span class="text-success fw-bold fs-2">R$ ' + parseFloat(dados.total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></div>';
     if (dados.total_desconto_ocorrencias && dados.total_desconto_ocorrencias > 0) {
-        html += '<div class="alert alert-warning d-flex align-items-center mb-5">';
-        html += '<i class="ki-duotone ki-information-5 fs-2x text-warning me-3">';
-        html += '<span class="path1"></span>';
-        html += '<span class="path2"></span>';
-        html += '<span class="path3"></span>';
-        html += '</i>';
-        html += '<div>';
-        html += '<strong>Desconto Total por Ocorrencias:</strong> ';
-        html += '<span class="fw-bold text-danger fs-3">-R$ ' + parseFloat(dados.total_desconto_ocorrencias || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
-        html += '</div>';
-        html += '</div>';
+        html += '<div class="alert alert-warning d-flex align-items-center mb-5"><i class="ki-duotone ki-information-5 fs-2x text-warning me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i><div><strong>Desconto Total por Ocorrencias:</strong> <span class="fw-bold text-danger fs-3">-R$ ' + parseFloat(dados.total_desconto_ocorrencias || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></div></div>';
     }
-
     if (dados.bonus_somam && dados.bonus_somam.length > 0) {
-        html += '<h5 class="fw-bold mb-3">Bonus que Somam no Total</h5>';
-        html += '<div class="table-responsive mb-5">';
-        html += '<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
-        html += '<thead>';
-        html += '<tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">';
-        html += '<th class="min-w-150px">Tipo de Bonus</th>';
-        html += '<th class="min-w-100px">Tipo</th>';
-        html += '<th class="min-w-100px text-end">Valor</th>';
-        html += '<th class="min-w-100px">Data Inicio</th>';
-        html += '<th class="min-w-100px">Data Fim</th>';
-        html += '<th class="min-w-200px">Observacoes</th>';
-        html += '</tr>';
-        html += '</thead>';
-        html += '<tbody>';
-
+        html += '<h5 class="fw-bold mb-3">Bonus que Somam no Total</h5><div class="table-responsive mb-5"><table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"><thead><tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0"><th class="min-w-150px">Tipo de Bonus</th><th class="min-w-100px">Tipo</th><th class="min-w-100px text-end">Valor</th><th class="min-w-100px">Data Inicio</th><th class="min-w-100px">Data Fim</th><th class="min-w-200px">Observacoes</th></tr></thead><tbody>';
         dados.bonus_somam.forEach(function(bonus) {
-            const tipoValor = bonus.tipo_valor || 'variavel';
-            const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : 'Variavel';
-            const tipoBadge = tipoValor === 'fixo' ? 'primary' : 'success';
-            const valorOriginal = parseFloat(bonus.valor_original || bonus.valor || 0);
-            const descontoOcorrencias = parseFloat(bonus.desconto_ocorrencias || 0);
-            const valorFinal = parseFloat(bonus.valor || 0);
-
-            html += '<tr>';
-            html += '<td><span class="fw-bold text-gray-800">' + (bonus.tipo_bonus_nome || '-') + '</span></td>';
-            html += '<td><span class="badge badge-light-' + tipoBadge + '">' + tipoLabel + '</span></td>';
-            html += '<td class="text-end">';
+            var tipoValor = bonus.tipo_valor || 'variavel';
+            var tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : 'Variavel';
+            var tipoBadge = tipoValor === 'fixo' ? 'primary' : 'success';
+            var valorOriginal = parseFloat(bonus.valor_original || bonus.valor || 0);
+            var descontoOcorrencias = parseFloat(bonus.desconto_ocorrencias || 0);
+            var valorFinal = parseFloat(bonus.valor || 0);
+            html += '<tr><td><span class="fw-bold text-gray-800">' + (bonus.tipo_bonus_nome || '-') + '</span></td><td><span class="badge badge-light-' + tipoBadge + '">' + tipoLabel + '</span></td><td class="text-end">';
             if (descontoOcorrencias > 0) {
-                html += '<div class="d-flex flex-column align-items-end">';
-                html += '<span class="text-muted text-decoration-line-through fs-7">R$ ' + valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
-                html += '<span class="text-danger fs-7">-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
-                html += '<span class="fw-bold text-success">R$ ' + valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
-                html += '</div>';
+                html += '<div class="d-flex flex-column align-items-end"><span class="text-muted text-decoration-line-through fs-7">R$ ' + valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span><span class="text-danger fs-7">-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span><span class="fw-bold text-success">R$ ' + valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></div>';
             } else {
                 html += '<span class="fw-bold text-success">R$ ' + valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
             }
-            html += '</td>';
-            html += '<td>' + (bonus.data_inicio ? new Date(bonus.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td>';
-            html += '<td>' + (bonus.data_fim ? new Date(bonus.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td>';
-            html += '<td>' + (bonus.observacoes || '-') + '</td>';
-            html += '</tr>';
+            html += '</td><td>' + (bonus.data_inicio ? new Date(bonus.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td><td>' + (bonus.data_fim ? new Date(bonus.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td><td>' + (bonus.observacoes || '-') + '</td></tr>';
         });
-
-        html += '</tbody>';
-        html += '</table>';
-        html += '</div>';
+        html += '</tbody></table></div>';
     }
-
     if (dados.bonus_informativos && dados.bonus_informativos.length > 0) {
-        html += '<h5 class="fw-bold mb-3 text-info">Bonus Informativos (nao somam no total)</h5>';
-        html += '<div class="table-responsive mb-5">';
-        html += '<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
-        html += '<thead>';
-        html += '<tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">';
-        html += '<th class="min-w-150px">Tipo de Bonus</th>';
-        html += '<th class="min-w-100px">Data Inicio</th>';
-        html += '<th class="min-w-100px">Data Fim</th>';
-        html += '<th class="min-w-200px">Observacoes</th>';
-        html += '</tr>';
-        html += '</thead>';
-        html += '<tbody>';
-
+        html += '<h5 class="fw-bold mb-3 text-info">Bonus Informativos (nao somam no total)</h5><div class="table-responsive mb-5"><table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3"><thead><tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0"><th class="min-w-150px">Tipo de Bonus</th><th class="min-w-100px">Data Inicio</th><th class="min-w-100px">Data Fim</th><th class="min-w-200px">Observacoes</th></tr></thead><tbody>';
         dados.bonus_informativos.forEach(function(bonus) {
-            html += '<tr>';
-            html += '<td><span class="fw-bold text-gray-800">' + (bonus.tipo_bonus_nome || '-') + '</span></td>';
-            html += '<td>' + (bonus.data_inicio ? new Date(bonus.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td>';
-            html += '<td>' + (bonus.data_fim ? new Date(bonus.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td>';
-            html += '<td>' + (bonus.observacoes || '-') + '</td>';
-            html += '</tr>';
+            html += '<tr><td><span class="fw-bold text-gray-800">' + (bonus.tipo_bonus_nome || '-') + '</span></td><td>' + (bonus.data_inicio ? new Date(bonus.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td><td>' + (bonus.data_fim ? new Date(bonus.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '<span class="text-muted">Permanente</span>') + '</td><td>' + (bonus.observacoes || '-') + '</td></tr>';
         });
-
-        html += '</tbody>';
-        html += '</table>';
-        html += '</div>';
+        html += '</tbody></table></div>';
     }
-
     if ((!dados.bonus_somam || dados.bonus_somam.length === 0) && (!dados.bonus_informativos || dados.bonus_informativos.length === 0)) {
         html += '<div class="alert alert-info">Nenhum bonus encontrado.</div>';
     }
-
     html += '</div>';
     conteudo.innerHTML = html;
-
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_bonus'));
+    var modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_bonus'));
     modal.show();
 }
 
