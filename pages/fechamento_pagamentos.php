@@ -4570,71 +4570,44 @@ require_once __DIR__ . '/../includes/header.php';
 <script>
 console.log('[DEBUG] Script fechamento_pagamentos.php iniciado');
 
-// Carrega colaboradores ao selecionar empresa
 console.log('[DEBUG] Ponto 1 - Antes de empresa_id listener');
 document.getElementById('empresa_id')?.addEventListener('change', function() {
-    const empresaId = this.value;
-    const container = document.getElementById('colaboradores_container');
-    
+    var empresaId = this.value;
+    var container = document.getElementById('colaboradores_container');
     if (!empresaId) {
         container.innerHTML = '<p class="text-muted">Selecione uma empresa primeiro</p>';
         return;
     }
-    
     container.innerHTML = '<p class="text-muted">Carregando...</p>';
-    
-    fetch(`../api/get_colaboradores.php?empresa_id=${empresaId}&status=ativo&com_salario=1`)
-        .then(r => r.json())
-        .then(data => {
-            let html = '';
-            
-            // Adiciona checkbox "Selecionar Todos"
+    fetch('../api/get_colaboradores.php?empresa_id=' + empresaId + '&status=ativo&com_salario=1')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var html = '';
             if (data.length > 0) {
-                html += `
-                    <div class="form-check mb-3 pb-3 border-bottom">
-                        <input class="form-check-input" type="checkbox" id="selecionar_todos_colaboradores">
-                        <label class="form-check-label fw-bold" for="selecionar_todos_colaboradores">
-                            Selecionar Todos (${data.length} colaborador${data.length > 1 ? 'es' : ''})
-                        </label>
-                    </div>
-                `;
+                html += '<div class="form-check mb-3 pb-3 border-bottom"><input class="form-check-input" type="checkbox" id="selecionar_todos_colaboradores"><label class="form-check-label fw-bold" for="selecionar_todos_colaboradores">Selecionar Todos (' + data.length + ' colaborador' + (data.length > 1 ? 'es' : '') + ')</label></div>';
             }
-            
-            data.forEach(colab => {
-                html += `
-                    <div class="form-check mb-3">
-                        <input class="form-check-input colaborador-checkbox" type="checkbox" name="colaboradores[]" value="${colab.id}" id="colab_${colab.id}">
-                        <label class="form-check-label" for="colab_${colab.id}">
-                            ${colab.nome_completo} - Salário: R$ ${parseFloat(colab.salario || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                        </label>
-                    </div>
-                `;
+            data.forEach(function(colab) {
+                html += '<div class="form-check mb-3"><input class="form-check-input colaborador-checkbox" type="checkbox" name="colaboradores[]" value="' + colab.id + '" id="colab_' + colab.id + '"><label class="form-check-label" for="colab_' + colab.id + '">' + colab.nome_completo + ' - Salario: R$ ' + parseFloat(colab.salario || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2}) + '</label></div>';
             });
             container.innerHTML = html || '<p class="text-muted">Nenhum colaborador encontrado</p>';
-            
-            // Adiciona evento ao checkbox "Selecionar Todos"
-            const selecionarTodos = document.getElementById('selecionar_todos_colaboradores');
+            var selecionarTodos = document.getElementById('selecionar_todos_colaboradores');
             if (selecionarTodos) {
                 selecionarTodos.addEventListener('change', function() {
-                    const checkboxes = container.querySelectorAll('.colaborador-checkbox');
-                    checkboxes.forEach(cb => {
-                        cb.checked = this.checked;
-                    });
+                    var checkboxes = container.querySelectorAll('.colaborador-checkbox');
+                    checkboxes.forEach(function(cb) { cb.checked = selecionarTodos.checked; });
                 });
-                
-                // Atualiza "Selecionar Todos" quando checkboxes individuais mudam
-                const checkboxes = container.querySelectorAll('.colaborador-checkbox');
-                checkboxes.forEach(cb => {
+                var checkboxes = container.querySelectorAll('.colaborador-checkbox');
+                checkboxes.forEach(function(cb) {
                     cb.addEventListener('change', function() {
-                        const todosMarcados = Array.from(checkboxes).every(c => c.checked);
-                        const nenhumMarcado = Array.from(checkboxes).every(c => !c.checked);
+                        var todosMarcados = Array.from(checkboxes).every(function(c) { return c.checked; });
+                        var nenhumMarcado = Array.from(checkboxes).every(function(c) { return !c.checked; });
                         selecionarTodos.checked = todosMarcados;
                         selecionarTodos.indeterminate = !todosMarcados && !nenhumMarcado;
                     });
                 });
             }
         })
-        .catch(() => {
+        .catch(function() {
             container.innerHTML = '<p class="text-danger">Erro ao carregar colaboradores</p>';
         });
 });
