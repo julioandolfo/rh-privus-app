@@ -4625,15 +4625,13 @@ function editarItem(item) {
     document.getElementById('item_descontos').value = parseFloat(item.descontos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('item_adicionais').value = parseFloat(item.adicionais || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
-    // Busca bônus do colaborador no fechamento
-    const colaboradorId = item.colaborador_id;
-    const fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
+    var colaboradorId = item.colaborador_id;
+    var fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
     
     if (fechamentoId && colaboradorId) {
-        // Busca bônus salvos no fechamento
-        fetch(`../api/get_bonus_fechamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
-            .then(response => response.json())
-            .then(data => {
+        fetch('../api/get_bonus_fechamento.php?fechamento_id=' + fechamentoId + '&colaborador_id=' + colaboradorId)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success && data.data) {
                     bonusItemAtual = data.data;
                     renderizarBonusContainer();
@@ -4642,7 +4640,7 @@ function editarItem(item) {
                     renderizarBonusContainer();
                 }
             })
-            .catch(() => {
+            .catch(function() {
                 bonusItemAtual = [];
                 renderizarBonusContainer();
             });
@@ -4670,240 +4668,163 @@ function aplicarMascarasItem() {
     }
 }
 
-// Editar item Bonus Específico
 function editarItemBonusEspecifico(item, subtipo) {
-    const fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
-    
+    var fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
     document.getElementById('item_bonus_especifico_id').value = item.id;
     document.getElementById('item_bonus_especifico_fechamento_id').value = fechamentoId;
     document.getElementById('item_bonus_especifico_colaborador').value = item.colaborador_nome;
-    
-    // Busca bônus do colaborador no fechamento
     if (fechamentoId && item.colaborador_id) {
-        fetch(`../api/get_bonus_fechamento.php?fechamento_id=${fechamentoId}&colaborador_id=${item.colaborador_id}`)
-            .then(response => response.json())
-            .then(data => {
+        fetch('../api/get_bonus_fechamento.php?fechamento_id=' + fechamentoId + '&colaborador_id=' + item.colaborador_id)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success && data.data && data.data.length > 0) {
-                    const bonus = data.data[0];
+                    var bonus = data.data[0];
                     document.getElementById('item_bonus_especifico_tipo_bonus').value = bonus.tipo_bonus_id || '';
                     document.getElementById('item_bonus_especifico_valor').value = 'R$ ' + parseFloat(bonus.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 }
             })
-            .catch(() => {
-                // Erro ao buscar bônus
-            });
+            .catch(function() {});
     }
-    
-    // Preenche motivo se existir
     if (item.motivo) {
         document.getElementById('item_bonus_especifico_motivo').value = item.motivo;
     }
-    
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_item_bonus_especifico'));
+    var modal = new bootstrap.Modal(document.getElementById('kt_modal_item_bonus_especifico'));
     modal.show();
 }
 
-// Editar item Bonus Grupal
 function editarItemBonusGrupal(item, subtipo) {
-    const fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
-    
+    var fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
     document.getElementById('item_bonus_valor_action').value = 'atualizar_item_bonus_grupal';
     document.getElementById('item_bonus_valor_id').value = item.id;
     document.getElementById('item_bonus_valor_fechamento_id').value = fechamentoId;
     document.getElementById('item_bonus_valor_colaborador').value = item.colaborador_nome;
-    document.getElementById('item_bonus_valor_titulo').textContent = 'Editar Bônus Grupal';
-    
-    // Preenche valor manual
+    document.getElementById('item_bonus_valor_titulo').textContent = 'Editar Bonus Grupal';
     if (item.valor_manual) {
-        const valorFormatado = parseFloat(item.valor_manual).toFixed(2).replace('.', ',');
+        var valorFormatado = parseFloat(item.valor_manual).toFixed(2).replace('.', ',');
         document.getElementById('item_bonus_valor_valor').value = valorFormatado;
     }
-    
-    // Busca tipo de bônus se existir
     if (fechamentoId && item.colaborador_id) {
-        fetch(`../api/get_bonus_fechamento.php?fechamento_id=${fechamentoId}&colaborador_id=${item.colaborador_id}`)
-            .then(response => response.json())
-            .then(data => {
+        fetch('../api/get_bonus_fechamento.php?fechamento_id=' + fechamentoId + '&colaborador_id=' + item.colaborador_id)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success && data.data && data.data.length > 0) {
-                    const bonus = data.data[0];
+                    var bonus = data.data[0];
                     if (bonus.tipo_bonus_id) {
                         document.getElementById('item_bonus_valor_tipo_bonus').value = bonus.tipo_bonus_id;
                     }
                 }
             })
-            .catch(() => {
-                // Erro ao buscar bônus
-            });
+            .catch(function() {});
     }
-    
-    // Preenche motivo se existir
     if (item.motivo) {
         document.getElementById('item_bonus_valor_motivo').value = item.motivo;
     }
-    
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_item_bonus_valor'));
+    var modal = new bootstrap.Modal(document.getElementById('kt_modal_item_bonus_valor'));
     modal.show();
-    
-    // Aplica máscara
-    setTimeout(() => {
+    setTimeout(function() {
         if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
             jQuery('#item_bonus_valor_valor').mask('#.##0,00', {reverse: true});
         }
     }, 300);
 }
 
-// Editar item Bonus Individual
 function editarItemBonusIndividual(item, subtipo) {
-    const fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
-    
+    var fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
     document.getElementById('item_bonus_valor_action').value = 'atualizar_item_bonus_individual';
     document.getElementById('item_bonus_valor_id').value = item.id;
     document.getElementById('item_bonus_valor_fechamento_id').value = fechamentoId;
     document.getElementById('item_bonus_valor_colaborador').value = item.colaborador_nome;
-    document.getElementById('item_bonus_valor_titulo').textContent = 'Editar Bônus Individual';
-    
-    // Preenche valor manual
+    document.getElementById('item_bonus_valor_titulo').textContent = 'Editar Bonus Individual';
     if (item.valor_manual) {
-        const valorFormatado = parseFloat(item.valor_manual).toFixed(2).replace('.', ',');
+        var valorFormatado = parseFloat(item.valor_manual).toFixed(2).replace('.', ',');
         document.getElementById('item_bonus_valor_valor').value = valorFormatado;
     }
-    
-    // Busca tipo de bônus se existir
     if (fechamentoId && item.colaborador_id) {
-        fetch(`../api/get_bonus_fechamento.php?fechamento_id=${fechamentoId}&colaborador_id=${item.colaborador_id}`)
-            .then(response => response.json())
-            .then(data => {
+        fetch('../api/get_bonus_fechamento.php?fechamento_id=' + fechamentoId + '&colaborador_id=' + item.colaborador_id)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success && data.data && data.data.length > 0) {
-                    const bonus = data.data[0];
+                    var bonus = data.data[0];
                     if (bonus.tipo_bonus_id) {
                         document.getElementById('item_bonus_valor_tipo_bonus').value = bonus.tipo_bonus_id;
                     }
                 }
             })
-            .catch(() => {
-                // Erro ao buscar bônus
-            });
+            .catch(function() {});
     }
-    
-    // Preenche motivo se existir
     if (item.motivo) {
         document.getElementById('item_bonus_valor_motivo').value = item.motivo;
     }
-    
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_item_bonus_valor'));
+    var modal = new bootstrap.Modal(document.getElementById('kt_modal_item_bonus_valor'));
     modal.show();
-    
-    // Aplica máscara
-    setTimeout(() => {
+    setTimeout(function() {
         if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
             jQuery('#item_bonus_valor_valor').mask('#.##0,00', {reverse: true});
         }
     }, 300);
 }
 
-// Editar item Adiantamento
 function editarItemAdiantamento(item, subtipo) {
-    const fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
-    
+    var fechamentoId = <?= isset($fechamento_view) && $fechamento_view ? $fechamento_view['id'] : 0 ?>;
     document.getElementById('item_adiantamento_id').value = item.id;
     document.getElementById('item_adiantamento_fechamento_id').value = fechamentoId;
     document.getElementById('item_adiantamento_colaborador').value = item.colaborador_nome;
-    
-    // Preenche valor do adiantamento
     if (item.valor_manual) {
-        const valorFormatado = parseFloat(item.valor_manual).toFixed(2).replace('.', ',');
+        var valorFormatado = parseFloat(item.valor_manual).toFixed(2).replace('.', ',');
         document.getElementById('item_adiantamento_valor').value = valorFormatado;
     }
-    
-    // Busca dados do adiantamento (mes_desconto) do banco
     if (fechamentoId && item.colaborador_id) {
-        // Busca mes_desconto da tabela fechamentos_pagamento_adiantamentos
-        fetch(`../api/get_detalhes_pagamento.php?fechamento_id=${fechamentoId}&colaborador_id=${item.colaborador_id}`)
-            .then(response => response.json())
-            .then(data => {
+        fetch('../api/get_detalhes_pagamento.php?fechamento_id=' + fechamentoId + '&colaborador_id=' + item.colaborador_id)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
                 if (data.success && data.data && data.data.adiantamento && data.data.adiantamento.mes_desconto) {
                     document.getElementById('item_adiantamento_mes_desconto').value = data.data.adiantamento.mes_desconto;
                 }
             })
-            .catch((error) => {
+            .catch(function(error) {
                 console.error('Erro ao buscar mes_desconto:', error);
-                // Erro ao buscar - deixa vazio para o usuário preencher
             });
     }
-    
-    // Preenche motivo se existir
     if (item.motivo) {
         document.getElementById('item_adiantamento_motivo').value = item.motivo;
     }
-    
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_item_adiantamento'));
+    var modal = new bootstrap.Modal(document.getElementById('kt_modal_item_adiantamento'));
     modal.show();
-    
-    // Aplica máscara
-    setTimeout(() => {
+    setTimeout(function() {
         if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
             jQuery('#item_adiantamento_valor').mask('#.##0,00', {reverse: true});
         }
     }, 300);
 }
 
-// Renderizar container de bônus
 function renderizarBonusContainer() {
-    const container = document.getElementById('bonus_container');
+    var container = document.getElementById('bonus_container');
     if (!container) return;
-    
     if (bonusItemAtual.length === 0) {
-        container.innerHTML = '<p class="text-muted mb-0">Nenhum bônus adicionado</p>';
+        container.innerHTML = '<p class="text-muted mb-0">Nenhum bonus adicionado</p>';
         document.getElementById('bonus_editados_json').value = '[]';
         return;
     }
-    
-    let html = '';
-    bonusItemAtual.forEach((bonus, index) => {
-        const valorOriginal = parseFloat(bonus.valor_original || bonus.valor || 0);
-        const descontoOcorrencias = parseFloat(bonus.desconto_ocorrencias || 0);
-        const valorFinal = parseFloat(bonus.valor || 0);
-        
-        html += `
-            <div class="d-flex align-items-center gap-3 mb-3 p-3 border rounded" data-bonus-index="${index}">
-                <div class="flex-grow-1">
-                    <select class="form-select form-select-sm mb-2 bonus_tipo" data-index="${index}" required>
-                        <option value="">Selecione...</option>
-                        <?php foreach ($tipos_bonus as $tipo): ?>
-                        <option value="<?= $tipo['id'] ?>" ${bonus.tipo_bonus_id == <?= $tipo['id'] ?> ? 'selected' : ''}>
-                            <?= htmlspecialchars($tipo['nome']) ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div class="input-group input-group-sm mb-2">
-                        <span class="input-group-text">R$</span>
-                        <input type="text" class="form-control bonus_valor" data-index="${index}" 
-                               value="${valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}" 
-                               placeholder="0,00" required />
-                    </div>
-                    ${descontoOcorrencias > 0 ? `
-                    <div class="alert alert-warning py-2 px-3 mb-0">
-                        <small class="d-block">
-                            <strong>Valor Original:</strong> R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                        </small>
-                        <small class="d-block text-danger">
-                            <strong>Desconto por Ocorrências:</strong> -R$ ${descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                        </small>
-                    </div>
-                    ` : ''}
-                </div>
-                <button type="button" class="btn btn-sm btn-light-danger" onclick="removerBonusItem(${index})">
-                    <i class="ki-duotone ki-trash fs-5">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                </button>
-            </div>
-        `;
+    var tiposBonusOptions = '<?php $opts = ""; foreach ($tipos_bonus as $tipo) { $opts .= "<option value=\"" . $tipo["id"] . "\">" . htmlspecialchars($tipo["nome"]) . "</option>"; } echo addslashes($opts); ?>';
+    var html = '';
+    bonusItemAtual.forEach(function(bonus, index) {
+        var valorOriginal = parseFloat(bonus.valor_original || bonus.valor || 0);
+        var descontoOcorrencias = parseFloat(bonus.desconto_ocorrencias || 0);
+        var valorFinal = parseFloat(bonus.valor || 0);
+        html += '<div class="d-flex align-items-center gap-3 mb-3 p-3 border rounded" data-bonus-index="' + index + '"><div class="flex-grow-1"><select class="form-select form-select-sm mb-2 bonus_tipo" data-index="' + index + '" required><option value="">Selecione...</option>' + tiposBonusOptions + '</select><div class="input-group input-group-sm mb-2"><span class="input-group-text">R$</span><input type="text" class="form-control bonus_valor" data-index="' + index + '" value="' + valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '" placeholder="0,00" required /></div>';
+        if (descontoOcorrencias > 0) {
+            html += '<div class="alert alert-warning py-2 px-3 mb-0"><small class="d-block"><strong>Valor Original:</strong> R$ ' + valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</small><small class="d-block text-danger"><strong>Desconto por Ocorrencias:</strong> -R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</small></div>';
+        }
+        html += '</div><button type="button" class="btn btn-sm btn-light-danger" onclick="removerBonusItem(' + index + ')"><i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i></button></div>';
     });
-    
     container.innerHTML = html;
+    // Atualiza selected baseado no tipo_bonus_id
+    bonusItemAtual.forEach(function(bonus, index) {
+        var select = container.querySelector('.bonus_tipo[data-index="' + index + '"]');
+        if (select && bonus.tipo_bonus_id) {
+            select.value = bonus.tipo_bonus_id;
+        }
+    });
     atualizarBonusJSON();
     aplicarMascarasBonus();
 }
@@ -4924,74 +4845,60 @@ function removerBonusItem(index) {
     renderizarBonusContainer();
 }
 
-// Atualizar JSON de bônus
 function atualizarBonusJSON() {
-    const bonusData = bonusItemAtual.map((bonus, index) => {
-        const tipoSelect = document.querySelector(`.bonus_tipo[data-index="${index}"]`);
-        const valorInput = document.querySelector(`.bonus_valor[data-index="${index}"]`);
-        
-        // Remove formatação e converte para número
-        let valor = '0';
+    var bonusData = bonusItemAtual.map(function(bonus, index) {
+        var tipoSelect = document.querySelector('.bonus_tipo[data-index="' + index + '"]');
+        var valorInput = document.querySelector('.bonus_valor[data-index="' + index + '"]');
+        var valor = '0';
         if (valorInput && valorInput.value) {
-            // Remove tudo exceto números e vírgula
             valor = valorInput.value.replace(/[^0-9,]/g, '');
-            // Converte vírgula para ponto
             valor = valor.replace(',', '.');
-            // Remove pontos de milhar (se houver mais de um ponto)
-            const partes = valor.split('.');
+            var partes = valor.split('.');
             if (partes.length > 2) {
-                // Tem separador de milhar, junta tudo menos o último ponto
                 valor = partes.slice(0, -1).join('') + '.' + partes[partes.length - 1];
             }
         }
-        
         return {
             tipo_bonus_id: tipoSelect ? tipoSelect.value : '',
             valor: valor,
             observacoes: ''
         };
-    }).filter(b => b.tipo_bonus_id && parseFloat(b.valor) > 0);
-    
+    }).filter(function(b) { return b.tipo_bonus_id && parseFloat(b.valor) > 0; });
     document.getElementById('bonus_editados_json').value = JSON.stringify(bonusData);
 }
 
-// Aplicar máscaras nos campos de bônus
 function aplicarMascarasBonus() {
     if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
-        document.querySelectorAll('.bonus_valor').forEach(input => {
+        document.querySelectorAll('.bonus_valor').forEach(function(input) {
             jQuery(input).mask('#.##0,00', {reverse: true});
             jQuery(input).on('input', atualizarBonusJSON);
         });
-        document.querySelectorAll('.bonus_tipo').forEach(select => {
+        document.querySelectorAll('.bonus_tipo').forEach(function(select) {
             select.addEventListener('change', atualizarBonusJSON);
         });
     }
 }
 
-// Atualizar JSON ao submeter formulário
 document.getElementById('kt_modal_item_form')?.addEventListener('submit', function(e) {
     atualizarBonusJSON();
-    
-    // Adiciona os bônus como campos hidden
-    const bonusData = JSON.parse(document.getElementById('bonus_editados_json').value || '[]');
-    bonusData.forEach((bonus, index) => {
-        const input = document.createElement('input');
+    var bonusData = JSON.parse(document.getElementById('bonus_editados_json').value || '[]');
+    var form = this;
+    bonusData.forEach(function(bonus, index) {
+        var input = document.createElement('input');
         input.type = 'hidden';
-        input.name = `bonus_editados[${index}][tipo_bonus_id]`;
+        input.name = 'bonus_editados[' + index + '][tipo_bonus_id]';
         input.value = bonus.tipo_bonus_id;
-        this.appendChild(input);
-        
-        const inputValor = document.createElement('input');
+        form.appendChild(input);
+        var inputValor = document.createElement('input');
         inputValor.type = 'hidden';
-        inputValor.name = `bonus_editados[${index}][valor]`;
+        inputValor.name = 'bonus_editados[' + index + '][valor]';
         inputValor.value = bonus.valor;
-        this.appendChild(inputValor);
-        
-        const inputObs = document.createElement('input');
+        form.appendChild(inputValor);
+        var inputObs = document.createElement('input');
         inputObs.type = 'hidden';
-        inputObs.name = `bonus_editados[${index}][observacoes]`;
+        inputObs.name = 'bonus_editados[' + index + '][observacoes]';
         inputObs.value = bonus.observacoes || '';
-        this.appendChild(inputObs);
+        form.appendChild(inputObs);
     });
 });
 
@@ -5465,80 +5372,51 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
     } else if (subtipo === 'adiantamento') {
         container = document.querySelector('.campo-adiantamento #extra_colaboradores_container');
     } else if (subtipo === 'bonus_especifico' || subtipo === 'grupal') {
-        container = document.querySelector(`.campo-${subtipo === 'bonus_especifico' ? 'bonus-especifico' : 'grupal'} #extra_colaboradores_container`);
+        var campoClass = subtipo === 'bonus_especifico' ? 'bonus-especifico' : 'grupal';
+        container = document.querySelector('.campo-' + campoClass + ' #extra_colaboradores_container');
     }
-    
-    // Fallback: pega o primeiro container visível
     if (!container) {
-        const containers = document.querySelectorAll('#extra_colaboradores_container');
-        for (let c of containers) {
-            if (c.closest('.campo-individual, .campo-adiantamento, .campo-bonus-especifico, .campo-grupal')?.style.display !== 'none') {
+        var containers = document.querySelectorAll('#extra_colaboradores_container');
+        for (var i = 0; i < containers.length; i++) {
+            var c = containers[i];
+            var closest = c.closest('.campo-individual, .campo-adiantamento, .campo-bonus-especifico, .campo-grupal');
+            if (closest && closest.style.display !== 'none') {
                 container = c;
                 break;
             }
         }
     }
-    
-    if (!container) {
-        return;
-    }
-    
+    if (!container) { return; }
     container.innerHTML = '<p class="text-muted">Carregando...</p>';
-    
-    // Se selecionou "Todas Empresas", não passa empresa_id na requisição
-    const url = empresaId === 'todas' 
+    var url = empresaId === 'todas' 
         ? '../api/get_colaboradores.php?status=ativo'
-        : `../api/get_colaboradores.php?empresa_id=${empresaId}&status=ativo`;
-    
+        : '../api/get_colaboradores.php?empresa_id=' + empresaId + '&status=ativo';
     fetch(url)
-        .then(r => r.json())
-        .then(data => {
-            let html = '';
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var html = '';
             if (subtipo === 'individual' || subtipo === 'adiantamento') {
-                // Select único
-                html = '<select name="colaborador_id" id="extra_colaborador_id" class="form-select form-select-solid" required>';
-                html += '<option value="">Selecione...</option>';
-                data.forEach(colab => {
-                    html += `<option value="${colab.id}">${colab.nome_completo}${colab.empresa_nome ? ' - ' + colab.empresa_nome : ''}</option>`;
+                html = '<select name="colaborador_id" id="extra_colaborador_id" class="form-select form-select-solid" required><option value="">Selecione...</option>';
+                data.forEach(function(colab) {
+                    html += '<option value="' + colab.id + '">' + colab.nome_completo + (colab.empresa_nome ? ' - ' + colab.empresa_nome : '') + '</option>';
                 });
-                html += '</select>';
-                // Campo hidden para garantir que o valor seja enviado
-                html += '<input type="hidden" name="colaborador_id_hidden" id="extra_colaborador_id_hidden" value="">';
+                html += '</select><input type="hidden" name="colaborador_id_hidden" id="extra_colaborador_id_hidden" value="">';
             } else {
-                // Checkboxes múltiplos
-                // Adiciona checkbox "Selecionar Todos"
                 if (data.length > 0) {
-                    html += `
-                        <div class="form-check mb-3 pb-3 border-bottom">
-                            <input class="form-check-input" type="checkbox" id="selecionar_todos_colaboradores_extra">
-                            <label class="form-check-label fw-bold" for="selecionar_todos_colaboradores_extra">
-                                Selecionar Todos (${data.length} colaborador${data.length > 1 ? 'es' : ''})
-                            </label>
-                        </div>
-                    `;
+                    html += '<div class="form-check mb-3 pb-3 border-bottom"><input class="form-check-input" type="checkbox" id="selecionar_todos_colaboradores_extra"><label class="form-check-label fw-bold" for="selecionar_todos_colaboradores_extra">Selecionar Todos (' + data.length + ' colaborador' + (data.length > 1 ? 'es' : '') + ')</label></div>';
                 }
-                
-                data.forEach(colab => {
-                    html += `
-                        <div class="form-check mb-2">
-                            <input class="form-check-input colaborador-checkbox-extra" type="checkbox" name="colaboradores[]" value="${colab.id}" id="extra_colab_${colab.id}">
-                            <label class="form-check-label" for="extra_colab_${colab.id}">
-                                ${colab.nome_completo}${colab.empresa_nome ? ' <small class="text-muted">(' + colab.empresa_nome + ')</small>' : ''}
-                            </label>
-                        </div>
-                    `;
+                data.forEach(function(colab) {
+                    html += '<div class="form-check mb-2"><input class="form-check-input colaborador-checkbox-extra" type="checkbox" name="colaboradores[]" value="' + colab.id + '" id="extra_colab_' + colab.id + '"><label class="form-check-label" for="extra_colab_' + colab.id + '">' + colab.nome_completo + (colab.empresa_nome ? ' <small class="text-muted">(' + colab.empresa_nome + ')</small>' : '') + '</label></div>';
                 });
             }
             container.innerHTML = html || '<p class="text-muted">Nenhum colaborador encontrado</p>';
-            
-            // Adiciona evento ao checkbox "Selecionar Todos" (apenas para checkboxes múltiplos)
             if (subtipo === 'grupal') {
-                const selecionarTodos = document.getElementById('selecionar_todos_colaboradores_extra');
+                var selecionarTodos = document.getElementById('selecionar_todos_colaboradores_extra');
                 if (selecionarTodos) {
                     selecionarTodos.addEventListener('change', function() {
-                        const checkboxes = container.querySelectorAll('.colaborador-checkbox-extra');
-                        checkboxes.forEach(cb => {
-                            cb.checked = this.checked;
+                        var checkboxes = container.querySelectorAll('.colaborador-checkbox-extra');
+                        checkboxes.forEach(function(cb) {
+                            cb.checked = selecionarTodos.checked;
                         });
                     });
                     
