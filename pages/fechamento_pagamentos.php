@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Fechamento de Pagamentos - Metronic Theme
  */
