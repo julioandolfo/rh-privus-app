@@ -6786,6 +6786,126 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                             </div>
                         </div>
                         ` : ''}
+                        
+                        <!-- Flags do Colaborador -->
+                        ${d.flags && (d.flags.ativas.length > 0 || d.flags.expiradas.length > 0) ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-information-5 fs-2 text-warning me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Flags do Colaborador
+                                </h3>
+                                <div class="card-toolbar">
+                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">⚠️ ${d.flags.total_ativas} Ativa(s)</span>` : ''}
+                                    ${d.flags.total_expiradas > 0 ? `<span class="badge badge-light-secondary fs-7">${d.flags.total_expiradas} Expirada(s)</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                ${d.flags.ativas.length > 0 ? `
+                                <div class="mb-5">
+                                    <h5 class="fw-bold text-danger mb-3">🚩 Flags Ativas</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-row-bordered table-row-dashed gy-4">
+                                            <thead>
+                                                <tr class="fw-bold">
+                                                    <th>Tipo</th>
+                                                    <th>Data Recebida</th>
+                                                    <th>Validade</th>
+                                                    <th>Dias Restantes</th>
+                                                    <th>Motivo</th>
+                                                    <th>Adicionada Por</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${d.flags.ativas.map(flag => {
+                                                    let flagBadgeClass = 'badge-danger';
+                                                    let flagIcon = '⚠️';
+                                                    
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') {
+                                                        flagBadgeClass = 'badge-danger';
+                                                        flagIcon = '🚫';
+                                                    } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
+                                                        flagBadgeClass = 'badge-warning';
+                                                        flagIcon = '⚠️';
+                                                    } else if (flag.tipo_flag === 'ma_conduta') {
+                                                        flagBadgeClass = 'badge-dark';
+                                                        flagIcon = '⛔';
+                                                    }
+                                                    
+                                                    const diasRestantes = Math.ceil(flag.dias_para_expirar || 0);
+                                                    const diasBadge = diasRestantes <= 5 ? 'badge-danger' : diasRestantes <= 10 ? 'badge-warning' : 'badge-info';
+                                                    
+                                                    return \`
+                                                        <tr>
+                                                            <td>
+                                                                <span class="badge \${flagBadgeClass} fw-bold">\${flagIcon} \${flag.tipo_flag_label}</span>
+                                                            </td>
+                                                            <td>\${flag.data_flag_formatada}</td>
+                                                            <td>\${flag.data_validade_formatada}</td>
+                                                            <td><span class="badge \${diasBadge}">\${diasRestantes} dia(s)</span></td>
+                                                            <td>
+                                                                \${flag.tipo_ocorrencia_nome ? \`<strong>Ocorrência:</strong> \${flag.tipo_ocorrencia_nome}\` : '-'}
+                                                                \${flag.data_ocorrencia_formatada ? \`<br><small class="text-muted">Data: \${flag.data_ocorrencia_formatada}</small>\` : ''}
+                                                                \${flag.observacoes ? \`<br><small class="text-muted">\${flag.observacoes}</small>\` : ''}
+                                                            </td>
+                                                            <td>\${flag.created_by_nome || '-'}</td>
+                                                        </tr>
+                                                    \`;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                ${d.flags.expiradas.length > 0 ? `
+                                <div class="separator separator-dashed my-5"></div>
+                                <div>
+                                    <h5 class="fw-bold text-muted mb-3">📋 Histórico de Flags Expiradas</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-row-bordered table-row-dashed gy-4">
+                                            <thead>
+                                                <tr class="fw-bold text-muted">
+                                                    <th>Tipo</th>
+                                                    <th>Data Recebida</th>
+                                                    <th>Data Expiração</th>
+                                                    <th>Motivo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${d.flags.expiradas.map(flag => {
+                                                    let flagIcon = '⚠️';
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = '🚫';
+                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '⚠️';
+                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = '⛔';
+                                                    
+                                                    return \`
+                                                        <tr class="text-muted">
+                                                            <td>
+                                                                <span class="badge badge-light-secondary">\${flagIcon} \${flag.tipo_flag_label}</span>
+                                                            </td>
+                                                            <td>\${flag.data_flag_formatada}</td>
+                                                            <td>\${flag.data_validade_formatada}</td>
+                                                            <td>
+                                                                \${flag.tipo_ocorrencia_nome ? \`\${flag.tipo_ocorrencia_nome}\` : '-'}
+                                                                \${flag.data_ocorrencia_formatada ? \` (\${flag.data_ocorrencia_formatada})\` : ''}
+                                                                \${flag.observacoes ? \`<br><small>\${flag.observacoes}</small>\` : ''}
+                                                            </td>
+                                                        </tr>
+                                                    \`;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
                 `;
                 
@@ -7327,6 +7447,126 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                     </div>
                                     ` : ''}
                                 </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Flags do Colaborador -->
+                        ${d.flags && (d.flags.ativas.length > 0 || d.flags.expiradas.length > 0) ? `
+                        <div class="card card-flush mb-5">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="ki-duotone ki-information-5 fs-2 text-warning me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Flags do Colaborador
+                                </h3>
+                                <div class="card-toolbar">
+                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">⚠️ ${d.flags.total_ativas} Ativa(s)</span>` : ''}
+                                    ${d.flags.total_expiradas > 0 ? `<span class="badge badge-light-secondary fs-7">${d.flags.total_expiradas} Expirada(s)</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                ${d.flags.ativas.length > 0 ? `
+                                <div class="mb-5">
+                                    <h5 class="fw-bold text-danger mb-3">🚩 Flags Ativas</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-row-bordered table-row-dashed gy-4">
+                                            <thead>
+                                                <tr class="fw-bold">
+                                                    <th>Tipo</th>
+                                                    <th>Data Recebida</th>
+                                                    <th>Validade</th>
+                                                    <th>Dias Restantes</th>
+                                                    <th>Motivo</th>
+                                                    <th>Adicionada Por</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${d.flags.ativas.map(flag => {
+                                                    let flagBadgeClass = 'badge-danger';
+                                                    let flagIcon = '⚠️';
+                                                    
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') {
+                                                        flagBadgeClass = 'badge-danger';
+                                                        flagIcon = '🚫';
+                                                    } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
+                                                        flagBadgeClass = 'badge-warning';
+                                                        flagIcon = '⚠️';
+                                                    } else if (flag.tipo_flag === 'ma_conduta') {
+                                                        flagBadgeClass = 'badge-dark';
+                                                        flagIcon = '⛔';
+                                                    }
+                                                    
+                                                    const diasRestantes = Math.ceil(flag.dias_para_expirar || 0);
+                                                    const diasBadge = diasRestantes <= 5 ? 'badge-danger' : diasRestantes <= 10 ? 'badge-warning' : 'badge-info';
+                                                    
+                                                    return \`
+                                                        <tr>
+                                                            <td>
+                                                                <span class="badge \${flagBadgeClass} fw-bold">\${flagIcon} \${flag.tipo_flag_label}</span>
+                                                            </td>
+                                                            <td>\${flag.data_flag_formatada}</td>
+                                                            <td>\${flag.data_validade_formatada}</td>
+                                                            <td><span class="badge \${diasBadge}">\${diasRestantes} dia(s)</span></td>
+                                                            <td>
+                                                                \${flag.tipo_ocorrencia_nome ? \`<strong>Ocorrência:</strong> \${flag.tipo_ocorrencia_nome}\` : '-'}
+                                                                \${flag.data_ocorrencia_formatada ? \`<br><small class="text-muted">Data: \${flag.data_ocorrencia_formatada}</small>\` : ''}
+                                                                \${flag.observacoes ? \`<br><small class="text-muted">\${flag.observacoes}</small>\` : ''}
+                                                            </td>
+                                                            <td>\${flag.created_by_nome || '-'}</td>
+                                                        </tr>
+                                                    \`;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                ${d.flags.expiradas.length > 0 ? `
+                                <div class="separator separator-dashed my-5"></div>
+                                <div>
+                                    <h5 class="fw-bold text-muted mb-3">📋 Histórico de Flags Expiradas</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-row-bordered table-row-dashed gy-4">
+                                            <thead>
+                                                <tr class="fw-bold text-muted">
+                                                    <th>Tipo</th>
+                                                    <th>Data Recebida</th>
+                                                    <th>Data Expiração</th>
+                                                    <th>Motivo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${d.flags.expiradas.map(flag => {
+                                                    let flagIcon = '⚠️';
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = '🚫';
+                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '⚠️';
+                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = '⛔';
+                                                    
+                                                    return \`
+                                                        <tr class="text-muted">
+                                                            <td>
+                                                                <span class="badge badge-light-secondary">\${flagIcon} \${flag.tipo_flag_label}</span>
+                                                            </td>
+                                                            <td>\${flag.data_flag_formatada}</td>
+                                                            <td>\${flag.data_validade_formatada}</td>
+                                                            <td>
+                                                                \${flag.tipo_ocorrencia_nome ? \`\${flag.tipo_ocorrencia_nome}\` : '-'}
+                                                                \${flag.data_ocorrencia_formatada ? \` (\${flag.data_ocorrencia_formatada})\` : ''}
+                                                                \${flag.observacoes ? \`<br><small>\${flag.observacoes}</small>\` : ''}
+                                                            </td>
+                                                        </tr>
+                                                    \`;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
                         ` : ''}

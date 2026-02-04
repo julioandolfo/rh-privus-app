@@ -309,6 +309,71 @@ try {
     $stmt->execute([$colaborador_id, $data_inicio_periodo, $data_fim_periodo]);
     $ocorrencias_desconto = $stmt->fetchAll();
     
+    // Busca flags do colaborador (ativas e expiradas para mostrar histórico)
+    $stmt = $pdo->prepare("
+        SELECT 
+            f.id,
+            f.tipo_flag,
+            f.data_flag,
+            f.data_validade,
+            f.status,
+            f.observacoes,
+            o.data_ocorrencia,
+            o.id as ocorrencia_id,
+            to_tipo.nome as tipo_ocorrencia_nome,
+            to_tipo.codigo as tipo_ocorrencia_codigo,
+            u.nome as created_by_nome
+        FROM ocorrencias_flags f
+        LEFT JOIN ocorrencias o ON f.ocorrencia_id = o.id
+        LEFT JOIN tipos_ocorrencias to_tipo ON o.tipo_ocorrencia_id = to_tipo.id
+        LEFT JOIN usuarios u ON f.created_by = u.id
+        WHERE f.colaborador_id = ?
+        ORDER BY f.data_flag DESC, f.status ASC
+    ");
+    $stmt->execute([$colaborador_id]);
+    $flags = $stmt->fetchAll();
+    
+    // Formata flags
+    $flags_formatadas = array_map(function($flag) {
+        $tipo_flag_label = '';
+        switch($flag['tipo_flag']) {
+            case 'falta_nao_justificada':
+                $tipo_flag_label = 'Falta Não Justificada';
+                break;
+            case 'falta_compromisso_pessoal':
+                $tipo_flag_label = 'Falta Compromisso Pessoal';
+                break;
+            case 'ma_conduta':
+                $tipo_flag_label = 'Má Conduta';
+                break;
+            default:
+                $tipo_flag_label = ucfirst(str_replace('_', ' ', $flag['tipo_flag']));
+        }
+        
+        return [
+            'id' => $flag['id'],
+            'tipo_flag' => $flag['tipo_flag'],
+            'tipo_flag_label' => $tipo_flag_label,
+            'data_flag' => $flag['data_flag'],
+            'data_flag_formatada' => date('d/m/Y', strtotime($flag['data_flag'])),
+            'data_validade' => $flag['data_validade'],
+            'data_validade_formatada' => date('d/m/Y', strtotime($flag['data_validade'])),
+            'status' => $flag['status'],
+            'status_label' => $flag['status'] === 'ativa' ? 'Ativa' : 'Expirada',
+            'observacoes' => $flag['observacoes'],
+            'data_ocorrencia' => $flag['data_ocorrencia'],
+            'data_ocorrencia_formatada' => $flag['data_ocorrencia'] ? date('d/m/Y', strtotime($flag['data_ocorrencia'])) : null,
+            'tipo_ocorrencia_nome' => $flag['tipo_ocorrencia_nome'],
+            'tipo_ocorrencia_codigo' => $flag['tipo_ocorrencia_codigo'],
+            'created_by_nome' => $flag['created_by_nome'],
+            'dias_para_expirar' => $flag['status'] === 'ativa' ? max(0, (strtotime($flag['data_validade']) - strtotime(date('Y-m-d'))) / (60*60*24)) : null
+        ];
+    }, $flags);
+    
+    // Separa flags ativas e expiradas
+    $flags_ativas = array_filter($flags_formatadas, function($f) { return $f['status'] === 'ativa'; });
+    $flags_expiradas = array_filter($flags_formatadas, function($f) { return $f['status'] === 'expirada'; });
+    
     // Monta resposta
     $response = [
         'success' => true,
@@ -390,6 +455,13 @@ try {
             'ocorrencias' => [
                 'descontos' => $ocorrencias_desconto,
                 'total_descontos' => array_sum(array_column($ocorrencias_desconto, 'valor_desconto'))
+            ],
+            'flags' => [
+                'todas' => $flags_formatadas,
+                'ativas' => array_values($flags_ativas),
+                'expiradas' => array_values($flags_expiradas),
+                'total_ativas' => count($flags_ativas),
+                'total_expiradas' => count($flags_expiradas)
             ],
             'documento' => [
                 'status' => $item['documento_status'] ?? 'pendente',

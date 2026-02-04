@@ -823,9 +823,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <style>
 /* =====================================================
-   CARDS DE COLABORADORES
+   ESTILOS ESPECÍFICOS PARA PÁGINA DE OCORRÊNCIAS
+   Todos os estilos têm escopo limitado para não afetar 
+   o resto do sistema
    ===================================================== */
 
+/* Cards de Colaboradores */
 .card-colaborador {
     border: 1px solid #e4e6ef;
     border-radius: 0.625rem;
@@ -845,7 +848,6 @@ document.addEventListener('DOMContentLoaded', function() {
     box-shadow: 0 0 30px rgba(0,0,0,0.4);
 }
 
-/* Header do Card do Colaborador */
 .card-colaborador .card-header {
     border-bottom: 1px solid #e4e6ef;
 }
@@ -855,116 +857,13 @@ document.addEventListener('DOMContentLoaded', function() {
     border-bottom-color: #2b2b40;
 }
 
-/* Avatar círculo perfeito */
-.symbol-circle img,
-.symbol-circle .symbol-label {
-    border-radius: 50% !important;
-}
-
-/* =====================================================
-   TABS
-   ===================================================== */
-
-.nav-line-tabs .nav-link {
-    color: #7e8299;
-    font-weight: 600;
-    font-size: 1rem;
-    padding: 0.75rem 1.5rem;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    transition: all 0.3s ease;
-}
-
-.nav-line-tabs .nav-link:hover {
-    color: #3699ff;
-    border-bottom-color: #3699ff;
-}
-
-.nav-line-tabs .nav-link.active {
-    color: #3699ff;
-    border-bottom-color: #3699ff;
-    background-color: transparent;
-}
-
-[data-theme="dark"] .nav-line-tabs .nav-link {
-    color: #a1a5b7;
-}
-
-[data-theme="dark"] .nav-line-tabs .nav-link:hover {
-    color: #3699ff;
-}
-
-[data-theme="dark"] .nav-line-tabs .nav-link.active {
-    color: #3699ff;
-}
-
-/* Badge nas tabs */
-.nav-line-tabs .nav-link .badge {
-    font-weight: 600;
-    padding: 0.35rem 0.65rem;
-    font-size: 0.75rem;
-}
-
-/* =====================================================
-   TABELAS DENTRO DAS TABS
-   ===================================================== */
-
-.tab-content .table {
-    margin-bottom: 0;
-}
-
-.tab-content .table thead th {
-    background-color: #f9f9f9;
-    color: #7e8299;
-    font-weight: 600;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    padding: 1rem 0.75rem;
-    border-bottom: 2px solid #e4e6ef;
-}
-
-[data-theme="dark"] .tab-content .table thead th {
-    background-color: #1e1e2d;
-    color: #a1a5b7;
-    border-bottom-color: #2b2b40;
-}
-
-.tab-content .table tbody td {
-    padding: 1rem 0.75rem;
-    vertical-align: middle;
-}
-
-.tab-content .table tbody tr {
-    transition: background-color 0.2s ease;
-}
-
-.tab-content .table tbody tr:hover {
-    background-color: #f9f9f9;
-}
-
-[data-theme="dark"] .tab-content .table tbody tr:hover {
-    background-color: #1e1e2d;
-}
-
-/* =====================================================
-   BADGES
-   ===================================================== */
-
-.badge {
-    font-weight: 600;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
-}
-
-.badge-lg {
+/* Badge maior apenas dentro dos cards de colaborador */
+.card-colaborador .badge-lg {
     padding: 0.65rem 1rem;
     font-size: 0.95rem;
 }
 
-/* =====================================================
-   CARDS DE ESTATÍSTICAS
-   ===================================================== */
-
+/* Hover nos cards de estatísticas desta página */
 .card-flush:hover {
     transform: translateY(-5px);
     transition: all 0.3s ease;
@@ -975,68 +874,7 @@ document.addEventListener('DOMContentLoaded', function() {
     box-shadow: 0 0 20px rgba(0,0,0,0.4);
 }
 
-/* =====================================================
-   MENU DE AÇÕES
-   ===================================================== */
-
-.menu-link:hover {
-    background-color: #f3f6f9 !important;
-}
-
-[data-theme="dark"] .menu-link:hover {
-    background-color: #1e1e2d !important;
-}
-
-/* =====================================================
-   FILTROS
-   ===================================================== */
-
-#kt_filtros_collapse {
-    transition: all 0.3s ease;
-}
-
-/* =====================================================
-   RESPONSIVIDADE
-   ===================================================== */
-
-@media (max-width: 768px) {
-    .col-xl-3 {
-        margin-bottom: 1rem;
-    }
-    
-    .card-flush .fs-2hx {
-        font-size: 2rem !important;
-    }
-    
-    .nav-line-tabs .nav-link {
-        padding: 0.5rem 1rem;
-        font-size: 0.9rem;
-    }
-    
-    .symbol-circle {
-        width: 40px;
-        height: 40px;
-    }
-    
-    .tab-content .table {
-        font-size: 0.85rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .nav-line-tabs {
-        flex-wrap: wrap;
-    }
-    
-    .nav-line-tabs .nav-link {
-        margin-bottom: 0.5rem;
-    }
-}
-
-/* =====================================================
-   ANIMAÇÕES
-   ===================================================== */
-
+/* Animação hover apenas para cards de colaborador */
 .hover-elevate-up {
     transition: all 0.3s ease;
 }
@@ -1045,65 +883,37 @@ document.addEventListener('DOMContentLoaded', function() {
     transform: translateY(-5px);
 }
 
-/* =====================================================
-   TEMA ESCURO - AJUSTES GERAIS
-   ===================================================== */
-
-[data-theme="dark"] .text-gray-700 {
-    color: #a1a5b7 !important;
+/* Tabelas dentro dos cards de colaborador */
+.card-colaborador .table tbody tr:hover {
+    background-color: #f9f9f9;
 }
 
-[data-theme="dark"] .text-gray-600 {
-    color: #a1a5b7 !important;
+[data-theme="dark"] .card-colaborador .table tbody tr:hover {
+    background-color: #1e1e2d;
 }
 
-[data-theme="dark"] .text-gray-800 {
-    color: #ffffff !important;
+/* Responsividade */
+@media (max-width: 768px) {
+    .card-colaborador .symbol-circle {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .card-colaborador .table {
+        font-size: 0.85rem;
+    }
 }
 
-[data-theme="dark"] .text-gray-900 {
-    color: #ffffff !important;
-}
-
-[data-theme="dark"] .bg-light-primary {
-    background-color: #1e1e2d !important;
-}
-
-/* =====================================================
-   SCROLL SUAVE
-   ===================================================== */
-
-.tab-content {
-    scroll-behavior: smooth;
-}
-
-/* =====================================================
-   MELHORIAS VISUAIS
-   ===================================================== */
-
-.table-responsive {
-    border-radius: 0.475rem;
-}
-
-.card-body {
-    position: relative;
-}
-
-/* Loading state para tabs */
-.tab-pane {
-    min-height: 200px;
-}
-
-/* Badge de contagem nas tabs */
-.nav-link .badge {
-    margin-right: 0.5rem;
-}
-
-/* Espaçamento das tags */
-.badge-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    margin-right: 0.25rem;
+@media (max-width: 576px) {
+    .card-colaborador .nav-line-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .card-colaborador .nav-line-tabs .nav-link {
+        margin-bottom: 0.5rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
 }
 </style>
 
