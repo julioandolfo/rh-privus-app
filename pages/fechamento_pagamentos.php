@@ -5796,24 +5796,32 @@ function waitForDependencies() {
 }
 waitForDependencies();
 
-// Deletar fechamento
 function deletarFechamento(id, mesAno) {
     Swal.fire({
         text: 'Tem certeza que deseja excluir o fechamento de ' + mesAno + '? Esta acao nao pode ser desfeita!',
-        icon: "warning",
+        icon: 'warning',
         showCancelButton: true,
         buttonsStyling: false,
-        confirmButtonText: "Sim, excluir!",
-        cancelButtonText: "Cancelar",
+        confirmButtonText: 'Sim, excluir!',
+        cancelButtonText: 'Cancelar',
         customClass: {
-            confirmButton: "btn fw-bold btn-danger",
-            cancelButton: "btn fw-bold btn-active-light-primary"
+            confirmButton: 'btn fw-bold btn-danger',
+            cancelButton: 'btn fw-bold btn-active-light-primary'
         }
     }).then(function(result) {
         if (result.value) {
-            const form = document.createElement('form');
+            var form = document.createElement('form');
             form.method = 'POST';
-            form.innerHTML = '<input type="hidden" name="action" value="delete"><input type="hidden" name="fechamento_id" value="' + id + '">';
+            var inp1 = document.createElement('input');
+            inp1.type = 'hidden';
+            inp1.name = 'action';
+            inp1.value = 'delete';
+            var inp2 = document.createElement('input');
+            inp2.type = 'hidden';
+            inp2.name = 'fechamento_id';
+            inp2.value = id;
+            form.appendChild(inp1);
+            form.appendChild(inp2);
             document.body.appendChild(form);
             form.submit();
         }
