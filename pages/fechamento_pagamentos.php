@@ -5948,20 +5948,23 @@ function exportarFechamento(fechamentoId, formato) {
     });
 }
 
-// Mostrar detalhes dos bônus
+// Mostrar detalhes dos bonus
 function mostrarDetalhesBonus(dados) {
     const titulo = document.getElementById('kt_modal_detalhes_bonus_titulo');
     const conteudo = document.getElementById('kt_modal_detalhes_bonus_conteudo');
-    
-    titulo.textContent = `B\u00f4nus de ${dados.colaborador_nome}`;
-    
-    let html = '<div class="mb-7">';
+    if (!titulo || !conteudo) {
+        return;
+    }
+
+    titulo.textContent = 'Bonus de ' + (dados.colaborador_nome || '-');
+
+    let html = '';
+    html += '<div class="mb-7">';
     html += '<div class="d-flex justify-content-between align-items-center mb-5">';
-    html += '<h4 class="fw-bold text-gray-800">Total de B\u00f4nus (somados)</h4>';
+    html += '<h4 class="fw-bold text-gray-800">Total de Bonus (somados)</h4>';
     html += '<span class="text-success fw-bold fs-2">R$ ' + parseFloat(dados.total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
     html += '</div>';
-    
-    // Mostra total de desconto por ocorrencias se houver
+
     if (dados.total_desconto_ocorrencias && dados.total_desconto_ocorrencias > 0) {
         html += '<div class="alert alert-warning d-flex align-items-center mb-5">';
         html += '<i class="ki-duotone ki-information-5 fs-2x text-warning me-3">';
@@ -5970,25 +5973,24 @@ function mostrarDetalhesBonus(dados) {
         html += '<span class="path3"></span>';
         html += '</i>';
         html += '<div>';
-        html += '<strong>Desconto Total por Ocorr\u00eancias:</strong> ';
+        html += '<strong>Desconto Total por Ocorrencias:</strong> ';
         html += '<span class="fw-bold text-danger fs-3">-R$ ' + parseFloat(dados.total_desconto_ocorrencias || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span>';
         html += '</div>';
         html += '</div>';
     }
-    
-    // Mostra bonus que somam no total
+
     if (dados.bonus_somam && dados.bonus_somam.length > 0) {
-        html += '<h5 class="fw-bold mb-3">B\u00f4nus que Somam no Total</h5>';
+        html += '<h5 class="fw-bold mb-3">Bonus que Somam no Total</h5>';
         html += '<div class="table-responsive mb-5">';
         html += '<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
         html += '<thead>';
         html += '<tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">';
-        html += '<th class="min-w-150px">Tipo de B\u00f4nus</th>';
+        html += '<th class="min-w-150px">Tipo de Bonus</th>';
         html += '<th class="min-w-100px">Tipo</th>';
         html += '<th class="min-w-100px text-end">Valor</th>';
-        html += '<th class="min-w-100px">Data In\u00edcio</th>';
+        html += '<th class="min-w-100px">Data Inicio</th>';
         html += '<th class="min-w-100px">Data Fim</th>';
-        html += '<th class="min-w-200px">Observa\u00e7\u00f5es</th>';
+        html += '<th class="min-w-200px">Observacoes</th>';
         html += '</tr>';
         html += '</thead>';
         html += '<tbody>';
@@ -6025,22 +6027,21 @@ function mostrarDetalhesBonus(dados) {
         html += '</table>';
         html += '</div>';
     }
-    
-    // Mostra bonus informativos
+
     if (dados.bonus_informativos && dados.bonus_informativos.length > 0) {
-        html += '<h5 class="fw-bold mb-3 text-info">B\u00f4nus Informativos (n\u00e3o somam no total)</h5>';
+        html += '<h5 class="fw-bold mb-3 text-info">Bonus Informativos (nao somam no total)</h5>';
         html += '<div class="table-responsive mb-5">';
         html += '<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
         html += '<thead>';
         html += '<tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">';
-        html += '<th class="min-w-150px">Tipo de B\u00f4nus</th>';
-        html += '<th class="min-w-100px">Data In\u00edcio</th>';
+        html += '<th class="min-w-150px">Tipo de Bonus</th>';
+        html += '<th class="min-w-100px">Data Inicio</th>';
         html += '<th class="min-w-100px">Data Fim</th>';
-        html += '<th class="min-w-200px">Observa\u00e7\u00f5es</th>';
+        html += '<th class="min-w-200px">Observacoes</th>';
         html += '</tr>';
         html += '</thead>';
         html += '<tbody>';
-        
+
         dados.bonus_informativos.forEach(function(bonus) {
             html += '<tr>';
             html += '<td><span class="fw-bold text-gray-800">' + (bonus.tipo_bonus_nome || '-') + '</span></td>';
@@ -6049,20 +6050,19 @@ function mostrarDetalhesBonus(dados) {
             html += '<td>' + (bonus.observacoes || '-') + '</td>';
             html += '</tr>';
         });
-        
+
         html += '</tbody>';
         html += '</table>';
         html += '</div>';
     }
-    
+
     if ((!dados.bonus_somam || dados.bonus_somam.length === 0) && (!dados.bonus_informativos || dados.bonus_informativos.length === 0)) {
-        html += '<div class="alert alert-info">Nenhum b\u00f4nus encontrado.</div>';
+        html += '<div class="alert alert-info">Nenhum bonus encontrado.</div>';
     }
-    
+
     html += '</div>';
-    
     conteudo.innerHTML = html;
-    
+
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_bonus'));
     modal.show();
 }
@@ -6813,7 +6813,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                             <div class="card-body">
                                 ${d.flags.ativas.length > 0 ? `
                                 <div class="mb-5">
-                                    <h5 class="fw-bold text-danger mb-3">🚩 Flags Ativas</h5>
+                                    <h5 class="fw-bold text-danger mb-3">Flags Ativas</h5>
                                     <div class="table-responsive">
                                         <table class="table table-row-bordered table-row-dashed gy-4">
                                             <thead>
@@ -6833,13 +6833,13 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                     
                                                     if (flag.tipo_flag === 'falta_nao_justificada') {
                                                         flagBadgeClass = 'badge-danger';
-                                                        flagIcon = '🚫';
+                                                        flagIcon = 'X';
                                                     } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
                                                         flagBadgeClass = 'badge-warning';
                                                         flagIcon = '\u26A0';
                                                     } else if (flag.tipo_flag === 'ma_conduta') {
                                                         flagBadgeClass = 'badge-dark';
-                                                        flagIcon = '⛔';
+                                                        flagIcon = 'X';
                                                     }
                                                     
                                                     const diasRestantes = Math.ceil(flag.dias_para_expirar || 0);
@@ -6871,7 +6871,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                 ${d.flags.expiradas.length > 0 ? `
                                 <div class="separator separator-dashed my-5"></div>
                                 <div>
-                                    <h5 class="fw-bold text-muted mb-3">📋 Histórico de Flags Expiradas</h5>
+                                    <h5 class="fw-bold text-muted mb-3">Historico de Flags Expiradas</h5>
                                     <div class="table-responsive">
                                         <table class="table table-row-bordered table-row-dashed gy-4">
                                             <thead>
@@ -6885,9 +6885,9 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             <tbody>
                                                 ${d.flags.expiradas.map(flag => {
                                                     let flagIcon = '\u26A0';
-                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = '🚫';
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = 'X';
                                                     else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '\u26A0';
-                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = '⛔';
+                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = 'X';
                                                     
                                                     return \`
                                                         <tr class="text-muted">
@@ -7477,7 +7477,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                             <div class="card-body">
                                 ${d.flags.ativas.length > 0 ? `
                                 <div class="mb-5">
-                                    <h5 class="fw-bold text-danger mb-3">🚩 Flags Ativas</h5>
+                                    <h5 class="fw-bold text-danger mb-3">Flags Ativas</h5>
                                     <div class="table-responsive">
                                         <table class="table table-row-bordered table-row-dashed gy-4">
                                             <thead>
@@ -7497,13 +7497,13 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                                     
                                                     if (flag.tipo_flag === 'falta_nao_justificada') {
                                                         flagBadgeClass = 'badge-danger';
-                                                        flagIcon = '🚫';
+                                                        flagIcon = 'X';
                                                     } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
                                                         flagBadgeClass = 'badge-warning';
                                                         flagIcon = '\u26A0';
                                                     } else if (flag.tipo_flag === 'ma_conduta') {
                                                         flagBadgeClass = 'badge-dark';
-                                                        flagIcon = '⛔';
+                                                        flagIcon = 'X';
                                                     }
                                                     
                                                     const diasRestantes = Math.ceil(flag.dias_para_expirar || 0);
@@ -7535,7 +7535,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                 ${d.flags.expiradas.length > 0 ? `
                                 <div class="separator separator-dashed my-5"></div>
                                 <div>
-                                    <h5 class="fw-bold text-muted mb-3">📋 Histórico de Flags Expiradas</h5>
+                                    <h5 class="fw-bold text-muted mb-3">Historico de Flags Expiradas</h5>
                                     <div class="table-responsive">
                                         <table class="table table-row-bordered table-row-dashed gy-4">
                                             <thead>
@@ -7549,9 +7549,9 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             <tbody>
                                                 ${d.flags.expiradas.map(flag => {
                                                     let flagIcon = '\u26A0';
-                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = '🚫';
+                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = 'X';
                                                     else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '\u26A0';
-                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = '⛔';
+                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = 'X';
                                                     
                                                     return \`
                                                         <tr class="text-muted">
