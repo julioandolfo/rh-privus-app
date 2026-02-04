@@ -3597,8 +3597,12 @@ require_once __DIR__ . '/../includes/header.php';
         
         // Atualiza o select de filtro baseado no tipo selecionado
         function atualizarSelectFiltro() {
-            const tipoFiltro = document.getElementById('filtro_resumo_tipo').value;
+            const tipoSelect = document.getElementById('filtro_resumo_tipo');
             const selectId = document.getElementById('filtro_resumo_id');
+            if (!tipoSelect || !selectId) {
+                return;
+            }
+            const tipoFiltro = tipoSelect.value;
             
             selectId.innerHTML = '<option value="">Selecione...</option>';
             
@@ -5803,7 +5807,7 @@ function verificarDuplicacoes() {
         .then(r => r.json())
         .then(data => {
             if (data.duplicacoes && data.duplicacoes.length > 0) {
-                let mensagem = '⚠️ Atenção: Foram encontrados fechamentos extras similares neste mês:\n\n';
+                let mensagem = '\u26A0 Atenção: Foram encontrados fechamentos extras similares neste mês:\n\n';
                 data.duplicacoes.forEach(dup => {
                     mensagem += `• ${dup.tipo_bonus_nome || 'Bônus'} - ${dup.colaborador_nome}\n`;
                     mensagem += `  Fechamento #${dup.fechamento_id} - R$ ${parseFloat(dup.valor).toFixed(2).replace('.', ',')}\n\n`;
@@ -6800,7 +6804,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                     Flags do Colaborador
                                 </h3>
                                 <div class="card-toolbar">
-                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">⚠️ ${d.flags.total_ativas} Ativa(s)</span>` : ''}
+                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">\u26A0 ${d.flags.total_ativas} Ativa(s)</span>` : ''}
                                     ${d.flags.total_expiradas > 0 ? `<span class="badge badge-light-secondary fs-7">${d.flags.total_expiradas} Expirada(s)</span>` : ''}
                                 </div>
                             </div>
@@ -6823,14 +6827,14 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             <tbody>
                                                 ${d.flags.ativas.map(flag => {
                                                     let flagBadgeClass = 'badge-danger';
-                                                    let flagIcon = '⚠️';
+                                                    let flagIcon = '\u26A0';
                                                     
                                                     if (flag.tipo_flag === 'falta_nao_justificada') {
                                                         flagBadgeClass = 'badge-danger';
                                                         flagIcon = '🚫';
                                                     } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
                                                         flagBadgeClass = 'badge-warning';
-                                                        flagIcon = '⚠️';
+                                                        flagIcon = '\u26A0';
                                                     } else if (flag.tipo_flag === 'ma_conduta') {
                                                         flagBadgeClass = 'badge-dark';
                                                         flagIcon = '⛔';
@@ -6878,9 +6882,9 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             </thead>
                                             <tbody>
                                                 ${d.flags.expiradas.map(flag => {
-                                                    let flagIcon = '⚠️';
+                                                    let flagIcon = '\u26A0';
                                                     if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = '🚫';
-                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '⚠️';
+                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '\u26A0';
                                                     else if (flag.tipo_flag === 'ma_conduta') flagIcon = '⛔';
                                                     
                                                     return \`
@@ -7464,7 +7468,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                     Flags do Colaborador
                                 </h3>
                                 <div class="card-toolbar">
-                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">⚠️ ${d.flags.total_ativas} Ativa(s)</span>` : ''}
+                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">\u26A0 ${d.flags.total_ativas} Ativa(s)</span>` : ''}
                                     ${d.flags.total_expiradas > 0 ? `<span class="badge badge-light-secondary fs-7">${d.flags.total_expiradas} Expirada(s)</span>` : ''}
                                 </div>
                             </div>
@@ -7487,14 +7491,14 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             <tbody>
                                                 ${d.flags.ativas.map(flag => {
                                                     let flagBadgeClass = 'badge-danger';
-                                                    let flagIcon = '⚠️';
+                                                    let flagIcon = '\u26A0';
                                                     
                                                     if (flag.tipo_flag === 'falta_nao_justificada') {
                                                         flagBadgeClass = 'badge-danger';
                                                         flagIcon = '🚫';
                                                     } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
                                                         flagBadgeClass = 'badge-warning';
-                                                        flagIcon = '⚠️';
+                                                        flagIcon = '\u26A0';
                                                     } else if (flag.tipo_flag === 'ma_conduta') {
                                                         flagBadgeClass = 'badge-dark';
                                                         flagIcon = '⛔';
@@ -7542,9 +7546,9 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                                             </thead>
                                             <tbody>
                                                 ${d.flags.expiradas.map(flag => {
-                                                    let flagIcon = '⚠️';
+                                                    let flagIcon = '\u26A0';
                                                     if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = '🚫';
-                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '⚠️';
+                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '\u26A0';
                                                     else if (flag.tipo_flag === 'ma_conduta') flagIcon = '⛔';
                                                     
                                                     return \`
