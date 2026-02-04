@@ -4676,7 +4676,10 @@ require_once __DIR__ . '/../includes/header.php';
 <!--end::Modal-->
 
 <script>
+console.log('[DEBUG] Script fechamento_pagamentos.php iniciado');
+
 // Carrega colaboradores ao selecionar empresa
+console.log('[DEBUG] Ponto 1 - Antes de empresa_id listener');
 document.getElementById('empresa_id')?.addEventListener('change', function() {
     const empresaId = this.value;
     const container = document.getElementById('colaboradores_container');
@@ -5805,19 +5808,20 @@ function verificarDuplicacoes() {
     }
     
     // Busca fechamentos extras existentes
-    fetch(`../api/verificar_duplicacao_bonus.php?mes=${mesReferencia}&subtipo=${subtipo}&tipo_bonus_id=${tipoBonusId || ''}&colaboradores=${colaboradores.join(',')}`)
+    var urlVerificacao = '../api/verificar_duplicacao_bonus.php?mes=' + mesReferencia + '&subtipo=' + subtipo + '&tipo_bonus_id=' + (tipoBonusId || '') + '&colaboradores=' + colaboradores.join(',');
+    fetch(urlVerificacao)
         .then(r => r.json())
         .then(data => {
             if (data.duplicacoes && data.duplicacoes.length > 0) {
-                let mensagem = '\u26A0 Atenção: Foram encontrados fechamentos extras similares neste mês:\n\n';
+                let mensagem = 'Atencao: Foram encontrados fechamentos extras similares neste mes:\n\n';
                 data.duplicacoes.forEach(dup => {
-                    mensagem += `• ${dup.tipo_bonus_nome || 'Bônus'} - ${dup.colaborador_nome}\n`;
-                    mensagem += `  Fechamento #${dup.fechamento_id} - R$ ${parseFloat(dup.valor).toFixed(2).replace('.', ',')}\n\n`;
+                    mensagem += '- ' + (dup.tipo_bonus_nome || 'Bonus') + ' - ' + dup.colaborador_nome + '\n';
+                    mensagem += '  Fechamento #' + dup.fechamento_id + ' - R$ ' + parseFloat(dup.valor).toFixed(2).replace('.', ',') + '\n\n';
                 });
                 mensagem += 'Deseja continuar mesmo assim?';
                 
                 Swal.fire({
-                    title: 'Possível Duplicação',
+                    title: 'Possivel Duplicacao',
                     text: mensagem,
                     icon: 'warning',
                     showCancelButton: true,
@@ -5857,6 +5861,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+console.log('[DEBUG] Ponto 2 - Antes de DataTables');
 
 // DataTables
 var KTFechamentosList = function() {
@@ -5901,7 +5907,7 @@ waitForDependencies();
 // Deletar fechamento
 function deletarFechamento(id, mesAno) {
     Swal.fire({
-        text: `Tem certeza que deseja excluir o fechamento de ${mesAno}? Esta ação não pode ser desfeita!`,
+        text: 'Tem certeza que deseja excluir o fechamento de ' + mesAno + '? Esta acao nao pode ser desfeita!',
         icon: "warning",
         showCancelButton: true,
         buttonsStyling: false,
@@ -5922,6 +5928,8 @@ function deletarFechamento(id, mesAno) {
     });
 }
 
+console.log('[DEBUG] Ponto 2.5 - Antes de exportarFechamento');
+
 // Exportar fechamento
 function exportarFechamento(fechamentoId, formato) {
     Swal.fire({
@@ -5941,12 +5949,14 @@ function exportarFechamento(fechamentoId, formato) {
         }
     }).then(function(result) {
         if (result.isConfirmed || result.isDenied) {
-            const apenasAprovados = result.isDenied ? '1' : '0';
-            const url = `exportar_fechamento.php?id=${fechamentoId}&formato=${formato}&apenas_aprovados=${apenasAprovados}`;
-            window.open(url, '_blank');
+            var apenasAprovados = result.isDenied ? '1' : '0';
+            var urlExport = 'exportar_fechamento.php?id=' + fechamentoId + '&formato=' + formato + '&apenas_aprovados=' + apenasAprovados;
+            window.open(urlExport, '_blank');
         }
     });
 }
+
+console.log('[DEBUG] Ponto 3 - Antes de mostrarDetalhesBonus');
 
 // Mostrar detalhes dos bonus
 function mostrarDetalhesBonus(dados) {
@@ -6067,6 +6077,8 @@ function mostrarDetalhesBonus(dados) {
     modal.show();
 }
 
+console.log('[DEBUG] Ponto 4 - Depois de mostrarDetalhesBonus, antes de fecharFechamento');
+
 // Fechar fechamento
 function fecharFechamento(id) {
     Swal.fire({
@@ -6165,7 +6177,7 @@ function reabrirFechamento(id) {
 function marcarComoPagoLista(id, mesAno) {
     Swal.fire({
         title: "Marcar como Pago?",
-        text: `Confirma que o fechamento de ${mesAno} já foi pago?`,
+        text: 'Confirma que o fechamento de ' + mesAno + ' ja foi pago?',
         icon: "question",
         showCancelButton: true,
         buttonsStyling: false,
@@ -6279,20 +6291,15 @@ function rejeitarDocumento(itemId) {
     });
 }
 
+console.log('[DEBUG] Ponto 5 - Antes de verDetalhesPagamento (primeira definicao)');
+
 // Ver detalhes completos do pagamento
 function verDetalhesPagamento(fechamentoId, colaboradorId) {
     const titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
     const conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
     
     // Mostra loading
-    conteudo.innerHTML = `
-        <div class="text-center py-10">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <div class="text-muted mt-3">Carregando detalhes...</div>
-        </div>
-    `;
+    conteudo.innerHTML = '<div class="text-center py-10"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div><div class="text-muted mt-3">Carregando detalhes...</div></div>';
     
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_pagamento'));
     modal.show();
@@ -7688,6 +7695,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 });
+
+console.log('[DEBUG] Ponto FINAL - Script fechamento_pagamentos.php carregado com sucesso!');
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
