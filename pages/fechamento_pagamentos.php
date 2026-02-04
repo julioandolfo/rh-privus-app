@@ -6274,7 +6274,7 @@ function rejeitarDocumento(itemId) {
 }
 
 // Ver detalhes completos do pagamento
-function verDetalhesPagamento(fechamentoId, colaboradorId) {
+window.verDetalhesPagamento = function(fechamentoId, colaboradorId) {
     const titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
     const conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
     
@@ -6938,7 +6938,7 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
 }
 
 // Ver detalhes completos do pagamento
-function verDetalhesPagamento(fechamentoId, colaboradorId) {
+window.verDetalhesPagamento = function(fechamentoId, colaboradorId) {
     const titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
     const conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
     
