@@ -317,14 +317,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($colaboradores_ids as $colab_id) {
                 $colab_id = (int)$colab_id;
                 
-                // Busca dados do colaborador
-                $stmt = $pdo->prepare("SELECT salario FROM colaboradores WHERE id = ?");
+                // Busca dados do colaborador incluindo data de admissão
+                $stmt = $pdo->prepare("SELECT salario, data_admissao FROM colaboradores WHERE id = ?");
                 $stmt->execute([$colab_id]);
                 $colab = $stmt->fetch();
                 
                 if (!$colab || !$colab['salario']) continue;
                 
+                // Calcula salário proporcional baseado na data de admissão
                 $salario_base = $colab['salario'];
+                
+                // Se o colaborador foi admitido durante o mês de referência, calcular proporcional
+                if (!empty($colab['data_admissao'])) {
+                    $data_admissao = strtotime($colab['data_admissao']);
+                    $inicio_mes = strtotime($data_inicio);
+                    $fim_mes = strtotime($data_fim);
+                    
+                    // Se a admissão foi dentro do período do fechamento
+                    if ($data_admissao >= $inicio_mes && $data_admissao <= $fim_mes) {
+                        // Calcula dias trabalhados no mês
+                        $total_dias_mes = (int)date('t', $inicio_mes); // Total de dias do mês
+                        $dias_trabalhados = (int)date('d', $fim_mes) - (int)date('d', $data_admissao) + 1;
+                        
+                        // Calcula salário proporcional
+                        $salario_base = ($colab['salario'] / $total_dias_mes) * $dias_trabalhados;
+                    }
+                }
                 
                 // Busca horas extras do período (separando por tipo de pagamento)
                 // Considera NULL como 'dinheiro' para compatibilidade com registros antigos
@@ -1156,6 +1174,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento marcado como pago com sucesso!');
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao marcar como pago: ' . $e->getMessage(), 'error');
+        }
+    } elseif ($action === 'reabrir_fechamento') {
+        // Reabre um fechamento que estava fechado (permite editar novamente)
+        $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
+        $motivo_reabertura = trim($_POST['motivo_reabertura'] ?? '');
+        
+        try {
+            // Verifica permissão
+            $stmt = $pdo->prepare("SELECT empresa_id, status FROM fechamentos_pagamento WHERE id = ?");
+            $stmt->execute([$fechamento_id]);
+            $fechamento = $stmt->fetch();
+            
+            if (!$fechamento) {
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para reabrir este fechamento!', 'error');
+            }
+            
+            // Só pode reabrir se estiver fechado (não permite reabrir se já foi pago)
+            if ($fechamento['status'] !== 'fechado') {
+                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Apenas fechamentos com status "Fechado" podem ser reabertos!', 'error');
+            }
+            
+            // Registra log da reabertura
+            $log_msg = "Fechamento reaberto por: " . $usuario['nome'] . " (ID: " . $usuario['id'] . ") em " . date('d/m/Y H:i:s');
+            if (!empty($motivo_reabertura)) {
+                $log_msg .= " | Motivo: " . $motivo_reabertura;
+            }
+            
+            // Atualiza status e adiciona log
+            $stmt = $pdo->prepare("
+                UPDATE fechamentos_pagamento 
+                SET status = 'aberto',
+                    descricao = CONCAT(COALESCE(descricao, ''), '\n', ?)
+                WHERE id = ?
+            ");
+            $stmt->execute([$log_msg, $fechamento_id]);
+            
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento reaberto com sucesso! Agora você pode editar os itens.');
+        } catch (PDOException $e) {
+            redirect('fechamento_pagamentos.php', 'Erro ao reabrir fechamento: ' . $e->getMessage(), 'error');
         }
     } elseif ($action === 'delete') {
         $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
@@ -2276,6 +2337,38 @@ if (isset($_GET['view'])) {
         $stmt->execute([$fechamento_id]);
         $itens_fechamento = $stmt->fetchAll();
         
+        // Busca flags ativas de cada colaborador no fechamento
+        $flags_por_colaborador = [];
+        if (!empty($itens_fechamento)) {
+            $colaboradores_ids_flags = array_unique(array_column($itens_fechamento, 'colaborador_id'));
+            if (!empty($colaboradores_ids_flags)) {
+                $placeholders_flags = implode(',', array_fill(0, count($colaboradores_ids_flags), '?'));
+                $stmt_flags = $pdo->prepare("
+                    SELECT 
+                        f.colaborador_id,
+                        f.tipo_flag,
+                        f.data_flag,
+                        f.data_validade,
+                        o.data_ocorrencia,
+                        t.nome as tipo_ocorrencia_nome
+                    FROM ocorrencias_flags f
+                    LEFT JOIN ocorrencias o ON f.ocorrencia_id = o.id
+                    LEFT JOIN tipos_ocorrencias t ON o.tipo_ocorrencia_id = t.id
+                    WHERE f.colaborador_id IN ($placeholders_flags)
+                    AND f.status = 'ativa'
+                    AND f.data_validade >= CURDATE()
+                    ORDER BY f.data_flag DESC
+                ");
+                $stmt_flags->execute($colaboradores_ids_flags);
+                $flags_todas = $stmt_flags->fetchAll();
+                
+                // Organiza flags por colaborador
+                foreach ($flags_todas as $flag) {
+                    $flags_por_colaborador[$flag['colaborador_id']][] = $flag;
+                }
+            }
+        }
+        
         // Busca adiantamentos descontados para cada colaborador neste fechamento
         $adiantamentos_por_colaborador = [];
         if ($fechamento_view['tipo_fechamento'] === 'regular') {
@@ -2531,6 +2624,13 @@ require_once __DIR__ . '/../includes/header.php';
                         </button>
                     </form>
                     <?php elseif ($fechamento_view['status'] === 'fechado'): ?>
+                    <button type="button" class="btn btn-warning me-2" onclick="reabrirFechamento(<?= $fechamento_view['id'] ?>)">
+                        <i class="ki-duotone ki-arrow-circle-left fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Reabrir Fechamento
+                    </button>
                     <form method="POST" style="display: inline;" id="form_marcar_pago_<?= $fechamento_view['id'] ?>">
                         <input type="hidden" name="action" value="marcar_pago">
                         <input type="hidden" name="fechamento_id" value="<?= $fechamento_view['id'] ?>">
@@ -2639,6 +2739,23 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php if ($descricao_view): ?>
                             <div class="text-gray-700 mt-2"><strong>Descrição:</strong> <?= nl2br(htmlspecialchars($descricao_view)) ?></div>
                         <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <?php 
+                // Mostra alerta se o fechamento foi reaberto
+                if (!empty($descricao_view) && stripos($descricao_view, 'reaberto') !== false): 
+                ?>
+                <div class="alert alert-warning d-flex align-items-center mb-7">
+                    <i class="ki-duotone ki-information-5 fs-2x text-warning me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold mb-1">⚠️ Histórico de Reaberturas</div>
+                        <div class="text-gray-700 fs-7"><?= nl2br(htmlspecialchars($descricao_view)) ?></div>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -2788,6 +2905,19 @@ require_once __DIR__ . '/../includes/header.php';
                                 $horas_dinheiro = (float)($he_detalhes['horas_dinheiro'] ?? 0);
                                 $horas_banco = (float)($he_detalhes['horas_banco'] ?? 0);
                                 $valor_dinheiro = (float)($he_detalhes['valor_dinheiro'] ?? 0);
+                                
+                                // Se as horas extras foram editadas manualmente no item, usa os valores do item
+                                // Verifica se o item tem horas_extras diferentes das buscadas da tabela horas_extras
+                                $horas_extras_item = (float)($item['horas_extras'] ?? 0);
+                                $valor_horas_extras_item = (float)($item['valor_horas_extras'] ?? 0);
+                                
+                                // Se o item tem valores diferentes dos da tabela horas_extras, foi editado manualmente
+                                if ($horas_extras_item != ($horas_dinheiro + $horas_banco) || $valor_horas_extras_item != $valor_dinheiro) {
+                                    // Usa os valores editados do item (considera tudo como "dinheiro" quando editado manualmente)
+                                    $horas_dinheiro = $horas_extras_item;
+                                    $horas_banco = 0;
+                                    $valor_dinheiro = $valor_horas_extras_item;
+                                }
                             }
                             
                             // Calcula valor total
@@ -2800,6 +2930,43 @@ require_once __DIR__ . '/../includes/header.php';
                         ?>
                         <tr>
                             <td>
+                                <?php 
+                                // Exibe flags ativas na frente do nome
+                                $flags_colab = $flags_por_colaborador[$item['colaborador_id']] ?? [];
+                                if (!empty($flags_colab)):
+                                    foreach ($flags_colab as $flag):
+                                        $flag_badge_class = 'badge-danger';
+                                        $flag_icon = '⚠️';
+                                        $flag_titulo = '';
+                                        
+                                        switch($flag['tipo_flag']) {
+                                            case 'falta_nao_justificada':
+                                                $flag_badge_class = 'badge-danger';
+                                                $flag_icon = '🚫';
+                                                $flag_titulo = 'Falta não justificada';
+                                                break;
+                                            case 'falta_compromisso_pessoal':
+                                                $flag_badge_class = 'badge-warning';
+                                                $flag_icon = '⚠️';
+                                                $flag_titulo = 'Falta compromisso pessoal';
+                                                break;
+                                            case 'ma_conduta':
+                                                $flag_badge_class = 'badge-dark';
+                                                $flag_icon = '⛔';
+                                                $flag_titulo = 'Má conduta';
+                                                break;
+                                        }
+                                ?>
+                                    <span class="badge <?= $flag_badge_class ?> me-1" 
+                                          data-bs-toggle="tooltip" 
+                                          data-bs-placement="top"
+                                          title="<?= $flag_titulo ?> - Validade: <?= date('d/m/Y', strtotime($flag['data_validade'])) ?>">
+                                        <?= $flag_icon ?>
+                                    </span>
+                                <?php 
+                                    endforeach;
+                                endif; 
+                                ?>
                                 <strong><?= htmlspecialchars($item['colaborador_nome']) ?></strong>
                                 <?php if (!empty($bonus_colab)): ?>
                                 <br><small class="text-muted">
@@ -5935,6 +6102,59 @@ function marcarComoPago(id) {
     });
 }
 
+// Reabrir fechamento
+function reabrirFechamento(id) {
+    Swal.fire({
+        title: "Reabrir Fechamento?",
+        html: `
+            <p class="mb-3">Ao reabrir este fechamento, ele voltará ao status "Aberto" e permitirá edições.</p>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Motivo da reabertura (opcional):</label>
+                <textarea id="motivo_reabertura" class="form-control" rows="3" placeholder="Ex: Colaborador questionou valor de hora extra..."></textarea>
+            </div>
+        `,
+        icon: "warning",
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: "Sim, reabrir!",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn fw-bold btn-warning",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        },
+        preConfirm: () => {
+            return document.getElementById('motivo_reabertura').value;
+        }
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'reabrir_fechamento';
+            form.appendChild(actionInput);
+            
+            const fechamentoInput = document.createElement('input');
+            fechamentoInput.type = 'hidden';
+            fechamentoInput.name = 'fechamento_id';
+            fechamentoInput.value = id;
+            form.appendChild(fechamentoInput);
+            
+            const motivoInput = document.createElement('input');
+            motivoInput.type = 'hidden';
+            motivoInput.name = 'motivo_reabertura';
+            motivoInput.value = result.value || '';
+            form.appendChild(motivoInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
 // Marcar como pago (a partir da listagem)
 function marcarComoPagoLista(id, mesAno) {
     Swal.fire({
@@ -7214,6 +7434,14 @@ function verDocumentoAdmin(fechamentoId, itemId) {
             Swal.fire('Erro', 'Erro ao carregar documento', 'error');
         });
 }
+
+// Inicializa tooltips para as flags
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

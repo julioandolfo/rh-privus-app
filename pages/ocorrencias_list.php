@@ -436,264 +436,291 @@ $tipos_ocorrencias = [
             </div>
         </div>
     
-        <!-- Tabela Principal de Ocorrências -->
-        <div class="card">
-            <div class="card-header border-0 pt-6">
-                <h3 class="card-title align-items-start flex-column">
-                    <span class="card-label fw-bold fs-3 mb-1">Lista de Ocorrências</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7"><?= count($ocorrencias) ?> ocorrência(s) encontrada(s)</span>
-                </h3>
-                <div class="card-toolbar">
-                    <div class="d-flex justify-content-end" data-kt-user-table-toolbar="base">
-                        <!-- Botão de Exportar -->
-                        <button type="button" class="btn btn-light-primary me-3" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
-                            <i class="ki-duotone ki-exit-up fs-2"><span class="path1"></span><span class="path2"></span></i>
-                            Exportar
-                        </button>
-                        <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-200px py-4" data-kt-menu="true">
-                            <div class="menu-item px-3">
-                                <a href="#" class="menu-link px-3" onclick="exportarTabela('excel'); return false;">
-                                    <i class="ki-duotone ki-file fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
-                                    Excel
-                                </a>
-                            </div>
-                            <div class="menu-item px-3">
-                                <a href="#" class="menu-link px-3" onclick="exportarTabela('pdf'); return false;">
-                                    <i class="ki-duotone ki-file fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
-                                    PDF
-                                </a>
-                            </div>
-                            <div class="menu-item px-3">
-                                <a href="#" class="menu-link px-3" onclick="exportarTabela('csv'); return false;">
-                                    <i class="ki-duotone ki-file fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
-                                    CSV
-                                </a>
-                            </div>
+        <!-- Cards de Colaboradores com Ocorrências -->
+        <div class="row g-5 mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header border-0 pt-6">
+                        <h3 class="card-title align-items-start flex-column">
+                            <span class="card-label fw-bold fs-3 mb-1">Ocorrências por Colaborador</span>
+                            <span class="text-muted mt-1 fw-semibold fs-7"><?= count($ocorrencias) ?> ocorrência(s) em <?= count($ocorrencias_agrupadas) ?> colaborador(es)</span>
+                        </h3>
+                    </div>
+                    <div class="card-body py-4">
+                        <?php if (empty($ocorrencias_agrupadas)): ?>
+                        <div class="text-center py-10">
+                            <i class="ki-duotone ki-information-5 fs-3x text-muted mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <p class="text-muted fs-4">Nenhuma ocorrência encontrada com os filtros aplicados.</p>
                         </div>
+                        <?php else: ?>
+                        
+                        <!-- Cards dos Colaboradores -->
+                        <div class="row g-5">
+                            <?php foreach ($ocorrencias_agrupadas as $colab_id => $colaborador): ?>
+                            <div class="col-12">
+                                <div class="card card-colaborador shadow-sm hover-elevate-up">
+                                    <!-- Header do Card do Colaborador -->
+                                    <div class="card-header border-0 bg-light-primary py-5">
+                                        <div class="d-flex align-items-center">
+                                            <!-- Avatar do Colaborador -->
+                                            <div class="symbol symbol-circle symbol-60px me-4">
+                                                <?php if ($colaborador['foto']): ?>
+                                                <img src="../<?= htmlspecialchars($colaborador['foto']) ?>" 
+                                                     alt="<?= htmlspecialchars($colaborador['nome']) ?>" 
+                                                     style="object-fit: cover;"
+                                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <div class="symbol-label bg-primary text-white fs-2 fw-bold" style="display:none;">
+                                                    <?= htmlspecialchars($colaborador['inicial']) ?>
+                                                </div>
+                                                <?php else: ?>
+                                                <div class="symbol-label bg-primary text-white fs-2 fw-bold">
+                                                    <?= htmlspecialchars($colaborador['inicial']) ?>
+                                                </div>
+                                                <?php endif; ?>
+                                            </div>
+                                            
+                                            <!-- Informações do Colaborador -->
+                                            <div class="flex-grow-1">
+                                                <a href="colaborador_view.php?id=<?= $colab_id ?>" class="text-gray-900 text-hover-primary fs-3 fw-bold mb-1">
+                                                    <?= htmlspecialchars($colaborador['nome']) ?>
+                                                </a>
+                                                <div class="text-muted fw-semibold fs-6">
+                                                    <?php
+                                                    $total_ocorrencias_colab = 0;
+                                                    foreach ($colaborador['tipos'] as $tipo) {
+                                                        $total_ocorrencias_colab += count($tipo['ocorrencias']);
+                                                    }
+                                                    ?>
+                                                    <span class="badge badge-primary badge-lg">
+                                                        <?= $total_ocorrencias_colab ?> ocorrência<?= $total_ocorrencias_colab > 1 ? 's' : '' ?>
+                                                    </span>
+                                                    <span class="ms-3">
+                                                        <?= count($colaborador['tipos']) ?> tipo<?= count($colaborador['tipos']) > 1 ? 's' : '' ?>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Body do Card com Tabs -->
+                                    <div class="card-body">
+                                        <!-- Nav Tabs -->
+                                        <ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x mb-5 fs-6" role="tablist">
+                                            <?php 
+                                            $tab_index = 0;
+                                            foreach ($colaborador['tipos'] as $tipo_key => $tipo_info): 
+                                                $tab_index++;
+                                                $tab_id = 'tab_' . $colab_id . '_' . $tipo_key;
+                                                $active_class = $tab_index === 1 ? 'active' : '';
+                                                
+                                                // Define cor do badge baseado na categoria
+                                                $categoria_colors = [
+                                                    'pontualidade' => 'warning',
+                                                    'comportamento' => 'danger',
+                                                    'desempenho' => 'primary',
+                                                    'outros' => 'secondary'
+                                                ];
+                                                $badge_color = $categoria_colors[$tipo_info['categoria']] ?? 'secondary';
+                                            ?>
+                                            <li class="nav-item">
+                                                <a class="nav-link <?= $active_class ?>" data-bs-toggle="tab" href="#<?= $tab_id ?>">
+                                                    <span class="badge badge-<?= $badge_color ?> me-2"><?= count($tipo_info['ocorrencias']) ?></span>
+                                                    <?= htmlspecialchars($tipo_info['nome']) ?>
+                                                </a>
+                                            </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                        
+                                        <!-- Tab Content -->
+                                        <div class="tab-content" id="tabs_<?= $colab_id ?>">
+                                            <?php 
+                                            $tab_index = 0;
+                                            foreach ($colaborador['tipos'] as $tipo_key => $tipo_info): 
+                                                $tab_index++;
+                                                $tab_id = 'tab_' . $colab_id . '_' . $tipo_key;
+                                                $active_class = $tab_index === 1 ? 'show active' : '';
+                                            ?>
+                                            <div class="tab-pane fade <?= $active_class ?>" id="<?= $tab_id ?>" role="tabpanel">
+                                                <div class="table-responsive">
+                                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-3 gy-3">
+                                                        <thead>
+                                                            <tr class="fw-bold text-muted">
+                                                                <th class="min-w-100px">Data</th>
+                                                                <th class="min-w-80px">Severidade</th>
+                                                                <th class="min-w-80px">Status</th>
+                                                                <th class="min-w-300px">Descrição</th>
+                                                                <th class="min-w-80px text-center">Anexos</th>
+                                                                <th class="min-w-80px text-center">Comentários</th>
+                                                                <th class="min-w-120px">Registrado por</th>
+                                                                <th class="text-end min-w-100px">Ações</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <?php foreach ($tipo_info['ocorrencias'] as $ocorrencia): ?>
+                                                            <tr>
+                                                                <!-- Data -->
+                                                                <td>
+                                                                    <span class="fw-bold text-gray-800"><?= formatar_data($ocorrencia['data_ocorrencia']) ?></span>
+                                                                </td>
+                                                                
+                                                                <!-- Severidade -->
+                                                                <td>
+                                                                    <?php
+                                                                    $severidade = $ocorrencia['severidade'] ?? 'moderada';
+                                                                    $severidade_labels = [
+                                                                        'leve' => 'Leve',
+                                                                        'moderada' => 'Moderada',
+                                                                        'grave' => 'Grave',
+                                                                        'critica' => 'Crítica'
+                                                                    ];
+                                                                    $severidade_colors = [
+                                                                        'leve' => 'badge-light-success',
+                                                                        'moderada' => 'badge-light-info',
+                                                                        'grave' => 'badge-light-warning',
+                                                                        'critica' => 'badge-light-danger'
+                                                                    ];
+                                                                    ?>
+                                                                    <span class="badge <?= $severidade_colors[$severidade] ?? 'badge-light-info' ?>">
+                                                                        <?= $severidade_labels[$severidade] ?? 'Moderada' ?>
+                                                                    </span>
+                                                                </td>
+                                                                
+                                                                <!-- Status -->
+                                                                <td>
+                                                                    <?php
+                                                                    $status_aprovacao = $ocorrencia['status_aprovacao'] ?? 'aprovada';
+                                                                    $status_colors = [
+                                                                        'pendente' => 'badge-warning',
+                                                                        'aprovada' => 'badge-success',
+                                                                        'rejeitada' => 'badge-danger'
+                                                                    ];
+                                                                    $status_labels = [
+                                                                        'pendente' => 'Pendente',
+                                                                        'aprovada' => 'Aprovada',
+                                                                        'rejeitada' => 'Rejeitada'
+                                                                    ];
+                                                                    ?>
+                                                                    <span class="badge <?= $status_colors[$status_aprovacao] ?? 'badge-success' ?>">
+                                                                        <?= $status_labels[$status_aprovacao] ?? 'Aprovada' ?>
+                                                                    </span>
+                                                                </td>
+                                                                
+                                                                <!-- Descrição -->
+                                                                <td>
+                                                                    <?php
+                                                                    $descricao = $ocorrencia['descricao'] ?? '';
+                                                                    $descricao_curta = mb_substr($descricao, 0, 100);
+                                                                    ?>
+                                                                    <div class="text-gray-700">
+                                                                        <?= htmlspecialchars($descricao_curta) ?>
+                                                                        <?= mb_strlen($descricao) > 100 ? '...' : '' ?>
+                                                                    </div>
+                                                                    <?php if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1): ?>
+                                                                    <span class="badge badge-light-success mt-1" title="Apenas Informativa">
+                                                                        <i class="ki-duotone ki-information-5 fs-6"></i> Informativa
+                                                                    </span>
+                                                                    <?php endif; ?>
+                                                                    <?php
+                                                                    // Mostra tags
+                                                                    if (!empty($ocorrencia['tags'])) {
+                                                                        $tags_array = json_decode($ocorrencia['tags'], true);
+                                                                        if ($tags_array) {
+                                                                            echo '<div class="mt-1">';
+                                                                            foreach ($tags_array as $tag_id) {
+                                                                                foreach ($tags_disponiveis as $tag) {
+                                                                                    if ($tag['id'] == $tag_id) {
+                                                                                        echo '<span class="badge badge-sm me-1" style="background-color: ' . htmlspecialchars($tag['cor']) . '20; color: ' . htmlspecialchars($tag['cor']) . '; font-size: 0.75rem;">' . htmlspecialchars($tag['nome']) . '</span>';
+                                                                                        break;
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            echo '</div>';
+                                                                        }
+                                                                    }
+                                                                    ?>
+                                                                </td>
+                                                                
+                                                                <!-- Anexos -->
+                                                                <td class="text-center">
+                                                                    <?php if ($ocorrencia['total_anexos'] > 0): ?>
+                                                                        <span class="badge badge-light-info">
+                                                                            <i class="ki-duotone ki-file fs-5"></i>
+                                                                            <?= $ocorrencia['total_anexos'] ?>
+                                                                        </span>
+                                                                    <?php else: ?>
+                                                                        <span class="text-muted">-</span>
+                                                                    <?php endif; ?>
+                                                                </td>
+                                                                
+                                                                <!-- Comentários -->
+                                                                <td class="text-center">
+                                                                    <?php if ($ocorrencia['total_comentarios'] > 0): ?>
+                                                                        <span class="badge badge-light-primary">
+                                                                            <i class="ki-duotone ki-message-text-2 fs-5"></i>
+                                                                            <?= $ocorrencia['total_comentarios'] ?>
+                                                                        </span>
+                                                                    <?php else: ?>
+                                                                        <span class="text-muted">-</span>
+                                                                    <?php endif; ?>
+                                                                </td>
+                                                                
+                                                                <!-- Registrado por -->
+                                                                <td>
+                                                                    <span class="text-gray-600 fw-semibold">
+                                                                        <?= htmlspecialchars($ocorrencia['usuario_nome'] ?? 'N/A') ?>
+                                                                    </span>
+                                                                </td>
+                                                                
+                                                                <!-- Ações -->
+                                                                <td class="text-end">
+                                                                    <a href="#" class="btn btn-light btn-active-light-primary btn-sm" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                                                                        Ações
+                                                                        <i class="ki-duotone ki-down fs-5 ms-1"></i>
+                                                                    </a>
+                                                                    <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-150px py-4" data-kt-menu="true">
+                                                                        <div class="menu-item px-3">
+                                                                            <a href="ocorrencia_view.php?id=<?= $ocorrencia['id'] ?>" class="menu-link px-3">
+                                                                                <i class="ki-duotone ki-eye fs-5 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                                                                Ver Detalhes
+                                                                            </a>
+                                                                        </div>
+                                                                        <?php if (has_role(['ADMIN', 'RH'])): ?>
+                                                                        <div class="menu-item px-3">
+                                                                            <a href="ocorrencias_edit.php?id=<?= $ocorrencia['id'] ?>" class="menu-link px-3">
+                                                                                <i class="ki-duotone ki-pencil fs-5 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                                                                Editar
+                                                                            </a>
+                                                                        </div>
+                                                                        <div class="menu-item px-3">
+                                                                            <a href="#" onclick="deletarOcorrencia(<?= $ocorrencia['id'] ?>); return false;" class="menu-link px-3 text-danger">
+                                                                                <i class="ki-duotone ki-trash fs-5 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                                                                Deletar
+                                                                            </a>
+                                                                        </div>
+                                                                        <?php endif; ?>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                            <?php endforeach; ?>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        
+                        <?php endif; ?>
                     </div>
                 </div>
-            </div>
-            <div class="card-body py-4">
-                <?php if (empty($ocorrencias)): ?>
-                <div class="text-center py-10">
-                    <i class="ki-duotone ki-information-5 fs-3x text-muted mb-5">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    <p class="text-muted fs-4">Nenhuma ocorrência encontrada com os filtros aplicados.</p>
-                </div>
-                <?php else: ?>
-                <div class="table-responsive">
-                    <table id="kt_table_ocorrencias" class="table align-middle table-row-dashed fs-6 gy-5">
-                        <thead>
-                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
-                                <th class="min-w-150px">Colaborador</th>
-                                <th class="min-w-100px">Tipo</th>
-                                <th class="min-w-90px">Data</th>
-                                <th class="min-w-80px">Severidade</th>
-                                <th class="min-w-80px">Status</th>
-                                <th class="min-w-250px">Descrição</th>
-                                <th class="min-w-60px text-center">Anexos</th>
-                                <th class="min-w-80px text-center">Comentários</th>
-                                <th class="min-w-120px">Registrado por</th>
-                                <th class="text-end min-w-100px">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-gray-600 fw-semibold">
-                            <?php foreach ($ocorrencias as $ocorrencia): ?>
-                            <tr data-colaborador-id="<?= $ocorrencia['colaborador_id'] ?>">
-                                <!-- Colaborador com Avatar -->
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="symbol symbol-circle symbol-40px me-3">
-                                            <?php if ($ocorrencia['colaborador_foto']): ?>
-                                            <img src="../<?= htmlspecialchars($ocorrencia['colaborador_foto']) ?>" 
-                                                 alt="<?= htmlspecialchars($ocorrencia['colaborador_nome']) ?>" 
-                                                 style="object-fit: cover;"
-                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                            <div class="symbol-label bg-light-primary text-primary fw-bold" style="display:none;">
-                                                <?= mb_substr($ocorrencia['colaborador_nome'], 0, 1) ?>
-                                            </div>
-                                            <?php else: ?>
-                                            <div class="symbol-label bg-light-primary text-primary fw-bold">
-                                                <?= mb_substr($ocorrencia['colaborador_nome'], 0, 1) ?>
-                                            </div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="d-flex flex-column">
-                                            <a href="colaborador_view.php?id=<?= $ocorrencia['colaborador_id'] ?>" class="text-gray-800 text-hover-primary mb-1 fw-bold">
-                                                <?= htmlspecialchars($ocorrencia['colaborador_nome']) ?>
-                                            </a>
-                                        </div>
-                                    </div>
-                                </td>
-                                
-                                <!-- Tipo de Ocorrência -->
-                                <td>
-                                    <?php
-                                    $categoria = $ocorrencia['tipo_categoria'] ?? 'outros';
-                                    $categoria_colors = [
-                                        'pontualidade' => 'badge-light-warning',
-                                        'comportamento' => 'badge-light-danger',
-                                        'desempenho' => 'badge-light-primary',
-                                        'outros' => 'badge-light-secondary'
-                                    ];
-                                    $tipo_nome = $ocorrencia['tipo_ocorrencia_nome'] ?? 'N/A';
-                                    ?>
-                                    <span class="badge <?= $categoria_colors[$categoria] ?? 'badge-light-secondary' ?>">
-                                        <?= htmlspecialchars($tipo_nome) ?>
-                                    </span>
-                                    <?php if (!empty($ocorrencia['apenas_informativa']) && $ocorrencia['apenas_informativa'] == 1): ?>
-                                    <br><span class="badge badge-light-success mt-1" title="Apenas Informativa">
-                                        <i class="ki-duotone ki-information-5 fs-6"></i> Info
-                                    </span>
-                                    <?php endif; ?>
-                                </td>
-                                
-                                <!-- Data -->
-                                <td>
-                                    <span class="fw-bold"><?= formatar_data($ocorrencia['data_ocorrencia']) ?></span>
-                                </td>
-                                
-                                <!-- Severidade -->
-                                <td>
-                                    <?php
-                                    $severidade = $ocorrencia['severidade'] ?? 'moderada';
-                                    $severidade_labels = [
-                                        'leve' => 'Leve',
-                                        'moderada' => 'Moderada',
-                                        'grave' => 'Grave',
-                                        'critica' => 'Crítica'
-                                    ];
-                                    $severidade_colors = [
-                                        'leve' => 'badge-light-success',
-                                        'moderada' => 'badge-light-info',
-                                        'grave' => 'badge-light-warning',
-                                        'critica' => 'badge-light-danger'
-                                    ];
-                                    ?>
-                                    <span class="badge <?= $severidade_colors[$severidade] ?? 'badge-light-info' ?>">
-                                        <?= $severidade_labels[$severidade] ?? 'Moderada' ?>
-                                    </span>
-                                </td>
-                                
-                                <!-- Status -->
-                                <td>
-                                    <?php
-                                    $status_aprovacao = $ocorrencia['status_aprovacao'] ?? 'aprovada';
-                                    $status_colors = [
-                                        'pendente' => 'badge-warning',
-                                        'aprovada' => 'badge-success',
-                                        'rejeitada' => 'badge-danger'
-                                    ];
-                                    $status_labels = [
-                                        'pendente' => 'Pendente',
-                                        'aprovada' => 'Aprovada',
-                                        'rejeitada' => 'Rejeitada'
-                                    ];
-                                    ?>
-                                    <span class="badge <?= $status_colors[$status_aprovacao] ?? 'badge-success' ?>">
-                                        <?= $status_labels[$status_aprovacao] ?? 'Aprovada' ?>
-                                    </span>
-                                </td>
-                                
-                                <!-- Descrição -->
-                                <td>
-                                    <?php
-                                    $descricao = $ocorrencia['descricao'] ?? '';
-                                    $descricao_curta = mb_substr($descricao, 0, 80);
-                                    ?>
-                                    <span class="text-gray-700" title="<?= htmlspecialchars($descricao) ?>">
-                                        <?= htmlspecialchars($descricao_curta) ?>
-                                        <?= mb_strlen($descricao) > 80 ? '...' : '' ?>
-                                    </span>
-                                    <?php
-                                    // Mostra tags
-                                    if (!empty($ocorrencia['tags'])) {
-                                        $tags_array = json_decode($ocorrencia['tags'], true);
-                                        if ($tags_array) {
-                                            echo '<div class="mt-1">';
-                                            foreach ($tags_array as $tag_id) {
-                                                foreach ($tags_disponiveis as $tag) {
-                                                    if ($tag['id'] == $tag_id) {
-                                                        echo '<span class="badge badge-sm" style="background-color: ' . htmlspecialchars($tag['cor']) . '20; color: ' . htmlspecialchars($tag['cor']) . '; font-size: 0.75rem;">' . htmlspecialchars($tag['nome']) . '</span> ';
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            echo '</div>';
-                                        }
-                                    }
-                                    ?>
-                                </td>
-                                
-                                <!-- Anexos -->
-                                <td class="text-center">
-                                    <?php if ($ocorrencia['total_anexos'] > 0): ?>
-                                        <span class="badge badge-light-info">
-                                            <i class="ki-duotone ki-file fs-5"></i>
-                                            <?= $ocorrencia['total_anexos'] ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                
-                                <!-- Comentários -->
-                                <td class="text-center">
-                                    <?php if ($ocorrencia['total_comentarios'] > 0): ?>
-                                        <span class="badge badge-light-primary">
-                                            <i class="ki-duotone ki-message-text-2 fs-5"></i>
-                                            <?= $ocorrencia['total_comentarios'] ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                
-                                <!-- Registrado por -->
-                                <td>
-                                    <span class="text-gray-600 fw-semibold">
-                                        <?= htmlspecialchars($ocorrencia['usuario_nome'] ?? 'N/A') ?>
-                                    </span>
-                                </td>
-                                
-                                <!-- Ações -->
-                                <td class="text-end">
-                                    <a href="#" class="btn btn-light btn-active-light-primary btn-sm" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
-                                        Ações
-                                        <i class="ki-duotone ki-down fs-5 ms-1"></i>
-                                    </a>
-                                    <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-150px py-4" data-kt-menu="true">
-                                        <div class="menu-item px-3">
-                                            <a href="ocorrencia_view.php?id=<?= $ocorrencia['id'] ?>" class="menu-link px-3">
-                                                <i class="ki-duotone ki-eye fs-5 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                                                Ver Detalhes
-                                            </a>
-                                        </div>
-                                        <?php if (has_role(['ADMIN', 'RH'])): ?>
-                                        <div class="menu-item px-3">
-                                            <a href="ocorrencias_edit.php?id=<?= $ocorrencia['id'] ?>" class="menu-link px-3">
-                                                <i class="ki-duotone ki-pencil fs-5 me-2"><span class="path1"></span><span class="path2"></span></i>
-                                                Editar
-                                            </a>
-                                        </div>
-                                        <div class="menu-item px-3">
-                                            <a href="#" onclick="deletarOcorrencia(<?= $ocorrencia['id'] ?>); return false;" class="menu-link px-3 text-danger">
-                                                <i class="ki-duotone ki-trash fs-5 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
-                                                Deletar
-                                            </a>
-                                        </div>
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php endif; ?>
             </div>
         </div>
         
@@ -703,197 +730,6 @@ $tipos_ocorrencias = [
 
 <script>
 "use strict";
-
-var KTOcorrenciasList = (function() {
-    var table;
-    var datatable;
-    
-    return {
-        init: function() {
-            table = document.querySelector('#kt_table_ocorrencias');
-            
-            if (!table) {
-                return;
-            }
-            
-            // Inicializa DataTable
-            datatable = $(table).DataTable({
-                info: true,
-                order: [[2, 'desc']], // Ordena por data (coluna 2) decrescente
-                pageLength: 25,
-                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
-                language: {
-                    url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
-                },
-                columnDefs: [
-                    { orderable: false, targets: 9 }, // Coluna de ações não ordenável
-                    { width: '150px', targets: 0 }, // Colaborador
-                    { width: '100px', targets: 1 }, // Tipo
-                    { width: '90px', targets: 2 }, // Data
-                    { width: '80px', targets: 3 }, // Severidade
-                    { width: '80px', targets: 4 }, // Status
-                    { width: '250px', targets: 5 }, // Descrição
-                    { width: '60px', targets: 6, className: 'text-center' }, // Anexos
-                    { width: '80px', targets: 7, className: 'text-center' }, // Comentários
-                    { width: '120px', targets: 8 }, // Registrado por
-                    { width: '100px', targets: 9, className: 'text-end' } // Ações
-                ],
-                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
-                     '<"row"<"col-sm-12"tr>>' +
-                     '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
-                buttons: [
-                    {
-                        extend: 'excel',
-                        text: 'Excel',
-                        className: 'btn btn-light-success'
-                    },
-                    {
-                        extend: 'pdf',
-                        text: 'PDF',
-                        className: 'btn btn-light-danger'
-                    },
-                    {
-                        extend: 'csv',
-                        text: 'CSV',
-                        className: 'btn btn-light-info'
-                    }
-                ],
-                rowGroup: {
-                    dataSrc: 0, // Agrupa pela coluna 0 (Colaborador)
-                    startRender: function(rows, group) {
-                        var totalOcorrencias = rows.count();
-                        
-                        // Detecta o tema
-                        var isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
-                                     document.body.getAttribute('data-theme') === 'dark' ||
-                                     document.body.classList.contains('dark-mode') ||
-                                     document.documentElement.getAttribute('data-bs-theme') === 'dark';
-                        
-                        var bgColor = isDark ? '#1b1b29' : '#f3f6f9';
-                        var textColor = isDark ? '#ffffff' : '#181c32';
-                        var borderColor = isDark ? '#2b2b40' : '#e4e6ef';
-                        
-                        // Cria a linha com estilo inline forçado
-                        var $row = $('<tr/>')
-                            .addClass('group-row dtrg-group')
-                            .css({
-                                'background': bgColor,
-                                'background-color': bgColor
-                            });
-                        
-                        var $td = $('<td colspan="10"/>')
-                            .addClass('fw-bold')
-                            .css({
-                                'padding': '15px',
-                                'background': bgColor,
-                                'background-color': bgColor,
-                                'color': textColor,
-                                'border-top': '2px solid #3699ff',
-                                'border-bottom': '1px solid ' + borderColor
-                            })
-                            .html(
-                                '<i class="ki-duotone ki-user fs-2 me-2" style="color: ' + textColor + ' !important;"><span class="path1"></span><span class="path2"></span></i>' +
-                                '<span style="color: ' + textColor + ' !important;">' + group + '</span>' +
-                                ' <span class="badge badge-primary ms-3" style="background-color: #3699ff !important; color: #fff !important;">' + totalOcorrencias + ' ocorrência' + (totalOcorrencias > 1 ? 's' : '') + '</span>'
-                            );
-                        
-                        $row.append($td);
-                        return $row;
-                    }
-                },
-                drawCallback: function() {
-                    // Reinicializa menus do Metronic após cada redesenho
-                    KTMenu.createInstances();
-                    
-                    // Força cores corretas nas linhas de agrupamento após cada redesenho
-                    var isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
-                                 document.body.getAttribute('data-theme') === 'dark' ||
-                                 document.body.classList.contains('dark-mode') ||
-                                 document.documentElement.getAttribute('data-bs-theme') === 'dark';
-                    
-                    var bgColor = isDark ? '#1b1b29' : '#f3f6f9';
-                    var textColor = isDark ? '#ffffff' : '#181c32';
-                    var borderColor = isDark ? '#2b2b40' : '#e4e6ef';
-                    
-                    // Aplica a TODAS as linhas de grupo
-                    $('.group-row, .dtrg-group, tr.dtrg-group').each(function() {
-                        $(this).css({
-                            'background': bgColor,
-                            'background-color': bgColor
-                        });
-                        
-                        $(this).find('td').css({
-                            'background': bgColor,
-                            'background-color': bgColor,
-                            'color': textColor
-                        });
-                        
-                        // Força todos os elementos filhos
-                        $(this).find('*').css('color', textColor);
-                        
-                        // Badge mantém sua cor
-                        $(this).find('.badge').css({
-                            'background-color': '#3699ff',
-                            'color': '#ffffff'
-                        });
-                    });
-                }
-            });
-        },
-        
-        getDatatable: function() {
-            return datatable;
-        }
-    };
-})();
-
-// Função para exportar tabela
-function exportarTabela(formato) {
-    var dt = KTOcorrenciasList.getDatatable();
-    
-    if (!dt) {
-        Swal.fire({
-            title: 'Erro!',
-            text: 'Tabela não inicializada',
-            icon: 'error',
-            confirmButtonText: 'Ok',
-            buttonsStyling: false,
-            customClass: {
-                confirmButton: 'btn fw-bold btn-primary'
-            }
-        });
-        return;
-    }
-    
-    // Carrega bibliotecas de exportação se necessário
-    if (formato === 'excel') {
-        // Verifica se JSZip e Excel estão carregados
-        if (typeof JSZip === 'undefined') {
-            $.getScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', function() {
-                $.getScript('https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js', function() {
-                    dt.button('.buttons-excel').trigger();
-                });
-            });
-        } else {
-            dt.button('.buttons-excel').trigger();
-        }
-    } else if (formato === 'pdf') {
-        // Verifica se pdfMake está carregado
-        if (typeof pdfMake === 'undefined') {
-            $.getScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js', function() {
-                $.getScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js', function() {
-                    $.getScript('https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js', function() {
-                        dt.button('.buttons-pdf').trigger();
-                    });
-                });
-            });
-        } else {
-            dt.button('.buttons-pdf').trigger();
-        }
-    } else if (formato === 'csv') {
-        dt.button('.buttons-csv').trigger();
-    }
-}
 
 // Função para deletar ocorrência
 function deletarOcorrencia(ocorrenciaId) {
@@ -965,172 +801,58 @@ function deletarOcorrencia(ocorrenciaId) {
     });
 }
 
-// Aguarda jQuery e DataTables estarem disponíveis
-(function waitForDependencies() {
-    if (typeof jQuery === 'undefined' || typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
-        setTimeout(waitForDependencies, 50);
-        return;
-    }
+// Inicializa componentes do Metronic
+document.addEventListener('DOMContentLoaded', function() {
+    // Reinicializa menus do KTMenu
+    KTMenu.createInstances();
     
-    $(document).ready(function() {
-        // Aguarda um pouco para garantir que a tabela foi renderizada
-        setTimeout(function() {
-            KTOcorrenciasList.init();
-            
-            // Observer para mudanças de tema
-            if (typeof MutationObserver !== 'undefined') {
-                var observer = new MutationObserver(function(mutations) {
-                    mutations.forEach(function(mutation) {
-                        if (mutation.attributeName === 'data-theme') {
-                            var dt = KTOcorrenciasList.getDatatable();
-                            if (dt) {
-                                dt.draw(false);
-                            }
-                        }
-                    });
-                });
-                
-                // Observa mudanças no atributo data-theme
-                observer.observe(document.documentElement, {
-                    attributes: true,
-                    attributeFilter: ['data-theme']
-                });
-                
-                observer.observe(document.body, {
-                    attributes: true,
-                    attributeFilter: ['data-theme']
-                });
-            }
-        }, 300);
+    // Adiciona animação de hover aos cards
+    const cards = document.querySelectorAll('.card-colaborador');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+            this.style.transition = 'all 0.3s ease';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
     });
-})();
+});
 </script>
-
-<!-- Adiciona bibliotecas necessárias para exportação -->
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/rowgroup/1.4.1/js/dataTables.rowGroup.min.js"></script>
-<!-- CSS do RowGroup removido para controle manual das cores -->
 
 <style>
 /* =====================================================
-   LINHAS DE AGRUPAMENTO (CABEÇALHOS DE COLABORADOR)
+   CARDS DE COLABORADORES
    ===================================================== */
 
-/* TEMA ESCURO - Força máxima para linhas de grupo */
-[data-theme="dark"] tr.group-row,
-[data-theme="dark"] tr.group-row td,
-[data-theme="dark"] tr.dtrg-group,
-[data-theme="dark"] tr.dtrg-group td,
-[data-theme="dark"] table.dataTable tr.group-row,
-[data-theme="dark"] table.dataTable tr.group-row td,
-[data-theme="dark"] table.dataTable tr.dtrg-group,
-[data-theme="dark"] table.dataTable tr.dtrg-group td,
-body.dark-mode tr.group-row,
-body.dark-mode tr.group-row td,
-html[data-bs-theme="dark"] tr.group-row,
-html[data-bs-theme="dark"] tr.group-row td {
-    background: #1b1b29 !important;
-    background-color: #1b1b29 !important;
-    color: #ffffff !important;
-    border-top: 2px solid #3699ff !important;
-    border-bottom: 1px solid #2b2b40 !important;
+.card-colaborador {
+    border: 1px solid #e4e6ef;
+    border-radius: 0.625rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
 }
 
-/* Força todos os elementos dentro da linha de grupo */
-[data-theme="dark"] tr.group-row *,
-[data-theme="dark"] tr.dtrg-group *,
-body.dark-mode tr.group-row *,
-html[data-bs-theme="dark"] tr.group-row * {
-    color: #ffffff !important;
+.card-colaborador:hover {
+    box-shadow: 0 0 30px rgba(0,0,0,0.1);
 }
 
-/* Badge dentro do grupo */
-[data-theme="dark"] tr.group-row .badge,
-[data-theme="dark"] tr.dtrg-group .badge,
-body.dark-mode tr.group-row .badge {
-    background-color: #3699ff !important;
-    color: #ffffff !important;
+[data-theme="dark"] .card-colaborador {
+    border-color: #2b2b40;
 }
 
-/* Tema claro */
-tr.group-row,
-tr.group-row td,
-tr.dtrg-group,
-tr.dtrg-group td {
-    background: #f3f6f9 !important;
-    background-color: #f3f6f9 !important;
-    color: #181c32 !important;
-    font-weight: 600 !important;
-    font-size: 1.05rem !important;
-    border-top: 2px solid #3699ff !important;
-    border-bottom: 1px solid #e4e6ef !important;
+[data-theme="dark"] .card-colaborador:hover {
+    box-shadow: 0 0 30px rgba(0,0,0,0.4);
 }
 
-/* =====================================================
-   LINHAS NORMAIS DA TABELA
-   ===================================================== */
-
-/* Linhas normais no tema escuro */
-[data-theme="dark"] #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group),
-body.dark-mode #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group) {
-    background-color: #151521 !important;
+/* Header do Card do Colaborador */
+.card-colaborador .card-header {
+    border-bottom: 1px solid #e4e6ef;
 }
 
-[data-theme="dark"] #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group):nth-child(even),
-body.dark-mode #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group):nth-child(even) {
-    background-color: #1a1a27 !important;
-}
-
-[data-theme="dark"] #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group) td,
-body.dark-mode #kt_table_ocorrencias tbody tr:not(.group-row):not(.dtrg-group) td {
-    color: #a1a5b7 !important;
-}
-
-/* Links de colaboradores */
-[data-theme="dark"] #kt_table_ocorrencias tbody td a,
-body.dark-mode #kt_table_ocorrencias tbody td a {
-    color: #3699ff !important;
-}
-
-[data-theme="dark"] #kt_table_ocorrencias tbody td a:hover,
-body.dark-mode #kt_table_ocorrencias tbody td a:hover {
-    color: #0095e8 !important;
-}
-
-/* =====================================================
-   CABEÇALHO E WRAPPER
-   ===================================================== */
-
-/* Cabeçalho da tabela */
-[data-theme="dark"] #kt_table_ocorrencias thead th,
-body.dark-mode #kt_table_ocorrencias thead th {
+[data-theme="dark"] .card-colaborador .card-header {
     background-color: #1e1e2d !important;
-    color: #a1a5b7 !important;
-    border-bottom: 1px solid #2b2b40 !important;
-}
-
-/* DataTables wrapper */
-[data-theme="dark"] .dataTables_wrapper,
-[data-theme="dark"] .dataTables_info,
-body.dark-mode .dataTables_wrapper,
-body.dark-mode .dataTables_info {
-    color: #a1a5b7 !important;
-}
-
-/* Melhora visual dos badges */
-.badge {
-    font-weight: 600;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
-}
-
-/* Hover nas linhas da tabela */
-#kt_table_ocorrencias tbody tr:hover {
-    background-color: #f9f9f9 !important;
-}
-
-[data-theme="dark"] #kt_table_ocorrencias tbody tr:hover {
-    background-color: #1e1e2d !important;
+    border-bottom-color: #2b2b40;
 }
 
 /* Avatar círculo perfeito */
@@ -1139,14 +861,124 @@ body.dark-mode .dataTables_info {
     border-radius: 50% !important;
 }
 
-/* Cards de estatísticas com hover */
+/* =====================================================
+   TABS
+   ===================================================== */
+
+.nav-line-tabs .nav-link {
+    color: #7e8299;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0.75rem 1.5rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.nav-line-tabs .nav-link:hover {
+    color: #3699ff;
+    border-bottom-color: #3699ff;
+}
+
+.nav-line-tabs .nav-link.active {
+    color: #3699ff;
+    border-bottom-color: #3699ff;
+    background-color: transparent;
+}
+
+[data-theme="dark"] .nav-line-tabs .nav-link {
+    color: #a1a5b7;
+}
+
+[data-theme="dark"] .nav-line-tabs .nav-link:hover {
+    color: #3699ff;
+}
+
+[data-theme="dark"] .nav-line-tabs .nav-link.active {
+    color: #3699ff;
+}
+
+/* Badge nas tabs */
+.nav-line-tabs .nav-link .badge {
+    font-weight: 600;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
+}
+
+/* =====================================================
+   TABELAS DENTRO DAS TABS
+   ===================================================== */
+
+.tab-content .table {
+    margin-bottom: 0;
+}
+
+.tab-content .table thead th {
+    background-color: #f9f9f9;
+    color: #7e8299;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    padding: 1rem 0.75rem;
+    border-bottom: 2px solid #e4e6ef;
+}
+
+[data-theme="dark"] .tab-content .table thead th {
+    background-color: #1e1e2d;
+    color: #a1a5b7;
+    border-bottom-color: #2b2b40;
+}
+
+.tab-content .table tbody td {
+    padding: 1rem 0.75rem;
+    vertical-align: middle;
+}
+
+.tab-content .table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.tab-content .table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+[data-theme="dark"] .tab-content .table tbody tr:hover {
+    background-color: #1e1e2d;
+}
+
+/* =====================================================
+   BADGES
+   ===================================================== */
+
+.badge {
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.badge-lg {
+    padding: 0.65rem 1rem;
+    font-size: 0.95rem;
+}
+
+/* =====================================================
+   CARDS DE ESTATÍSTICAS
+   ===================================================== */
+
 .card-flush:hover {
     transform: translateY(-5px);
     transition: all 0.3s ease;
     box-shadow: 0 0 20px rgba(0,0,0,0.1);
 }
 
-/* Menu de ações */
+[data-theme="dark"] .card-flush:hover {
+    box-shadow: 0 0 20px rgba(0,0,0,0.4);
+}
+
+/* =====================================================
+   MENU DE AÇÕES
+   ===================================================== */
+
 .menu-link:hover {
     background-color: #f3f6f9 !important;
 }
@@ -1155,12 +987,18 @@ body.dark-mode .dataTables_info {
     background-color: #1e1e2d !important;
 }
 
-/* Botão de colapsar filtros */
+/* =====================================================
+   FILTROS
+   ===================================================== */
+
 #kt_filtros_collapse {
     transition: all 0.3s ease;
 }
 
-/* Responsividade dos cards de estatísticas */
+/* =====================================================
+   RESPONSIVIDADE
+   ===================================================== */
+
 @media (max-width: 768px) {
     .col-xl-3 {
         margin-bottom: 1rem;
@@ -1169,95 +1007,103 @@ body.dark-mode .dataTables_info {
     .card-flush .fs-2hx {
         font-size: 2rem !important;
     }
+    
+    .nav-line-tabs .nav-link {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .symbol-circle {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .tab-content .table {
+        font-size: 0.85rem;
+    }
 }
 
-/* DataTables search input styling */
-.dataTables_filter input {
-    margin-left: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.475rem;
-    border: 1px solid #e4e6ef;
-}
-
-[data-theme="dark"] .dataTables_filter input {
-    background-color: #1e1e2d;
-    border-color: #2b2b40;
-    color: #a1a5b7;
-}
-
-/* Paginação */
-.dataTables_paginate .paginate_button {
-    padding: 0.5rem 1rem;
-    margin: 0 0.25rem;
-    border-radius: 0.475rem;
-}
-
-.dataTables_paginate .paginate_button.current {
-    background: #3699ff !important;
-    color: white !important;
-}
-
-/* FORÇA MÁXIMA para linhas de agrupamento no tema escuro */
-[data-theme="dark"] tr.group-row > td,
-body[data-theme="dark"] tr.group-row > td,
-html[data-theme="dark"] tr.group-row > td,
-[data-theme="dark"] tr.dtrg-group > td,
-body[data-theme="dark"] tr.dtrg-group > td {
-    background-color: #1b1b29 !important;
-    background: #1b1b29 !important;
-    color: #ffffff !important;
-}
-
-/* Força para todos os elementos dentro da linha de grupo */
-[data-theme="dark"] .group-row *,
-body[data-theme="dark"] .group-row *,
-[data-theme="dark"] .dtrg-group *,
-body[data-theme="dark"] .dtrg-group * {
-    color: #ffffff !important;
-}
-
-[data-theme="dark"] .group-row .badge,
-body[data-theme="dark"] .group-row .badge,
-[data-theme="dark"] .dtrg-group .badge,
-body[data-theme="dark"] .dtrg-group .badge {
-    background-color: #3699ff !important;
-    color: #ffffff !important;
+@media (max-width: 576px) {
+    .nav-line-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .nav-line-tabs .nav-link {
+        margin-bottom: 0.5rem;
+    }
 }
 
 /* =====================================================
-   OVERRIDE ABSOLUTO - última linha de defesa
+   ANIMAÇÕES
    ===================================================== */
-   
-table#kt_table_ocorrencias tr.group-row,
-table#kt_table_ocorrencias tr.group-row td,
-table#kt_table_ocorrencias tr.dtrg-group,
-table#kt_table_ocorrencias tr.dtrg-group td,
-#kt_table_ocorrencias tr.group-row,
-#kt_table_ocorrencias tr.group-row td {
-    background: inherit;
+
+.hover-elevate-up {
+    transition: all 0.3s ease;
 }
 
-[data-theme="dark"] table#kt_table_ocorrencias tr.group-row,
-[data-theme="dark"] table#kt_table_ocorrencias tr.group-row td,
-[data-theme="dark"] table#kt_table_ocorrencias tr.dtrg-group,
-[data-theme="dark"] table#kt_table_ocorrencias tr.dtrg-group td,
-[data-theme="dark"] #kt_table_ocorrencias tr.group-row,
-[data-theme="dark"] #kt_table_ocorrencias tr.group-row td {
-    background: #1b1b29 !important;
-    background-color: #1b1b29 !important;
-    color: #fff !important;
+.hover-elevate-up:hover {
+    transform: translateY(-5px);
 }
 
-/* Symbol do avatar na linha de grupo - mantém visível */
-[data-theme="dark"] tr.group-row .symbol,
-[data-theme="dark"] tr.dtrg-group .symbol {
-    background: transparent !important;
+/* =====================================================
+   TEMA ESCURO - AJUSTES GERAIS
+   ===================================================== */
+
+[data-theme="dark"] .text-gray-700 {
+    color: #a1a5b7 !important;
 }
 
-[data-theme="dark"] tr.group-row .symbol-label,
-[data-theme="dark"] tr.dtrg-group .symbol-label {
-    background-color: #3699ff !important;
+[data-theme="dark"] .text-gray-600 {
+    color: #a1a5b7 !important;
+}
+
+[data-theme="dark"] .text-gray-800 {
     color: #ffffff !important;
+}
+
+[data-theme="dark"] .text-gray-900 {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .bg-light-primary {
+    background-color: #1e1e2d !important;
+}
+
+/* =====================================================
+   SCROLL SUAVE
+   ===================================================== */
+
+.tab-content {
+    scroll-behavior: smooth;
+}
+
+/* =====================================================
+   MELHORIAS VISUAIS
+   ===================================================== */
+
+.table-responsive {
+    border-radius: 0.475rem;
+}
+
+.card-body {
+    position: relative;
+}
+
+/* Loading state para tabs */
+.tab-pane {
+    min-height: 200px;
+}
+
+/* Badge de contagem nas tabs */
+.nav-link .badge {
+    margin-right: 0.5rem;
+}
+
+/* Espaçamento das tags */
+.badge-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    margin-right: 0.25rem;
 }
 </style>
 
