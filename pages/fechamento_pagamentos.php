@@ -5796,17 +5796,10 @@ function marcarComoPago(id) {
     });
 }
 
-// Reabrir fechamento
 function reabrirFechamento(id) {
     Swal.fire({
         title: "Reabrir Fechamento?",
-        html: `
-            <p class="mb-3">Ao reabrir este fechamento, ele voltará ao status "Aberto" e permitirá edições.</p>
-            <div class="mb-3">
-                <label class="form-label fw-bold">Motivo da reabertura (opcional):</label>
-                <textarea id="motivo_reabertura" class="form-control" rows="3" placeholder="Ex: Colaborador questionou valor de hora extra..."></textarea>
-            </div>
-        `,
+        html: '<p class="mb-3">Ao reabrir este fechamento, ele voltara ao status "Aberto" e permitira edicoes.</p><div class="mb-3"><label class="form-label fw-bold">Motivo da reabertura (opcional):</label><textarea id="motivo_reabertura" class="form-control" rows="3" placeholder="Ex: Colaborador questionou valor de hora extra..."></textarea></div>',
         icon: "warning",
         showCancelButton: true,
         buttonsStyling: false,
@@ -5816,33 +5809,29 @@ function reabrirFechamento(id) {
             confirmButton: "btn fw-bold btn-warning",
             cancelButton: "btn fw-bold btn-active-light-primary"
         },
-        preConfirm: () => {
+        preConfirm: function() {
             return document.getElementById('motivo_reabertura').value;
         }
     }).then(function(result) {
         if (result.isConfirmed) {
-            const form = document.createElement('form');
+            var form = document.createElement('form');
             form.method = 'POST';
             form.action = '';
-            
-            const actionInput = document.createElement('input');
+            var actionInput = document.createElement('input');
             actionInput.type = 'hidden';
             actionInput.name = 'action';
             actionInput.value = 'reabrir_fechamento';
             form.appendChild(actionInput);
-            
-            const fechamentoInput = document.createElement('input');
+            var fechamentoInput = document.createElement('input');
             fechamentoInput.type = 'hidden';
             fechamentoInput.name = 'fechamento_id';
             fechamentoInput.value = id;
             form.appendChild(fechamentoInput);
-            
-            const motivoInput = document.createElement('input');
+            var motivoInput = document.createElement('input');
             motivoInput.type = 'hidden';
             motivoInput.name = 'motivo_reabertura';
             motivoInput.value = result.value || '';
             form.appendChild(motivoInput);
-            
             document.body.appendChild(form);
             form.submit();
         }
@@ -5967,1376 +5956,155 @@ function rejeitarDocumento(itemId) {
     });
 }
 
-console.log('[DEBUG] Ponto 5 - Antes de verDetalhesPagamento (primeira definicao)');
+console.log('[DEBUG] Ponto 5 - Antes de verDetalhesPagamento');
 
 // Ver detalhes completos do pagamento
 function verDetalhesPagamento(fechamentoId, colaboradorId) {
-    const titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
-    const conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
+    var titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
+    var conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
     
-    // Mostra loading
     conteudo.innerHTML = '<div class="text-center py-10"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div><div class="text-muted mt-3">Carregando detalhes...</div></div>';
     
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_pagamento'));
+    var modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_pagamento'));
     modal.show();
     
-    // Busca dados via API
-    fetch(`../api/get_detalhes_pagamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
-        .then(response => response.json())
-        .then(data => {
+    fetch('../api/get_detalhes_pagamento.php?fechamento_id=' + fechamentoId + '&colaborador_id=' + colaboradorId)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             if (data.success && data.data) {
-                const d = data.data;
+                var d = data.data;
+                titulo.textContent = 'Detalhes do Pagamento - ' + d.colaborador.nome_completo;
                 
-                titulo.textContent = `Detalhes do Pagamento - ${d.colaborador.nome_completo}`;
+                var html = '<div class="mb-10">';
                 
-                let html = `
-                    <div class="mb-10">
-                        <!-- Informações do Fechamento -->
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Informações do Fechamento</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Mês/Ano de Referência:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.mes_referencia_formatado}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Data de Fechamento:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.data_fechamento_formatada}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Empresa:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.empresa_nome}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Período:</strong><br>
-                                        <span class="text-gray-800">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Informações do Colaborador -->
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Colaborador</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Nome:</strong><br>
-                                        <span class="text-gray-800">${d.colaborador.nome_completo}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>CPF:</strong><br>
-                                        <span class="text-gray-800">${d.colaborador.cpf || '-'}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Cargo:</strong><br>
-                                        <span class="text-gray-800">${d.colaborador.cargo || '-'}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Resumo Financeiro -->
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Resumo Financeiro</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-dashed gy-4">
-                                        <tbody>
-                                            <tr>
-                                                <td class="fw-bold">Salário Base</td>
-                                                <td class="text-end">
-                                                    <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="fw-bold">Horas Extras (Total)</td>
-                                                <td class="text-end">
-                                                    <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="fw-bold">Valor Horas Extras</td>
-                                                <td class="text-end">
-                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="fw-bold">Total de Bônus</td>
-                                                <td class="text-end">
-                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ${d.bonus.total_desconto_ocorrencias > 0 ? `
-                                            <tr>
-                                                <td class="fw-bold text-danger">Desconto por Ocorrências (Bônus)</td>
-                                                <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ` : ''}
-                                            ${d.item.descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
-                                            <tr>
-                                                <td class="fw-bold text-danger">Descontos</td>
-                                                <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                    ${d.ocorrencias.total_descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
-                                                    <br><small class="text-muted fs-8">
-                                                        ${d.ocorrencias.total_descontos > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
-                                                        ${d.ocorrencias.total_descontos > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
-                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
-                                                    </small>
-                                                    ` : ''}
-                                                </td>
-                                            </tr>
-                                            ` : ''}
-                                            ${d.item.adicionais > 0 ? `
-                                            <tr>
-                                                <td class="fw-bold text-success">Adicionais</td>
-                                                <td class="text-end">
-                                                    <span class="text-success fw-bold">+R$ ${parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ` : ''}
-                                            <tr class="border-top border-2">
-                                                <td class="fw-bold fs-4">Valor Total</td>
-                                                <td class="text-end">
-                                                    <span class="text-success fw-bold fs-3">R$ ${parseFloat(d.item.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Detalhes de Horas Extras -->
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Detalhes de Horas Extras</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-5">
-                                    <h5 class="fw-bold mb-3">Resumo</h5>
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="d-flex align-items-center p-3 bg-light-success rounded">
-                                                <i class="ki-duotone ki-money fs-2x text-success me-3">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                <div>
-                                                    <div class="text-muted fs-7">Horas Pagas em R$</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
-                                                    <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="d-flex align-items-center p-3 bg-light-info rounded">
-                                                <i class="ki-duotone ki-time fs-2x text-info me-3">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                <div>
-                                                    <div class="text-muted fs-7">Horas em Banco</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_banco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="d-flex align-items-center p-3 bg-light-primary rounded">
-                                                <i class="ki-duotone ki-chart-simple fs-2x text-primary me-3">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                <div>
-                                                    <div class="text-muted fs-7">Total de Horas</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.total_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                ${d.horas_extras.registros.length > 0 ? `
-                                <h5 class="fw-bold mb-3">Registros Individuais</h5>
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-dashed gy-4">
-                                        <thead>
-                                            <tr class="fw-bold">
-                                                <th>Data</th>
-                                                <th>Quantidade</th>
-                                                <th>Valor/Hora</th>
-                                                <th>% Adicional</th>
-                                                <th>Valor Total</th>
-                                                <th>Tipo</th>
-                                                <th>Observações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.horas_extras.registros.map(he => `
-                                                <tr>
-                                                    <td>${new Date(he.data_trabalho + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                                                    <td>${parseFloat(he.quantidade_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</td>
-                                                    <td>R$ ${parseFloat(he.valor_hora || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                    <td>${parseFloat(he.percentual_adicional || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</td>
-                                                    <td class="fw-bold">R$ ${parseFloat(he.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                    <td>
-                                                        ${he.tipo_pagamento === 'banco_horas' 
-                                                            ? '<span class="badge badge-light-info">Banco de Horas</span>' 
-                                                            : '<span class="badge badge-light-success">Dinheiro</span>'}
-                                                    </td>
-                                                    <td>${he.observacoes || '-'}</td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste período.</p>'}
-                            </div>
-                        </div>
-                        
-                        <!-- Detalhes de Bônus -->
-                        ${d.bonus.lista.length > 0 ? `
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Detalhes de Bônus</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-dashed gy-4">
-                                        <thead>
-                                            <tr class="fw-bold">
-                                                <th>Tipo de Bônus</th>
-                                                <th>Tipo</th>
-                                                <th>Valor Original</th>
-                                                <th>Desconto Ocorrências</th>
-                                                <th>Valor Final</th>
-                                                <th>Observações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.bonus.lista.map(b => {
-                                                const tipoValor = b.tipo_valor || 'variavel';
-                                                const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : tipoValor === 'informativo' ? 'Informativo' : 'Variável';
-                                                const tipoBadge = tipoValor === 'fixo' ? 'primary' : tipoValor === 'informativo' ? 'info' : 'success';
-                                                const valorOriginal = parseFloat(b.valor_original || b.valor || 0);
-                                                const descontoOcorrencias = parseFloat(b.desconto_ocorrencias || 0);
-                                                const valorFinal = parseFloat(b.valor || 0);
-                                                
-                                                return `
-                                                    <tr>
-                                                        <td class="fw-bold">${b.tipo_bonus_nome}</td>
-                                                        <td><span class="badge badge-light-${tipoBadge}">${tipoLabel}</span></td>
-                                                        <td>R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                        <td class="text-danger">${descontoOcorrencias > 0 ? '-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</td>
-                                                        <td class="fw-bold text-success">R$ ${valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                        <td>${b.observacoes || '-'}</td>
-                                                    </tr>
-                                                `;
-                                            }).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                
-                                ${d.bonus.lista.some(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0) ? `
-                                <div class="separator separator-dashed my-5"></div>
-                                <h5 class="fw-bold mb-3">Detalhes de Descontos por Ocorrências</h5>
-                                ${d.bonus.lista.filter(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0).map(b => `
-                                    <div class="mb-5">
-                                        <h6 class="fw-bold text-gray-800 mb-3">${b.tipo_bonus_nome}</h6>
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-row-bordered">
-                                                <thead>
-                                                    <tr class="fw-bold fs-7">
-                                                        <th>Ocorrência</th>
-                                                        <th>Período Atual</th>
-                                                        <th>Período Anterior</th>
-                                                        <th>Tipo Desconto</th>
-                                                        <th>Desconto Aplicado</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    ${b.detalhes_desconto_array.map(det => `
-                                                        <tr>
-                                                            <td>${det.tipo_ocorrencia_nome || det.tipo_ocorrencia_codigo || '-'}</td>
-                                                            <td>${det.total_ocorrencias_periodo_atual || 0} ocorrência(s)</td>
-                                                            <td>${det.total_ocorrencias_periodo_anterior || 0} ocorrência(s)</td>
-                                                            <td>
-                                                                ${det.tipo_desconto === 'total' ? '<span class="badge badge-light-danger">Valor Total</span>' : 
-                                                                  det.tipo_desconto === 'fixo' ? '<span class="badge badge-light-warning">Fixo</span>' :
-                                                                  det.tipo_desconto === 'percentual' ? '<span class="badge badge-light-info">Percentual</span>' :
-                                                                  '<span class="badge badge-light-primary">Proporcional</span>'}
-                                                            </td>
-                                                            <td class="text-danger fw-bold">-R$ ${parseFloat(det.desconto_aplicado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                        </tr>
-                                                    `).join('')}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                                ` : ''}
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Ocorrências com Desconto -->
-                        ${d.ocorrencias.descontos.length > 0 ? `
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Ocorrências com Desconto em R$</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-dashed gy-4">
-                                        <thead>
-                                            <tr class="fw-bold">
-                                                <th>Data</th>
-                                                <th>Tipo</th>
-                                                <th>Descrição</th>
-                                                <th>Valor Desconto</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.ocorrencias.descontos.map(occ => `
-                                                <tr>
-                                                    <td>${new Date(occ.data_ocorrencia + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                                                    <td><span class="badge badge-light-danger">${occ.tipo_ocorrencia_nome || occ.tipo_ocorrencia_codigo || '-'}</span></td>
-                                                    <td>${occ.descricao || '-'}</td>
-                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(occ.valor_desconto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Adiantamentos Descontados -->
-                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? `
-                        <div class="card card-flush">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="ki-duotone ki-wallet fs-2 text-primary me-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    Adiantamentos Descontados
-                                </h3>
-                                <div class="card-toolbar">
-                                    <span class="badge badge-light-danger fs-4 fw-bold">
-                                        Total: -R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
-                                        <thead>
-                                            <tr class="fw-bold text-muted">
-                                                <th class="min-w-100px">Data do Adiantamento</th>
-                                                <th class="min-w-100px">Mês de Desconto</th>
-                                                <th class="min-w-150px">Valor</th>
-                                                <th class="min-w-200px">Observações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.adiantamentos_descontados.map(ad => `
-                                                <tr>
-                                                    <td>${ad.fechamento_data || '-'}</td>
-                                                    <td>
-                                                        <span class="badge badge-light-info">${ad.mes_desconto_formatado || ad.mes_desconto || '-'}</span>
-                                                    </td>
-                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                    <td>${ad.observacoes || '-'}</td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Adiantamentos Pendentes -->
-                        ${d.adiantamentos_pendentes && d.adiantamentos_pendentes.length > 0 ? `
-                        <div class="card card-flush">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="ki-duotone ki-time fs-2 text-warning me-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                    </i>
-                                    Adiantamentos Pendentes
-                                    <span class="badge badge-light-warning ms-2">${d.adiantamentos_pendentes.length}</span>
-                                </h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="alert alert-info d-flex align-items-center p-3 mb-5">
-                                    <i class="ki-duotone ki-information-5 fs-2hx text-info me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                    </i>
-                                    <div class="d-flex flex-column">
-                                        <span class="fw-bold">Atenção:</span>
-                                        <span>Estes adiantamentos ainda não foram descontados. Serão descontados automaticamente quando o fechamento do mês de desconto for criado.</span>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
-                                        <thead>
-                                            <tr class="fw-bold text-muted">
-                                                <th class="min-w-100px">Data do Adiantamento</th>
-                                                <th class="min-w-100px">Mês de Desconto</th>
-                                                <th class="min-w-150px">Valor a Descontar</th>
-                                                <th class="min-w-200px">Observações</th>
-                                                <th class="min-w-100px text-center">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.adiantamentos_pendentes.map(ad => `
-                                                <tr>
-                                                    <td>${ad.fechamento_data || '-'}</td>
-                                                    <td>
-                                                        <span class="badge ${ad.mes_desconto === d.fechamento.mes_referencia ? 'badge-light-success' : 'badge-light-warning'}">
-                                                            ${ad.mes_desconto_formatado || ad.mes_desconto || '-'}
-                                                        </span>
-                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? '<span class="badge badge-light-success ms-1">Será descontado</span>' : ''}
-                                                    </td>
-                                                    <td class="fw-bold">R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                    <td>${ad.observacoes || '-'}</td>
-                                                    <td class="text-center">
-                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? 
-                                                            '<span class="badge badge-light-success">Será descontado</span>' : 
-                                                            '<span class="badge badge-light-warning">Aguardando</span>'}
-                                                    </td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr class="fw-bold">
-                                                <td colspan="2" class="text-end">Total Pendente:</td>
-                                                <td class="text-warning">R$ ${parseFloat(d.adiantamentos_pendentes.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                <td colspan="2"></td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Status do Documento -->
-                        ${d.documento.status ? `
-                        <div class="card card-flush">
-                            <div class="card-header">
-                                <h3 class="card-title">Status do Documento</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Status:</strong><br>
-                                        ${d.documento.status === 'aprovado' ? '<span class="badge badge-light-success">Aprovado</span>' :
-                                          d.documento.status === 'enviado' ? '<span class="badge badge-light-warning">Enviado</span>' :
-                                          d.documento.status === 'rejeitado' ? '<span class="badge badge-light-danger">Rejeitado</span>' :
-                                          '<span class="badge badge-light-secondary">Pendente</span>'}
-                                    </div>
-                                    ${d.documento.data_envio ? `
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Data de Envio:</strong><br>
-                                        <span class="text-gray-800">${new Date(d.documento.data_envio).toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${d.documento.data_aprovacao ? `
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Data de Aprovação:</strong><br>
-                                        <span class="text-gray-800">${new Date(d.documento.data_aprovacao).toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${d.documento.observacoes ? `
-                                    <div class="col-md-12 mb-3">
-                                        <strong>Observações:</strong><br>
-                                        <span class="text-gray-800">${d.documento.observacoes}</span>
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Flags do Colaborador -->
-                        ${d.flags && (d.flags.ativas.length > 0 || d.flags.expiradas.length > 0) ? `
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="ki-duotone ki-information-5 fs-2 text-warning me-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                    </i>
-                                    Flags do Colaborador
-                                </h3>
-                                <div class="card-toolbar">
-                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">\u26A0 ${d.flags.total_ativas} Ativa(s)</span>` : ''}
-                                    ${d.flags.total_expiradas > 0 ? `<span class="badge badge-light-secondary fs-7">${d.flags.total_expiradas} Expirada(s)</span>` : ''}
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                ${d.flags.ativas.length > 0 ? `
-                                <div class="mb-5">
-                                    <h5 class="fw-bold text-danger mb-3">Flags Ativas</h5>
-                                    <div class="table-responsive">
-                                        <table class="table table-row-bordered table-row-dashed gy-4">
-                                            <thead>
-                                                <tr class="fw-bold">
-                                                    <th>Tipo</th>
-                                                    <th>Data Recebida</th>
-                                                    <th>Validade</th>
-                                                    <th>Dias Restantes</th>
-                                                    <th>Motivo</th>
-                                                    <th>Adicionada Por</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                ${d.flags.ativas.map(flag => {
-                                                    let flagBadgeClass = 'badge-danger';
-                                                    let flagIcon = '\u26A0';
-                                                    
-                                                    if (flag.tipo_flag === 'falta_nao_justificada') {
-                                                        flagBadgeClass = 'badge-danger';
-                                                        flagIcon = 'X';
-                                                    } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
-                                                        flagBadgeClass = 'badge-warning';
-                                                        flagIcon = '\u26A0';
-                                                    } else if (flag.tipo_flag === 'ma_conduta') {
-                                                        flagBadgeClass = 'badge-dark';
-                                                        flagIcon = 'X';
-                                                    }
-                                                    
-                                                    const diasRestantes = Math.ceil(flag.dias_para_expirar || 0);
-                                                    const diasBadge = diasRestantes <= 5 ? 'badge-danger' : diasRestantes <= 10 ? 'badge-warning' : 'badge-info';
-                                                    
-                                                    return \`
-                                                        <tr>
-                                                            <td>
-                                                                <span class="badge \${flagBadgeClass} fw-bold">\${flagIcon} \${flag.tipo_flag_label}</span>
-                                                            </td>
-                                                            <td>\${flag.data_flag_formatada}</td>
-                                                            <td>\${flag.data_validade_formatada}</td>
-                                                            <td><span class="badge \${diasBadge}">\${diasRestantes} dia(s)</span></td>
-                                                            <td>
-                                                                \${flag.tipo_ocorrencia_nome ? \`<strong>Ocorrência:</strong> \${flag.tipo_ocorrencia_nome}\` : '-'}
-                                                                \${flag.data_ocorrencia_formatada ? \`<br><small class="text-muted">Data: \${flag.data_ocorrencia_formatada}</small>\` : ''}
-                                                                \${flag.observacoes ? \`<br><small class="text-muted">\${flag.observacoes}</small>\` : ''}
-                                                            </td>
-                                                            <td>\${flag.created_by_nome || '-'}</td>
-                                                        </tr>
-                                                    \`;
-                                                }).join('')}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                ` : ''}
-                                
-                                ${d.flags.expiradas.length > 0 ? `
-                                <div class="separator separator-dashed my-5"></div>
-                                <div>
-                                    <h5 class="fw-bold text-muted mb-3">Historico de Flags Expiradas</h5>
-                                    <div class="table-responsive">
-                                        <table class="table table-row-bordered table-row-dashed gy-4">
-                                            <thead>
-                                                <tr class="fw-bold text-muted">
-                                                    <th>Tipo</th>
-                                                    <th>Data Recebida</th>
-                                                    <th>Data Expiração</th>
-                                                    <th>Motivo</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                ${d.flags.expiradas.map(flag => {
-                                                    let flagIcon = '\u26A0';
-                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = 'X';
-                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '\u26A0';
-                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = 'X';
-                                                    
-                                                    return \`
-                                                        <tr class="text-muted">
-                                                            <td>
-                                                                <span class="badge badge-light-secondary">\${flagIcon} \${flag.tipo_flag_label}</span>
-                                                            </td>
-                                                            <td>\${flag.data_flag_formatada}</td>
-                                                            <td>\${flag.data_validade_formatada}</td>
-                                                            <td>
-                                                                \${flag.tipo_ocorrencia_nome ? \`\${flag.tipo_ocorrencia_nome}\` : '-'}
-                                                                \${flag.data_ocorrencia_formatada ? \` (\${flag.data_ocorrencia_formatada})\` : ''}
-                                                                \${flag.observacoes ? \`<br><small>\${flag.observacoes}</small>\` : ''}
-                                                            </td>
-                                                        </tr>
-                                                    \`;
-                                                }).join('')}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                        ` : ''}
-                    </div>
-                `;
+                // Info Fechamento
+                html += '<div class="card card-flush mb-5"><div class="card-header"><h3 class="card-title">Informacoes do Fechamento</h3></div><div class="card-body"><div class="row">';
+                html += '<div class="col-md-6 mb-3"><strong>Mes/Ano de Referencia:</strong><br><span class="text-gray-800">' + d.fechamento.mes_referencia_formatado + '</span></div>';
+                html += '<div class="col-md-6 mb-3"><strong>Data de Fechamento:</strong><br><span class="text-gray-800">' + d.fechamento.data_fechamento_formatada + '</span></div>';
+                html += '<div class="col-md-6 mb-3"><strong>Empresa:</strong><br><span class="text-gray-800">' + d.fechamento.empresa_nome + '</span></div>';
+                html += '<div class="col-md-6 mb-3"><strong>Periodo:</strong><br><span class="text-gray-800">' + d.periodo.inicio_formatado + ' ate ' + d.periodo.fim_formatado + '</span></div>';
+                html += '</div></div></div>';
                 
-                conteudo.innerHTML = html;
-            } else {
-                conteudo.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="ki-duotone ki-information-5 fs-2x me-3">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                            <span class="path3"></span>
-                        </i>
-                        ${data.message || 'Erro ao carregar detalhes do pagamento'}
-                    </div>
-                `;
-            }
-        })
-        .catch(error => {
-            conteudo.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="ki-duotone ki-information-5 fs-2x me-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    Erro ao carregar detalhes do pagamento
-                </div>
-            `;
-        });
-}
-
-// Ver detalhes completos do pagamento
-function verDetalhesPagamento(fechamentoId, colaboradorId) {
-    const titulo = document.getElementById('kt_modal_detalhes_pagamento_titulo');
-    const conteudo = document.getElementById('kt_modal_detalhes_pagamento_conteudo');
-    
-    // Mostra loading
-    conteudo.innerHTML = `
-        <div class="text-center py-10">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <div class="text-muted mt-3">Carregando detalhes...</div>
-        </div>
-    `;
-    
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_detalhes_pagamento'));
-    modal.show();
-    
-    // Busca dados via API
-    fetch(`../api/get_detalhes_pagamento.php?fechamento_id=${fechamentoId}&colaborador_id=${colaboradorId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.data) {
-                const d = data.data;
+                // Info Colaborador
+                html += '<div class="card card-flush mb-5"><div class="card-header"><h3 class="card-title">Colaborador</h3></div><div class="card-body"><div class="row">';
+                html += '<div class="col-md-6 mb-3"><strong>Nome:</strong><br><span class="text-gray-800">' + d.colaborador.nome_completo + '</span></div>';
+                html += '<div class="col-md-6 mb-3"><strong>CPF:</strong><br><span class="text-gray-800">' + (d.colaborador.cpf || '-') + '</span></div>';
+                html += '<div class="col-md-6 mb-3"><strong>Cargo:</strong><br><span class="text-gray-800">' + (d.colaborador.cargo || '-') + '</span></div>';
+                html += '</div></div></div>';
                 
-                titulo.textContent = `Detalhes do Pagamento - ${d.colaborador.nome_completo}`;
+                // Resumo Financeiro
+                html += '<div class="card card-flush mb-5"><div class="card-header"><h3 class="card-title">Resumo Financeiro</h3></div><div class="card-body"><div class="table-responsive"><table class="table table-row-bordered table-row-dashed gy-4"><tbody>';
+                html += '<tr><td class="fw-bold">Salario Base</td><td class="text-end"><span class="text-gray-800 fw-bold">R$ ' + parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
+                html += '<tr><td class="fw-bold">Horas Extras (Total)</td><td class="text-end"><span class="text-gray-800 fw-bold">' + parseFloat(d.item.horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + 'h</span></td></tr>';
+                html += '<tr><td class="fw-bold">Valor Horas Extras</td><td class="text-end"><span class="text-success fw-bold">R$ ' + parseFloat(d.item.valor_horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
+                html += '<tr><td class="fw-bold">Total de Bonus</td><td class="text-end"><span class="text-success fw-bold">R$ ' + parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
                 
-                let html = `
-                    <div class="mb-10">
-                        <!-- Informações do Fechamento -->
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Informações do Fechamento</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Mês/Ano de Referência:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.mes_referencia_formatado}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Data de Fechamento:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.data_fechamento_formatada}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Empresa:</strong><br>
-                                        <span class="text-gray-800">${d.fechamento.empresa_nome}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Período:</strong><br>
-                                        <span class="text-gray-800">${d.periodo.inicio_formatado} até ${d.periodo.fim_formatado}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Informações do Colaborador -->
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Colaborador</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Nome:</strong><br>
-                                        <span class="text-gray-800">${d.colaborador.nome_completo}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>CPF:</strong><br>
-                                        <span class="text-gray-800">${d.colaborador.cpf || '-'}</span>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Cargo:</strong><br>
-                                        <span class="text-gray-800">${d.colaborador.cargo || '-'}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Resumo Financeiro -->
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Resumo Financeiro</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-dashed gy-4">
-                                        <tbody>
-                                            <tr>
-                                                <td class="fw-bold">Salário Base</td>
-                                                <td class="text-end">
-                                                    <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="fw-bold">Horas Extras (Total)</td>
-                                                <td class="text-end">
-                                                    <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="fw-bold">Valor Horas Extras</td>
-                                                <td class="text-end">
-                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="fw-bold">Total de Bônus</td>
-                                                <td class="text-end">
-                                                    <span class="text-success fw-bold">R$ ${parseFloat(d.bonus.total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ${d.bonus.total_desconto_ocorrencias > 0 ? `
-                                            <tr>
-                                                <td class="fw-bold text-danger">Desconto por Ocorrências (Bônus)</td>
-                                                <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ` : ''}
-                                            ${d.item.descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
-                                            <tr>
-                                                <td class="fw-bold text-danger">Descontos</td>
-                                                <td class="text-end">
-                                                    <span class="text-danger fw-bold">-R$ ${parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                    ${d.ocorrencias.total_descontos > 0 || (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) ? `
-                                                    <br><small class="text-muted fs-8">
-                                                        ${d.ocorrencias.total_descontos > 0 ? 'Ocorrências: R$ ' + parseFloat(d.ocorrencias.total_descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
-                                                        ${d.ocorrencias.total_descontos > 0 && d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? ' | ' : ''}
-                                                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? 'Adiantamentos: R$ ' + d.adiantamentos_descontados.reduce((sum, a) => sum + parseFloat(a.valor_descontar || 0), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ''}
-                                                    </small>
-                                                    ` : ''}
-                                                </td>
-                                            </tr>
-                                            ` : ''}
-                                            ${d.item.adicionais > 0 ? `
-                                            <tr>
-                                                <td class="fw-bold text-success">Adicionais</td>
-                                                <td class="text-end">
-                                                    <span class="text-success fw-bold">+R$ ${parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                            ` : ''}
-                                            <tr class="border-top border-2">
-                                                <td class="fw-bold fs-4">Valor Total</td>
-                                                <td class="text-end">
-                                                    <span class="text-success fw-bold fs-3">R$ ${parseFloat(d.item.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Detalhes de Horas Extras -->
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Detalhes de Horas Extras</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-5">
-                                    <h5 class="fw-bold mb-3">Resumo</h5>
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="d-flex align-items-center p-3 bg-light-success rounded">
-                                                <i class="ki-duotone ki-money fs-2x text-success me-3">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                <div>
-                                                    <div class="text-muted fs-7">Horas Pagas em R$</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
-                                                    <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="d-flex align-items-center p-3 bg-light-info rounded">
-                                                <i class="ki-duotone ki-time fs-2x text-info me-3">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                <div>
-                                                    <div class="text-muted fs-7">Horas em Banco</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_banco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="d-flex align-items-center p-3 bg-light-primary rounded">
-                                                <i class="ki-duotone ki-chart-simple fs-2x text-primary me-3">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                <div>
-                                                    <div class="text-muted fs-7">Total de Horas</div>
-                                                    <div class="fw-bold fs-4">${parseFloat(d.horas_extras.total_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                ${d.horas_extras.registros.length > 0 ? `
-                                <h5 class="fw-bold mb-3">Registros Individuais</h5>
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-dashed gy-4">
-                                        <thead>
-                                            <tr class="fw-bold">
-                                                <th>Data</th>
-                                                <th>Quantidade</th>
-                                                <th>Valor/Hora</th>
-                                                <th>% Adicional</th>
-                                                <th>Valor Total</th>
-                                                <th>Tipo</th>
-                                                <th>Observações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.horas_extras.registros.map(he => `
-                                                <tr>
-                                                    <td>${new Date(he.data_trabalho + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                                                    <td>${parseFloat(he.quantidade_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</td>
-                                                    <td>R$ ${parseFloat(he.valor_hora || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                    <td>${parseFloat(he.percentual_adicional || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</td>
-                                                    <td class="fw-bold">R$ ${parseFloat(he.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                    <td>
-                                                        ${he.tipo_pagamento === 'banco_horas' 
-                                                            ? '<span class="badge badge-light-info">Banco de Horas</span>' 
-                                                            : '<span class="badge badge-light-success">Dinheiro</span>'}
-                                                    </td>
-                                                    <td>${he.observacoes || '-'}</td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste período.</p>'}
-                            </div>
-                        </div>
-                        
-                        <!-- Detalhes de Bônus -->
-                        ${d.bonus.lista.length > 0 ? `
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Detalhes de Bônus</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-dashed gy-4">
-                                        <thead>
-                                            <tr class="fw-bold">
-                                                <th>Tipo de Bônus</th>
-                                                <th>Tipo</th>
-                                                <th>Valor Original</th>
-                                                <th>Desconto Ocorrências</th>
-                                                <th>Valor Final</th>
-                                                <th>Observações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.bonus.lista.map(b => {
-                                                const tipoValor = b.tipo_valor || 'variavel';
-                                                const tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : tipoValor === 'informativo' ? 'Informativo' : 'Variável';
-                                                const tipoBadge = tipoValor === 'fixo' ? 'primary' : tipoValor === 'informativo' ? 'info' : 'success';
-                                                const valorOriginal = parseFloat(b.valor_original || b.valor || 0);
-                                                const descontoOcorrencias = parseFloat(b.desconto_ocorrencias || 0);
-                                                const valorFinal = parseFloat(b.valor || 0);
-                                                
-                                                return `
-                                                    <tr>
-                                                        <td class="fw-bold">${b.tipo_bonus_nome}</td>
-                                                        <td><span class="badge badge-light-${tipoBadge}">${tipoLabel}</span></td>
-                                                        <td>R$ ${valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                        <td class="text-danger">${descontoOcorrencias > 0 ? '-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</td>
-                                                        <td class="fw-bold text-success">R$ ${valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                        <td>${b.observacoes || '-'}</td>
-                                                    </tr>
-                                                `;
-                                            }).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                
-                                ${d.bonus.lista.some(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0) ? `
-                                <div class="separator separator-dashed my-5"></div>
-                                <h5 class="fw-bold mb-3">Detalhes de Descontos por Ocorrências</h5>
-                                ${d.bonus.lista.filter(b => b.detalhes_desconto_array && b.detalhes_desconto_array.length > 0).map(b => `
-                                    <div class="mb-5">
-                                        <h6 class="fw-bold text-gray-800 mb-3">${b.tipo_bonus_nome}</h6>
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-row-bordered">
-                                                <thead>
-                                                    <tr class="fw-bold fs-7">
-                                                        <th>Ocorrência</th>
-                                                        <th>Período Atual</th>
-                                                        <th>Período Anterior</th>
-                                                        <th>Tipo Desconto</th>
-                                                        <th>Desconto Aplicado</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    ${b.detalhes_desconto_array.map(det => `
-                                                        <tr>
-                                                            <td>${det.tipo_ocorrencia_nome || det.tipo_ocorrencia_codigo || '-'}</td>
-                                                            <td>${det.total_ocorrencias_periodo_atual || 0} ocorrência(s)</td>
-                                                            <td>${det.total_ocorrencias_periodo_anterior || 0} ocorrência(s)</td>
-                                                            <td>
-                                                                ${det.tipo_desconto === 'total' ? '<span class="badge badge-light-danger">Valor Total</span>' : 
-                                                                  det.tipo_desconto === 'fixo' ? '<span class="badge badge-light-warning">Fixo</span>' :
-                                                                  det.tipo_desconto === 'percentual' ? '<span class="badge badge-light-info">Percentual</span>' :
-                                                                  '<span class="badge badge-light-primary">Proporcional</span>'}
-                                                            </td>
-                                                            <td class="text-danger fw-bold">-R$ ${parseFloat(det.desconto_aplicado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                        </tr>
-                                                    `).join('')}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                                ` : ''}
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Ocorrências com Desconto -->
-                        ${d.ocorrencias.descontos.length > 0 ? `
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">Ocorrências com Desconto em R$</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-dashed gy-4">
-                                        <thead>
-                                            <tr class="fw-bold">
-                                                <th>Data</th>
-                                                <th>Tipo</th>
-                                                <th>Descrição</th>
-                                                <th>Valor Desconto</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.ocorrencias.descontos.map(occ => `
-                                                <tr>
-                                                    <td>${new Date(occ.data_ocorrencia + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                                                    <td><span class="badge badge-light-danger">${occ.tipo_ocorrencia_nome || occ.tipo_ocorrencia_codigo || '-'}</span></td>
-                                                    <td>${occ.descricao || '-'}</td>
-                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(occ.valor_desconto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Adiantamentos Descontados -->
-                        ${d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0 ? `
-                        <div class="card card-flush">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="ki-duotone ki-wallet fs-2 text-primary me-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    Adiantamentos Descontados
-                                </h3>
-                                <div class="card-toolbar">
-                                    <span class="badge badge-light-danger fs-4 fw-bold">
-                                        Total: -R$ ${parseFloat(d.adiantamentos_descontados.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
-                                        <thead>
-                                            <tr class="fw-bold text-muted">
-                                                <th class="min-w-100px">Data do Adiantamento</th>
-                                                <th class="min-w-100px">Mês de Desconto</th>
-                                                <th class="min-w-150px">Valor</th>
-                                                <th class="min-w-200px">Observações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.adiantamentos_descontados.map(ad => `
-                                                <tr>
-                                                    <td>${ad.fechamento_data || '-'}</td>
-                                                    <td>
-                                                        <span class="badge badge-light-info">${ad.mes_desconto_formatado || ad.mes_desconto || '-'}</span>
-                                                    </td>
-                                                    <td class="text-danger fw-bold">-R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                    <td>${ad.observacoes || '-'}</td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Adiantamentos Pendentes -->
-                        ${d.adiantamentos_pendentes && d.adiantamentos_pendentes.length > 0 ? `
-                        <div class="card card-flush">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="ki-duotone ki-time fs-2 text-warning me-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                    </i>
-                                    Adiantamentos Pendentes
-                                    <span class="badge badge-light-warning ms-2">${d.adiantamentos_pendentes.length}</span>
-                                </h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="alert alert-info d-flex align-items-center p-3 mb-5">
-                                    <i class="ki-duotone ki-information-5 fs-2hx text-info me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                    </i>
-                                    <div class="d-flex flex-column">
-                                        <span class="fw-bold">Atenção:</span>
-                                        <span>Estes adiantamentos ainda não foram descontados. Serão descontados automaticamente quando o fechamento do mês de desconto for criado.</span>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
-                                        <thead>
-                                            <tr class="fw-bold text-muted">
-                                                <th class="min-w-100px">Data do Adiantamento</th>
-                                                <th class="min-w-100px">Mês de Desconto</th>
-                                                <th class="min-w-150px">Valor a Descontar</th>
-                                                <th class="min-w-200px">Observações</th>
-                                                <th class="min-w-100px text-center">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${d.adiantamentos_pendentes.map(ad => `
-                                                <tr>
-                                                    <td>${ad.fechamento_data || '-'}</td>
-                                                    <td>
-                                                        <span class="badge ${ad.mes_desconto === d.fechamento.mes_referencia ? 'badge-light-success' : 'badge-light-warning'}">
-                                                            ${ad.mes_desconto_formatado || ad.mes_desconto || '-'}
-                                                        </span>
-                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? '<span class="badge badge-light-success ms-1">Será descontado</span>' : ''}
-                                                    </td>
-                                                    <td class="fw-bold">R$ ${parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                    <td>${ad.observacoes || '-'}</td>
-                                                    <td class="text-center">
-                                                        ${ad.mes_desconto === d.fechamento.mes_referencia ? 
-                                                            '<span class="badge badge-light-success">Será descontado</span>' : 
-                                                            '<span class="badge badge-light-warning">Aguardando</span>'}
-                                                    </td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr class="fw-bold">
-                                                <td colspan="2" class="text-end">Total Pendente:</td>
-                                                <td class="text-warning">R$ ${parseFloat(d.adiantamentos_pendentes.reduce((sum, ad) => sum + (parseFloat(ad.valor_descontar || 0)), 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                <td colspan="2"></td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Status do Documento -->
-                        ${d.documento.status ? `
-                        <div class="card card-flush">
-                            <div class="card-header">
-                                <h3 class="card-title">Status do Documento</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Status:</strong><br>
-                                        ${d.documento.status === 'aprovado' ? '<span class="badge badge-light-success">Aprovado</span>' :
-                                          d.documento.status === 'enviado' ? '<span class="badge badge-light-warning">Enviado</span>' :
-                                          d.documento.status === 'rejeitado' ? '<span class="badge badge-light-danger">Rejeitado</span>' :
-                                          '<span class="badge badge-light-secondary">Pendente</span>'}
-                                    </div>
-                                    ${d.documento.data_envio ? `
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Data de Envio:</strong><br>
-                                        <span class="text-gray-800">${new Date(d.documento.data_envio).toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${d.documento.data_aprovacao ? `
-                                    <div class="col-md-6 mb-3">
-                                        <strong>Data de Aprovação:</strong><br>
-                                        <span class="text-gray-800">${new Date(d.documento.data_aprovacao).toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${d.documento.observacoes ? `
-                                    <div class="col-md-12 mb-3">
-                                        <strong>Observações:</strong><br>
-                                        <span class="text-gray-800">${d.documento.observacoes}</span>
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- Flags do Colaborador -->
-                        ${d.flags && (d.flags.ativas.length > 0 || d.flags.expiradas.length > 0) ? `
-                        <div class="card card-flush mb-5">
-                            <div class="card-header">
-                                <h3 class="card-title">
-                                    <i class="ki-duotone ki-information-5 fs-2 text-warning me-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                    </i>
-                                    Flags do Colaborador
-                                </h3>
-                                <div class="card-toolbar">
-                                    ${d.flags.total_ativas > 0 ? `<span class="badge badge-danger fs-6 me-2">\u26A0 ${d.flags.total_ativas} Ativa(s)</span>` : ''}
-                                    ${d.flags.total_expiradas > 0 ? `<span class="badge badge-light-secondary fs-7">${d.flags.total_expiradas} Expirada(s)</span>` : ''}
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                ${d.flags.ativas.length > 0 ? `
-                                <div class="mb-5">
-                                    <h5 class="fw-bold text-danger mb-3">Flags Ativas</h5>
-                                    <div class="table-responsive">
-                                        <table class="table table-row-bordered table-row-dashed gy-4">
-                                            <thead>
-                                                <tr class="fw-bold">
-                                                    <th>Tipo</th>
-                                                    <th>Data Recebida</th>
-                                                    <th>Validade</th>
-                                                    <th>Dias Restantes</th>
-                                                    <th>Motivo</th>
-                                                    <th>Adicionada Por</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                ${d.flags.ativas.map(flag => {
-                                                    let flagBadgeClass = 'badge-danger';
-                                                    let flagIcon = '\u26A0';
-                                                    
-                                                    if (flag.tipo_flag === 'falta_nao_justificada') {
-                                                        flagBadgeClass = 'badge-danger';
-                                                        flagIcon = 'X';
-                                                    } else if (flag.tipo_flag === 'falta_compromisso_pessoal') {
-                                                        flagBadgeClass = 'badge-warning';
-                                                        flagIcon = '\u26A0';
-                                                    } else if (flag.tipo_flag === 'ma_conduta') {
-                                                        flagBadgeClass = 'badge-dark';
-                                                        flagIcon = 'X';
-                                                    }
-                                                    
-                                                    const diasRestantes = Math.ceil(flag.dias_para_expirar || 0);
-                                                    const diasBadge = diasRestantes <= 5 ? 'badge-danger' : diasRestantes <= 10 ? 'badge-warning' : 'badge-info';
-                                                    
-                                                    return \`
-                                                        <tr>
-                                                            <td>
-                                                                <span class="badge \${flagBadgeClass} fw-bold">\${flagIcon} \${flag.tipo_flag_label}</span>
-                                                            </td>
-                                                            <td>\${flag.data_flag_formatada}</td>
-                                                            <td>\${flag.data_validade_formatada}</td>
-                                                            <td><span class="badge \${diasBadge}">\${diasRestantes} dia(s)</span></td>
-                                                            <td>
-                                                                \${flag.tipo_ocorrencia_nome ? \`<strong>Ocorrência:</strong> \${flag.tipo_ocorrencia_nome}\` : '-'}
-                                                                \${flag.data_ocorrencia_formatada ? \`<br><small class="text-muted">Data: \${flag.data_ocorrencia_formatada}</small>\` : ''}
-                                                                \${flag.observacoes ? \`<br><small class="text-muted">\${flag.observacoes}</small>\` : ''}
-                                                            </td>
-                                                            <td>\${flag.created_by_nome || '-'}</td>
-                                                        </tr>
-                                                    \`;
-                                                }).join('')}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                ` : ''}
-                                
-                                ${d.flags.expiradas.length > 0 ? `
-                                <div class="separator separator-dashed my-5"></div>
-                                <div>
-                                    <h5 class="fw-bold text-muted mb-3">Historico de Flags Expiradas</h5>
-                                    <div class="table-responsive">
-                                        <table class="table table-row-bordered table-row-dashed gy-4">
-                                            <thead>
-                                                <tr class="fw-bold text-muted">
-                                                    <th>Tipo</th>
-                                                    <th>Data Recebida</th>
-                                                    <th>Data Expiração</th>
-                                                    <th>Motivo</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                ${d.flags.expiradas.map(flag => {
-                                                    let flagIcon = '\u26A0';
-                                                    if (flag.tipo_flag === 'falta_nao_justificada') flagIcon = 'X';
-                                                    else if (flag.tipo_flag === 'falta_compromisso_pessoal') flagIcon = '\u26A0';
-                                                    else if (flag.tipo_flag === 'ma_conduta') flagIcon = 'X';
-                                                    
-                                                    return \`
-                                                        <tr class="text-muted">
-                                                            <td>
-                                                                <span class="badge badge-light-secondary">\${flagIcon} \${flag.tipo_flag_label}</span>
-                                                            </td>
-                                                            <td>\${flag.data_flag_formatada}</td>
-                                                            <td>\${flag.data_validade_formatada}</td>
-                                                            <td>
-                                                                \${flag.tipo_ocorrencia_nome ? \`\${flag.tipo_ocorrencia_nome}\` : '-'}
-                                                                \${flag.data_ocorrencia_formatada ? \` (\${flag.data_ocorrencia_formatada})\` : ''}
-                                                                \${flag.observacoes ? \`<br><small>\${flag.observacoes}</small>\` : ''}
-                                                            </td>
-                                                        </tr>
-                                                    \`;
-                                                }).join('')}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                        ` : ''}
-                    </div>
-                `;
-                
-                conteudo.innerHTML = html;
-            } else {
-                conteudo.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="ki-duotone ki-information-5 fs-2x me-3">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                            <span class="path3"></span>
-                        </i>
-                        ${data.message || 'Erro ao carregar detalhes do pagamento'}
-                    </div>
-                `;
-            }
-        })
-        .catch(error => {
-            conteudo.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="ki-duotone ki-information-5 fs-2x me-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    Erro ao carregar detalhes do pagamento
-                </div>
-            `;
-        });
-}
-
-// Ver documento (admin)
-function verDocumentoAdmin(fechamentoId, itemId) {
-    fetch(`../api/get_documento_pagamento.php?fechamento_id=${fechamentoId}&item_id=${itemId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.data) {
-                const doc = data.data;
-                const isImage = doc.is_image;
-                
-                let html = '';
-                if (isImage) {
-                    html = `
-                        <div class="text-center">
-                            <img src="../${doc.documento_anexo}" class="img-fluid" alt="Documento" style="max-height: 600px;">
-                        </div>
-                        <div class="mt-5">
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">Status:</span>
-                                <span class="fw-bold">${doc.documento_status === 'aprovado' ? 'Aprovado' : doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado'}</span>
-                            </div>
-                            ${doc.documento_data_envio ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>${new Date(doc.documento_data_envio).toLocaleString('pt-BR')}</span></div>` : ''}
-                            ${doc.documento_data_aprovacao ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovação:</span><span>${new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR')}</span></div>` : ''}
-                            ${doc.documento_observacoes ? `<div class="mt-3"><strong>Observações:</strong><div class="text-gray-600">${doc.documento_observacoes}</div></div>` : ''}
-                        </div>
-                    `;
-                } else {
-                    html = `
-                        <div class="text-center py-10">
-                            <i class="ki-duotone ki-file fs-3x text-primary mb-5">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            <div class="text-gray-600 mb-3">Clique em "Download" para baixar o documento</div>
-                            <div class="text-muted fs-7 mb-5">${doc.documento_nome || 'documento'}</div>
-                            <div class="text-start">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted">Status:</span>
-                                    <span class="fw-bold">${doc.documento_status === 'aprovado' ? 'Aprovado' : doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado'}</span>
-                                </div>
-                                ${doc.documento_data_envio ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>${new Date(doc.documento_data_envio).toLocaleString('pt-BR')}</span></div>` : ''}
-                                ${doc.documento_data_aprovacao ? `<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovação:</span><span>${new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR')}</span></div>` : ''}
-                                ${doc.documento_observacoes ? `<div class="mt-3"><strong>Observações:</strong><div class="text-gray-600">${doc.documento_observacoes}</div></div>` : ''}
-                            </div>
-                        </div>
-                    `;
+                if (d.bonus.total_desconto_ocorrencias > 0) {
+                    html += '<tr><td class="fw-bold text-danger">Desconto por Ocorrencias (Bonus)</td><td class="text-end"><span class="text-danger fw-bold">-R$ ' + parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
+                }
+                if (d.item.descontos > 0) {
+                    html += '<tr><td class="fw-bold text-danger">Descontos</td><td class="text-end"><span class="text-danger fw-bold">-R$ ' + parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
+                }
+                if (d.item.adicionais > 0) {
+                    html += '<tr><td class="fw-bold text-success">Adicionais</td><td class="text-end"><span class="text-success fw-bold">+R$ ' + parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
                 }
                 
+                html += '<tr class="border-top border-2"><td class="fw-bold fs-4">Valor Total</td><td class="text-end"><span class="text-success fw-bold fs-3">R$ ' + parseFloat(d.item.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
+                html += '</tbody></table></div></div></div>';
+                
+                // Horas Extras
+                html += '<div class="card card-flush mb-5"><div class="card-header"><h3 class="card-title">Detalhes de Horas Extras</h3></div><div class="card-body">';
+                html += '<div class="mb-5"><h5 class="fw-bold mb-3">Resumo</h5><div class="row">';
+                html += '<div class="col-md-4"><div class="d-flex align-items-center p-3 bg-light-success rounded"><div><div class="text-muted fs-7">Horas Pagas em R$</div><div class="fw-bold fs-4">' + parseFloat(d.horas_extras.resumo.horas_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + 'h</div><div class="text-success fs-6">R$ ' + parseFloat(d.horas_extras.resumo.valor_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</div></div></div></div>';
+                html += '<div class="col-md-4"><div class="d-flex align-items-center p-3 bg-light-info rounded"><div><div class="text-muted fs-7">Horas em Banco</div><div class="fw-bold fs-4">' + parseFloat(d.horas_extras.resumo.horas_banco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + 'h</div></div></div></div>';
+                html += '<div class="col-md-4"><div class="d-flex align-items-center p-3 bg-light-primary rounded"><div><div class="text-muted fs-7">Total de Horas</div><div class="fw-bold fs-4">' + parseFloat(d.horas_extras.total_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + 'h</div></div></div></div>';
+                html += '</div></div>';
+                
+                if (d.horas_extras.registros && d.horas_extras.registros.length > 0) {
+                    html += '<h5 class="fw-bold mb-3">Registros Individuais</h5><div class="table-responsive"><table class="table table-row-bordered table-row-dashed gy-4"><thead><tr class="fw-bold"><th>Data</th><th>Quantidade</th><th>Valor/Hora</th><th>% Adicional</th><th>Valor Total</th><th>Tipo</th><th>Observacoes</th></tr></thead><tbody>';
+                    d.horas_extras.registros.forEach(function(he) {
+                        var tipoLabel = he.tipo_pagamento === 'banco_horas' ? '<span class="badge badge-light-info">Banco de Horas</span>' : '<span class="badge badge-light-success">Dinheiro</span>';
+                        html += '<tr><td>' + new Date(he.data_trabalho + 'T00:00:00').toLocaleDateString('pt-BR') + '</td><td>' + parseFloat(he.quantidade_horas).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + 'h</td><td>R$ ' + parseFloat(he.valor_hora || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td><td>' + parseFloat(he.percentual_adicional || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%</td><td class="fw-bold">R$ ' + parseFloat(he.valor_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td><td>' + tipoLabel + '</td><td>' + (he.observacoes || '-') + '</td></tr>';
+                    });
+                    html += '</tbody></table></div>';
+                } else {
+                    html += '<p class="text-muted">Nenhuma hora extra registrada neste periodo.</p>';
+                }
+                html += '</div></div>';
+                
+                // Bonus
+                if (d.bonus.lista && d.bonus.lista.length > 0) {
+                    html += '<div class="card card-flush mb-5"><div class="card-header"><h3 class="card-title">Detalhes de Bonus</h3></div><div class="card-body"><div class="table-responsive"><table class="table table-row-bordered table-row-dashed gy-4"><thead><tr class="fw-bold"><th>Tipo de Bonus</th><th>Tipo</th><th>Valor Original</th><th>Desconto Ocorrencias</th><th>Valor Final</th><th>Observacoes</th></tr></thead><tbody>';
+                    d.bonus.lista.forEach(function(b) {
+                        var tipoValor = b.tipo_valor || 'variavel';
+                        var tipoLabel = tipoValor === 'fixo' ? 'Valor Fixo' : (tipoValor === 'informativo' ? 'Informativo' : 'Variavel');
+                        var tipoBadge = tipoValor === 'fixo' ? 'primary' : (tipoValor === 'informativo' ? 'info' : 'success');
+                        var valorOriginal = parseFloat(b.valor_original || b.valor || 0);
+                        var descontoOcorrencias = parseFloat(b.desconto_ocorrencias || 0);
+                        var valorFinal = parseFloat(b.valor || 0);
+                        html += '<tr><td class="fw-bold">' + b.tipo_bonus_nome + '</td><td><span class="badge badge-light-' + tipoBadge + '">' + tipoLabel + '</span></td><td>R$ ' + valorOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td><td class="text-danger">' + (descontoOcorrencias > 0 ? '-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-') + '</td><td class="fw-bold text-success">R$ ' + valorFinal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td><td>' + (b.observacoes || '-') + '</td></tr>';
+                    });
+                    html += '</tbody></table></div></div></div>';
+                }
+                
+                // Ocorrencias
+                if (d.ocorrencias.descontos && d.ocorrencias.descontos.length > 0) {
+                    html += '<div class="card card-flush mb-5"><div class="card-header"><h3 class="card-title">Ocorrencias com Desconto em R$</h3></div><div class="card-body"><div class="table-responsive"><table class="table table-row-bordered table-row-dashed gy-4"><thead><tr class="fw-bold"><th>Data</th><th>Tipo</th><th>Descricao</th><th>Valor Desconto</th></tr></thead><tbody>';
+                    d.ocorrencias.descontos.forEach(function(occ) {
+                        html += '<tr><td>' + new Date(occ.data_ocorrencia + 'T00:00:00').toLocaleDateString('pt-BR') + '</td><td><span class="badge badge-light-danger">' + (occ.tipo_ocorrencia_nome || occ.tipo_ocorrencia_codigo || '-') + '</span></td><td>' + (occ.descricao || '-') + '</td><td class="text-danger fw-bold">-R$ ' + parseFloat(occ.valor_desconto || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td></tr>';
+                    });
+                    html += '</tbody></table></div></div></div>';
+                }
+                
+                html += '</div>';
+                conteudo.innerHTML = html;
+            } else {
+                conteudo.innerHTML = '<div class="alert alert-danger"><i class="ki-duotone ki-information-5 fs-2x me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>' + (data.message || 'Erro ao carregar detalhes do pagamento') + '</div>';
+            }
+        })
+        .catch(function(error) {
+            conteudo.innerHTML = '<div class="alert alert-danger"><i class="ki-duotone ki-information-5 fs-2x me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Erro ao carregar detalhes do pagamento</div>';
+        });
+}
+
+// Codigo duplicado removido - funcao verDetalhesPagamento ja definida anteriormente
+// INICIO REMOCAO CODIGO ORFAO
+// FIM REMOCAO CODIGO ORFAO
+
+function verDocumentoAdmin(fechamentoId, itemId) {
+    fetch('../api/get_documento_pagamento.php?fechamento_id=' + fechamentoId + '&item_id=' + itemId)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success && data.data) {
+                var doc = data.data;
+                var isImage = doc.is_image;
+                var statusText = doc.documento_status === 'aprovado' ? 'Aprovado' : (doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado');
+                var html = '';
+                if (isImage) {
+                    html = '<div class="text-center"><img src="../' + doc.documento_anexo + '" class="img-fluid" alt="Documento" style="max-height: 600px;"></div><div class="mt-5"><div class="d-flex justify-content-between mb-2"><span class="text-muted">Status:</span><span class="fw-bold">' + statusText + '</span></div>';
+                    if (doc.documento_data_envio) {
+                        html += '<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>' + new Date(doc.documento_data_envio).toLocaleString('pt-BR') + '</span></div>';
+                    }
+                    if (doc.documento_data_aprovacao) {
+                        html += '<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovacao:</span><span>' + new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR') + '</span></div>';
+                    }
+                    if (doc.documento_observacoes) {
+                        html += '<div class="mt-3"><strong>Observacoes:</strong><div class="text-gray-600">' + doc.documento_observacoes + '</div></div>';
+                    }
+                    html += '</div>';
+                } else {
+                    html = '<div class="text-center py-10"><i class="ki-duotone ki-file fs-3x text-primary mb-5"><span class="path1"></span><span class="path2"></span></i><div class="text-gray-600 mb-3">Clique em "Download" para baixar o documento</div><div class="text-muted fs-7 mb-5">' + (doc.documento_nome || 'documento') + '</div><div class="text-start"><div class="d-flex justify-content-between mb-2"><span class="text-muted">Status:</span><span class="fw-bold">' + statusText + '</span></div>';
+                    if (doc.documento_data_envio) {
+                        html += '<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>' + new Date(doc.documento_data_envio).toLocaleString('pt-BR') + '</span></div>';
+                    }
+                    if (doc.documento_data_aprovacao) {
+                        html += '<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovacao:</span><span>' + new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR') + '</span></div>';
+                    }
+                    if (doc.documento_observacoes) {
+                        html += '<div class="mt-3"><strong>Observacoes:</strong><div class="text-gray-600">' + doc.documento_observacoes + '</div></div>';
+                    }
+                    html += '</div></div>';
+                }
                 Swal.fire({
                     title: 'Documento',
                     html: html,
@@ -7350,7 +6118,7 @@ function verDocumentoAdmin(fechamentoId, itemId) {
                         confirmButton: "btn fw-bold btn-primary",
                         cancelButton: "btn fw-bold btn-active-light-primary"
                     }
-                }).then((result) => {
+                }).then(function(result) {
                     if (result.isConfirmed) {
                         window.open('../' + doc.documento_anexo, '_blank');
                     }
@@ -7359,7 +6127,7 @@ function verDocumentoAdmin(fechamentoId, itemId) {
                 Swal.fire('Erro', data.message || 'Erro ao carregar documento', 'error');
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             Swal.fire('Erro', 'Erro ao carregar documento', 'error');
         });
 }
