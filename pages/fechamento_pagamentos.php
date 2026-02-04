@@ -319,19 +319,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($colaboradores_ids as $colab_id) {
                 $colab_id = (int)$colab_id;
                 
-                // Busca dados do colaborador incluindo data de admissão
-                $stmt = $pdo->prepare("SELECT salario, data_admissao FROM colaboradores WHERE id = ?");
+                // Busca dados do colaborador incluindo data de início
+                $stmt = $pdo->prepare("SELECT salario, data_inicio FROM colaboradores WHERE id = ?");
                 $stmt->execute([$colab_id]);
                 $colab = $stmt->fetch();
                 
                 if (!$colab || !$colab['salario']) continue;
                 
-                // Calcula salário proporcional baseado na data de admissão
+                // Calcula salário proporcional baseado na data de início
                 $salario_base = $colab['salario'];
                 
                 // Se o colaborador foi admitido durante o mês de referência, calcular proporcional
-                if (!empty($colab['data_admissao'])) {
-                    $data_admissao = strtotime($colab['data_admissao']);
+                if (!empty($colab['data_inicio'])) {
+                    $data_admissao = strtotime($colab['data_inicio']);
                     $inicio_mes = strtotime($data_inicio);
                     $fim_mes = strtotime($data_fim);
                     
