@@ -129,6 +129,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $contrato_id = $pdo->lastInsertId();
         
+        // Salva testemunhas (mesmo em rascunho)
+        $testemunhas = $_POST['testemunhas'] ?? [];
+        foreach ($testemunhas as $index => $testemunha) {
+            if (!empty($testemunha['email'])) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO contratos_signatarios 
+                    (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                    VALUES (?, 'testemunha', ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $contrato_id,
+                    $testemunha['nome'] ?? '',
+                    $testemunha['email'],
+                    formatar_cpf($testemunha['cpf'] ?? ''),
+                    $index + 1
+                ]);
+            }
+        }
+        
         // Se for enviar, integra com Autentique
         if ($acao === 'enviar') {
             try {

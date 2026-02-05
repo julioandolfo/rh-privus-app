@@ -61,6 +61,15 @@ if ($contrato['status'] !== 'rascunho') {
 // Busca colaborador completo
 $colaborador = buscar_dados_colaborador_completos($contrato['colaborador_id']);
 
+// Busca testemunhas já cadastradas para este contrato
+$stmt = $pdo->prepare("
+    SELECT * FROM contratos_signatarios 
+    WHERE contrato_id = ? AND tipo = 'testemunha'
+    ORDER BY ordem_assinatura ASC
+");
+$stmt->execute([$contrato_id]);
+$testemunhas_salvas = $stmt->fetchAll();
+
 // Processa POST - Envio para Autentique
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$autentique_configurado) {
@@ -287,12 +296,52 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="card-header border-0 pt-5">
                             <h3 class="card-title align-items-start flex-column">
                                 <span class="card-label fw-bold fs-3 mb-1">Testemunhas (opcional)</span>
-                                <span class="text-muted fw-semibold fs-7">Adicione testemunhas que também precisarão assinar</span>
+                                <span class="text-muted fw-semibold fs-7">
+                                    <?= count($testemunhas_salvas) > 0 ? count($testemunhas_salvas) . ' testemunha(s) cadastrada(s)' : 'Adicione testemunhas que também precisarão assinar' ?>
+                                </span>
                             </h3>
                         </div>
                         <div class="card-body pt-5">
                             <div id="testemunhas_container">
-                                <!-- Testemunhas serão adicionadas aqui via JavaScript -->
+                                <?php foreach ($testemunhas_salvas as $index => $testemunha): ?>
+                                <div class="card mb-5 testemunha-item" data-index="<?= $index ?>">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 class="mb-0">Testemunha <?= $index + 1 ?></h5>
+                                            <button type="button" class="btn btn-sm btn-light-danger btn-remover-testemunha">
+                                                <i class="ki-duotone ki-trash fs-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                    <span class="path4"></span>
+                                                    <span class="path5"></span>
+                                                </i>
+                                            </button>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Nome</label>
+                                                <input type="text" name="testemunhas[<?= $index ?>][nome]" 
+                                                       class="form-control form-control-solid" 
+                                                       value="<?= htmlspecialchars($testemunha['nome'] ?? '') ?>" />
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label required">Email</label>
+                                                <input type="email" name="testemunhas[<?= $index ?>][email]" 
+                                                       class="form-control form-control-solid" 
+                                                       value="<?= htmlspecialchars($testemunha['email'] ?? '') ?>" required />
+                                            </div>
+                                            <div class="col-md-12">
+                                                <label class="form-label">CPF</label>
+                                                <input type="text" name="testemunhas[<?= $index ?>][cpf]" 
+                                                       class="form-control form-control-solid" 
+                                                       value="<?= htmlspecialchars($testemunha['cpf'] ?? '') ?>"
+                                                       placeholder="000.000.000-00" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
                             </div>
                             <button type="button" class="btn btn-light-primary" id="btn_adicionar_testemunha">
                                 <i class="ki-duotone ki-plus fs-2">
@@ -370,18 +419,39 @@ require_once __DIR__ . '/../includes/header.php';
 <!--end::Post-->
 
 <script>
-let testemunhaIndex = 0;
+// Inicia o índice com o número de testemunhas já existentes
+let testemunhaIndex = <?= count($testemunhas_salvas) ?>;
+
+// Adiciona eventos de remover nas testemunhas já existentes
+document.querySelectorAll('.testemunha-item .btn-remover-testemunha').forEach(btn => {
+    btn.addEventListener('click', function() {
+        this.closest('.testemunha-item').remove();
+        atualizarNumerosTestemunhas();
+    });
+});
+
+// Atualiza os números das testemunhas
+function atualizarNumerosTestemunhas() {
+    const items = document.querySelectorAll('.testemunha-item');
+    items.forEach((item, idx) => {
+        const titulo = item.querySelector('h5');
+        if (titulo) {
+            titulo.textContent = 'Testemunha ' + (idx + 1);
+        }
+    });
+}
 
 // Adiciona testemunha
 document.getElementById('btn_adicionar_testemunha')?.addEventListener('click', function() {
     const container = document.getElementById('testemunhas_container');
     const index = testemunhaIndex++;
+    const numeroExibido = document.querySelectorAll('.testemunha-item').length + 1;
     
     const html = `
         <div class="card mb-5 testemunha-item" data-index="${index}">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">Testemunha ${index + 1}</h5>
+                    <h5 class="mb-0">Testemunha ${numeroExibido}</h5>
                     <button type="button" class="btn btn-sm btn-light-danger btn-remover-testemunha">
                         <i class="ki-duotone ki-trash fs-2">
                             <span class="path1"></span>
@@ -416,6 +486,7 @@ document.getElementById('btn_adicionar_testemunha')?.addEventListener('click', f
     // Adiciona evento de remover
     container.querySelector(`.testemunha-item[data-index="${index}"] .btn-remover-testemunha`)?.addEventListener('click', function() {
         this.closest('.testemunha-item').remove();
+        atualizarNumerosTestemunhas();
     });
 });
 
