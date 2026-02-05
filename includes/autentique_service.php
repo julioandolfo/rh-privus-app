@@ -89,22 +89,24 @@ class AutentiqueService {
         $signers = [];
         foreach ($signatarios as $index => $signatario) {
             $signers[] = [
-                'action' => 'SIGN',
                 'email' => $signatario['email'],
-                'position' => [
-                    'x' => $signatario['x'] ?? 100,
-                    'y' => $signatario['y'] ?? ($index * 150 + 100)
-                ]
+                'action' => 'SIGN'
             ];
         }
         
         $query = '
-            mutation CreateDocument($document: DocumentInput!) {
-                createDocument(document: $document) {
+            mutation CreateDocumentMutation(
+                $document: DocumentInput!,
+                $signers: [SignerInput!]!,
+                $file: Upload!
+            ) {
+                createDocument(
+                    document: $document,
+                    signers: $signers,
+                    file: $file
+                ) {
                     id
                     name
-                    refusable
-                    sortable
                     created_at
                     signatures {
                         public_id
@@ -113,7 +115,6 @@ class AutentiqueService {
                         created_at
                         action { name }
                         link { short_link }
-                        user { id name email }
                     }
                 }
             }
@@ -121,15 +122,75 @@ class AutentiqueService {
         
         $variables = [
             'document' => [
-                'name' => $nome,
-                'file' => $pdfBase64,
-                'signers' => $signers
-            ]
+                'name' => $nome
+            ],
+            'signers' => $signers,
+            'file' => null // Será enviado via multipart
         ];
         
-        $result = $this->executeGraphQL($query, $variables);
+        // Para envio de arquivo, precisamos usar multipart/form-data
+        return $this->executeGraphQLWithFile($query, $variables, $pdfBase64);
+    }
+    
+    /**
+     * Executa GraphQL com upload de arquivo (multipart)
+     */
+    private function executeGraphQLWithFile($query, $variables, $fileBase64) {
+        $ch = curl_init($this->endpoint);
         
-        return $result['createDocument'] ?? null;
+        // Prepara o mapa de arquivo
+        $operations = json_encode([
+            'query' => $query,
+            'variables' => $variables
+        ]);
+        
+        $map = json_encode(['0' => ['variables.file']]);
+        
+        // Decodifica o base64 e salva temporariamente
+        $tempFile = tempnam(sys_get_temp_dir(), 'pdf_');
+        file_put_contents($tempFile, base64_decode($fileBase64));
+        
+        $postFields = [
+            'operations' => $operations,
+            'map' => $map,
+            '0' => new CURLFile($tempFile, 'application/pdf', 'contrato.pdf')
+        ];
+        
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->apiKey
+            ],
+            CURLOPT_POSTFIELDS => $postFields,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_CONNECTTIMEOUT => 30
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        // Remove arquivo temporário
+        @unlink($tempFile);
+        
+        if ($curlError) {
+            throw new Exception('Erro cURL: ' . $curlError);
+        }
+        
+        if ($httpCode !== 200) {
+            throw new Exception('Erro HTTP ' . $httpCode . ': ' . $response);
+        }
+        
+        $data = json_decode($response, true);
+        
+        if (isset($data['errors'])) {
+            $errorMessage = $data['errors'][0]['message'] ?? 'Erro desconhecido';
+            throw new Exception('Erro GraphQL: ' . $errorMessage);
+        }
+        
+        return $data['data']['createDocument'] ?? null;
     }
     
     /**
