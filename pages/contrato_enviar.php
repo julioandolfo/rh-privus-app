@@ -3,6 +3,15 @@
  * Enviar Contrato Rascunho para Assinatura
  */
 
+// Ativa exibição de erros temporariamente para debug
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Handler para capturar erros fatais
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
+
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
