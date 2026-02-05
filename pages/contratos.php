@@ -13,6 +13,96 @@ require_page_permission('contratos.php');
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
+// Processa exclusão de contratos
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    
+    if ($acao === 'deletar_contrato') {
+        $contrato_id = intval($_POST['contrato_id'] ?? 0);
+        if ($contrato_id > 0) {
+            try {
+                // Verifica se o contrato está cancelado ou expirado
+                $stmt = $pdo->prepare("SELECT status, pdf_path FROM contratos WHERE id = ?");
+                $stmt->execute([$contrato_id]);
+                $contrato = $stmt->fetch();
+                
+                if ($contrato && in_array($contrato['status'], ['cancelado', 'expirado'])) {
+                    // Deleta signatários
+                    $stmt = $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?");
+                    $stmt->execute([$contrato_id]);
+                    
+                    // Deleta eventos
+                    $stmt = $pdo->prepare("DELETE FROM contratos_eventos WHERE contrato_id = ?");
+                    $stmt->execute([$contrato_id]);
+                    
+                    // Deleta PDF se existir
+                    if ($contrato['pdf_path'] && file_exists(__DIR__ . '/../' . $contrato['pdf_path'])) {
+                        @unlink(__DIR__ . '/../' . $contrato['pdf_path']);
+                    }
+                    
+                    // Deleta contrato
+                    $stmt = $pdo->prepare("DELETE FROM contratos WHERE id = ?");
+                    $stmt->execute([$contrato_id]);
+                    
+                    redirect('contratos.php', 'Contrato excluído com sucesso!', 'success');
+                } else {
+                    redirect('contratos.php', 'Apenas contratos cancelados ou expirados podem ser excluídos.', 'error');
+                }
+            } catch (Exception $e) {
+                redirect('contratos.php', 'Erro ao excluir contrato: ' . $e->getMessage(), 'error');
+            }
+        }
+    } elseif ($acao === 'limpar_cancelados') {
+        try {
+            // Busca todos os cancelados
+            $stmt = $pdo->query("SELECT id, pdf_path FROM contratos WHERE status = 'cancelado'");
+            $cancelados = $stmt->fetchAll();
+            
+            foreach ($cancelados as $c) {
+                // Deleta signatários
+                $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?")->execute([$c['id']]);
+                // Deleta eventos
+                $pdo->prepare("DELETE FROM contratos_eventos WHERE contrato_id = ?")->execute([$c['id']]);
+                // Deleta PDF
+                if ($c['pdf_path'] && file_exists(__DIR__ . '/../' . $c['pdf_path'])) {
+                    @unlink(__DIR__ . '/../' . $c['pdf_path']);
+                }
+            }
+            
+            // Deleta contratos
+            $pdo->exec("DELETE FROM contratos WHERE status = 'cancelado'");
+            
+            redirect('contratos.php', count($cancelados) . ' contrato(s) cancelado(s) excluído(s)!', 'success');
+        } catch (Exception $e) {
+            redirect('contratos.php', 'Erro ao limpar cancelados: ' . $e->getMessage(), 'error');
+        }
+    } elseif ($acao === 'limpar_expirados') {
+        try {
+            // Busca todos os expirados
+            $stmt = $pdo->query("SELECT id, pdf_path FROM contratos WHERE status = 'expirado'");
+            $expirados = $stmt->fetchAll();
+            
+            foreach ($expirados as $c) {
+                // Deleta signatários
+                $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?")->execute([$c['id']]);
+                // Deleta eventos
+                $pdo->prepare("DELETE FROM contratos_eventos WHERE contrato_id = ?")->execute([$c['id']]);
+                // Deleta PDF
+                if ($c['pdf_path'] && file_exists(__DIR__ . '/../' . $c['pdf_path'])) {
+                    @unlink(__DIR__ . '/../' . $c['pdf_path']);
+                }
+            }
+            
+            // Deleta contratos
+            $pdo->exec("DELETE FROM contratos WHERE status = 'expirado'");
+            
+            redirect('contratos.php', count($expirados) . ' contrato(s) expirado(s) excluído(s)!', 'success');
+        } catch (Exception $e) {
+            redirect('contratos.php', 'Erro ao limpar expirados: ' . $e->getMessage(), 'error');
+        }
+    }
+}
+
 // Filtros
 $filtro_colaborador = $_GET['colaborador'] ?? '';
 $filtro_status = $_GET['status'] ?? '';
@@ -283,10 +373,26 @@ require_once __DIR__ . '/../includes/header.php';
                     <!-- Cancelado -->
                     <div class="col-lg-2">
                         <div class="d-flex flex-column">
-                            <h4 class="text-gray-800 fw-bold mb-3">
-                                ❌ Cancelado
-                                <span class="badge badge-light-danger ms-2"><?= count($kanban['cancelado']) ?></span>
-                            </h4>
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h4 class="text-gray-800 fw-bold mb-0">
+                                    ❌ Cancelado
+                                    <span class="badge badge-light-danger ms-2"><?= count($kanban['cancelado']) ?></span>
+                                </h4>
+                                <?php if (count($kanban['cancelado']) > 0): ?>
+                                <button type="button" class="btn btn-sm btn-light-danger btn-limpar-todos" 
+                                        data-acao="limpar_cancelados" 
+                                        data-quantidade="<?= count($kanban['cancelado']) ?>"
+                                        title="Excluir todos cancelados">
+                                    <i class="ki-duotone ki-trash fs-6">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                        <span class="path4"></span>
+                                        <span class="path5"></span>
+                                    </i>
+                                </button>
+                                <?php endif; ?>
+                            </div>
                             <div class="kanban-column" data-status="cancelado">
                                 <?php foreach ($kanban['cancelado'] as $contrato): ?>
                                 <?php include __DIR__ . '/../includes/contrato_card.php'; ?>
@@ -298,10 +404,26 @@ require_once __DIR__ . '/../includes/header.php';
                     <!-- Expirado -->
                     <div class="col-lg-2">
                         <div class="d-flex flex-column">
-                            <h4 class="text-gray-800 fw-bold mb-3">
-                                ⚠️ Expirado
-                                <span class="badge badge-light-secondary ms-2"><?= count($kanban['expirado']) ?></span>
-                            </h4>
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h4 class="text-gray-800 fw-bold mb-0">
+                                    ⚠️ Expirado
+                                    <span class="badge badge-light-secondary ms-2"><?= count($kanban['expirado']) ?></span>
+                                </h4>
+                                <?php if (count($kanban['expirado']) > 0): ?>
+                                <button type="button" class="btn btn-sm btn-light-warning btn-limpar-todos" 
+                                        data-acao="limpar_expirados" 
+                                        data-quantidade="<?= count($kanban['expirado']) ?>"
+                                        title="Excluir todos expirados">
+                                    <i class="ki-duotone ki-trash fs-6">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                        <span class="path4"></span>
+                                        <span class="path5"></span>
+                                    </i>
+                                </button>
+                                <?php endif; ?>
+                            </div>
                             <div class="kanban-column" data-status="expirado">
                                 <?php foreach ($kanban['expirado'] as $contrato): ?>
                                 <?php include __DIR__ . '/../includes/contrato_card.php'; ?>
@@ -380,6 +502,64 @@ require_once __DIR__ . '/../includes/header.php';
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 </style>
+
+<!-- Formulário oculto para exclusões -->
+<form id="formLimpeza" method="POST" style="display: none;">
+    <input type="hidden" name="acao" id="acaoLimpeza" value="">
+</form>
+
+<form id="formDeletarContrato" method="POST" style="display: none;">
+    <input type="hidden" name="acao" value="deletar_contrato">
+    <input type="hidden" name="contrato_id" id="contratoIdDeletar" value="">
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Botões de limpar todos
+    document.querySelectorAll('.btn-limpar-todos').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const acao = this.dataset.acao;
+            const quantidade = this.dataset.quantidade;
+            const tipo = acao === 'limpar_cancelados' ? 'cancelados' : 'expirados';
+            
+            Swal.fire({
+                title: 'Confirmar exclusão',
+                html: `Deseja excluir <strong>${quantidade}</strong> contrato(s) ${tipo}?<br><br><small class="text-muted">Esta ação não pode ser desfeita.</small>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sim, excluir todos',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('acaoLimpeza').value = acao;
+                    document.getElementById('formLimpeza').submit();
+                }
+            });
+        });
+    });
+    
+    // Função global para deletar contrato individual
+    window.deletarContrato = function(id, nome) {
+        Swal.fire({
+            title: 'Confirmar exclusão',
+            html: `Deseja excluir o contrato <strong>${nome}</strong>?<br><br><small class="text-muted">Esta ação não pode ser desfeita.</small>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sim, excluir',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('contratoIdDeletar').value = id;
+                document.getElementById('formDeletarContrato').submit();
+            }
+        });
+    };
+});
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

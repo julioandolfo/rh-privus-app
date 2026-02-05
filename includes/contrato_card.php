@@ -86,6 +86,21 @@ $status_info = $status_labels[$contrato['status']] ?? ['label' => ucfirst($contr
             </i>
             Ver
         </a>
+        
+        <?php if (in_array($contrato['status'], ['cancelado', 'expirado'])): ?>
+        <button type="button" 
+           class="btn btn-sm btn-light-danger"
+           onclick="event.stopPropagation(); deletarContrato(<?= $contrato['id'] ?>, '<?= htmlspecialchars(addslashes($contrato['titulo'])) ?>');"
+           title="Excluir Contrato">
+            <i class="ki-duotone ki-trash fs-5">
+                <span class="path1"></span>
+                <span class="path2"></span>
+                <span class="path3"></span>
+                <span class="path4"></span>
+                <span class="path5"></span>
+            </i>
+        </button>
+        <?php endif; ?>
     </div>
     <!--end::Ações Rápidas-->
 </div>

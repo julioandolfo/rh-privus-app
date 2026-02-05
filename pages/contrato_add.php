@@ -228,7 +228,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Cria documento no Autentique
                 $resultado = $service->criarDocumento($titulo, $pdf_base64, $signatarios);
                 
-                if ($resultado) {
+                // Log para debug
+                if (function_exists('log_contrato')) {
+                    log_contrato("contrato_add.php - Resultado Autentique: " . json_encode($resultado));
+                    log_contrato("contrato_add.php - Colaborador: " . json_encode($colaborador));
+                    log_contrato("contrato_add.php - Representante: " . json_encode($representante));
+                    log_contrato("contrato_add.php - Incluir Representante: " . ($incluir_representante ? 'SIM' : 'NAO'));
+                }
+                
+                // Obtém signatures da resposta
+                $signatures = $resultado['signatures'] ?? [];
+                $tem_signatures = !empty($signatures);
+                
+                if ($resultado && $tem_signatures) {
                     // Atualiza contrato com dados do Autentique
                     $stmt = $pdo->prepare("
                         UPDATE contratos 
@@ -239,9 +251,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $resultado['id'],
                         $contrato_id
                     ]);
-                    
-                    // Obtém signatures da resposta
-                    $signatures = $resultado['signatures'] ?? [];
                     
                     // Remove signatários existentes (testemunhas salvas como rascunho) e recria
                     $stmt = $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?");
@@ -269,6 +278,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $link_assinatura
                     ]);
                     
+                    if (function_exists('log_contrato')) {
+                        log_contrato("contrato_add.php - Colaborador inserido: " . $colaborador['nome_completo']);
+                    }
+                    
                     // Representante da empresa (se habilitado)
                     if ($incluir_representante && !empty($representante['email'])) {
                         $signer = $signatures[$sigIndex++] ?? null;
@@ -288,6 +301,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $ordem++,
                             $link_publico
                         ]);
+                        
+                        if (function_exists('log_contrato')) {
+                            log_contrato("contrato_add.php - Representante inserido: " . ($representante['nome'] ?? 'sem nome'));
+                        }
                     }
                     
                     // Testemunhas
@@ -313,7 +330,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                 } else {
-                    // API falhou - salva signatários básicos sem dados do Autentique
+                    // API retornou sem signatures ou falhou - salva signatários manualmente
+                    if (function_exists('log_contrato')) {
+                        log_contrato("contrato_add.php - Usando fallback para salvar signatários (signatures vazio ou resultado nulo)");
+                    }
+                    
+                    // Se temos document_id, atualiza mesmo assim
+                    if ($resultado && !empty($resultado['id'])) {
+                        $stmt = $pdo->prepare("
+                            UPDATE contratos 
+                            SET autentique_document_id = ?, status = 'enviado'
+                            WHERE id = ?
+                        ");
+                        $stmt->execute([$resultado['id'], $contrato_id]);
+                    } else {
+                        // Apenas atualiza status
+                        $stmt = $pdo->prepare("UPDATE contratos SET status = 'enviado' WHERE id = ?");
+                        $stmt->execute([$contrato_id]);
+                    }
+                    
+                    // Remove signatários existentes e recria
                     $stmt = $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?");
                     $stmt->execute([$contrato_id]);
                     
@@ -333,6 +369,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ordem++
                     ]);
                     
+                    if (function_exists('log_contrato')) {
+                        log_contrato("contrato_add.php - Fallback: Colaborador inserido: " . ($colaborador['nome_completo'] ?? 'sem nome'));
+                    }
+                    
                     // Representante (se habilitado)
                     if ($incluir_representante && !empty($representante['email'])) {
                         $stmt = $pdo->prepare("
@@ -347,6 +387,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             formatar_cpf($representante['cpf'] ?? ''),
                             $ordem++
                         ]);
+                        
+                        if (function_exists('log_contrato')) {
+                            log_contrato("contrato_add.php - Fallback: Representante inserido: " . ($representante['nome'] ?? 'sem nome'));
+                        }
                     }
                     
                     // Testemunhas
@@ -366,10 +410,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ]);
                         }
                     }
-                    
-                    // Atualiza status
-                    $stmt = $pdo->prepare("UPDATE contratos SET status = 'enviado' WHERE id = ?");
-                    $stmt->execute([$contrato_id]);
                 }
             } catch (Exception $e) {
                 $pdo->rollBack();
