@@ -95,7 +95,7 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
     // Dados de data/hora
     $variaveis['{{data_atual}}'] = date('d/m/Y');
     $variaveis['{{hora_atual}}'] = date('H:i');
-    $variaveis['{{data_formatada}}'] = date('d de ') . getNomeMes(date('m')) . date(' de Y');
+    $variaveis['{{data_formatada}}'] = date('d') . ' de ' . getNomeMes(date('m')) . ' de ' . date('Y');
     
     // Substitui todas as variáveis
     $resultado = $template;
@@ -380,7 +380,7 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
     // Dados de data/hora
     $variaveis['{{data_atual}}'] = date('d/m/Y');
     $variaveis['{{hora_atual}}'] = date('H:i');
-    $variaveis['{{data_formatada}}'] = date('d de ') . getNomeMes(date('m')) . date(' de Y');
+    $variaveis['{{data_formatada}}'] = date('d') . ' de ' . getNomeMes(date('m')) . ' de ' . date('Y');
     
     // Aplica campos manuais (sobrescreve valores vazios)
     foreach ($campos_manuais as $variavel => $valor) {
