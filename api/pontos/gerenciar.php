@@ -102,9 +102,68 @@ try {
             
         case 'saldo':
             $pontos_atuais = obter_pontos(null, $colaborador_id);
+            $saldo_dinheiro = obter_saldo_dinheiro($colaborador_id);
             echo json_encode([
                 'success' => true,
-                'pontos' => $pontos_atuais
+                'pontos' => $pontos_atuais,
+                'saldo_dinheiro' => $saldo_dinheiro
+            ]);
+            break;
+        
+        // =============================================
+        // ENDPOINTS PARA SALDO EM R$ (DINHEIRO/CRÉDITOS)
+        // =============================================
+        
+        case 'adicionar_dinheiro':
+            $valor = floatval(str_replace(['.', ','], ['', '.'], $_POST['valor'] ?? '0'));
+            $descricao = trim($_POST['descricao'] ?? '');
+            
+            if ($valor <= 0) {
+                throw new Exception('Valor deve ser maior que zero');
+            }
+            
+            if (empty($descricao)) {
+                throw new Exception('Descrição/motivo é obrigatório');
+            }
+            
+            $resultado = gerenciar_saldo_dinheiro($colaborador_id, $valor, $descricao, $usuario['id']);
+            echo json_encode($resultado);
+            break;
+            
+        case 'remover_dinheiro':
+            $valor = floatval(str_replace(['.', ','], ['', '.'], $_POST['valor'] ?? '0'));
+            $descricao = trim($_POST['descricao'] ?? '');
+            
+            if ($valor <= 0) {
+                throw new Exception('Valor deve ser maior que zero');
+            }
+            
+            if (empty($descricao)) {
+                throw new Exception('Descrição/motivo é obrigatório');
+            }
+            
+            // Passa como negativo para remover
+            $resultado = gerenciar_saldo_dinheiro($colaborador_id, -$valor, $descricao, $usuario['id']);
+            echo json_encode($resultado);
+            break;
+            
+        case 'historico_dinheiro':
+            $limite = intval($_POST['limite'] ?? 50);
+            $historico = obter_historico_saldo_dinheiro($colaborador_id, $limite);
+            $saldo_atual = obter_saldo_dinheiro($colaborador_id);
+            
+            echo json_encode([
+                'success' => true,
+                'historico' => $historico,
+                'saldo_dinheiro' => $saldo_atual
+            ]);
+            break;
+            
+        case 'saldo_dinheiro':
+            $saldo_atual = obter_saldo_dinheiro($colaborador_id);
+            echo json_encode([
+                'success' => true,
+                'saldo_dinheiro' => $saldo_atual
             ]);
             break;
             

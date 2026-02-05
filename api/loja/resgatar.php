@@ -36,6 +36,9 @@ try {
     $produto_id = intval($_POST['produto_id'] ?? 0);
     $quantidade = intval($_POST['quantidade'] ?? 1);
     $observacao = trim($_POST['observacao'] ?? '');
+    $forma_pagamento = in_array($_POST['forma_pagamento'] ?? 'pontos', ['pontos', 'dinheiro']) 
+        ? $_POST['forma_pagamento'] 
+        : 'pontos';
     
     if ($produto_id <= 0) {
         throw new Exception('Produto inválido');
@@ -46,7 +49,7 @@ try {
     }
     
     // Processa o resgate
-    $resultado = loja_resgatar($colaborador_id, $produto_id, $quantidade, $observacao);
+    $resultado = loja_resgatar($colaborador_id, $produto_id, $quantidade, $observacao, $forma_pagamento);
     
     echo json_encode($resultado);
     

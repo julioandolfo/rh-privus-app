@@ -46,10 +46,162 @@ $beneficios_padrao = [
         <div class="post d-flex flex-column-fluid" id="kt_post">
             <div id="kt_content_container" class="container-xxl">
                 
+                <!-- Card de Geração com IA -->
+                <?php
+                // Verifica se OpenAI está configurada
+                $openai_configurada = false;
+                try {
+                    $stmt = $pdo->query("SELECT ativo FROM openai_config WHERE ativo = 1 LIMIT 1");
+                    $openai_config = $stmt->fetch();
+                    $openai_configurada = $openai_config ? true : false;
+                } catch (PDOException $e) {
+                    // Tabela não existe ainda
+                }
+                ?>
+                
+                <?php if ($openai_configurada): ?>
+                <div class="card mb-5 shadow-sm border-primary" id="ia_card_gerador">
+                    <div class="card-header border-0 pt-5" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <div class="card-title">
+                            <h2 class="text-white mb-0">
+                                <i class="ki-duotone ki-robot fs-2hx text-white me-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Criar Vaga com IA
+                            </h2>
+                        </div>
+                        <div class="card-toolbar">
+                            <button type="button" class="btn btn-sm btn-light-primary" data-bs-toggle="collapse" data-bs-target="#ia_collapse">
+                                <i class="ki-duotone ki-down fs-3"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="collapse show" id="ia_collapse">
+                        <div class="card-body">
+                            <div class="alert alert-primary d-flex align-items-center p-5 mb-5">
+                                <i class="ki-duotone ki-information-5 fs-2hx text-primary me-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <div class="d-flex flex-column flex-grow-1">
+                                    <h4 class="mb-2 text-primary">Como Funciona?</h4>
+                                    <span>Descreva brevemente a vaga que você quer criar e deixe a Inteligência Artificial preencher todos os campos automaticamente! Você poderá revisar e editar tudo antes de salvar.</span>
+                                </div>
+                            </div>
+                            
+                            <div class="row g-5">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold fs-6 required">Tipo de Vaga</label>
+                                    <select class="form-select form-select-solid" id="ia_template_select">
+                                        <option value="">Carregando...</option>
+                                    </select>
+                                    <div id="ia_template_info"></div>
+                                </div>
+                                
+                                <div class="col-md-8">
+                                    <label class="form-label fw-semibold fs-6 required">Descreva a Vaga</label>
+                                    <textarea class="form-control form-control-solid" id="ia_descricao_input" 
+                                              rows="4" 
+                                              placeholder="Ex: Desenvolvedor Full Stack Python/React para startup de fintech. Remoto, salário entre 8k-12k, experiência mínima 3 anos com AWS e Docker. Benefícios: VA, VR, plano de saúde..."></textarea>
+                                    <div class="form-text">
+                                        Descreva: cargo, área, tipo de empresa, modalidade, faixa salarial, requisitos principais, benefícios, etc.
+                                        (mínimo 20 caracteres)
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-5">
+                                <div class="col-12">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div id="ia_limite_info">
+                                            <small class="text-muted">Carregando...</small>
+                                        </div>
+                                        <div>
+                                            <button type="button" class="btn btn-light me-2" data-bs-toggle="modal" data-bs-target="#modalExemploIA">
+                                                <i class="ki-duotone ki-information-5 fs-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                </i>
+                                                Ver Exemplo
+                                            </button>
+                                            <button type="button" class="btn btn-primary" id="btnGerarIA">
+                                                <i class="ki-duotone ki-stars fs-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Gerar Vaga com IA
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Resultado da Geração -->
+                            <div id="ia_resultado_geracao"></div>
+                            
+                            <!-- Botões de Refinamento -->
+                            <div id="ia_botoes_refinamento" class="d-none">
+                                <div class="separator separator-dashed my-7"></div>
+                                <h4 class="mb-4">
+                                    <i class="ki-duotone ki-wrench fs-2 me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Refinar Vaga
+                                </h4>
+                                <div class="d-flex flex-wrap gap-2 mb-4">
+                                    <button type="button" class="btn btn-sm btn-light-primary btn-refinar-ia" data-acao="Tornar a descrição mais formal e profissional">
+                                        <i class="ki-duotone ki-profile-circle fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                        Mais Formal
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light-primary btn-refinar-ia" data-acao="Adicionar mais requisitos técnicos detalhados">
+                                        <i class="ki-duotone ki-code fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                                        + Requisitos Técnicos
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light-primary btn-refinar-ia" data-acao="Simplificar a linguagem para torná-la mais acessível">
+                                        <i class="ki-duotone ki-message-text-2 fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                        Simplificar
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light-primary btn-refinar-ia" data-acao="Aumentar a faixa salarial em 20%">
+                                        <i class="ki-duotone ki-chart-simple fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                                        Aumentar Salário
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light-primary btn-refinar-ia" data-acao="Adicionar mais benefícios atrativos">
+                                        <i class="ki-duotone ki-gift fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                        + Benefícios
+                                    </button>
+                                </div>
+                                
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="ia_instrucao_refinamento" 
+                                           placeholder="Ou descreva como quer refinar a vaga...">
+                                    <button type="button" class="btn btn-primary" id="btnRefinarCustom">
+                                        <i class="ki-duotone ki-arrow-right fs-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Refinar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
                 <div class="card">
                     <div class="card-header border-0 pt-6">
                         <div class="card-title">
-                            <h2>Nova Vaga</h2>
+                            <h2>
+                                Nova Vaga
+                                <?php if ($openai_configurada): ?>
+                                <small class="text-muted fs-7 ms-2">(Preencha manualmente ou use IA acima)</small>
+                                <?php endif; ?>
+                            </h2>
                         </div>
                         <div class="card-toolbar">
                             <a href="vagas.php" class="btn btn-light">Voltar</a>
@@ -484,6 +636,101 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<!-- Script de Geração com IA -->
+<?php
+$openai_check = false;
+try {
+    $stmt = $pdo->query("SELECT ativo FROM openai_config WHERE ativo = 1 LIMIT 1");
+    $openai_check = $stmt->fetch() ? true : false;
+} catch (PDOException $e) {}
+?>
+<?php if ($openai_check): ?>
+<script src="../assets/js/vaga_ia_generator.js"></script>
+<?php endif; ?>
+
+<!-- Modal: Exemplo de Uso da IA -->
+<div class="modal fade" id="modalExemploIA" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-information-5 fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Como Usar a IA para Gerar Vagas
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="mb-7">
+                    <h4 class="mb-3">1. Selecione o Tipo de Vaga</h4>
+                    <p class="text-muted">Escolha entre Tecnologia, Administrativa, Vendas, Operacional ou Genérica. Cada tipo otimiza a geração para a área específica.</p>
+                </div>
+                
+                <div class="mb-7">
+                    <h4 class="mb-3">2. Descreva a Vaga</h4>
+                    <p class="text-muted mb-3">Quanto mais detalhes, melhor! Inclua informações como:</p>
+                    <ul class="text-muted">
+                        <li><strong>Cargo/Função:</strong> "Desenvolvedor Full Stack", "Analista Financeiro", "Vendedor Externo"</li>
+                        <li><strong>Tipo de Empresa:</strong> "startup de fintech", "indústria automotiva", "varejo de moda"</li>
+                        <li><strong>Modalidade:</strong> "Remoto", "Presencial em São Paulo", "Híbrido"</li>
+                        <li><strong>Faixa Salarial:</strong> "de 5k a 8k", "até 12 mil", "salário competitivo + comissões"</li>
+                        <li><strong>Experiência:</strong> "experiência mínima 3 anos", "júnior/pleno", "sem experiência"</li>
+                        <li><strong>Requisitos Principais:</strong> "conhecimento em Python e React", "CNH B obrigatória", "inglês fluente"</li>
+                        <li><strong>Benefícios:</strong> "VA, VR, plano de saúde, gympass"</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-7">
+                    <h4 class="mb-3">3. Exemplos Práticos</h4>
+                    
+                    <div class="card bg-light-primary mb-3">
+                        <div class="card-body">
+                            <h5 class="text-primary mb-2">Exemplo 1: Vaga de Tecnologia</h5>
+                            <p class="mb-0"><em>"Desenvolvedor Full Stack Python/React para startup de fintech em crescimento. Remoto, salário entre 8k-12k, experiência mínima 3 anos com AWS, Docker e microsserviços. Benefícios: VA, VR, plano de saúde, stock options, ambiente inovador."</em></p>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-light-success mb-3">
+                        <div class="card-body">
+                            <h5 class="text-success mb-2">Exemplo 2: Vaga Administrativa</h5>
+                            <p class="mb-0"><em>"Assistente Administrativo para empresa de logística. Presencial em São Paulo, salário 3k-4k, experiência com Excel avançado, atendimento telefônico e gestão de documentos. Benefícios: VA, VR, convênio médico."</em></p>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-light-warning mb-3">
+                        <div class="card-body">
+                            <h5 class="text-warning mb-2">Exemplo 3: Vaga de Vendas</h5>
+                            <p class="mb-0"><em>"Vendedor Externo para revenda de veículos. Atuação em Campo Grande/MS, salário fixo 2.5k + comissões agressivas (média 5k-10k/mês), carteira própria de clientes desejável, experiência em vendas B2C. Benefícios: VA, carro da empresa, celular."</em></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info d-flex align-items-center p-5">
+                    <i class="ki-duotone ki-shield-tick fs-2hx text-info me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <div>
+                        <h4 class="mb-1 text-info">Dica Importante</h4>
+                        <span>A IA irá gerar uma vaga completa, mas você sempre pode revisar e editar todos os campos antes de salvar. Use os botões de refinamento para ajustar a vaga rapidamente!</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendi!</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!--begin::Tutorial System-->
 <link href="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/introjs.min.css" rel="stylesheet" />

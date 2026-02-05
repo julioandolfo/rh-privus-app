@@ -61,15 +61,17 @@ try {
                 throw new Exception('Produto não encontrado');
             }
             
-            // Info de pontos e wishlist
+            // Info de pontos, saldo R$ e wishlist
             $colaborador_id = $usuario['colaborador_id'] ?? null;
             $meus_pontos = $colaborador_id ? obter_pontos(null, $colaborador_id) : ['pontos_totais' => 0];
+            $meu_saldo_dinheiro = $colaborador_id ? obter_saldo_dinheiro($colaborador_id) : 0;
             $na_wishlist = $colaborador_id ? loja_is_wishlist($colaborador_id, $id) : false;
             
             echo json_encode([
                 'success' => true,
                 'produto' => $produto,
                 'meus_pontos' => $meus_pontos['pontos_totais'],
+                'meu_saldo_dinheiro' => $meu_saldo_dinheiro,
                 'na_wishlist' => $na_wishlist
             ]);
             break;
@@ -77,13 +79,16 @@ try {
         case 'verificar':
             $id = intval($_GET['id'] ?? 0);
             $quantidade = intval($_GET['quantidade'] ?? 1);
+            $forma_pagamento = in_array($_GET['forma_pagamento'] ?? 'pontos', ['pontos', 'dinheiro']) 
+                ? $_GET['forma_pagamento'] 
+                : 'pontos';
             $colaborador_id = $usuario['colaborador_id'] ?? null;
             
             if (!$colaborador_id) {
                 throw new Exception('Usuário não vinculado a um colaborador');
             }
             
-            $verificacao = loja_pode_resgatar($colaborador_id, $id, $quantidade);
+            $verificacao = loja_pode_resgatar($colaborador_id, $id, $quantidade, $forma_pagamento);
             echo json_encode($verificacao);
             break;
             
@@ -109,6 +114,15 @@ try {
             $disponivel_ate = !empty($_POST['disponivel_ate']) ? $_POST['disponivel_ate'] : null;
             $destaque = isset($_POST['destaque']) && $_POST['destaque'] == '1' ? 1 : 0;
             $ativo = isset($_POST['ativo']) && $_POST['ativo'] == '1' ? 1 : 0;
+            
+            // Preço em R$ (opcional)
+            $preco_dinheiro = null;
+            if (!empty($_POST['preco_dinheiro'])) {
+                $preco_dinheiro = floatval(str_replace(['.', ','], ['', '.'], $_POST['preco_dinheiro']));
+                if ($preco_dinheiro <= 0) {
+                    $preco_dinheiro = null;
+                }
+            }
             
             if (empty($nome)) {
                 throw new Exception('Nome é obrigatório');
@@ -149,9 +163,9 @@ try {
                 // Update
                 $sql = "UPDATE loja_produtos SET 
                         categoria_id = ?, nome = ?, descricao = ?, descricao_curta = ?,
-                        pontos_necessarios = ?, estoque = ?, limite_por_colaborador = ?,
+                        pontos_necessarios = ?, preco_dinheiro = ?, estoque = ?, limite_por_colaborador = ?,
                         disponivel_de = ?, disponivel_ate = ?, destaque = ?, ativo = ?";
-                $params = [$categoria_id, $nome, $descricao, $descricao_curta, $pontos_necessarios,
+                $params = [$categoria_id, $nome, $descricao, $descricao_curta, $pontos_necessarios, $preco_dinheiro,
                            $estoque, $limite_por_colaborador, $disponivel_de, $disponivel_ate, $destaque, $ativo];
                 
                 if ($imagem) {
@@ -170,11 +184,11 @@ try {
                 // Insert
                 $stmt = $pdo->prepare("
                     INSERT INTO loja_produtos 
-                    (categoria_id, nome, descricao, descricao_curta, imagem, pontos_necessarios, 
+                    (categoria_id, nome, descricao, descricao_curta, imagem, pontos_necessarios, preco_dinheiro,
                      estoque, limite_por_colaborador, disponivel_de, disponivel_ate, destaque, ativo, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$categoria_id, $nome, $descricao, $descricao_curta, $imagem, $pontos_necessarios,
+                $stmt->execute([$categoria_id, $nome, $descricao, $descricao_curta, $imagem, $pontos_necessarios, $preco_dinheiro,
                                $estoque, $limite_por_colaborador, $disponivel_de, $disponivel_ate, $destaque, $ativo, $usuario['id']]);
                 
                 echo json_encode(['success' => true, 'message' => 'Produto criado com sucesso!', 'id' => $pdo->lastInsertId()]);

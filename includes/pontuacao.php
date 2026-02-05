@@ -353,3 +353,182 @@ function obter_ranking_pontos($periodo = 'mes', $limite = 10) {
     }
 }
 
+// =============================================
+// FUNÇÕES PARA SALDO EM R$ (DINHEIRO/CRÉDITOS)
+// =============================================
+
+/**
+ * Obtém saldo em R$ de um colaborador
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @return float Saldo em R$
+ */
+function obter_saldo_dinheiro($colaborador_id) {
+    try {
+        $pdo = getDB();
+        $stmt = $pdo->prepare("SELECT COALESCE(saldo_dinheiro, 0) as saldo FROM pontos_total WHERE colaborador_id = ?");
+        $stmt->execute([$colaborador_id]);
+        $result = $stmt->fetch();
+        return $result ? floatval($result['saldo']) : 0.00;
+    } catch (PDOException $e) {
+        error_log("Erro ao obter saldo em dinheiro: " . $e->getMessage());
+        return 0.00;
+    }
+}
+
+/**
+ * Adiciona/Remove saldo em R$ manualmente (para uso administrativo)
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @param float $valor Valor em R$ (positivo para adicionar, negativo para remover)
+ * @param string $descricao Descrição/motivo da alteração
+ * @param int $usuario_admin_id ID do usuário admin que fez a alteração
+ * @param string|null $referencia_tipo Tipo de referência (opcional)
+ * @param int|null $referencia_id ID de referência (opcional)
+ * @return array Array com success e message
+ */
+function gerenciar_saldo_dinheiro($colaborador_id, $valor, $descricao, $usuario_admin_id, $referencia_tipo = null, $referencia_id = null) {
+    try {
+        $pdo = getDB();
+        
+        $valor = floatval($valor);
+        
+        if ($valor == 0) {
+            return ['success' => false, 'message' => 'Valor inválido'];
+        }
+        
+        if (empty($descricao)) {
+            return ['success' => false, 'message' => 'Descrição é obrigatória'];
+        }
+        
+        // Busca saldo atual
+        $saldo_anterior = obter_saldo_dinheiro($colaborador_id);
+        $saldo_posterior = $saldo_anterior + $valor;
+        
+        // Verifica se terá saldo negativo (não permitido para débitos)
+        if ($saldo_posterior < 0) {
+            return ['success' => false, 'message' => 'Saldo insuficiente. Saldo atual: R$ ' . number_format($saldo_anterior, 2, ',', '.')];
+        }
+        
+        $pdo->beginTransaction();
+        
+        try {
+            // Garante que existe registro na tabela pontos_total
+            $stmt = $pdo->prepare("
+                INSERT INTO pontos_total (colaborador_id, saldo_dinheiro)
+                VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE saldo_dinheiro = ?
+            ");
+            $stmt->execute([$colaborador_id, $saldo_posterior, $saldo_posterior]);
+            
+            // Registra no histórico
+            $tipo = $valor > 0 ? 'credito' : 'debito';
+            $stmt = $pdo->prepare("
+                INSERT INTO saldo_dinheiro_historico 
+                (colaborador_id, tipo, valor, saldo_anterior, saldo_posterior, descricao, referencia_tipo, referencia_id, usuario_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $colaborador_id, 
+                $tipo, 
+                $valor, 
+                $saldo_anterior, 
+                $saldo_posterior, 
+                $descricao, 
+                $referencia_tipo, 
+                $referencia_id, 
+                $usuario_admin_id
+            ]);
+            
+            $pdo->commit();
+            
+            $mensagem = $valor > 0 
+                ? 'Crédito de R$ ' . number_format($valor, 2, ',', '.') . ' adicionado com sucesso!'
+                : 'Débito de R$ ' . number_format(abs($valor), 2, ',', '.') . ' realizado com sucesso!';
+            
+            return [
+                'success' => true,
+                'message' => $mensagem,
+                'saldo_anterior' => $saldo_anterior,
+                'saldo_atual' => $saldo_posterior
+            ];
+            
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        
+    } catch (PDOException $e) {
+        error_log("Erro ao gerenciar saldo em dinheiro: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Erro ao processar a operação'];
+    }
+}
+
+/**
+ * Obtém histórico de movimentações de saldo em R$
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @param int $limite Limite de registros
+ * @return array Histórico de movimentações
+ */
+function obter_historico_saldo_dinheiro($colaborador_id, $limite = 50) {
+    try {
+        $pdo = getDB();
+        
+        $stmt = $pdo->prepare("
+            SELECT h.*, u.nome as usuario_nome
+            FROM saldo_dinheiro_historico h
+            LEFT JOIN usuarios u ON h.usuario_id = u.id
+            WHERE h.colaborador_id = ?
+            ORDER BY h.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$colaborador_id, $limite]);
+        
+        return $stmt->fetchAll();
+        
+    } catch (PDOException $e) {
+        error_log("Erro ao obter histórico de saldo em dinheiro: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Debita saldo em R$ para resgate na loja
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @param float $valor Valor a debitar
+ * @param int $resgate_id ID do resgate na loja
+ * @return array Array com success e message
+ */
+function debitar_saldo_loja($colaborador_id, $valor, $resgate_id) {
+    return gerenciar_saldo_dinheiro(
+        $colaborador_id,
+        -abs($valor),
+        'Resgate na Loja de Pontos',
+        null, // Sistema automático
+        'loja_resgate',
+        $resgate_id
+    );
+}
+
+/**
+ * Estorna saldo em R$ de resgate cancelado/rejeitado
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @param float $valor Valor a estornar
+ * @param int $resgate_id ID do resgate na loja
+ * @param int $usuario_id ID do usuário que cancelou
+ * @return array Array com success e message
+ */
+function estornar_saldo_loja($colaborador_id, $valor, $resgate_id, $usuario_id) {
+    return gerenciar_saldo_dinheiro(
+        $colaborador_id,
+        abs($valor),
+        'Estorno de resgate cancelado/rejeitado',
+        $usuario_id,
+        'loja_resgate_estorno',
+        $resgate_id
+    );
+}
+

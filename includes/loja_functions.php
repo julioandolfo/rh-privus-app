@@ -173,8 +173,13 @@ function loja_get_produto($id) {
 
 /**
  * Verifica se colaborador pode resgatar produto
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @param int $produto_id ID do produto
+ * @param int $quantidade Quantidade a resgatar
+ * @param string $forma_pagamento 'pontos' ou 'dinheiro'
  */
-function loja_pode_resgatar($colaborador_id, $produto_id, $quantidade = 1) {
+function loja_pode_resgatar($colaborador_id, $produto_id, $quantidade = 1, $forma_pagamento = 'pontos') {
     $pdo = getDB();
     
     // Verifica se loja está ativa
@@ -243,39 +248,80 @@ function loja_pode_resgatar($colaborador_id, $produto_id, $quantidade = 1) {
         }
     }
     
-    // Verifica pontos do colaborador
-    $pontos = obter_pontos(null, $colaborador_id);
-    $pontos_necessarios = $produto['pontos_necessarios'] * $quantidade;
-    
-    if ($pontos['pontos_totais'] < $pontos_necessarios) {
-        $faltam = $pontos_necessarios - $pontos['pontos_totais'];
-        return ['pode' => false, 'motivo' => "Pontos insuficientes. Faltam {$faltam} pontos."];
+    // Verifica saldo conforme forma de pagamento
+    if ($forma_pagamento === 'dinheiro') {
+        // Verifica se produto aceita pagamento em R$
+        if (empty($produto['preco_dinheiro']) || floatval($produto['preco_dinheiro']) <= 0) {
+            return ['pode' => false, 'motivo' => 'Este produto não aceita pagamento em R$.'];
+        }
+        
+        $valor_necessario = floatval($produto['preco_dinheiro']) * $quantidade;
+        $saldo_dinheiro = obter_saldo_dinheiro($colaborador_id);
+        
+        if ($saldo_dinheiro < $valor_necessario) {
+            $faltam = $valor_necessario - $saldo_dinheiro;
+            return ['pode' => false, 'motivo' => "Saldo insuficiente. Faltam R$ " . number_format($faltam, 2, ',', '.')];
+        }
+        
+        return [
+            'pode' => true,
+            'produto' => $produto,
+            'forma_pagamento' => 'dinheiro',
+            'valor_necessario' => $valor_necessario,
+            'saldo_atual' => $saldo_dinheiro,
+            'saldo_restante' => $saldo_dinheiro - $valor_necessario
+        ];
+    } else {
+        // Pagamento com pontos
+        $pontos = obter_pontos(null, $colaborador_id);
+        $pontos_necessarios = $produto['pontos_necessarios'] * $quantidade;
+        
+        if ($pontos['pontos_totais'] < $pontos_necessarios) {
+            $faltam = $pontos_necessarios - $pontos['pontos_totais'];
+            return ['pode' => false, 'motivo' => "Pontos insuficientes. Faltam {$faltam} pontos."];
+        }
+        
+        return [
+            'pode' => true,
+            'produto' => $produto,
+            'forma_pagamento' => 'pontos',
+            'pontos_necessarios' => $pontos_necessarios,
+            'pontos_atuais' => $pontos['pontos_totais'],
+            'pontos_restantes' => $pontos['pontos_totais'] - $pontos_necessarios
+        ];
     }
-    
-    return [
-        'pode' => true,
-        'produto' => $produto,
-        'pontos_necessarios' => $pontos_necessarios,
-        'pontos_atuais' => $pontos['pontos_totais'],
-        'pontos_restantes' => $pontos['pontos_totais'] - $pontos_necessarios
-    ];
 }
 
 /**
  * Processa resgate de produto
+ * 
+ * @param int $colaborador_id ID do colaborador
+ * @param int $produto_id ID do produto
+ * @param int $quantidade Quantidade a resgatar
+ * @param string $observacao Observação do colaborador
+ * @param string $forma_pagamento 'pontos' ou 'dinheiro'
  */
-function loja_resgatar($colaborador_id, $produto_id, $quantidade = 1, $observacao = null) {
+function loja_resgatar($colaborador_id, $produto_id, $quantidade = 1, $observacao = null, $forma_pagamento = 'pontos') {
     $pdo = getDB();
     
     // Verifica se pode resgatar
-    $verificacao = loja_pode_resgatar($colaborador_id, $produto_id, $quantidade);
+    $verificacao = loja_pode_resgatar($colaborador_id, $produto_id, $quantidade, $forma_pagamento);
     if (!$verificacao['pode']) {
         return ['success' => false, 'message' => $verificacao['motivo']];
     }
     
     $produto = $verificacao['produto'];
-    $pontos_unitario = $produto['pontos_necessarios'];
-    $pontos_total = $pontos_unitario * $quantidade;
+    
+    // Define valores conforme forma de pagamento
+    if ($forma_pagamento === 'dinheiro') {
+        $pontos_unitario = 0;
+        $pontos_total = 0;
+        $valor_dinheiro = floatval($produto['preco_dinheiro']) * $quantidade;
+    } else {
+        $pontos_unitario = $produto['pontos_necessarios'];
+        $pontos_total = $pontos_unitario * $quantidade;
+        $valor_dinheiro = null;
+    }
     
     // Define status inicial
     $status = loja_aprovacao_obrigatoria() ? 'pendente' : 'aprovado';
@@ -286,21 +332,27 @@ function loja_resgatar($colaborador_id, $produto_id, $quantidade = 1, $observaca
         // Cria o resgate
         $stmt = $pdo->prepare("
             INSERT INTO loja_resgates 
-            (colaborador_id, produto_id, quantidade, pontos_unitario, pontos_total, status, observacao_colaborador)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (colaborador_id, produto_id, quantidade, pontos_unitario, pontos_total, forma_pagamento, valor_dinheiro, status, observacao_colaborador)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$colaborador_id, $produto_id, $quantidade, $pontos_unitario, $pontos_total, $status, $observacao]);
+        $stmt->execute([$colaborador_id, $produto_id, $quantidade, $pontos_unitario, $pontos_total, $forma_pagamento, $valor_dinheiro, $status, $observacao]);
         $resgate_id = $pdo->lastInsertId();
         
-        // Debita pontos
-        $stmt = $pdo->prepare("
-            INSERT INTO pontos_historico (colaborador_id, acao, pontos, referencia_id, referencia_tipo, data_registro)
-            VALUES (?, 'resgate_loja', ?, ?, 'loja_resgate', CURDATE())
-        ");
-        $stmt->execute([$colaborador_id, -$pontos_total, $resgate_id]);
-        
-        // Atualiza total de pontos
-        atualizar_total_pontos(null, $colaborador_id);
+        // Debita conforme forma de pagamento
+        if ($forma_pagamento === 'dinheiro') {
+            // Debita saldo em R$
+            debitar_saldo_loja($colaborador_id, $valor_dinheiro, $resgate_id);
+        } else {
+            // Debita pontos
+            $stmt = $pdo->prepare("
+                INSERT INTO pontos_historico (colaborador_id, acao, pontos, referencia_id, referencia_tipo, data_registro)
+                VALUES (?, 'resgate_loja', ?, ?, 'loja_resgate', CURDATE())
+            ");
+            $stmt->execute([$colaborador_id, -$pontos_total, $resgate_id]);
+            
+            // Atualiza total de pontos
+            atualizar_total_pontos(null, $colaborador_id);
+        }
         
         // Atualiza estoque (se não for ilimitado)
         if ($produto['estoque'] !== null) {
@@ -325,19 +377,34 @@ function loja_resgatar($colaborador_id, $produto_id, $quantidade = 1, $observaca
             loja_notificar_admins_resgate($resgate_id);
         }
         
-        // Busca novo saldo
-        $novo_saldo = obter_pontos(null, $colaborador_id);
-        
-        return [
-            'success' => true,
-            'message' => $status === 'aprovado' 
-                ? 'Resgate realizado com sucesso! Aguarde a preparação do seu produto.'
-                : 'Resgate solicitado com sucesso! Aguarde a aprovação.',
-            'resgate_id' => $resgate_id,
-            'status' => $status,
-            'pontos_gastos' => $pontos_total,
-            'pontos_restantes' => $novo_saldo['pontos_totais']
-        ];
+        // Monta resposta conforme forma de pagamento
+        if ($forma_pagamento === 'dinheiro') {
+            $novo_saldo = obter_saldo_dinheiro($colaborador_id);
+            return [
+                'success' => true,
+                'message' => $status === 'aprovado' 
+                    ? 'Resgate realizado com sucesso! Aguarde a preparação do seu produto.'
+                    : 'Resgate solicitado com sucesso! Aguarde a aprovação.',
+                'resgate_id' => $resgate_id,
+                'status' => $status,
+                'forma_pagamento' => 'dinheiro',
+                'valor_gasto' => $valor_dinheiro,
+                'saldo_restante' => $novo_saldo
+            ];
+        } else {
+            $novo_saldo = obter_pontos(null, $colaborador_id);
+            return [
+                'success' => true,
+                'message' => $status === 'aprovado' 
+                    ? 'Resgate realizado com sucesso! Aguarde a preparação do seu produto.'
+                    : 'Resgate solicitado com sucesso! Aguarde a aprovação.',
+                'resgate_id' => $resgate_id,
+                'status' => $status,
+                'forma_pagamento' => 'pontos',
+                'pontos_gastos' => $pontos_total,
+                'pontos_restantes' => $novo_saldo['pontos_totais']
+            ];
+        }
         
     } catch (Exception $e) {
         $pdo->rollBack();
@@ -439,16 +506,24 @@ function loja_atualizar_status_resgate($resgate_id, $novo_status, $usuario_id, $
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         
-        // Se rejeitado ou cancelado, devolve pontos e estoque
+        // Se rejeitado ou cancelado, devolve saldo e estoque
         if (in_array($novo_status, ['rejeitado', 'cancelado'])) {
-            // Devolve pontos
-            $stmt = $pdo->prepare("
-                INSERT INTO pontos_historico (colaborador_id, acao, pontos, referencia_id, referencia_tipo, data_registro)
-                VALUES (?, 'estorno_resgate', ?, ?, 'loja_resgate', CURDATE())
-            ");
-            $stmt->execute([$resgate['colaborador_id'], $resgate['pontos_total'], $resgate_id]);
+            // Devolve conforme forma de pagamento
+            $forma_pagamento = $resgate['forma_pagamento'] ?? 'pontos';
             
-            atualizar_total_pontos(null, $resgate['colaborador_id']);
+            if ($forma_pagamento === 'dinheiro' && !empty($resgate['valor_dinheiro'])) {
+                // Devolve saldo em R$
+                estornar_saldo_loja($resgate['colaborador_id'], $resgate['valor_dinheiro'], $resgate_id, $usuario_id);
+            } else {
+                // Devolve pontos
+                $stmt = $pdo->prepare("
+                    INSERT INTO pontos_historico (colaborador_id, acao, pontos, referencia_id, referencia_tipo, data_registro)
+                    VALUES (?, 'estorno_resgate', ?, ?, 'loja_resgate', CURDATE())
+                ");
+                $stmt->execute([$resgate['colaborador_id'], $resgate['pontos_total'], $resgate_id]);
+                
+                atualizar_total_pontos(null, $resgate['colaborador_id']);
+            }
             
             // Devolve estoque
             $stmt = $pdo->prepare("

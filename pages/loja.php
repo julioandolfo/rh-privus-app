@@ -21,8 +21,9 @@ if (!loja_ativa() && !in_array($usuario['role'], ['ADMIN', 'RH', 'GESTOR'])) {
     redirect('dashboard.php', loja_config('mensagem_loja_fechada', 'Loja temporariamente fechada.'), 'warning');
 }
 
-// Obtém pontos do colaborador
+// Obtém pontos e saldo em R$ do colaborador
 $meus_pontos = $colaborador_id ? obter_pontos(null, $colaborador_id) : ['pontos_totais' => 0];
+$meu_saldo_dinheiro = $colaborador_id ? obter_saldo_dinheiro($colaborador_id) : 0;
 
 // Obtém categorias
 $categorias = loja_get_categorias();
@@ -152,6 +153,21 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
             </div>
+            <?php if ($meu_saldo_dinheiro > 0): ?>
+            <div class="rounded px-4 py-2 text-white" style="background: linear-gradient(135deg, #1e7e34 0%, #28a745 100%);">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="ki-duotone ki-dollar fs-2x text-white">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div>
+                        <div class="fs-8 opacity-75">Créditos</div>
+                        <div class="fs-3 fw-bold">R$ <?= number_format($meu_saldo_dinheiro, 2, ',', '.') ?></div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -226,16 +242,33 @@ require_once __DIR__ . '/../includes/header.php';
                             <p class="text-gray-600 fs-7 mb-3"><?= htmlspecialchars($produto['descricao_curta'] ?? '') ?></p>
                         </div>
                         <div class="card-footer border-top pt-4">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="badge badge-light-warning pontos-badge">
-                                    <i class="ki-duotone ki-medal-star fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
-                                    <?= number_format($produto['pontos_necessarios'], 0, ',', '.') ?> pts
-                                </span>
-                                <button class="btn btn-sm btn-<?= $pode_resgatar && ($produto['estoque'] === null || $produto['estoque'] > 0) ? 'primary' : 'secondary' ?>" 
-                                        onclick="abrirModalResgate(<?= $produto['id'] ?>)"
-                                        <?= !$pode_resgatar || ($produto['estoque'] !== null && $produto['estoque'] == 0) ? 'disabled' : '' ?>>
-                                    <?= $produto['estoque'] !== null && $produto['estoque'] == 0 ? 'Esgotado' : 'Resgatar' ?>
-                                </button>
+                            <?php 
+                                $tem_preco_dinheiro = !empty($produto['preco_dinheiro']) && floatval($produto['preco_dinheiro']) > 0;
+                                $pode_pagar_pontos = $meus_pontos['pontos_totais'] >= $produto['pontos_necessarios'];
+                                $pode_pagar_dinheiro = $tem_preco_dinheiro && $meu_saldo_dinheiro >= floatval($produto['preco_dinheiro']);
+                                $pode_resgatar_alguma_forma = $pode_pagar_pontos || $pode_pagar_dinheiro;
+                                $disponivel_estoque = $produto['estoque'] === null || $produto['estoque'] > 0;
+                            ?>
+                            <div class="d-flex flex-column gap-2">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div class="d-flex flex-column gap-1">
+                                        <span class="badge badge-light-warning pontos-badge">
+                                            <i class="ki-duotone ki-medal-star fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                                            <?= number_format($produto['pontos_necessarios'], 0, ',', '.') ?> pts
+                                        </span>
+                                        <?php if ($tem_preco_dinheiro): ?>
+                                        <span class="badge badge-light-success pontos-badge">
+                                            <i class="ki-duotone ki-dollar fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                            R$ <?= number_format($produto['preco_dinheiro'], 2, ',', '.') ?>
+                                        </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <button class="btn btn-sm btn-<?= $pode_resgatar_alguma_forma && $disponivel_estoque ? 'primary' : 'secondary' ?>" 
+                                            onclick="abrirModalResgate(<?= $produto['id'] ?>)"
+                                            <?= !$pode_resgatar_alguma_forma || !$disponivel_estoque ? 'disabled' : '' ?>>
+                                        <?= !$disponivel_estoque ? 'Esgotado' : 'Resgatar' ?>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -359,22 +392,43 @@ require_once __DIR__ . '/../includes/header.php';
                             <p class="text-gray-600 fs-7 mb-0"><?= htmlspecialchars($produto['descricao_curta'] ?? '') ?></p>
                         </div>
                         <div class="card-footer border-top pt-4">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="badge badge-light-warning pontos-badge">
-                                    <i class="ki-duotone ki-medal-star fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
-                                    <?= number_format($produto['pontos_necessarios'], 0, ',', '.') ?> pts
-                                </span>
-                                <button class="btn btn-sm btn-<?= $pode_resgatar && ($produto['estoque'] === null || $produto['estoque'] > 0) ? 'primary' : 'secondary' ?>" 
-                                        onclick="abrirModalResgate(<?= $produto['id'] ?>)"
-                                        <?= !$pode_resgatar || ($produto['estoque'] !== null && $produto['estoque'] == 0) ? 'disabled' : '' ?>>
-                                    <?= $produto['estoque'] !== null && $produto['estoque'] == 0 ? 'Esgotado' : 'Resgatar' ?>
-                                </button>
+                            <?php 
+                                $tem_preco_dinheiro = !empty($produto['preco_dinheiro']) && floatval($produto['preco_dinheiro']) > 0;
+                                $pode_pagar_pontos = $meus_pontos['pontos_totais'] >= $produto['pontos_necessarios'];
+                                $pode_pagar_dinheiro = $tem_preco_dinheiro && $meu_saldo_dinheiro >= floatval($produto['preco_dinheiro']);
+                                $pode_resgatar_alguma_forma = $pode_pagar_pontos || $pode_pagar_dinheiro;
+                                $disponivel_estoque = $produto['estoque'] === null || $produto['estoque'] > 0;
+                            ?>
+                            <div class="d-flex flex-column gap-2">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div class="d-flex flex-column gap-1">
+                                        <span class="badge badge-light-warning pontos-badge">
+                                            <i class="ki-duotone ki-medal-star fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                                            <?= number_format($produto['pontos_necessarios'], 0, ',', '.') ?> pts
+                                        </span>
+                                        <?php if ($tem_preco_dinheiro): ?>
+                                        <span class="badge badge-light-success pontos-badge">
+                                            <i class="ki-duotone ki-dollar fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                            R$ <?= number_format($produto['preco_dinheiro'], 2, ',', '.') ?>
+                                        </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <button class="btn btn-sm btn-<?= $pode_resgatar_alguma_forma && $disponivel_estoque ? 'primary' : 'secondary' ?>" 
+                                            onclick="abrirModalResgate(<?= $produto['id'] ?>)"
+                                            <?= !$pode_resgatar_alguma_forma || !$disponivel_estoque ? 'disabled' : '' ?>>
+                                        <?= !$disponivel_estoque ? 'Esgotado' : 'Resgatar' ?>
+                                    </button>
+                                </div>
+                                <?php if (!$pode_resgatar_alguma_forma && $disponivel_estoque): ?>
+                                <div class="text-center">
+                                    <small class="text-muted">
+                                        <?php if (!$pode_pagar_pontos): ?>
+                                            Faltam <?= number_format($produto['pontos_necessarios'] - $meus_pontos['pontos_totais'], 0, ',', '.') ?> pts
+                                        <?php endif; ?>
+                                    </small>
+                                </div>
+                                <?php endif; ?>
                             </div>
-                            <?php if (!$pode_resgatar && ($produto['estoque'] === null || $produto['estoque'] > 0)): ?>
-                            <div class="text-center mt-2">
-                                <small class="text-muted">Faltam <?= number_format($produto['pontos_necessarios'] - $meus_pontos['pontos_totais'], 0, ',', '.') ?> pts</small>
-                            </div>
-                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -407,6 +461,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <script>
 const meusPontos = <?= $meus_pontos['pontos_totais'] ?>;
+const meuSaldoDinheiro = <?= $meu_saldo_dinheiro ?>;
 
 function aplicarFiltros() {
     const busca = document.getElementById('busca_produto').value;
@@ -456,8 +511,51 @@ function abrirModalResgate(produtoId) {
         .then(data => {
             if (data.success) {
                 const p = data.produto;
-                const pode = meusPontos >= p.pontos_necessarios;
+                const podePontos = meusPontos >= p.pontos_necessarios;
+                const temPrecoDinheiro = p.preco_dinheiro && parseFloat(p.preco_dinheiro) > 0;
+                const podeDinheiro = temPrecoDinheiro && meuSaldoDinheiro >= parseFloat(p.preco_dinheiro);
+                const podeAlgumaForma = podePontos || podeDinheiro;
                 const estoqueBaixo = p.estoque !== null && p.estoque <= 5;
+                
+                // HTML para escolha de forma de pagamento
+                let formaPagamentoHtml = '';
+                if (temPrecoDinheiro && podeAlgumaForma) {
+                    formaPagamentoHtml = `
+                        <div class="mb-5">
+                            <label class="form-label fw-semibold">Forma de Pagamento</label>
+                            <div class="d-flex gap-4">
+                                <label class="d-flex flex-stack cursor-pointer">
+                                    <span class="d-flex align-items-center me-2">
+                                        <span class="form-check form-check-custom form-check-solid">
+                                            <input class="form-check-input" type="radio" name="forma_pagamento" value="pontos" 
+                                                   ${podePontos ? 'checked' : 'disabled'}>
+                                        </span>
+                                        <span class="d-flex flex-column ms-3">
+                                            <span class="fw-bold text-gray-800 fs-6">Pontos</span>
+                                            <span class="fs-7 text-muted">${p.pontos_necessarios.toLocaleString('pt-BR')} pts</span>
+                                            ${!podePontos ? '<span class="badge badge-light-danger fs-8">Saldo insuficiente</span>' : ''}
+                                        </span>
+                                    </span>
+                                </label>
+                                <label class="d-flex flex-stack cursor-pointer">
+                                    <span class="d-flex align-items-center me-2">
+                                        <span class="form-check form-check-custom form-check-solid">
+                                            <input class="form-check-input" type="radio" name="forma_pagamento" value="dinheiro" 
+                                                   ${!podePontos && podeDinheiro ? 'checked' : ''} ${!podeDinheiro ? 'disabled' : ''}>
+                                        </span>
+                                        <span class="d-flex flex-column ms-3">
+                                            <span class="fw-bold text-gray-800 fs-6">Créditos R$</span>
+                                            <span class="fs-7 text-muted">R$ ${parseFloat(p.preco_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                            ${!podeDinheiro ? '<span class="badge badge-light-danger fs-8">Saldo insuficiente</span>' : ''}
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    `;
+                } else if (podeAlgumaForma) {
+                    formaPagamentoHtml = '<input type="hidden" name="forma_pagamento" value="pontos">';
+                }
                 
                 body.innerHTML = `
                     <div class="text-center mb-5">
@@ -470,26 +568,34 @@ function abrirModalResgate(produtoId) {
                     <h3 class="text-center mb-3">${p.nome}</h3>
                     <p class="text-gray-600 text-center mb-5">${p.descricao || p.descricao_curta || ''}</p>
                     
-                    <div class="d-flex justify-content-center gap-5 mb-5">
-                        <div class="border rounded p-4 text-center">
-                            <div class="fs-6 text-gray-500">Seu saldo</div>
-                            <div class="fs-2 fw-bold text-success">${meusPontos.toLocaleString('pt-BR')} pts</div>
+                    <div class="d-flex justify-content-center gap-4 mb-5 flex-wrap">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fs-7 text-gray-500">Seus Pontos</div>
+                            <div class="fs-3 fw-bold ${podePontos ? 'text-success' : 'text-muted'}">${meusPontos.toLocaleString('pt-BR')} pts</div>
                         </div>
-                        <div class="border rounded p-4 text-center">
-                            <div class="fs-6 text-gray-500">Custo</div>
-                            <div class="fs-2 fw-bold text-warning">${p.pontos_necessarios.toLocaleString('pt-BR')} pts</div>
+                        <div class="border rounded p-3 text-center">
+                            <div class="fs-7 text-gray-500">Custo em Pontos</div>
+                            <div class="fs-3 fw-bold text-warning">${p.pontos_necessarios.toLocaleString('pt-BR')} pts</div>
                         </div>
-                        <div class="border rounded p-4 text-center">
-                            <div class="fs-6 text-gray-500">Restante</div>
-                            <div class="fs-2 fw-bold ${pode ? 'text-primary' : 'text-danger'}">${(meusPontos - p.pontos_necessarios).toLocaleString('pt-BR')} pts</div>
+                        ${temPrecoDinheiro ? `
+                        <div class="border rounded p-3 text-center">
+                            <div class="fs-7 text-gray-500">Seu Saldo R$</div>
+                            <div class="fs-3 fw-bold ${podeDinheiro ? 'text-success' : 'text-muted'}">R$ ${meuSaldoDinheiro.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
                         </div>
+                        <div class="border rounded p-3 text-center">
+                            <div class="fs-7 text-gray-500">Custo em R$</div>
+                            <div class="fs-3 fw-bold text-success">R$ ${parseFloat(p.preco_dinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                        </div>
+                        ` : ''}
                     </div>
                     
                     ${estoqueBaixo ? `<div class="alert alert-warning text-center mb-5">Últimas ${p.estoque} unidades!</div>` : ''}
                     
-                    ${pode ? `
+                    ${podeAlgumaForma ? `
                         <form id="form_resgate">
                             <input type="hidden" name="produto_id" value="${p.id}">
+                            
+                            ${formaPagamentoHtml}
                             
                             <div class="mb-5">
                                 <label class="form-label">Observação (opcional)</label>
@@ -513,8 +619,9 @@ function abrirModalResgate(produtoId) {
                     ` : `
                         <div class="alert alert-danger text-center">
                             <i class="ki-duotone ki-information-5 fs-2x mb-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                            <div>Você não tem pontos suficientes para este produto.</div>
-                            <div class="mt-2">Faltam <strong>${(p.pontos_necessarios - meusPontos).toLocaleString('pt-BR')}</strong> pontos.</div>
+                            <div>Você não tem saldo suficiente para este produto.</div>
+                            ${!podePontos ? `<div class="mt-2">Faltam <strong>${(p.pontos_necessarios - meusPontos).toLocaleString('pt-BR')}</strong> pontos.</div>` : ''}
+                            ${temPrecoDinheiro && !podeDinheiro ? `<div class="mt-1">Ou faltam <strong>R$ ${(parseFloat(p.preco_dinheiro) - meuSaldoDinheiro).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> em créditos.</div>` : ''}
                         </div>
                         <div class="text-center">
                             <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>

@@ -139,6 +139,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <th class="min-w-200px">Produto</th>
                             <th class="min-w-100px">Categoria</th>
                             <th class="min-w-80px text-center">Pontos</th>
+                            <th class="min-w-80px text-center">Preço R$</th>
                             <th class="min-w-80px text-center">Estoque</th>
                             <th class="min-w-80px text-center">Resgates</th>
                             <th class="min-w-80px text-center">Status</th>
@@ -179,6 +180,15 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="badge badge-light-warning fs-6">
                                     <?= number_format($prod['pontos_necessarios'], 0, ',', '.') ?>
                                 </span>
+                            </td>
+                            <td class="text-center">
+                                <?php if ($prod['preco_dinheiro'] !== null && $prod['preco_dinheiro'] > 0): ?>
+                                    <span class="badge badge-light-success fs-6">
+                                        R$ <?= number_format($prod['preco_dinheiro'], 2, ',', '.') ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted fs-8">-</span>
+                                <?php endif; ?>
                             </td>
                             <td class="text-center">
                                 <?php if ($prod['estoque'] === null): ?>
@@ -255,6 +265,15 @@ require_once __DIR__ . '/../includes/header.php';
                                     <label class="form-label required">Pontos Necessários</label>
                                     <input type="number" name="pontos_necessarios" id="produto_pontos" class="form-control form-control-solid" min="1" required>
                                 </div>
+                            </div>
+                            
+                            <div class="mb-5">
+                                <label class="form-label">Preço em R$ (opcional)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="text" name="preco_dinheiro" id="produto_preco_dinheiro" class="form-control form-control-solid" placeholder="0,00" oninput="formatarMoedaProduto(this)">
+                                </div>
+                                <div class="form-text">Deixe vazio se o produto aceita apenas pontos. Se preenchido, o colaborador poderá escolher pagar com pontos ou R$.</div>
                             </div>
                             
                             <div class="mb-5">
@@ -344,6 +363,17 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+// Função para formatar moeda
+function formatarMoedaProduto(input) {
+    let valor = input.value.replace(/\D/g, '');
+    valor = (parseInt(valor) / 100).toFixed(2);
+    if (isNaN(valor) || valor === '0.00') {
+        input.value = '';
+        return;
+    }
+    input.value = valor.replace('.', ',');
+}
+
 // Filtros
 document.getElementById('busca_produto').addEventListener('input', filtrarTabela);
 document.getElementById('filtro_categoria').addEventListener('change', filtrarTabela);
@@ -382,6 +412,7 @@ function previewImagem(input) {
 function limparForm() {
     document.getElementById('form_produto').reset();
     document.getElementById('produto_id').value = '';
+    document.getElementById('produto_preco_dinheiro').value = '';
     document.getElementById('modal_produto_titulo').textContent = 'Novo Produto';
     document.getElementById('produto_imagem_preview').style.backgroundImage = "url('../assets/media/svg/files/blank-image.svg')";
     document.getElementById('produto_imagem_preview').style.backgroundSize = '50%';
@@ -409,6 +440,13 @@ function editarProduto(id) {
                 document.getElementById('produto_disponivel_ate').value = p.disponivel_ate || '';
                 document.getElementById('produto_destaque').checked = p.destaque == 1;
                 document.getElementById('produto_ativo').checked = p.ativo == 1;
+                
+                // Preço em R$
+                if (p.preco_dinheiro && parseFloat(p.preco_dinheiro) > 0) {
+                    document.getElementById('produto_preco_dinheiro').value = parseFloat(p.preco_dinheiro).toFixed(2).replace('.', ',');
+                } else {
+                    document.getElementById('produto_preco_dinheiro').value = '';
+                }
                 
                 if (p.imagem) {
                     document.getElementById('produto_imagem_preview').style.backgroundImage = `url('../${p.imagem}')`;

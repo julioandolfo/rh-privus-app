@@ -1778,72 +1778,90 @@ require_once __DIR__ . '/../includes/header.php';
                         require_once __DIR__ . '/../includes/pontuacao.php';
                         $pontos_colaborador = obter_pontos(null, $id);
                         $historico_pontos = obter_historico_pontos($id, 50);
+                        $saldo_dinheiro = obter_saldo_dinheiro($id);
+                        $historico_dinheiro = obter_historico_saldo_dinheiro($id, 50);
                         ?>
                         
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-7 gap-3">
-                            <h3 class="fw-bold text-gray-800 mb-0">Gerenciar Pontos</h3>
-                            <div class="d-flex gap-2">
+                            <h3 class="fw-bold text-gray-800 mb-0">Gerenciar Pontos e Créditos</h3>
+                            <div class="d-flex flex-wrap gap-2">
                                 <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modal_adicionar_pontos">
                                     <i class="ki-duotone ki-plus fs-6">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
-                                    Adicionar Pontos
+                                    <span class="d-none d-md-inline">Adicionar</span> Pontos
                                 </button>
                                 <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modal_remover_pontos">
                                     <i class="ki-duotone ki-minus fs-6">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
-                                    Remover Pontos
+                                    <span class="d-none d-md-inline">Remover</span> Pontos
+                                </button>
+                                <div class="vr d-none d-md-block mx-1"></div>
+                                <button type="button" class="btn btn-sm btn-light-success" data-bs-toggle="modal" data-bs-target="#modal_adicionar_dinheiro">
+                                    <i class="ki-duotone ki-dollar fs-6">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <span class="d-none d-md-inline">Adicionar</span> R$
+                                </button>
+                                <button type="button" class="btn btn-sm btn-light-danger" data-bs-toggle="modal" data-bs-target="#modal_remover_dinheiro">
+                                    <i class="ki-duotone ki-minus fs-6">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <span class="d-none d-md-inline">Remover</span> R$
                                 </button>
                             </div>
                         </div>
                         
                         <!-- Cards de Estatísticas -->
                         <div class="row g-4 mb-7">
-                            <div class="col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <div class="card card-flush bg-light-warning border-warning border border-dashed h-100">
-                                    <div class="card-body text-center p-5">
-                                        <i class="ki-duotone ki-medal-star fs-3x text-warning mb-3">
+                                    <div class="card-body text-center p-4">
+                                        <i class="ki-duotone ki-medal-star fs-2x text-warning mb-2">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                             <span class="path3"></span>
                                             <span class="path4"></span>
                                         </i>
-                                        <div class="fs-2hx fw-bold text-warning" id="pontos_total_display"><?= number_format($pontos_colaborador['pontos_totais'], 0, ',', '.') ?></div>
-                                        <div class="text-gray-600 fw-semibold fs-6">Pontos Totais</div>
+                                        <div class="fs-2 fw-bold text-warning" id="pontos_total_display"><?= number_format($pontos_colaborador['pontos_totais'], 0, ',', '.') ?></div>
+                                        <div class="text-gray-600 fw-semibold fs-7">Pontos Totais</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <div class="card card-flush bg-light-primary border-primary border border-dashed h-100">
-                                    <div class="card-body text-center p-5">
-                                        <i class="ki-duotone ki-calendar fs-3x text-primary mb-3">
+                                    <div class="card-body text-center p-4">
+                                        <i class="ki-duotone ki-calendar fs-2x text-primary mb-2">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
-                                        <div class="fs-2hx fw-bold text-primary"><?= number_format($pontos_colaborador['pontos_mes'], 0, ',', '.') ?></div>
-                                        <div class="text-gray-600 fw-semibold fs-6">Pontos no Mês</div>
+                                        <div class="fs-2 fw-bold text-primary"><?= number_format($pontos_colaborador['pontos_mes'], 0, ',', '.') ?></div>
+                                        <div class="text-gray-600 fw-semibold fs-7">Pontos no Mês</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <div class="card card-flush bg-light-success border-success border border-dashed h-100">
-                                    <div class="card-body text-center p-5">
-                                        <i class="ki-duotone ki-time fs-3x text-success mb-3">
+                                    <div class="card-body text-center p-4">
+                                        <i class="ki-duotone ki-time fs-2x text-success mb-2">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
-                                        <div class="fs-2hx fw-bold text-success"><?= number_format($pontos_colaborador['pontos_semana'], 0, ',', '.') ?></div>
-                                        <div class="text-gray-600 fw-semibold fs-6">Pontos na Semana</div>
+                                        <div class="fs-2 fw-bold text-success"><?= number_format($pontos_colaborador['pontos_semana'], 0, ',', '.') ?></div>
+                                        <div class="text-gray-600 fw-semibold fs-7">Pontos Semana</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <div class="card card-flush bg-light-info border-info border border-dashed h-100">
-                                    <div class="card-body text-center p-5">
-                                        <i class="ki-duotone ki-sun fs-3x text-info mb-3">
+                                    <div class="card-body text-center p-4">
+                                        <i class="ki-duotone ki-sun fs-2x text-info mb-2">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                             <span class="path3"></span>
@@ -1853,8 +1871,26 @@ require_once __DIR__ . '/../includes/header.php';
                                             <span class="path7"></span>
                                             <span class="path8"></span>
                                         </i>
-                                        <div class="fs-2hx fw-bold text-info"><?= number_format($pontos_colaborador['pontos_dia'], 0, ',', '.') ?></div>
-                                        <div class="text-gray-600 fw-semibold fs-6">Pontos Hoje</div>
+                                        <div class="fs-2 fw-bold text-info"><?= number_format($pontos_colaborador['pontos_dia'], 0, ',', '.') ?></div>
+                                        <div class="text-gray-600 fw-semibold fs-7">Pontos Hoje</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-8 col-xl-4">
+                                <div class="card card-flush h-100" style="background: linear-gradient(135deg, #1e7e34 0%, #28a745 100%);">
+                                    <div class="card-body d-flex align-items-center justify-content-between p-4">
+                                        <div>
+                                            <div class="text-white opacity-75 fs-7 mb-1">Saldo em Créditos</div>
+                                            <div class="fs-2hx fw-bold text-white" id="saldo_dinheiro_display">R$ <?= number_format($saldo_dinheiro, 2, ',', '.') ?></div>
+                                            <div class="text-white opacity-75 fs-8 mt-1">Disponível para uso na loja</div>
+                                        </div>
+                                        <div class="d-flex flex-column align-items-center">
+                                            <i class="ki-duotone ki-dollar fs-4x text-white opacity-50">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1932,6 +1968,78 @@ require_once __DIR__ . '/../includes/header.php';
                                                         <?php else: ?>
                                                             <span class="text-muted fs-8">-</span>
                                                         <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        
+                        <!-- Histórico de Saldo em R$ -->
+                        <div class="card card-flush mt-7">
+                            <div class="card-header pt-7">
+                                <h3 class="card-title align-items-start flex-column">
+                                    <span class="card-label fw-bold text-gray-800">
+                                        <i class="ki-duotone ki-dollar fs-3 text-success me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        Histórico de Créditos (R$)
+                                    </span>
+                                    <span class="text-muted mt-1 fw-semibold fs-7">Últimas 50 movimentações</span>
+                                </h3>
+                            </div>
+                            <div class="card-body pt-5">
+                                <?php if (empty($historico_dinheiro)): ?>
+                                    <div class="text-center text-muted py-10">
+                                        <i class="ki-duotone ki-dollar fs-3x text-gray-300 mb-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <p>Nenhum registro de créditos em R$ ainda.</p>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                            <thead>
+                                                <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase">
+                                                    <th class="min-w-100px">Data</th>
+                                                    <th class="min-w-150px">Descrição</th>
+                                                    <th class="min-w-100px text-center">Valor</th>
+                                                    <th class="min-w-100px text-center">Saldo</th>
+                                                    <th class="min-w-120px">Responsável</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($historico_dinheiro as $hd): 
+                                                    $is_credito = $hd['tipo'] === 'credito';
+                                                ?>
+                                                <tr>
+                                                    <td>
+                                                        <span class="text-gray-800 fw-semibold"><?= date('d/m/Y', strtotime($hd['created_at'])) ?></span>
+                                                        <br><span class="text-muted fs-8"><?= date('H:i', strtotime($hd['created_at'])) ?></span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge badge-light-<?= $is_credito ? 'success' : 'danger' ?> fs-7 mb-1">
+                                                            <?= $is_credito ? 'Crédito' : 'Débito' ?>
+                                                        </span>
+                                                        <br><span class="text-gray-600 fs-7"><?= htmlspecialchars($hd['descricao']) ?></span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span class="fw-bold fs-5 text-<?= $is_credito ? 'success' : 'danger' ?>">
+                                                            <?= $is_credito ? '+' : '' ?>R$ <?= number_format($hd['valor'], 2, ',', '.') ?>
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span class="text-gray-700 fs-7">R$ <?= number_format($hd['saldo_posterior'], 2, ',', '.') ?></span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="text-gray-600 fs-7"><?= htmlspecialchars($hd['usuario_nome'] ?? 'Sistema') ?></span>
                                                     </td>
                                                 </tr>
                                                 <?php endforeach; ?>
@@ -2155,6 +2263,146 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="path2"></span>
                             </i>
                             Remover Pontos
+                        </span>
+                        <span class="indicator-progress">Processando...
+                            <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Saldo em R$ -->
+<div class="modal fade" id="modal_adicionar_dinheiro" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold text-success">
+                    <i class="ki-duotone ki-dollar fs-2x text-success me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Adicionar Créditos (R$)
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="form_adicionar_dinheiro">
+                <div class="modal-body py-10 px-lg-17">
+                    <input type="hidden" name="action" value="adicionar_dinheiro">
+                    <input type="hidden" name="colaborador_id" value="<?= $id ?>">
+                    
+                    <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-4 mb-7">
+                        <i class="ki-duotone ki-information fs-2x text-success me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <span class="fw-semibold text-gray-800">Adicionar créditos em R$</span>
+                            <span class="text-gray-600 fs-7">O colaborador poderá usar este saldo para comprar produtos na loja.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-7">
+                        <label class="fw-semibold fs-6 mb-2 required">Valor (R$)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="text" name="valor" class="form-control form-control-solid" placeholder="0,00" required oninput="formatarMoeda(this)">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="fw-semibold fs-6 mb-2 required">Motivo/Descrição</label>
+                        <textarea name="descricao" class="form-control form-control-solid" rows="3" placeholder="Ex: Bonificação, Vale-alimentação, Premiação, etc." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <span class="indicator-label">
+                            <i class="ki-duotone ki-plus fs-4 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Adicionar Créditos
+                        </span>
+                        <span class="indicator-progress">Processando...
+                            <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Remover Saldo em R$ -->
+<div class="modal fade" id="modal_remover_dinheiro" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold text-danger">
+                    <i class="ki-duotone ki-dollar fs-2x text-danger me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Remover Créditos (R$)
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="form_remover_dinheiro">
+                <div class="modal-body py-10 px-lg-17">
+                    <input type="hidden" name="action" value="remover_dinheiro">
+                    <input type="hidden" name="colaborador_id" value="<?= $id ?>">
+                    
+                    <div class="notice d-flex bg-light-danger rounded border-danger border border-dashed p-4 mb-7">
+                        <i class="ki-duotone ki-information fs-2x text-danger me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <span class="fw-semibold text-gray-800">Remover créditos em R$</span>
+                            <span class="text-gray-600 fs-7">Use para correções ou ajustes necessários.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-7">
+                        <label class="fw-semibold fs-6 mb-2 required">Valor (R$)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="text" name="valor" class="form-control form-control-solid" placeholder="0,00" required oninput="formatarMoeda(this)">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="fw-semibold fs-6 mb-2 required">Motivo/Descrição</label>
+                        <textarea name="descricao" class="form-control form-control-solid" rows="3" placeholder="Ex: Correção de lançamento, Estorno, etc." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <span class="indicator-label">
+                            <i class="ki-duotone ki-minus fs-4 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Remover Créditos
                         </span>
                         <span class="indicator-progress">Processando...
                             <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
@@ -3395,6 +3643,143 @@ document.getElementById('modal_adicionar_pontos').addEventListener('hidden.bs.mo
 
 document.getElementById('modal_remover_pontos').addEventListener('hidden.bs.modal', function() {
     document.getElementById('form_remover_pontos').reset();
+});
+
+// === Gerenciamento de Saldo em R$ ===
+
+// Função para formatar moeda
+function formatarMoeda(input) {
+    let valor = input.value.replace(/\D/g, '');
+    valor = (parseInt(valor) / 100).toFixed(2);
+    if (isNaN(valor)) valor = '0.00';
+    input.value = valor.replace('.', ',');
+}
+
+// Adicionar Saldo R$
+document.getElementById('form_adicionar_dinheiro').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const form = this;
+    const btn = form.querySelector('button[type="submit"]');
+    const formData = new FormData(form);
+    
+    // Confirma a operação
+    Swal.fire({
+        title: 'Confirmar Crédito',
+        text: `Deseja adicionar R$ ${formData.get('valor')} ao saldo do colaborador?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#28a745',
+        cancelButtonText: 'Cancelar',
+        confirmButtonText: 'Sim, adicionar!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            btn.setAttribute('data-kt-indicator', 'on');
+            btn.disabled = true;
+            
+            fetch('../api/pontos/gerenciar.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Sucesso!',
+                        text: data.message,
+                        icon: 'success'
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Erro',
+                        text: data.message || 'Erro ao processar a operação',
+                        icon: 'error'
+                    });
+                    btn.removeAttribute('data-kt-indicator');
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    title: 'Erro',
+                    text: 'Erro ao processar a requisição',
+                    icon: 'error'
+                });
+                btn.removeAttribute('data-kt-indicator');
+                btn.disabled = false;
+            });
+        }
+    });
+});
+
+// Remover Saldo R$
+document.getElementById('form_remover_dinheiro').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const form = this;
+    const btn = form.querySelector('button[type="submit"]');
+    const formData = new FormData(form);
+    
+    // Confirma a operação
+    Swal.fire({
+        title: 'Confirmar Débito',
+        text: `Deseja remover R$ ${formData.get('valor')} do saldo do colaborador?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonText: 'Cancelar',
+        confirmButtonText: 'Sim, remover!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            btn.setAttribute('data-kt-indicator', 'on');
+            btn.disabled = true;
+            
+            fetch('../api/pontos/gerenciar.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Sucesso!',
+                        text: data.message,
+                        icon: 'success'
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Erro',
+                        text: data.message || 'Erro ao processar a operação',
+                        icon: 'error'
+                    });
+                    btn.removeAttribute('data-kt-indicator');
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    title: 'Erro',
+                    text: 'Erro ao processar a requisição',
+                    icon: 'error'
+                });
+                btn.removeAttribute('data-kt-indicator');
+                btn.disabled = false;
+            });
+        }
+    });
+});
+
+// Limpa formulários ao fechar modais de dinheiro
+document.getElementById('modal_adicionar_dinheiro').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('form_adicionar_dinheiro').reset();
+});
+
+document.getElementById('modal_remover_dinheiro').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('form_remover_dinheiro').reset();
 });
 </script>
 <?php endif; ?>
