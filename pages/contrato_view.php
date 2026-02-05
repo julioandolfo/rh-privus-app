@@ -33,8 +33,14 @@ $stmt = $pdo->prepare("
     LEFT JOIN contratos_templates t ON c.template_id = t.id
     WHERE c.id = ?
 ");
-$stmt->execute([$contrato_id]);
-$contrato = $stmt->fetch();
+
+try {
+    $stmt->execute([$contrato_id]);
+    $contrato = $stmt->fetch();
+} catch (Exception $e) {
+    error_log("Erro ao buscar contrato: " . $e->getMessage());
+    redirect('contratos.php', 'Erro ao carregar contrato: ' . $e->getMessage(), 'error');
+}
 
 if (!$contrato) {
     redirect('contratos.php', 'Contrato não encontrado.', 'error');
@@ -150,9 +156,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Recarrega dados após ações
+$stmt = $pdo->prepare("
+    SELECT c.*, 
+           col.nome_completo as colaborador_nome,
+           col.cpf as colaborador_cpf,
+           col.email_pessoal as colaborador_email,
+           u.nome as criado_por_nome,
+           t.nome as template_nome
+    FROM contratos c
+    INNER JOIN colaboradores col ON c.colaborador_id = col.id
+    LEFT JOIN usuarios u ON c.criado_por_usuario_id = u.id
+    LEFT JOIN contratos_templates t ON c.template_id = t.id
+    WHERE c.id = ?
+");
 $stmt->execute([$contrato_id]);
 $contrato = $stmt->fetch();
 
+$stmt = $pdo->prepare("
+    SELECT * FROM contratos_signatarios 
+    WHERE contrato_id = ? 
+    ORDER BY ordem_assinatura ASC
+");
 $stmt->execute([$contrato_id]);
 $signatarios = $stmt->fetchAll();
 

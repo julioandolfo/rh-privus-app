@@ -14,15 +14,15 @@ $status_info = $status_labels[$contrato['status']] ?? ['label' => ucfirst($contr
 ?>
 <div class="contrato-card">
     <div class="d-flex justify-content-between align-items-start mb-2">
-        <a href="contrato_view.php?id=<?= $contrato['id'] ?>" class="text-gray-900 text-hover-primary fw-bold fs-6 mb-0">
+        <a href="contrato_view.php?id=<?= $contrato['id'] ?>" class="text-gray-800 text-hover-primary fw-bold fs-6 mb-0">
             <?= htmlspecialchars($contrato['titulo']) ?>
         </a>
         <span class="badge badge-light-<?= $status_info['class'] ?>"><?= $status_info['label'] ?></span>
     </div>
-    <div class="text-muted fs-7 mb-2">
+    <div class="text-gray-700 fs-7 mb-2">
         <strong><?= htmlspecialchars($contrato['colaborador_nome']) ?></strong>
     </div>
-    <div class="text-muted fs-7 mb-2">
+    <div class="text-gray-600 fs-7 mb-2">
         Criado: <?= date('d/m/Y', strtotime($contrato['created_at'])) ?>
     </div>
     <?php if ($contrato['assinaturas_pendentes'] > 0): ?>
@@ -35,7 +35,7 @@ $status_info = $status_labels[$contrato['status']] ?? ['label' => ucfirst($contr
     </div>
     <?php endif; ?>
     <?php if ($contrato['total_signatarios'] > 0): ?>
-    <div class="text-muted fs-7 mb-2">
+    <div class="text-gray-600 fs-7 mb-2">
         <i class="ki-duotone ki-user fs-6">
             <span class="path1"></span>
             <span class="path2"></span>
@@ -47,7 +47,7 @@ $status_info = $status_labels[$contrato['status']] ?? ['label' => ucfirst($contr
     <!--begin::Ações Rápidas-->
     <div class="d-flex gap-2 mt-3 pt-3 border-top">
         <?php if (!empty($contrato['pdf_path'])): ?>
-        <a href="<?= htmlspecialchars($contrato['pdf_path']) ?>" 
+        <a href="../<?= htmlspecialchars($contrato['pdf_path']) ?>" 
            target="_blank" 
            class="btn btn-sm btn-light-primary flex-grow-1"
            onclick="event.stopPropagation();"

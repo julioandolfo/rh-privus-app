@@ -324,8 +324,8 @@ require_once __DIR__ . '/../includes/header.php';
 }
 
 .contrato-card {
-    background: white;
-    border: 1px solid #e4e6ef;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
     border-radius: 8px;
     padding: 15px;
     margin-bottom: 10px;
@@ -336,6 +336,16 @@ require_once __DIR__ . '/../includes/header.php';
 .contrato-card:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     transform: translateY(-2px);
+}
+
+/* Modo escuro */
+[data-bs-theme="dark"] .contrato-card {
+    background: var(--bs-gray-200);
+    border-color: var(--bs-gray-300);
+}
+
+[data-bs-theme="dark"] .contrato-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 </style>
 
