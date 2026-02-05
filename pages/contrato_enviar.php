@@ -3,15 +3,6 @@
  * Enviar Contrato Rascunho para Assinatura
  */
 
-// Ativa exibição de erros temporariamente para debug
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
-// Handler para capturar erros fatais
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
-});
-
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
@@ -51,7 +42,6 @@ $stmt = $pdo->prepare("
            col.nome_completo as colaborador_nome,
            col.cpf as colaborador_cpf,
            col.email_pessoal as colaborador_email,
-           col.email as colaborador_email_alt,
            col.empresa_id
     FROM contratos c
     INNER JOIN colaboradores col ON c.colaborador_id = col.id
@@ -91,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $signatarios = [];
         
         // Colaborador como primeiro signatário
-        $email_colaborador = $colaborador['email_pessoal'] ?? $colaborador['email'] ?? '';
+        $email_colaborador = $colaborador['email_pessoal'] ?? '';
         if (empty($email_colaborador)) {
             throw new Exception('O colaborador não possui email cadastrado.');
         }
@@ -268,7 +258,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="text-muted fs-7">Colaborador:</span>
                                 <div class="fw-bold"><?= htmlspecialchars($contrato['colaborador_nome']) ?></div>
                                 <div class="text-muted fs-7">
-                                    <?= htmlspecialchars($colaborador['email_pessoal'] ?? $colaborador['email'] ?? 'Sem email') ?>
+                                    <?= htmlspecialchars($colaborador['email_pessoal'] ?? 'Sem email') ?>
                                 </div>
                             </div>
                             <div>
