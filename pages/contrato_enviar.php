@@ -156,9 +156,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Cria documento no Autentique
+        error_log("Enviando para Autentique - Signatários: " . count($signatarios));
         $resultado = $service->criarDocumento($contrato['titulo'], $pdf_base64, $signatarios);
         
+        error_log("Resultado Autentique: " . print_r($resultado, true));
+        
         if ($resultado) {
+            error_log("API Autentique retornou sucesso");
             // Atualiza contrato com dados do Autentique
             $stmt = $pdo->prepare("
                 UPDATE contratos 
@@ -181,43 +185,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ordem = 0;
             $sigIndex = 0;
             
-            // Colaborador (primeiro signatário)
-            $stmt = $pdo->prepare("
-                INSERT INTO contratos_signatarios 
-                (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
-                VALUES (?, 'colaborador', ?, ?, ?, ?, ?, ?)
-            ");
-            $signer = $signatures[$sigIndex++] ?? null;
-            $link_assinatura = $signer['link']['short_link'] ?? null;
-            $stmt->execute([
-                $contrato_id,
-                $colaborador['nome_completo'],
-                $email_colaborador,
-                formatar_cpf($colaborador['cpf'] ?? ''),
-                $signer['public_id'] ?? null,
-                $ordem++,
-                $link_assinatura
-            ]);
+            // Log para debug
+            error_log("Contrato ID: $contrato_id - Iniciando inserção de signatários");
+            error_log("Colaborador: " . print_r($colaborador, true));
+            error_log("Signatures da API: " . print_r($signatures, true));
             
-            // Representante da empresa (se habilitado)
-            if ($incluir_representante && !empty($representante['email'])) {
-                $signer = $signatures[$sigIndex++] ?? null;
-                $link_publico = $signer['link']['short_link'] ?? null;
-                
+            // Colaborador (primeiro signatário)
+            try {
                 $stmt = $pdo->prepare("
                     INSERT INTO contratos_signatarios 
                     (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
-                    VALUES (?, 'representante', ?, ?, ?, ?, ?, ?)
+                    VALUES (?, 'colaborador', ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([
+                $signer = $signatures[$sigIndex++] ?? null;
+                $link_assinatura = $signer['link']['short_link'] ?? null;
+                
+                $dados_colaborador = [
                     $contrato_id,
-                    $representante['nome'] ?? '',
-                    $representante['email'],
-                    formatar_cpf($representante['cpf'] ?? ''),
+                    $colaborador['nome_completo'] ?? 'Nome não informado',
+                    $email_colaborador,
+                    formatar_cpf($colaborador['cpf'] ?? ''),
                     $signer['public_id'] ?? null,
                     $ordem++,
-                    $link_publico
-                ]);
+                    $link_assinatura
+                ];
+                error_log("Inserindo colaborador: " . print_r($dados_colaborador, true));
+                
+                $stmt->execute($dados_colaborador);
+                error_log("Colaborador inserido com sucesso");
+            } catch (Exception $e) {
+                error_log("ERRO ao inserir colaborador: " . $e->getMessage());
+                throw $e;
+            }
+            
+            // Representante da empresa (se habilitado)
+            error_log("Incluir representante: " . ($incluir_representante ? 'SIM' : 'NAO'));
+            error_log("Representante email: " . ($representante['email'] ?? 'VAZIO'));
+            
+            if ($incluir_representante && !empty($representante['email'])) {
+                try {
+                    $signer = $signatures[$sigIndex++] ?? null;
+                    $link_publico = $signer['link']['short_link'] ?? null;
+                    
+                    $stmt = $pdo->prepare("
+                        INSERT INTO contratos_signatarios 
+                        (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
+                        VALUES (?, 'representante', ?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $contrato_id,
+                        $representante['nome'] ?? '',
+                        $representante['email'],
+                        formatar_cpf($representante['cpf'] ?? ''),
+                        $signer['public_id'] ?? null,
+                        $ordem++,
+                        $link_publico
+                    ]);
+                    error_log("Representante inserido com sucesso");
+                } catch (Exception $e) {
+                    error_log("ERRO ao inserir representante: " . $e->getMessage());
+                    throw $e;
+                }
             }
             
             // Testemunhas
@@ -242,8 +270,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
             }
+        } else {
+            // API falhou - salva signatários básicos sem dados do Autentique
+            error_log("API Autentique retornou falso/null - salvando signatários localmente");
+            
+            // Remove signatários existentes
+            $stmt = $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?");
+            $stmt->execute([$contrato_id]);
+            
+            $ordem = 0;
+            
+            // Colaborador
+            $stmt = $pdo->prepare("
+                INSERT INTO contratos_signatarios 
+                (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                VALUES (?, 'colaborador', ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $contrato_id,
+                $colaborador['nome_completo'] ?? 'Nome não informado',
+                $email_colaborador,
+                formatar_cpf($colaborador['cpf'] ?? ''),
+                $ordem++
+            ]);
+            
+            // Representante (se habilitado)
+            if ($incluir_representante && !empty($representante['email'])) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO contratos_signatarios 
+                    (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                    VALUES (?, 'representante', ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $contrato_id,
+                    $representante['nome'] ?? '',
+                    $representante['email'],
+                    formatar_cpf($representante['cpf'] ?? ''),
+                    $ordem++
+                ]);
+            }
+            
+            // Testemunhas
+            foreach ($testemunhas as $testemunha) {
+                if (!empty($testemunha['email'])) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO contratos_signatarios 
+                        (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                        VALUES (?, 'testemunha', ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $contrato_id,
+                        $testemunha['nome'] ?? '',
+                        $testemunha['email'],
+                        formatar_cpf($testemunha['cpf'] ?? ''),
+                        $ordem++
+                    ]);
+                }
+            }
+            
+            // Ainda atualiza o status para enviado
+            $stmt = $pdo->prepare("UPDATE contratos SET status = 'enviado' WHERE id = ?");
+            $stmt->execute([$contrato_id]);
         }
         
+        error_log("Finalizando transação - commit");
         $pdo->commit();
         
         redirect('contrato_view.php?id=' . $contrato_id, 'Contrato enviado para assinatura com sucesso!', 'success');

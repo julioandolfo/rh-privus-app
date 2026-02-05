@@ -185,12 +185,18 @@ class AutentiqueService {
         
         $data = json_decode($response, true);
         
+        error_log("Autentique Response: " . print_r($data, true));
+        
         if (isset($data['errors'])) {
             $errorMessage = $data['errors'][0]['message'] ?? 'Erro desconhecido';
+            error_log("Autentique Error: " . $errorMessage);
             throw new Exception('Erro GraphQL: ' . $errorMessage);
         }
         
-        return $data['data']['createDocument'] ?? null;
+        $result = $data['data']['createDocument'] ?? null;
+        error_log("Autentique createDocument result: " . print_r($result, true));
+        
+        return $result;
     }
     
     /**
