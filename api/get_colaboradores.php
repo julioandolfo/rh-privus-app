@@ -125,13 +125,20 @@ if ($q) {
     $params[] = $search_term;
 }
 
-// Se busca desligados, retorna mais dados
+// Se busca desligados, retorna mais dados (com JOIN em empresas)
 if ($status === 'desligado') {
+    // Adiciona prefixo c. nas condições WHERE para funcionar com o JOIN
+    $where_com_alias = array_map(function($w) {
+        // Adiciona c. nas colunas que não tem prefixo
+        $w = preg_replace('/\b(empresa_id|status|setor_id|salario|nome_completo|cpf)\b/', 'c.$1', $w);
+        return $w;
+    }, $where);
+    
     $sql = "SELECT c.id, c.nome_completo, c.cpf, c.salario, c.empresa_id, c.tipo_contrato, c.data_inicio,
                    e.nome_fantasia as empresa_nome
             FROM colaboradores c
             LEFT JOIN empresas e ON c.empresa_id = e.id
-            WHERE " . implode(' AND ', $where) . " ORDER BY c.nome_completo LIMIT 50";
+            WHERE " . implode(' AND ', $where_com_alias) . " ORDER BY c.nome_completo LIMIT 50";
 } else {
     $sql = "SELECT id, nome_completo, cpf, salario, empresa_id FROM colaboradores WHERE " . implode(' AND ', $where) . " ORDER BY nome_completo LIMIT 50";
 }
