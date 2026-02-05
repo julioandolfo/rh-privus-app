@@ -125,7 +125,16 @@ if ($q) {
     $params[] = $search_term;
 }
 
-$sql = "SELECT id, nome_completo, cpf, salario, empresa_id FROM colaboradores WHERE " . implode(' AND ', $where) . " ORDER BY nome_completo LIMIT 50";
+// Se busca desligados, retorna mais dados
+if ($status === 'desligado') {
+    $sql = "SELECT c.id, c.nome_completo, c.cpf, c.salario, c.empresa_id, c.tipo_contrato, c.data_inicio,
+                   e.nome_fantasia as empresa_nome
+            FROM colaboradores c
+            LEFT JOIN empresas e ON c.empresa_id = e.id
+            WHERE " . implode(' AND ', $where) . " ORDER BY c.nome_completo LIMIT 50";
+} else {
+    $sql = "SELECT id, nome_completo, cpf, salario, empresa_id FROM colaboradores WHERE " . implode(' AND ', $where) . " ORDER BY nome_completo LIMIT 50";
+}
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $colaboradores = $stmt->fetchAll(PDO::FETCH_ASSOC);

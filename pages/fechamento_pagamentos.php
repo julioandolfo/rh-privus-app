@@ -1991,16 +1991,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ? (int)$colabs_fechamento[0] 
                     : (int)($_POST['colaborador_desligado_id'] ?? 0);
                 
-                // Valores do acerto
-                $valor_ferias = str_replace(['.', ','], ['', '.'], $_POST['acerto_valor_ferias'] ?? '0');
-                $valor_13 = str_replace(['.', ','], ['', '.'], $_POST['acerto_valor_13'] ?? '0');
-                $saldo_banco_horas = str_replace(['.', ','], ['', '.'], $_POST['acerto_saldo_banco_horas'] ?? '0');
-                $saldo_salario = str_replace(['.', ','], ['', '.'], $_POST['acerto_saldo_salario'] ?? '0');
+                // Tipo de contrato (CLT ou PJ)
+                $tipo_contrato_acerto = $_POST['acerto_tipo_contrato'] ?? 'CLT';
+                
+                // Valores comuns
                 $acerto_adicionais = str_replace(['.', ','], ['', '.'], $_POST['acerto_adicionais'] ?? '0');
                 $acerto_descontos = str_replace(['.', ','], ['', '.'], $_POST['acerto_descontos'] ?? '0');
                 $observacoes = trim($_POST['acerto_observacoes'] ?? '');
-                $dias_ferias = (int)($_POST['acerto_dias_ferias'] ?? 0);
-                $meses_13 = (int)($_POST['acerto_meses_13'] ?? 0);
+                
+                // Valores específicos por tipo
+                if ($tipo_contrato_acerto === 'PJ') {
+                    // PJ: apenas dias trabalhados × valor/dia
+                    $pj_dias = (int)($_POST['acerto_pj_dias'] ?? 0);
+                    $pj_valor_total = str_replace(['.', ','], ['', '.'], $_POST['acerto_pj_valor_total'] ?? '0');
+                    
+                    $valor_ferias = 0;
+                    $valor_13 = 0;
+                    $saldo_banco_horas = 0;
+                    $saldo_salario = (float)$pj_valor_total;
+                    $dias_ferias = 0;
+                    $meses_13 = 0;
+                } else {
+                    // CLT: todos os campos
+                    $valor_ferias = str_replace(['.', ','], ['', '.'], $_POST['acerto_valor_ferias'] ?? '0');
+                    $valor_13 = str_replace(['.', ','], ['', '.'], $_POST['acerto_valor_13'] ?? '0');
+                    $saldo_banco_horas = str_replace(['.', ','], ['', '.'], $_POST['acerto_saldo_banco_horas'] ?? '0');
+                    $saldo_salario = str_replace(['.', ','], ['', '.'], $_POST['acerto_saldo_salario'] ?? '0');
+                    $dias_ferias = (int)($_POST['acerto_dias_ferias'] ?? 0);
+                    $meses_13 = (int)($_POST['acerto_meses_13'] ?? 0);
+                    $pj_dias = 0;
+                }
                 
                 if (empty($colab_id)) {
                     $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Selecione um colaborador desligado') WHERE id = ?");
@@ -2028,7 +2048,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $colaboradores_ids = [$colab_id];
                 
                 // Busca dados do colaborador
-                $stmt = $pdo->prepare("SELECT salario, nome_completo, status FROM colaboradores WHERE id = ?");
+                $stmt = $pdo->prepare("SELECT salario, nome_completo, status, tipo_contrato FROM colaboradores WHERE id = ?");
                 $stmt->execute([$colab_id]);
                 $colab = $stmt->fetch();
                 
@@ -2040,14 +2060,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Monta descrição detalhada do acerto
                 $detalhes_acerto = [];
-                if ((float)$saldo_salario > 0) $detalhes_acerto[] = "Saldo Salário: R$ " . number_format((float)$saldo_salario, 2, ',', '.');
-                if ((float)$valor_ferias > 0) $detalhes_acerto[] = "Férias + 1/3 ({$dias_ferias} dias): R$ " . number_format((float)$valor_ferias, 2, ',', '.');
-                if ((float)$valor_13 > 0) $detalhes_acerto[] = "13º Proporcional ({$meses_13}/12): R$ " . number_format((float)$valor_13, 2, ',', '.');
-                if ((float)$saldo_banco_horas > 0) $detalhes_acerto[] = "Banco de Horas: R$ " . number_format((float)$saldo_banco_horas, 2, ',', '.');
+                $detalhes_acerto[] = "Tipo: " . $tipo_contrato_acerto;
+                
+                if ($tipo_contrato_acerto === 'PJ') {
+                    if ($pj_dias > 0) $detalhes_acerto[] = "Dias Trabalhados: {$pj_dias} dias = R$ " . number_format((float)$saldo_salario, 2, ',', '.');
+                } else {
+                    if ((float)$saldo_salario > 0) $detalhes_acerto[] = "Saldo Salário: R$ " . number_format((float)$saldo_salario, 2, ',', '.');
+                    if ((float)$valor_ferias > 0) $detalhes_acerto[] = "Férias + 1/3 ({$dias_ferias} dias): R$ " . number_format((float)$valor_ferias, 2, ',', '.');
+                    if ((float)$valor_13 > 0) $detalhes_acerto[] = "13º Proporcional ({$meses_13}/12): R$ " . number_format((float)$valor_13, 2, ',', '.');
+                    if ((float)$saldo_banco_horas > 0) $detalhes_acerto[] = "Banco de Horas: R$ " . number_format((float)$saldo_banco_horas, 2, ',', '.');
+                }
+                
                 if ((float)$acerto_adicionais > 0) $detalhes_acerto[] = "Outros Adicionais: R$ " . number_format((float)$acerto_adicionais, 2, ',', '.');
                 if ((float)$acerto_descontos > 0) $detalhes_acerto[] = "Descontos: -R$ " . number_format((float)$acerto_descontos, 2, ',', '.');
                 
-                $motivo_completo = "ACERTO DE RESCISÃO - " . $colab['nome_completo'] . "\n";
+                $motivo_completo = "ACERTO DE RESCISÃO ({$tipo_contrato_acerto}) - " . $colab['nome_completo'] . "\n";
                 $motivo_completo .= implode("\n", $detalhes_acerto) . "\n";
                 $motivo_completo .= "Total: R$ " . number_format($valor_total, 2, ',', '.') . "\n";
                 $motivo_completo .= "Obs: " . $observacoes;
@@ -4480,9 +4507,9 @@ require_once __DIR__ . '/../includes/header.php';
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6" id="extra_mes_referencia_container">
                             <label class="required fw-semibold fs-6 mb-2">Mês/Ano de Referência</label>
-                            <input type="month" name="mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m', strtotime('first day of last month')) ?>" required />
+                            <input type="month" name="mes_referencia" id="extra_mes_referencia" class="form-control form-control-solid" value="<?= date('Y-m', strtotime('first day of last month')) ?>" required />
                         </div>
                     </div>
                     
@@ -4659,6 +4686,30 @@ require_once __DIR__ . '/../includes/header.php';
                                 Este fechamento é destinado a colaboradores desligados para pagamento de verbas rescisórias.
                             </div>
                         </div>
+                        
+                        <!-- Tipo de Contrato -->
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Tipo de Contrato</label>
+                                <div class="d-flex gap-5">
+                                    <div class="form-check form-check-custom form-check-solid form-check-lg">
+                                        <input class="form-check-input" type="radio" name="acerto_tipo_contrato" id="acerto_tipo_clt" value="CLT" checked />
+                                        <label class="form-check-label fw-semibold" for="acerto_tipo_clt">
+                                            <span class="badge badge-light-primary fs-6 px-4 py-2">CLT</span>
+                                            <span class="text-muted d-block fs-7">Férias, 13º, FGTS, etc.</span>
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-custom form-check-solid form-check-lg">
+                                        <input class="form-check-input" type="radio" name="acerto_tipo_contrato" id="acerto_tipo_pj" value="PJ" />
+                                        <label class="form-check-label fw-semibold" for="acerto_tipo_pj">
+                                            <span class="badge badge-light-warning fs-6 px-4 py-2">PJ</span>
+                                            <span class="text-muted d-block fs-7">Apenas dias trabalhados</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="row mb-7">
                             <div class="col-md-12">
                                 <label class="required fw-semibold fs-6 mb-2">Colaborador Desligado</label>
@@ -4667,40 +4718,95 @@ require_once __DIR__ . '/../includes/header.php';
                                 </div>
                             </div>
                         </div>
-                        <div class="row mb-7">
-                            <div class="col-md-6">
-                                <label class="fw-semibold fs-6 mb-2">Saldo de Férias (dias)</label>
-                                <input type="number" name="acerto_dias_ferias" id="acerto_dias_ferias" class="form-control form-control-solid" placeholder="0" min="0" max="30" step="1" />
-                                <div class="form-text text-muted">Dias de férias proporcionais a pagar</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="fw-semibold fs-6 mb-2">Valor Férias + 1/3</label>
-                                <input type="text" name="acerto_valor_ferias" id="acerto_valor_ferias" class="form-control form-control-solid" placeholder="0,00" />
-                            </div>
-                        </div>
-                        <div class="row mb-7">
-                            <div class="col-md-6">
-                                <label class="fw-semibold fs-6 mb-2">13º Proporcional (meses)</label>
-                                <input type="number" name="acerto_meses_13" id="acerto_meses_13" class="form-control form-control-solid" placeholder="0" min="0" max="12" step="1" />
-                                <div class="form-text text-muted">Meses trabalhados para 13º</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="fw-semibold fs-6 mb-2">Valor 13º Proporcional</label>
-                                <input type="text" name="acerto_valor_13" id="acerto_valor_13" class="form-control form-control-solid" placeholder="0,00" />
-                            </div>
-                        </div>
-                        <div class="row mb-7">
-                            <div class="col-md-6">
-                                <label class="fw-semibold fs-6 mb-2">Saldo Banco de Horas</label>
-                                <input type="text" name="acerto_saldo_banco_horas" id="acerto_saldo_banco_horas" class="form-control form-control-solid" placeholder="0,00" />
-                                <div class="form-text text-muted">Horas a serem pagas em R$</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="fw-semibold fs-6 mb-2">Saldo de Salário</label>
-                                <input type="text" name="acerto_saldo_salario" id="acerto_saldo_salario" class="form-control form-control-solid" placeholder="0,00" />
-                                <div class="form-text text-muted">Dias trabalhados no último mês</div>
+                        
+                        <!-- Informações do Colaborador (preenchidas automaticamente) -->
+                        <div class="row mb-7" id="acerto_info_colaborador" style="display: none;">
+                            <div class="col-md-12">
+                                <div class="card bg-light">
+                                    <div class="card-body py-4">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <span class="text-muted fs-7">Salário</span>
+                                                <div class="fw-bold fs-5 text-primary" id="acerto_info_salario">-</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <span class="text-muted fs-7">Admissão</span>
+                                                <div class="fw-bold" id="acerto_info_admissao">-</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <span class="text-muted fs-7">Desligamento</span>
+                                                <div class="fw-bold text-danger" id="acerto_info_desligamento">-</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <span class="text-muted fs-7">Banco de Horas</span>
+                                                <div class="fw-bold" id="acerto_info_banco_horas">-</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                        
+                        <!-- Campos CLT -->
+                        <div id="acerto_campos_clt">
+                            <div class="row mb-7">
+                                <div class="col-md-6">
+                                    <label class="fw-semibold fs-6 mb-2">Saldo de Férias (dias)</label>
+                                    <input type="number" name="acerto_dias_ferias" id="acerto_dias_ferias" class="form-control form-control-solid" placeholder="0" min="0" max="30" step="1" />
+                                    <div class="form-text text-muted">Dias de férias proporcionais a pagar</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="fw-semibold fs-6 mb-2">Valor Férias + 1/3</label>
+                                    <input type="text" name="acerto_valor_ferias" id="acerto_valor_ferias" class="form-control form-control-solid" placeholder="0,00" />
+                                </div>
+                            </div>
+                            <div class="row mb-7">
+                                <div class="col-md-6">
+                                    <label class="fw-semibold fs-6 mb-2">13º Proporcional (meses)</label>
+                                    <input type="number" name="acerto_meses_13" id="acerto_meses_13" class="form-control form-control-solid" placeholder="0" min="0" max="12" step="1" />
+                                    <div class="form-text text-muted">Meses trabalhados para 13º</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="fw-semibold fs-6 mb-2">Valor 13º Proporcional</label>
+                                    <input type="text" name="acerto_valor_13" id="acerto_valor_13" class="form-control form-control-solid" placeholder="0,00" />
+                                </div>
+                            </div>
+                            <div class="row mb-7">
+                                <div class="col-md-6">
+                                    <label class="fw-semibold fs-6 mb-2">Saldo Banco de Horas</label>
+                                    <input type="text" name="acerto_saldo_banco_horas" id="acerto_saldo_banco_horas" class="form-control form-control-solid" placeholder="0,00" />
+                                    <div class="form-text text-muted">Horas a serem pagas em R$</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="fw-semibold fs-6 mb-2">Saldo de Salário</label>
+                                    <input type="text" name="acerto_saldo_salario" id="acerto_saldo_salario" class="form-control form-control-solid" placeholder="0,00" />
+                                    <div class="form-text text-muted">Dias trabalhados no último mês</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Campos PJ -->
+                        <div id="acerto_campos_pj" style="display: none;">
+                            <div class="row mb-7">
+                                <div class="col-md-4">
+                                    <label class="fw-semibold fs-6 mb-2">Dias Trabalhados</label>
+                                    <input type="number" name="acerto_pj_dias" id="acerto_pj_dias" class="form-control form-control-solid" placeholder="0" min="0" max="31" step="1" />
+                                    <div class="form-text text-muted">Dias não pagos</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="fw-semibold fs-6 mb-2">Valor por Dia</label>
+                                    <input type="text" name="acerto_pj_valor_dia" id="acerto_pj_valor_dia" class="form-control form-control-solid" placeholder="0,00" readonly />
+                                    <div class="form-text text-muted">Salário ÷ 30</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="fw-semibold fs-6 mb-2">Valor a Pagar</label>
+                                    <input type="text" name="acerto_pj_valor_total" id="acerto_pj_valor_total" class="form-control form-control-solid bg-light-primary" placeholder="0,00" readonly />
+                                    <div class="form-text text-muted">Dias × Valor/Dia</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Campos comuns -->
                         <div class="row mb-7">
                             <div class="col-md-6">
                                 <label class="fw-semibold fs-6 mb-2">Outros Adicionais</label>
@@ -5177,6 +5283,26 @@ function abrirModalFechamentoExtra(subtipo) {
         el.style.display = 'none';
     });
     
+    // Mostra/esconde mês/ano de referência (não aplica para acerto)
+    const mesRefContainer = document.getElementById('extra_mes_referencia_container');
+    const mesRefInput = document.getElementById('extra_mes_referencia');
+    const empresaSelect = document.getElementById('extra_empresa_id');
+    const todasOption = empresaSelect?.querySelector('option[value="todas"]');
+    
+    if (subtipo === 'acerto') {
+        mesRefContainer.style.display = 'none';
+        mesRefInput.removeAttribute('required');
+        // Define mês atual para acerto
+        mesRefInput.value = new Date().toISOString().slice(0, 7);
+        // Esconde opção "Todas Empresas" (não faz sentido para acerto individual)
+        if (todasOption) todasOption.style.display = 'none';
+    } else {
+        mesRefContainer.style.display = 'block';
+        mesRefInput.setAttribute('required', 'required');
+        // Mostra opção "Todas Empresas"
+        if (todasOption) todasOption.style.display = '';
+    }
+    
     // Mostra campos conforme subtipo
     if (subtipo === 'bonus_especifico') {
         document.querySelectorAll('.campo-bonus-especifico').forEach(el => el.style.display = 'block');
@@ -5210,6 +5336,11 @@ function abrirModalFechamentoExtra(subtipo) {
     document.querySelectorAll('#extra_colaboradores_container').forEach(container => {
         container.innerHTML = '<p class="text-muted">Selecione uma empresa primeiro</p>';
     });
+    
+    // Se for acerto, reseta os campos específicos APÓS o reset do form
+    if (subtipo === 'acerto') {
+        resetarCamposAcerto();
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_fechamento_extra'));
     modal.show();
@@ -5564,6 +5695,9 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
     if (subtipo === 'acerto') {
         const containerDesligados = document.getElementById('extra_colaboradores_desligados_container');
         if (containerDesligados) {
+            // Reseta campos quando muda empresa
+            resetarCamposAcerto();
+            
             containerDesligados.innerHTML = '<p class="text-muted">Carregando colaboradores desligados...</p>';
             const urlDesligados = empresaId === 'todas' 
                 ? '../api/get_colaboradores.php?status=desligado'
@@ -5573,10 +5707,27 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
                 .then(data => {
                     let html = '<select name="colaborador_desligado_id" id="extra_colaborador_desligado_id" class="form-select form-select-solid" required><option value="">Selecione um colaborador desligado...</option>';
                     data.forEach(colab => {
-                        html += '<option value="' + colab.id + '" data-salario="' + (colab.salario || 0) + '">' + colab.nome_completo + (colab.empresa_nome ? ' - ' + colab.empresa_nome : '') + '</option>';
+                        html += '<option value="' + colab.id + '">' + colab.nome_completo + (colab.empresa_nome ? ' - ' + colab.empresa_nome : '') + '</option>';
                     });
                     html += '</select>';
-                    containerDesligados.innerHTML = data.length > 0 ? html : '<p class="text-warning">Nenhum colaborador desligado encontrado nesta empresa</p>';
+                    
+                    if (data.length > 0) {
+                        containerDesligados.innerHTML = html;
+                        
+                        // Adiciona listener para buscar dados quando selecionar colaborador
+                        document.getElementById('extra_colaborador_desligado_id')?.addEventListener('change', function() {
+                            const colabId = this.value;
+                            if (colabId) {
+                                buscarDadosColaboradorDesligado(colabId);
+                            } else {
+                                // Limpa dados se nenhum colaborador selecionado
+                                document.getElementById('acerto_info_colaborador').style.display = 'none';
+                                resetarCamposAcerto();
+                            }
+                        });
+                    } else {
+                        containerDesligados.innerHTML = '<p class="text-warning">Nenhum colaborador desligado encontrado nesta empresa</p>';
+                    }
                 })
                 .catch(() => {
                     containerDesligados.innerHTML = '<p class="text-danger">Erro ao carregar colaboradores</p>';
@@ -5759,20 +5910,33 @@ function calcularTotalAcerto() {
         return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
     };
     
-    const valorFerias = parseValor(document.getElementById('acerto_valor_ferias')?.value);
-    const valor13 = parseValor(document.getElementById('acerto_valor_13')?.value);
-    const saldoBancoHoras = parseValor(document.getElementById('acerto_saldo_banco_horas')?.value);
-    const saldoSalario = parseValor(document.getElementById('acerto_saldo_salario')?.value);
+    let total = 0;
+    
+    // Verifica se é CLT ou PJ
+    const isPJ = document.getElementById('acerto_tipo_pj')?.checked;
+    
+    if (isPJ) {
+        // PJ: apenas valor total + adicionais - descontos
+        total = parseValor(document.getElementById('acerto_pj_valor_total')?.value);
+    } else {
+        // CLT: soma todos os campos
+        const valorFerias = parseValor(document.getElementById('acerto_valor_ferias')?.value);
+        const valor13 = parseValor(document.getElementById('acerto_valor_13')?.value);
+        const saldoBancoHoras = parseValor(document.getElementById('acerto_saldo_banco_horas')?.value);
+        const saldoSalario = parseValor(document.getElementById('acerto_saldo_salario')?.value);
+        total = valorFerias + valor13 + saldoBancoHoras + saldoSalario;
+    }
+    
+    // Adiciona adicionais e subtrai descontos (comum para CLT e PJ)
     const adicionais = parseValor(document.getElementById('acerto_adicionais')?.value);
     const descontos = parseValor(document.getElementById('acerto_descontos')?.value);
-    
-    const total = valorFerias + valor13 + saldoBancoHoras + saldoSalario + adicionais - descontos;
+    total = total + adicionais - descontos;
     
     const displayEl = document.getElementById('acerto_total_display');
     if (displayEl) {
         displayEl.textContent = 'R$ ' + total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         displayEl.classList.remove('text-primary', 'text-danger');
-        displayEl.classList.add(total > 0 ? 'text-primary' : 'text-danger');
+        displayEl.classList.add(total >= 0 ? 'text-primary' : 'text-danger');
     }
 }
 
@@ -5802,6 +5966,163 @@ document.getElementById('kt_modal_fechamento_extra')?.addEventListener('shown.bs
         }
     });
 });
+
+// ======== ACERTO - Funções auxiliares ========
+
+// Dados do colaborador selecionado para acerto
+let acertoColaboradorDados = null;
+
+// Reseta todos os campos de acerto
+function resetarCamposAcerto() {
+    acertoColaboradorDados = null;
+    
+    // Reseta tipo para CLT
+    document.getElementById('acerto_tipo_clt').checked = true;
+    document.getElementById('acerto_tipo_pj').checked = false;
+    atualizarCamposAcertoTipo('CLT');
+    
+    // Esconde info do colaborador
+    document.getElementById('acerto_info_colaborador').style.display = 'none';
+    
+    // Limpa campos CLT
+    ['acerto_dias_ferias', 'acerto_meses_13'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    ['acerto_valor_ferias', 'acerto_valor_13', 'acerto_saldo_banco_horas', 'acerto_saldo_salario', 'acerto_adicionais', 'acerto_descontos'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    
+    // Limpa campos PJ
+    document.getElementById('acerto_pj_dias').value = '';
+    document.getElementById('acerto_pj_valor_dia').value = '';
+    document.getElementById('acerto_pj_valor_total').value = '';
+    
+    // Limpa observações
+    document.getElementById('acerto_observacoes').value = '';
+    
+    // Reseta total
+    document.getElementById('acerto_total_display').textContent = 'R$ 0,00';
+    
+    // Reseta container de colaboradores
+    document.getElementById('extra_colaboradores_desligados_container').innerHTML = '<p class="text-muted">Selecione uma empresa primeiro</p>';
+}
+
+// Atualiza visibilidade dos campos baseado no tipo de contrato
+function atualizarCamposAcertoTipo(tipo) {
+    const camposCLT = document.getElementById('acerto_campos_clt');
+    const camposPJ = document.getElementById('acerto_campos_pj');
+    
+    if (tipo === 'CLT') {
+        camposCLT.style.display = 'block';
+        camposPJ.style.display = 'none';
+    } else {
+        camposCLT.style.display = 'none';
+        camposPJ.style.display = 'block';
+    }
+    
+    calcularTotalAcerto();
+}
+
+// Formata valor para exibição em moeda
+function formatarMoeda(valor) {
+    return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Formata data para exibição
+function formatarData(dataStr) {
+    if (!dataStr) return '-';
+    const data = new Date(dataStr + 'T00:00:00');
+    return data.toLocaleDateString('pt-BR');
+}
+
+// Preenche campos com dados do colaborador
+function preencherDadosAcerto(dados) {
+    acertoColaboradorDados = dados;
+    
+    // Atualiza tipo de contrato baseado no cadastro
+    const tipo = dados.tipo_contrato || 'CLT';
+    if (tipo === 'PJ') {
+        document.getElementById('acerto_tipo_pj').checked = true;
+        document.getElementById('acerto_tipo_clt').checked = false;
+    } else {
+        document.getElementById('acerto_tipo_clt').checked = true;
+        document.getElementById('acerto_tipo_pj').checked = false;
+    }
+    atualizarCamposAcertoTipo(tipo);
+    
+    // Mostra info do colaborador
+    document.getElementById('acerto_info_colaborador').style.display = 'block';
+    document.getElementById('acerto_info_salario').textContent = 'R$ ' + formatarMoeda(dados.salario || 0);
+    document.getElementById('acerto_info_admissao').textContent = formatarData(dados.data_admissao);
+    document.getElementById('acerto_info_desligamento').textContent = formatarData(dados.data_desligamento);
+    
+    const saldoHoras = dados.saldo_banco_horas || 0;
+    document.getElementById('acerto_info_banco_horas').textContent = saldoHoras.toFixed(2) + 'h';
+    document.getElementById('acerto_info_banco_horas').classList.toggle('text-success', saldoHoras > 0);
+    document.getElementById('acerto_info_banco_horas').classList.toggle('text-danger', saldoHoras < 0);
+    
+    if (tipo === 'CLT') {
+        // Preenche campos CLT
+        document.getElementById('acerto_dias_ferias').value = dados.ferias_dias || 0;
+        document.getElementById('acerto_valor_ferias').value = formatarMoeda(dados.valor_ferias || 0);
+        document.getElementById('acerto_meses_13').value = dados.meses_13 || 0;
+        document.getElementById('acerto_valor_13').value = formatarMoeda(dados.valor_13 || 0);
+        document.getElementById('acerto_saldo_banco_horas').value = formatarMoeda(dados.valor_banco_horas || 0);
+        document.getElementById('acerto_saldo_salario').value = formatarMoeda(dados.valor_saldo_salario || 0);
+    } else {
+        // Preenche campos PJ
+        document.getElementById('acerto_pj_dias').value = dados.saldo_salario_dias || 0;
+        const valorDia = (dados.salario || 0) / 30;
+        document.getElementById('acerto_pj_valor_dia').value = formatarMoeda(valorDia);
+        calcularTotalPJ();
+    }
+    
+    calcularTotalAcerto();
+}
+
+// Calcula total para PJ
+function calcularTotalPJ() {
+    const dias = parseInt(document.getElementById('acerto_pj_dias')?.value) || 0;
+    const salario = acertoColaboradorDados?.salario || 0;
+    const valorDia = salario / 30;
+    const total = dias * valorDia;
+    
+    document.getElementById('acerto_pj_valor_dia').value = formatarMoeda(valorDia);
+    document.getElementById('acerto_pj_valor_total').value = formatarMoeda(total);
+    
+    calcularTotalAcerto();
+}
+
+// Busca dados do colaborador desligado
+function buscarDadosColaboradorDesligado(colaboradorId) {
+    if (!colaboradorId) return;
+    
+    fetch(`../api/get_colaborador_desligado.php?id=${colaboradorId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.colaborador) {
+                preencherDadosAcerto(data.colaborador);
+            } else {
+                console.error('Erro ao buscar dados:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erro na requisição:', error);
+        });
+}
+
+// Listeners para toggle CLT/PJ
+document.getElementById('acerto_tipo_clt')?.addEventListener('change', function() {
+    if (this.checked) atualizarCamposAcertoTipo('CLT');
+});
+document.getElementById('acerto_tipo_pj')?.addEventListener('change', function() {
+    if (this.checked) atualizarCamposAcertoTipo('PJ');
+});
+
+// Listener para cálculo PJ
+document.getElementById('acerto_pj_dias')?.addEventListener('input', calcularTotalPJ);
 
 // Função para verificar duplicações de bônus
 function verificarDuplicacoes() {
