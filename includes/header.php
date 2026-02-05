@@ -338,7 +338,6 @@ $_header_saldo_dinheiro = ($usuario['colaborador_id'] ?? null) ? obter_saldo_din
                                 <!--end::Pontos Badge-->
                             </div>
                             <!--end::Pontos-->
-                            <?php if ($_header_saldo_dinheiro > 0): ?>
                             <!--begin::Saldo R$-->
                             <div class="d-flex align-items-center ms-1 ms-lg-2">
                                 <!--begin::Saldo Badge-->
@@ -353,7 +352,6 @@ $_header_saldo_dinheiro = ($usuario['colaborador_id'] ?? null) ? obter_saldo_din
                                 <!--end::Saldo Badge-->
                             </div>
                             <!--end::Saldo R$-->
-                            <?php endif; ?>
                             <!--begin::Notifications-->
                             <div class="d-flex align-items-center ms-1 ms-lg-3">
                                 <!--begin::Menu wrapper-->
