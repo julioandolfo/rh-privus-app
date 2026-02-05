@@ -110,8 +110,25 @@ if (!$representante_salvo && $autentique_config) {
     ];
 }
 
+// DEBUG MODE - Ativar para ver o que está acontecendo
+$DEBUG_MODE = isset($_GET['debug']) && $_GET['debug'] === '1';
+
 // Processa POST - Envio para Autentique
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    
+    // Se modo debug, mostra informações na tela
+    if ($DEBUG_MODE) {
+        echo "<pre style='background:#222;color:#0f0;padding:20px;'>";
+        echo "=== DEBUG CONTRATO ENVIAR ===\n\n";
+        echo "Autentique Configurado: " . ($autentique_configurado ? 'SIM' : 'NAO') . "\n";
+        echo "Contrato ID: $contrato_id\n";
+        echo "POST recebido:\n";
+        print_r($_POST);
+        echo "\nColaborador:\n";
+        print_r($colaborador);
+        echo "</pre>";
+    }
+    
     if (!$autentique_configurado) {
         redirect('contrato_view.php?id=' . $contrato_id, 'Autentique não está configurado. Configure em Configurações > Integrações.', 'error');
     }
@@ -119,6 +136,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $testemunhas = $_POST['testemunhas'] ?? [];
     $representante = $_POST['representante'] ?? [];
     $incluir_representante = isset($_POST['incluir_representante']) && $_POST['incluir_representante'] === '1';
+    
+    if ($DEBUG_MODE) {
+        echo "<pre style='background:#222;color:#0f0;padding:20px;'>";
+        echo "Testemunhas: " . count($testemunhas) . "\n";
+        echo "Incluir Representante: " . ($incluir_representante ? 'SIM' : 'NAO') . "\n";
+        echo "Representante Email: " . ($representante['email'] ?? 'VAZIO') . "\n";
+        echo "</pre>";
+    }
     
     try {
         $pdo->beginTransaction();
@@ -165,9 +190,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Cria documento no Autentique
         log_contrato("Enviando para Autentique - Signatários: " . count($signatarios));
+        
+        if ($DEBUG_MODE) {
+            echo "<pre style='background:#222;color:#ff0;padding:20px;'>";
+            echo "=== ENVIANDO PARA AUTENTIQUE ===\n";
+            echo "Total Signatários: " . count($signatarios) . "\n";
+            print_r($signatarios);
+            echo "</pre>";
+        }
+        
         $resultado = $service->criarDocumento($contrato['titulo'], $pdf_base64, $signatarios);
         
         log_contrato("Resultado Autentique: " . json_encode($resultado, JSON_UNESCAPED_UNICODE));
+        
+        if ($DEBUG_MODE) {
+            echo "<pre style='background:#222;color:#0ff;padding:20px;'>";
+            echo "=== RESULTADO AUTENTIQUE ===\n";
+            echo "Resultado: " . ($resultado ? 'OK' : 'FALHOU') . "\n";
+            print_r($resultado);
+            echo "</pre>";
+        }
         
         if ($resultado) {
             log_contrato("API Autentique retornou sucesso");
@@ -344,10 +386,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         log_contrato("Finalizando transação - commit");
         $pdo->commit();
         
+        if ($DEBUG_MODE) {
+            // Busca signatários inseridos para verificar
+            $stmt = $pdo->prepare("SELECT * FROM contratos_signatarios WHERE contrato_id = ?");
+            $stmt->execute([$contrato_id]);
+            $signatarios_inseridos = $stmt->fetchAll();
+            
+            echo "<pre style='background:#222;color:#0f0;padding:20px;'>";
+            echo "=== SIGNATÁRIOS INSERIDOS NO BANCO ===\n";
+            echo "Total: " . count($signatarios_inseridos) . "\n\n";
+            foreach ($signatarios_inseridos as $sig) {
+                echo "- Tipo: {$sig['tipo']}, Nome: {$sig['nome']}, Email: {$sig['email']}\n";
+            }
+            echo "\n\n<a href='contrato_view.php?id=$contrato_id' style='color:#fff;'>Ver Contrato</a>";
+            echo "</pre>";
+            exit;
+        }
+        
         redirect('contrato_view.php?id=' . $contrato_id, 'Contrato enviado para assinatura com sucesso!', 'success');
         
     } catch (Exception $e) {
         $pdo->rollBack();
+        
+        if ($DEBUG_MODE) {
+            echo "<pre style='background:#400;color:#fff;padding:20px;'>";
+            echo "=== ERRO ===\n";
+            echo "Mensagem: " . $e->getMessage() . "\n";
+            echo "Arquivo: " . $e->getFile() . "\n";
+            echo "Linha: " . $e->getLine() . "\n";
+            echo "\nStack Trace:\n" . $e->getTraceAsString();
+            echo "</pre>";
+            exit;
+        }
+        
         redirect('contrato_enviar.php?id=' . $contrato_id, 'Erro ao enviar: ' . $e->getMessage(), 'error');
     }
 }
