@@ -7,7 +7,6 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/contratos_functions.php';
-require_once __DIR__ . '/../includes/autentique_service.php';
 
 require_page_permission('contrato_add.php');
 
@@ -17,6 +16,24 @@ $contrato_id = intval($_GET['id'] ?? 0);
 
 if ($contrato_id <= 0) {
     redirect('contratos.php', 'Contrato não encontrado.', 'error');
+}
+
+// Verifica se Autentique está configurado
+$autentique_configurado = false;
+try {
+    $stmt = $pdo->query("SHOW TABLES LIKE 'autentique_config'");
+    if ($stmt->fetch()) {
+        $stmt = $pdo->query("SELECT COUNT(*) as total FROM autentique_config WHERE ativo = 1");
+        $result = $stmt->fetch();
+        $autentique_configurado = ($result['total'] > 0);
+    }
+} catch (Exception $e) {
+    error_log('Erro ao verificar Autentique: ' . $e->getMessage());
+}
+
+// Só carrega o serviço se estiver configurado
+if ($autentique_configurado) {
+    require_once __DIR__ . '/../includes/autentique_service.php';
 }
 
 // Busca contrato
@@ -47,6 +64,10 @@ $colaborador = buscar_dados_colaborador_completos($contrato['colaborador_id']);
 
 // Processa POST - Envio para Autentique
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!$autentique_configurado) {
+        redirect('contrato_view.php?id=' . $contrato_id, 'Autentique não está configurado. Configure em Configurações > Integrações.', 'error');
+    }
+    
     $testemunhas = $_POST['testemunhas'] ?? [];
     
     try {
@@ -200,6 +221,24 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
         
+        <?php if (!$autentique_configurado): ?>
+        <!--begin::Alert - Autentique não configurado-->
+        <div class="alert alert-danger d-flex align-items-center mb-5">
+            <i class="ki-duotone ki-cross-circle fs-2hx text-danger me-4">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
+            <div class="d-flex flex-column">
+                <h4 class="mb-1 text-danger">Autentique não configurado</h4>
+                <span>
+                    Para enviar contratos para assinatura digital, é necessário configurar a integração com o Autentique.
+                    Entre em contato com o administrador do sistema.
+                </span>
+            </div>
+        </div>
+        <!--end::Alert-->
+        <?php endif; ?>
+        
         <div class="row">
             <!--begin::Col - Formulário-->
             <div class="col-lg-6">
@@ -285,8 +324,8 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <!--begin::Actions-->
                     <div class="d-flex justify-content-end gap-3">
-                        <a href="contrato_view.php?id=<?= $contrato_id ?>" class="btn btn-light">Cancelar</a>
-                        <button type="submit" class="btn btn-success">
+                        <a href="contrato_view.php?id=<?= $contrato_id ?>" class="btn btn-light">Voltar</a>
+                        <button type="submit" class="btn btn-success" <?= !$autentique_configurado ? 'disabled' : '' ?>>
                             <i class="ki-duotone ki-send fs-2">
                                 <span class="path1"></span>
                                 <span class="path2"></span>

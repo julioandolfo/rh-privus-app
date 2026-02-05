@@ -438,12 +438,20 @@ function gerar_pdf_contrato($html, $titulo = 'Contrato') {
         mkdir($upload_dir, 0755, true);
     }
     
+    // Decodifica entidades HTML que podem ter sido codificadas pelo editor
+    // Isso corrige problemas como &CCEDIL; => Ç, &ATILDE; => Ã, etc.
+    $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    
     // Cria PDF
     $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
     
     // Remove header e footer padrão
     $pdf->setPrintHeader(false);
     $pdf->setPrintFooter(false);
+    
+    // Define margens
+    $pdf->SetMargins(15, 15, 15);
+    $pdf->SetAutoPageBreak(true, 15);
     
     // Adiciona página
     $pdf->AddPage();

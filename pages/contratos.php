@@ -327,15 +327,47 @@ require_once __DIR__ . '/../includes/header.php';
     background: var(--bs-body-bg);
     border: 1px solid var(--bs-border-color);
     border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 10px;
+    padding: 18px;
+    margin-bottom: 14px;
     cursor: pointer;
     transition: all 0.3s;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
 }
 
 .contrato-card:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     transform: translateY(-2px);
+}
+
+.contrato-card a.text-gray-800 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
+    max-height: 2.8em;
+    overflow: hidden;
+}
+
+.contrato-card .flex-grow-1 {
+    margin-bottom: 8px;
+}
+
+.contrato-card .d-flex.gap-2.mt-3 {
+    margin-top: auto !important;
+    gap: 0.5rem !important;
+}
+
+.contrato-card .btn-sm {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    min-width: 60px;
+}
+
+.contrato-card .flex-fill {
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 /* Modo escuro */
