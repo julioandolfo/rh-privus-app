@@ -445,6 +445,80 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     <!--end::Card-->
                     
+                    <!--begin::Card - Representante da Empresa-->
+                    <?php if ($autentique_configurado): ?>
+                    <div class="card mb-5">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1">
+                                    <i class="ki-duotone ki-user-tick fs-2 me-2 text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Representante da Empresa
+                                </span>
+                                <span class="text-muted fw-semibold fs-7">Sócio/RH que assina pela empresa</span>
+                            </h3>
+                            <div class="card-toolbar">
+                                <div class="form-check form-switch form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" name="incluir_representante" 
+                                           id="incluir_representante" value="1" 
+                                           <?= !empty($autentique_config['representante_email']) ? 'checked' : '' ?>>
+                                    <label class="form-check-label fw-bold" for="incluir_representante">
+                                        Incluir
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body pt-5" id="representante_form" style="<?= empty($autentique_config['representante_email']) ? 'display: none;' : '' ?>">
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">Nome</label>
+                                    <input type="text" name="representante[nome]" class="form-control form-control-solid" 
+                                           value="<?= htmlspecialchars($autentique_config['representante_nome'] ?? '') ?>" 
+                                           placeholder="Nome completo do representante" />
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Cargo</label>
+                                    <input type="text" name="representante[cargo]" class="form-control form-control-solid" 
+                                           value="<?= htmlspecialchars($autentique_config['representante_cargo'] ?? '') ?>" 
+                                           placeholder="Ex: Sócio, Diretor" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label required">Email</label>
+                                    <input type="email" name="representante[email]" id="representante_email" 
+                                           class="form-control form-control-solid" 
+                                           value="<?= htmlspecialchars($autentique_config['representante_email'] ?? '') ?>" 
+                                           placeholder="email@empresa.com" />
+                                    <div class="form-text">Email para receber o link de assinatura</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">CPF</label>
+                                    <input type="text" name="representante[cpf]" class="form-control form-control-solid cpf-mask" 
+                                           value="<?= htmlspecialchars($autentique_config['representante_cpf'] ?? '') ?>" 
+                                           placeholder="000.000.000-00" />
+                                </div>
+                            </div>
+                            <?php if (!empty($autentique_config['empresa_cnpj'])): ?>
+                            <div class="alert alert-light-info border border-info border-dashed d-flex align-items-center p-4">
+                                <i class="ki-duotone ki-shield-tick fs-2hx text-info me-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div>
+                                    <span class="fw-bold d-block">CNPJ da Empresa:</span>
+                                    <span><?= htmlspecialchars($autentique_config['empresa_cnpj']) ?></span>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <!--end::Card-->
+                    
                     <!--begin::Card - Testemunhas-->
                     <div class="card mb-5">
                         <div class="card-header border-0 pt-5">
@@ -533,6 +607,31 @@ let testemunhaIndex = 0;
 let camposFaltantes = [];
 let podeEnviar = false;
 
+// Toggle representante
+document.getElementById('incluir_representante')?.addEventListener('change', function() {
+    const form = document.getElementById('representante_form');
+    const emailInput = document.getElementById('representante_email');
+    
+    if (this.checked) {
+        form.style.display = 'block';
+    } else {
+        form.style.display = 'none';
+    }
+});
+
+// Máscara de CPF
+document.querySelectorAll('.cpf-mask').forEach(input => {
+    input.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length <= 11) {
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        }
+        e.target.value = value;
+    });
+});
+
 // Adiciona testemunha
 document.getElementById('btn_adicionar_testemunha')?.addEventListener('click', function() {
     const container = document.getElementById('testemunhas_container');
@@ -597,15 +696,55 @@ document.getElementById('template_id')?.addEventListener('change', function() {
     }
 });
 
+// Função para buscar dados do colaborador e preencher descrição da função
+function buscarDadosColaborador(colaboradorId) {
+    if (!colaboradorId) return;
+    
+    // Faz uma requisição simples para buscar dados do colaborador
+    fetch(`../api/contratos/preview.php?colaborador_id=${colaboradorId}&template_id=0`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            titulo: '',
+            descricao_funcao: '',
+            data_criacao: '',
+            data_vencimento: '',
+            observacoes: '',
+            conteudo_customizado: '<p>placeholder</p>'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.colaborador) {
+            // Preenche descrição da função se estiver vazia
+            const descricaoInput = document.querySelector('[name="descricao_funcao"]');
+            if (descricaoInput && !descricaoInput.value.trim()) {
+                const descricaoColaborador = data.colaborador.descricao_funcao || data.colaborador.cargo_nome || '';
+                if (descricaoColaborador) {
+                    descricaoInput.value = descricaoColaborador;
+                }
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao buscar dados do colaborador:', error);
+    });
+}
+
 // Listener para Select2 (quando usar Select2)
 if (typeof jQuery !== 'undefined') {
     jQuery(document).on('select2:select', '#colaborador_id', function() {
+        const colaboradorId = this.value;
+        buscarDadosColaborador(colaboradorId);
         atualizarPreview();
     });
 }
 
 // Listener padrão também (fallback)
 document.getElementById('colaborador_id')?.addEventListener('change', function() {
+    buscarDadosColaborador(this.value);
     atualizarPreview();
 });
 
@@ -789,6 +928,16 @@ function atualizarPreview() {
             // Atualiza campos faltantes
             atualizarCamposFaltantes(data.campos_faltantes || []);
             podeEnviar = data.pode_enviar || false;
+            
+            // Preenche descrição da função do colaborador se o campo estiver vazio
+            const descricaoInput = document.querySelector('[name="descricao_funcao"]');
+            if (descricaoInput && !descricaoInput.value.trim() && data.colaborador) {
+                // Prioriza descricao_funcao, depois cargo_nome
+                const descricaoColaborador = data.colaborador.descricao_funcao || data.colaborador.cargo_nome || '';
+                if (descricaoColaborador) {
+                    descricaoInput.value = descricaoColaborador;
+                }
+            }
         } else {
             preview.innerHTML = `<div class="alert alert-danger">
                 <strong>Erro ao gerar preview:</strong><br>

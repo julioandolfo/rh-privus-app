@@ -86,7 +86,12 @@ try {
         'success' => true,
         'html' => $html,
         'campos_faltantes' => array_values($campos_faltantes),
-        'pode_enviar' => empty($campos_faltantes)
+        'pode_enviar' => empty($campos_faltantes),
+        'colaborador' => [
+            'nome_completo' => $colaborador['nome_completo'] ?? '',
+            'descricao_funcao' => $colaborador['descricao_funcao'] ?? '',
+            'cargo_nome' => $colaborador['cargo_nome'] ?? ''
+        ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     
 } catch (Exception $e) {
