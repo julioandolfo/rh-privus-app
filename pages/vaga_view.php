@@ -433,7 +433,7 @@ $tempo_contratacao = $stmt->fetch();
                                 <h3 class="card-title">Descrição da Vaga</h3>
                             </div>
                             <div class="card-body">
-                                <div class="text-gray-800"><?= nl2br(htmlspecialchars($vaga['descricao'])) ?></div>
+                                <div class="text-gray-800 vaga-html-content"><?= $vaga['descricao'] ?></div>
                             </div>
                         </div>
                         
@@ -446,12 +446,12 @@ $tempo_contratacao = $stmt->fetch();
                             <div class="card-body">
                                 <?php if ($vaga['requisitos_obrigatorios']): ?>
                                 <h4 class="mb-3">Obrigatórios</h4>
-                                <div class="text-gray-800"><?= nl2br(htmlspecialchars($vaga['requisitos_obrigatorios'])) ?></div>
+                                <div class="text-gray-800 vaga-html-content"><?= $vaga['requisitos_obrigatorios'] ?></div>
                                 <?php endif; ?>
                                 
                                 <?php if ($vaga['requisitos_desejaveis']): ?>
                                 <h4 class="mt-5 mb-3">Desejáveis</h4>
-                                <div class="text-gray-800"><?= nl2br(htmlspecialchars($vaga['requisitos_desejaveis'])) ?></div>
+                                <div class="text-gray-800 vaga-html-content"><?= $vaga['requisitos_desejaveis'] ?></div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -563,6 +563,50 @@ $tempo_contratacao = $stmt->fetch();
         </div>
     </div>
 </div>
+
+<!-- Estilos para HTML gerado pela IA -->
+<style>
+.vaga-html-content ul,
+.vaga-html-content ol {
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+.vaga-html-content li {
+    margin-bottom: 0.75rem;
+    line-height: 1.8;
+}
+
+.vaga-html-content ul li {
+    list-style-type: none;
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.vaga-html-content ul li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: #50cd89;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.vaga-html-content strong,
+.vaga-html-content b {
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.vaga-html-content p {
+    margin-bottom: 1rem;
+    line-height: 1.8;
+}
+
+.vaga-html-content p:last-child {
+    margin-bottom: 0;
+}
+</style>
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

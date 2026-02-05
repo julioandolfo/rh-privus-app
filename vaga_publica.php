@@ -274,6 +274,48 @@ $cor_secundaria = $landing_page['cor_secundaria'] ?? $portal_config['cor_secunda
             font-size: 1.05rem;
         }
         
+        /* Estilização do HTML gerado pela IA */
+        .content-section ul,
+        .content-section ol {
+            margin: 1rem 0;
+            padding-left: 2rem;
+            color: #64748b;
+        }
+        
+        .content-section li {
+            margin-bottom: 0.75rem;
+            line-height: 1.8;
+        }
+        
+        .content-section ul li {
+            list-style-type: none;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+        
+        .content-section ul li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--cor-secundaria);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .content-section strong,
+        .content-section b {
+            color: #2d3748;
+            font-weight: 600;
+        }
+        
+        .content-section p {
+            margin-bottom: 1rem;
+        }
+        
+        .content-section p:last-child {
+            margin-bottom: 0;
+        }
+        
         /* Requisitos */
         .requisitos-list {
             list-style: none;
@@ -402,7 +444,7 @@ $cor_secundaria = $landing_page['cor_secundaria'] ?? $portal_config['cor_secunda
                     <?php endif; ?>
                     <h1><?= htmlspecialchars($componente['titulo'] ?: $vaga['titulo']) ?></h1>
                     <?php if ($componente['conteudo']): ?>
-                    <p class="lead"><?= nl2br(htmlspecialchars($componente['conteudo'])) ?></p>
+                    <div class="lead"><?= $componente['conteudo'] ?></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -410,7 +452,7 @@ $cor_secundaria = $landing_page['cor_secundaria'] ?? $portal_config['cor_secunda
             <div class="container my-5">
                 <div class="content-section">
                     <h2><?= htmlspecialchars($componente['titulo'] ?: 'Sobre a Vaga') ?></h2>
-                    <div><?= nl2br(htmlspecialchars($componente['conteudo'] ?: $vaga['descricao'])) ?></div>
+                    <div><?= $componente['conteudo'] ?: $vaga['descricao'] ?></div>
                 </div>
             </div>
             <?php elseif ($componente['tipo_componente'] === 'requisitos'): ?>
@@ -419,33 +461,11 @@ $cor_secundaria = $landing_page['cor_secundaria'] ?? $portal_config['cor_secunda
                     <h2><?= htmlspecialchars($componente['titulo'] ?: 'Requisitos') ?></h2>
                     <?php if ($vaga['requisitos_obrigatorios']): ?>
                     <h4 class="mt-4 mb-3" style="color: var(--cor-primaria);">Obrigatórios:</h4>
-                    <ul class="requisitos-list">
-                        <?php 
-                        $reqs_obrigatorios = explode("\n", $vaga['requisitos_obrigatorios']);
-                        foreach ($reqs_obrigatorios as $req): 
-                            if (trim($req)):
-                        ?>
-                        <li><?= htmlspecialchars(trim($req)) ?></li>
-                        <?php 
-                            endif;
-                        endforeach; 
-                        ?>
-                    </ul>
+                    <div><?= $vaga['requisitos_obrigatorios'] ?></div>
                     <?php endif; ?>
                     <?php if ($vaga['requisitos_desejaveis']): ?>
                     <h4 class="mt-4 mb-3" style="color: var(--cor-primaria);">Desejáveis:</h4>
-                    <ul class="requisitos-list">
-                        <?php 
-                        $reqs_desejaveis = explode("\n", $vaga['requisitos_desejaveis']);
-                        foreach ($reqs_desejaveis as $req): 
-                            if (trim($req)):
-                        ?>
-                        <li><?= htmlspecialchars(trim($req)) ?></li>
-                        <?php 
-                            endif;
-                        endforeach; 
-                        ?>
-                    </ul>
+                    <div><?= $vaga['requisitos_desejaveis'] ?></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -540,42 +560,20 @@ $cor_secundaria = $landing_page['cor_secundaria'] ?? $portal_config['cor_secunda
                 <div class="col-lg-8">
                     <div class="content-section">
                         <h2>Sobre a Vaga</h2>
-                        <div><?= nl2br(htmlspecialchars($vaga['descricao'])) ?></div>
+                        <div><?= $vaga['descricao'] ?></div>
                     </div>
                     
                     <?php if ($vaga['requisitos_obrigatorios']): ?>
                     <div class="content-section">
                         <h2>Requisitos Obrigatórios</h2>
-                        <ul class="requisitos-list">
-                            <?php 
-                            $reqs_obrigatorios = explode("\n", $vaga['requisitos_obrigatorios']);
-                            foreach ($reqs_obrigatorios as $req): 
-                                if (trim($req)):
-                            ?>
-                            <li><?= htmlspecialchars(trim($req)) ?></li>
-                            <?php 
-                                endif;
-                            endforeach; 
-                            ?>
-                        </ul>
+                        <div><?= $vaga['requisitos_obrigatorios'] ?></div>
                     </div>
                     <?php endif; ?>
                     
                     <?php if ($vaga['requisitos_desejaveis']): ?>
                     <div class="content-section">
                         <h2>Requisitos Desejáveis</h2>
-                        <ul class="requisitos-list">
-                            <?php 
-                            $reqs_desejaveis = explode("\n", $vaga['requisitos_desejaveis']);
-                            foreach ($reqs_desejaveis as $req): 
-                                if (trim($req)):
-                            ?>
-                            <li><?= htmlspecialchars(trim($req)) ?></li>
-                            <?php 
-                                endif;
-                            endforeach; 
-                            ?>
-                        </ul>
+                        <div><?= $vaga['requisitos_desejaveis'] ?></div>
                     </div>
                     <?php endif; ?>
                 </div>

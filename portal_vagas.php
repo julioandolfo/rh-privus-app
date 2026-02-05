@@ -253,6 +253,13 @@ $base_url = get_base_url();
             overflow: hidden;
         }
         
+        .vaga-descricao * {
+            all: unset;
+            color: inherit;
+            font-size: inherit;
+            line-height: inherit;
+        }
+        
         .beneficios-list {
             display: flex;
             flex-wrap: wrap;
@@ -522,7 +529,7 @@ $base_url = get_base_url();
                         <?php endif; ?>
                         
                         <div class="vaga-descricao">
-                            <?= nl2br(htmlspecialchars(substr($vaga['descricao'], 0, 150))) ?>...
+                            <?= strip_tags(substr($vaga['descricao'], 0, 150)) ?>...
                         </div>
                         
                         <?php if ($vaga['beneficios']): ?>
