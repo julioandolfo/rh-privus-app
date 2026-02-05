@@ -13,6 +13,24 @@ require_page_permission('configuracoes_autentique.php');
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
+// Verifica se as novas colunas existem e adiciona se necessário
+try {
+    $stmt = $pdo->query("SHOW COLUMNS FROM autentique_config LIKE 'representante_nome'");
+    if (!$stmt->fetch()) {
+        // Adiciona as novas colunas
+        $pdo->exec("
+            ALTER TABLE autentique_config 
+            ADD COLUMN representante_nome VARCHAR(255) NULL COMMENT 'Nome do representante/sócio que assina contratos',
+            ADD COLUMN representante_email VARCHAR(255) NULL COMMENT 'Email do representante para assinatura',
+            ADD COLUMN representante_cpf VARCHAR(14) NULL COMMENT 'CPF do representante',
+            ADD COLUMN representante_cargo VARCHAR(100) NULL COMMENT 'Cargo do representante (ex: Sócio, Diretor, RH)',
+            ADD COLUMN empresa_cnpj VARCHAR(18) NULL COMMENT 'CNPJ da empresa contratante'
+        ");
+    }
+} catch (Exception $e) {
+    // Ignora se colunas já existem
+}
+
 // Busca configuração atual
 $stmt = $pdo->query("SELECT * FROM autentique_config WHERE ativo = 1 ORDER BY id DESC LIMIT 1");
 $config = $stmt->fetch();
@@ -33,6 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Mantém compatibilidade com campos antigos
     $webhook_url = trim($_POST['webhook_url'] ?? '');
     $webhook_secret = trim($_POST['webhook_secret'] ?? '');
+    
+    // Dados do representante da empresa
+    $representante_nome = trim($_POST['representante_nome'] ?? '');
+    $representante_email = trim($_POST['representante_email'] ?? '');
+    $representante_cpf = trim($_POST['representante_cpf'] ?? '');
+    $representante_cargo = trim($_POST['representante_cargo'] ?? '');
+    $empresa_cnpj = trim($_POST['empresa_cnpj'] ?? '');
     
     if (empty($api_key)) {
         redirect('configuracoes_autentique.php', 'API Key é obrigatória!', 'error');
@@ -59,8 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 webhook_url, webhook_secret,
                 webhook_documento_url, webhook_documento_secret,
                 webhook_assinatura_url, webhook_assinatura_secret,
+                representante_nome, representante_email, representante_cpf, 
+                representante_cargo, empresa_cnpj,
                 ativo
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ");
         $stmt->execute([
             $api_key, 
@@ -70,7 +97,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $webhook_documento_url,
             $webhook_documento_secret,
             $webhook_assinatura_url,
-            $webhook_assinatura_secret
+            $webhook_assinatura_secret,
+            $representante_nome,
+            $representante_email,
+            $representante_cpf,
+            $representante_cargo,
+            $empresa_cnpj
         ]);
         
         redirect('configuracoes_autentique.php', 'Configurações salvas com sucesso!', 'success');
@@ -257,6 +289,80 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <!--end::Card-->
             
+            <!--begin::Card - Representante da Empresa-->
+            <div class="card mb-5">
+                <div class="card-header border-0 pt-5">
+                    <h3 class="card-title align-items-start flex-column">
+                        <span class="card-label fw-bold fs-3 mb-1">
+                            <i class="ki-duotone ki-user-tick fs-2 me-2 text-primary">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Representante da Empresa
+                        </span>
+                        <span class="text-muted fw-semibold fs-7">Sócio/RH que assina os contratos pela empresa</span>
+                    </h3>
+                </div>
+                <div class="card-body pt-5">
+                    <!--begin::Alert Info-->
+                    <div class="alert alert-info d-flex align-items-center p-5 mb-10">
+                        <i class="ki-duotone ki-information fs-2hx text-info me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <span>
+                                Este representante será incluído automaticamente como signatário em todos os contratos. 
+                                Você poderá editar os dados no momento do envio se necessário.
+                            </span>
+                        </div>
+                    </div>
+                    <!--end::Alert Info-->
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-5">
+                            <label class="form-label">Nome do Representante</label>
+                            <input type="text" name="representante_nome" class="form-control form-control-solid" 
+                                   value="<?= htmlspecialchars($config['representante_nome'] ?? '') ?>" 
+                                   placeholder="Ex: João da Silva" />
+                        </div>
+                        <div class="col-md-6 mb-5">
+                            <label class="form-label">Cargo</label>
+                            <input type="text" name="representante_cargo" class="form-control form-control-solid" 
+                                   value="<?= htmlspecialchars($config['representante_cargo'] ?? '') ?>" 
+                                   placeholder="Ex: Sócio, Diretor, RH" />
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-5">
+                            <label class="form-label">Email do Representante</label>
+                            <input type="email" name="representante_email" class="form-control form-control-solid" 
+                                   value="<?= htmlspecialchars($config['representante_email'] ?? '') ?>" 
+                                   placeholder="email@empresa.com" />
+                            <div class="form-text">Email para receber o link de assinatura</div>
+                        </div>
+                        <div class="col-md-6 mb-5">
+                            <label class="form-label">CPF do Representante</label>
+                            <input type="text" name="representante_cpf" id="representante_cpf" class="form-control form-control-solid" 
+                                   value="<?= htmlspecialchars($config['representante_cpf'] ?? '') ?>" 
+                                   placeholder="000.000.000-00" />
+                        </div>
+                    </div>
+                    
+                    <div class="mb-0">
+                        <label class="form-label">CNPJ da Empresa</label>
+                        <input type="text" name="empresa_cnpj" id="empresa_cnpj" class="form-control form-control-solid" 
+                               value="<?= htmlspecialchars($config['empresa_cnpj'] ?? '') ?>" 
+                               placeholder="00.000.000/0000-00" />
+                        <div class="form-text">CNPJ da empresa contratante</div>
+                    </div>
+                </div>
+            </div>
+            <!--end::Card-->
+            
             <!--begin::Card - Teste de Conexão-->
             <?php if ($config): ?>
             <div class="card mb-5">
@@ -299,6 +405,29 @@ require_once __DIR__ . '/../includes/header.php';
 <!--end::Post-->
 
 <script>
+// Máscara de CPF
+document.getElementById('representante_cpf')?.addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length <= 11) {
+        value = value.replace(/(\d{3})(\d)/, '$1.$2');
+        value = value.replace(/(\d{3})(\d)/, '$1.$2');
+        value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    }
+    e.target.value = value;
+});
+
+// Máscara de CNPJ
+document.getElementById('empresa_cnpj')?.addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length <= 14) {
+        value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+        value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+        value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+        value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    }
+    e.target.value = value;
+});
+
 // Submit com loading
 document.getElementById('form_config')?.addEventListener('submit', function(e) {
     const submitBtn = this.querySelector('button[type="submit"]');
