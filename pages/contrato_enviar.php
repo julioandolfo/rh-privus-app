@@ -14,6 +14,17 @@ $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 $contrato_id = intval($_GET['id'] ?? 0);
 
+// Verifica e atualiza o ENUM para incluir 'representante' se necessário
+try {
+    $stmt = $pdo->query("SHOW COLUMNS FROM contratos_signatarios LIKE 'tipo'");
+    $column = $stmt->fetch();
+    if ($column && strpos($column['Type'], 'representante') === false) {
+        $pdo->exec("ALTER TABLE contratos_signatarios MODIFY COLUMN tipo ENUM('colaborador', 'testemunha', 'rh', 'representante') NOT NULL");
+    }
+} catch (Exception $e) {
+    error_log('Erro ao verificar/atualizar ENUM: ' . $e->getMessage());
+}
+
 if ($contrato_id <= 0) {
     redirect('contratos.php', 'Contrato não encontrado.', 'error');
 }
