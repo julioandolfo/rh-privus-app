@@ -104,6 +104,7 @@ function get_page_permissions() {
         // Configurações - apenas ADMIN
         'configuracoes_email.php' => ['ADMIN'],
         'configuracoes_onesignal.php' => ['ADMIN'],
+        'configuracoes_openai.php' => ['ADMIN'],
         'templates_email.php' => ['ADMIN'],
         'email_logs.php' => ['ADMIN'],
         
@@ -413,6 +414,7 @@ function can_access_configuracoes() {
         'permissoes.php',
         'configuracoes_email.php',
         'configuracoes_onesignal.php',
+        'configuracoes_openai.php',
         'configuracoes_pontos.php',
         'templates_email.php',
         'chat_configuracoes.php'

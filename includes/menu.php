@@ -1543,7 +1543,7 @@ function getIcon($name) {
                     <?php endif; ?>
                     
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php') || isActive('configuracoes_pontos.php') || isActive('templates_email.php') || isActive('email_logs.php') || isActive('configuracoes_autentique.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php') || isActive('configuracoes_pontos.php') || isActive('configuracoes_openai.php') || isActive('templates_email.php') || isActive('email_logs.php') || isActive('configuracoes_autentique.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -1638,6 +1638,24 @@ function getIcon($name) {
                                         <span class="bullet bullet-dot"></span>
                                     </span>
                                     <span class="menu-title">Pontos</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('configuracoes_openai.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('configuracoes_openai.php') ?>" href="configuracoes_openai.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">
+                                        <i class="ki-duotone ki-robot fs-6 me-1">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        OpenAI (IA)
+                                    </span>
                                 </a>
                             </div>
                             <!--end:Menu item-->
