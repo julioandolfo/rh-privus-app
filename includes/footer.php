@@ -1220,6 +1220,26 @@ window.RHPrivusPontos = {
         }
     },
     
+    // Atualiza o saldo em R$ no header
+    atualizarHeaderSaldoDinheiro: function(novoSaldo) {
+        const headerSaldo = document.getElementById('header_saldo_dinheiro');
+        if (headerSaldo && novoSaldo !== undefined) {
+            // Animação de destaque
+            headerSaldo.classList.add('text-success');
+            headerSaldo.style.transition = 'all 0.3s ease';
+            headerSaldo.style.transform = 'scale(1.3)';
+            
+            // Atualiza o valor
+            headerSaldo.textContent = novoSaldo.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            // Remove animação após 500ms
+            setTimeout(() => {
+                headerSaldo.classList.remove('text-success');
+                headerSaldo.style.transform = 'scale(1)';
+            }, 500);
+        }
+    },
+    
     // Processa resposta de API que contém pontos
     processarRespostaPontos: function(data, acao) {
         if (data && data.pontos_ganhos && data.pontos_ganhos > 0) {
@@ -1235,6 +1255,10 @@ window.mostrarToastPontos = function(pontosGanhos, novoPontosTotal, acao) {
 
 window.processarRespostaPontos = function(data, acao) {
     window.RHPrivusPontos.processarRespostaPontos(data, acao);
+};
+
+window.atualizarHeaderSaldoDinheiro = function(novoSaldo) {
+    window.RHPrivusPontos.atualizarHeaderSaldoDinheiro(novoSaldo);
 };
 </script>
 <!--end::Sistema de Toast de Pontos-->

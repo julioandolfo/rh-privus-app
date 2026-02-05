@@ -23,9 +23,10 @@ if (!isset($_SESSION['usuario'])) {
 
 $usuario = $_SESSION['usuario'];
 
-// Carrega pontos do usuário para exibir no header
+// Carrega pontos e saldo R$ do usuário para exibir no header
 require_once __DIR__ . '/pontuacao.php';
 $_header_pontos = obter_pontos($usuario['id'] ?? null, $usuario['colaborador_id'] ?? null);
+$_header_saldo_dinheiro = ($usuario['colaborador_id'] ?? null) ? obter_saldo_dinheiro($usuario['colaborador_id']) : 0;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -337,6 +338,22 @@ $_header_pontos = obter_pontos($usuario['id'] ?? null, $usuario['colaborador_id'
                                 <!--end::Pontos Badge-->
                             </div>
                             <!--end::Pontos-->
+                            <?php if ($_header_saldo_dinheiro > 0): ?>
+                            <!--begin::Saldo R$-->
+                            <div class="d-flex align-items-center ms-1 ms-lg-2">
+                                <!--begin::Saldo Badge-->
+                                <a href="loja.php" class="btn btn-sm btn-light-success d-flex align-items-center gap-2 px-3 py-2" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Seu saldo em créditos R$">
+                                    <i class="ki-duotone ki-dollar fs-3 text-success">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <span class="fw-bold text-gray-800" id="header_saldo_dinheiro"><?= number_format($_header_saldo_dinheiro, 2, ',', '.') ?></span>
+                                </a>
+                                <!--end::Saldo Badge-->
+                            </div>
+                            <!--end::Saldo R$-->
+                            <?php endif; ?>
                             <!--begin::Notifications-->
                             <div class="d-flex align-items-center ms-1 ms-lg-3">
                                 <!--begin::Menu wrapper-->
