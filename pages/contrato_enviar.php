@@ -18,14 +18,15 @@ if ($contrato_id <= 0) {
     redirect('contratos.php', 'Contrato não encontrado.', 'error');
 }
 
-// Verifica se Autentique está configurado
+// Verifica se Autentique está configurado e busca configuração
 $autentique_configurado = false;
+$autentique_config = null;
 try {
     $stmt = $pdo->query("SHOW TABLES LIKE 'autentique_config'");
     if ($stmt->fetch()) {
-        $stmt = $pdo->query("SELECT COUNT(*) as total FROM autentique_config WHERE ativo = 1");
-        $result = $stmt->fetch();
-        $autentique_configurado = ($result['total'] > 0);
+        $stmt = $pdo->query("SELECT * FROM autentique_config WHERE ativo = 1 ORDER BY id DESC LIMIT 1");
+        $autentique_config = $stmt->fetch();
+        $autentique_configurado = ($autentique_config !== false);
     }
 } catch (Exception $e) {
     error_log('Erro ao verificar Autentique: ' . $e->getMessage());
@@ -70,6 +71,26 @@ $stmt = $pdo->prepare("
 $stmt->execute([$contrato_id]);
 $testemunhas_salvas = $stmt->fetchAll();
 
+// Busca representante já cadastrado para este contrato
+$stmt = $pdo->prepare("
+    SELECT * FROM contratos_signatarios 
+    WHERE contrato_id = ? AND tipo = 'representante'
+    ORDER BY id DESC LIMIT 1
+");
+$stmt->execute([$contrato_id]);
+$representante_salvo = $stmt->fetch();
+
+// Se não tem representante salvo, usa o padrão da configuração
+if (!$representante_salvo && $autentique_config) {
+    $representante_salvo = [
+        'nome' => $autentique_config['representante_nome'] ?? '',
+        'email' => $autentique_config['representante_email'] ?? '',
+        'cpf' => $autentique_config['representante_cpf'] ?? '',
+        'cargo' => $autentique_config['representante_cargo'] ?? '',
+        'empresa_cnpj' => $autentique_config['empresa_cnpj'] ?? ''
+    ];
+}
+
 // Processa POST - Envio para Autentique
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$autentique_configurado) {
@@ -77,6 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     $testemunhas = $_POST['testemunhas'] ?? [];
+    $representante = $_POST['representante'] ?? [];
+    $incluir_representante = isset($_POST['incluir_representante']) && $_POST['incluir_representante'] === '1';
     
     try {
         $pdo->beginTransaction();
@@ -101,13 +124,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'y' => 100
         ];
         
+        // Representante da empresa (segundo signatário, se habilitado)
+        if ($incluir_representante && !empty($representante['email'])) {
+            $signatarios[] = [
+                'email' => $representante['email'],
+                'x' => 100,
+                'y' => 250
+            ];
+        }
+        
         // Testemunhas
         foreach ($testemunhas as $index => $testemunha) {
             if (!empty($testemunha['email'])) {
                 $signatarios[] = [
                     'email' => $testemunha['email'],
                     'x' => 100,
-                    'y' => ($index + 2) * 150 + 100
+                    'y' => (count($signatarios) + 1) * 150 + 100
                 ];
             }
         }
@@ -136,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Insere signatários
             $ordem = 0;
+            $sigIndex = 0;
             
             // Colaborador (primeiro signatário)
             $stmt = $pdo->prepare("
@@ -143,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
                 VALUES (?, 'colaborador', ?, ?, ?, ?, ?, ?)
             ");
-            $signer = $signatures[0] ?? null;
+            $signer = $signatures[$sigIndex++] ?? null;
             $link_assinatura = $signer['link']['short_link'] ?? null;
             $stmt->execute([
                 $contrato_id,
@@ -155,10 +188,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $link_assinatura
             ]);
             
+            // Representante da empresa (se habilitado)
+            if ($incluir_representante && !empty($representante['email'])) {
+                $signer = $signatures[$sigIndex++] ?? null;
+                $link_publico = $signer['link']['short_link'] ?? null;
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO contratos_signatarios 
+                    (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
+                    VALUES (?, 'representante', ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $contrato_id,
+                    $representante['nome'] ?? '',
+                    $representante['email'],
+                    formatar_cpf($representante['cpf'] ?? ''),
+                    $signer['public_id'] ?? null,
+                    $ordem++,
+                    $link_publico
+                ]);
+            }
+            
             // Testemunhas
             foreach ($testemunhas as $index => $testemunha) {
                 if (!empty($testemunha['email'])) {
-                    $signer = $signatures[$index + 1] ?? null;
+                    $signer = $signatures[$sigIndex++] ?? null;
                     $link_publico = $signer['link']['short_link'] ?? null;
                     
                     $stmt = $pdo->prepare("
@@ -240,51 +294,123 @@ require_once __DIR__ . '/../includes/header.php';
         <!--end::Alert-->
         <?php endif; ?>
         
-        <div class="row">
-            <!--begin::Col - Formulário-->
-            <div class="col-lg-6">
-                <!--begin::Card - Informações do Contrato-->
-                <div class="card mb-5">
-                    <div class="card-header border-0 pt-5">
-                        <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold fs-3 mb-1">Informações do Contrato</span>
-                        </h3>
-                    </div>
-                    <div class="card-body pt-5">
-                        <div class="d-flex flex-column gap-4">
-                            <div>
-                                <span class="text-muted fs-7">Título:</span>
-                                <div class="fw-bold fs-5"><?= htmlspecialchars($contrato['titulo']) ?></div>
-                            </div>
-                            <div>
-                                <span class="text-muted fs-7">Colaborador:</span>
-                                <div class="fw-bold"><?= htmlspecialchars($contrato['colaborador_nome']) ?></div>
-                                <div class="text-muted fs-7">
-                                    <?= htmlspecialchars($colaborador['email_pessoal'] ?? 'Sem email') ?>
+        <form method="POST" id="form_enviar">
+            <div class="row">
+                <!--begin::Col - Formulário-->
+                <div class="col-lg-6">
+                    <!--begin::Card - Informações do Contrato-->
+                    <div class="card mb-5">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1">Informações do Contrato</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <div class="d-flex flex-column gap-4">
+                                <div>
+                                    <span class="text-muted fs-7">Título:</span>
+                                    <div class="fw-bold fs-5"><?= htmlspecialchars($contrato['titulo']) ?></div>
                                 </div>
+                                <div>
+                                    <span class="text-muted fs-7">Colaborador:</span>
+                                    <div class="fw-bold"><?= htmlspecialchars($contrato['colaborador_nome']) ?></div>
+                                    <div class="text-muted fs-7">
+                                        <?= htmlspecialchars($colaborador['email_pessoal'] ?? 'Sem email') ?>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="text-muted fs-7">Data de Criação:</span>
+                                    <div class="fw-bold"><?= formatar_data($contrato['data_criacao']) ?></div>
+                                </div>
+                                <?php if ($contrato['pdf_path']): ?>
+                                <div>
+                                    <a href="../<?= htmlspecialchars($contrato['pdf_path']) ?>" target="_blank" class="btn btn-light-primary">
+                                        <i class="ki-duotone ki-file-down fs-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Baixar PDF para Revisão
+                                    </a>
+                                </div>
+                                <?php endif; ?>
                             </div>
-                            <div>
-                                <span class="text-muted fs-7">Data de Criação:</span>
-                                <div class="fw-bold"><?= formatar_data($contrato['data_criacao']) ?></div>
-                            </div>
-                            <?php if ($contrato['pdf_path']): ?>
-                            <div>
-                                <a href="../<?= htmlspecialchars($contrato['pdf_path']) ?>" target="_blank" class="btn btn-light-primary">
-                                    <i class="ki-duotone ki-file-down fs-2">
+                        </div>
+                    </div>
+                    <!--end::Card-->
+                    
+                    <!--begin::Card - Representante da Empresa-->
+                    <div class="card mb-5">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1">
+                                    <i class="ki-duotone ki-user-tick fs-2 me-2 text-primary">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
+                                        <span class="path3"></span>
                                     </i>
-                                    Baixar PDF para Revisão
-                                </a>
+                                    Representante da Empresa
+                                </span>
+                                <span class="text-muted fw-semibold fs-7">Sócio/RH que assina pela empresa</span>
+                            </h3>
+                            <div class="card-toolbar">
+                                <div class="form-check form-switch form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" name="incluir_representante" 
+                                           id="incluir_representante" value="1" 
+                                           <?= !empty($representante_salvo['email']) ? 'checked' : '' ?>>
+                                    <label class="form-check-label fw-bold" for="incluir_representante">
+                                        Incluir
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body pt-5" id="representante_form" style="<?= empty($representante_salvo['email']) ? 'display: none;' : '' ?>">
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">Nome</label>
+                                    <input type="text" name="representante[nome]" class="form-control form-control-solid" 
+                                           value="<?= htmlspecialchars($representante_salvo['nome'] ?? '') ?>" 
+                                           placeholder="Nome completo do representante" />
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Cargo</label>
+                                    <input type="text" name="representante[cargo]" class="form-control form-control-solid" 
+                                           value="<?= htmlspecialchars($representante_salvo['cargo'] ?? '') ?>" 
+                                           placeholder="Ex: Sócio, Diretor" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label required">Email</label>
+                                    <input type="email" name="representante[email]" id="representante_email" 
+                                           class="form-control form-control-solid" 
+                                           value="<?= htmlspecialchars($representante_salvo['email'] ?? '') ?>" 
+                                           placeholder="email@empresa.com" />
+                                    <div class="form-text">Email para receber o link de assinatura</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">CPF</label>
+                                    <input type="text" name="representante[cpf]" class="form-control form-control-solid cpf-mask" 
+                                           value="<?= htmlspecialchars($representante_salvo['cpf'] ?? '') ?>" 
+                                           placeholder="000.000.000-00" />
+                                </div>
+                            </div>
+                            <?php if (!empty($autentique_config['empresa_cnpj'])): ?>
+                            <div class="alert alert-light-info border border-info border-dashed d-flex align-items-center p-4">
+                                <i class="ki-duotone ki-shield-tick fs-2hx text-info me-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div>
+                                    <span class="fw-bold d-block">CNPJ da Empresa:</span>
+                                    <span><?= htmlspecialchars($autentique_config['empresa_cnpj']) ?></span>
+                                </div>
                             </div>
                             <?php endif; ?>
                         </div>
                     </div>
-                </div>
-                <!--end::Card-->
-                
-                <!--begin::Card - Testemunhas-->
-                <form method="POST" id="form_enviar">
+                    <!--end::Card-->
+                    
+                    <!--begin::Card - Testemunhas-->
                     <div class="card mb-5">
                         <div class="card-header border-0 pt-5">
                             <h3 class="card-title align-items-start flex-column">
@@ -327,7 +453,7 @@ require_once __DIR__ . '/../includes/header.php';
                                             <div class="col-md-12">
                                                 <label class="form-label">CPF</label>
                                                 <input type="text" name="testemunhas[<?= $index ?>][cpf]" 
-                                                       class="form-control form-control-solid" 
+                                                       class="form-control form-control-solid cpf-mask" 
                                                        value="<?= htmlspecialchars($testemunha['cpf'] ?? '') ?>"
                                                        placeholder="000.000.000-00" />
                                             </div>
@@ -345,6 +471,7 @@ require_once __DIR__ . '/../includes/header.php';
                             </button>
                         </div>
                     </div>
+                    <!--end::Card-->
                     
                     <!--begin::Alert-->
                     <div class="alert alert-warning d-flex align-items-center mb-5">
@@ -375,43 +502,132 @@ require_once __DIR__ . '/../includes/header.php';
                         </button>
                     </div>
                     <!--end::Actions-->
-                </form>
-                <!--end::Card-->
-            </div>
-            <!--end::Col-->
-            
-            <!--begin::Col - Preview-->
-            <div class="col-lg-6">
-                <!--begin::Card - Preview do PDF-->
-                <div class="card mb-5">
-                    <div class="card-header border-0 pt-5">
-                        <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold fs-3 mb-1">Preview do Contrato</span>
-                        </h3>
-                    </div>
-                    <div class="card-body pt-5">
-                        <?php if ($contrato['pdf_path']): ?>
-                        <div class="ratio ratio-1x1" style="max-height: 600px;">
-                            <iframe src="../<?= htmlspecialchars($contrato['pdf_path']) ?>" 
-                                    style="border: 1px solid #e4e6ef; border-radius: 8px;"></iframe>
-                        </div>
-                        <?php else: ?>
-                        <div class="border rounded p-5 bg-light" style="min-height: 400px;">
-                            <?= $contrato['conteudo_final_html'] ?>
-                        </div>
-                        <?php endif; ?>
-                    </div>
                 </div>
-                <!--end::Card-->
+                <!--end::Col-->
+                
+                <!--begin::Col - Preview-->
+                <div class="col-lg-6">
+                    <!--begin::Card - Resumo Signatários-->
+                    <div class="card mb-5">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1">Resumo dos Signatários</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <div class="d-flex flex-column gap-4" id="resumo_signatarios">
+                                <!-- Colaborador -->
+                                <div class="d-flex align-items-center">
+                                    <div class="symbol symbol-40px me-4">
+                                        <span class="symbol-label bg-light-primary">
+                                            <i class="ki-duotone ki-user fs-2 text-primary">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                        </span>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <span class="text-muted fs-8 d-block">Colaborador (Contratado)</span>
+                                        <span class="fw-bold"><?= htmlspecialchars($contrato['colaborador_nome']) ?></span>
+                                        <span class="text-muted fs-7 d-block"><?= htmlspecialchars($colaborador['email_pessoal'] ?? 'Sem email') ?></span>
+                                    </div>
+                                    <span class="badge badge-light-success">1º</span>
+                                </div>
+                                
+                                <!-- Representante (se houver) -->
+                                <div id="resumo_representante" style="<?= empty($representante_salvo['email']) ? 'display: none;' : '' ?>">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-40px me-4">
+                                            <span class="symbol-label bg-light-info">
+                                                <i class="ki-duotone ki-briefcase fs-2 text-info">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </span>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <span class="text-muted fs-8 d-block">Representante da Empresa</span>
+                                            <span class="fw-bold" id="resumo_representante_nome"><?= htmlspecialchars($representante_salvo['nome'] ?? 'Nome não informado') ?></span>
+                                            <span class="text-muted fs-7 d-block" id="resumo_representante_email"><?= htmlspecialchars($representante_salvo['email'] ?? '') ?></span>
+                                        </div>
+                                        <span class="badge badge-light-info">2º</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Card-->
+                    
+                    <!--begin::Card - Preview do PDF-->
+                    <div class="card mb-5">
+                        <div class="card-header border-0 pt-5">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold fs-3 mb-1">Preview do Contrato</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <?php if ($contrato['pdf_path']): ?>
+                            <div class="ratio ratio-1x1" style="max-height: 600px;">
+                                <iframe src="../<?= htmlspecialchars($contrato['pdf_path']) ?>" 
+                                        style="border: 1px solid #e4e6ef; border-radius: 8px;"></iframe>
+                            </div>
+                            <?php else: ?>
+                            <div class="border rounded p-5 bg-light" style="min-height: 400px;">
+                                <?= $contrato['conteudo_final_html'] ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <!--end::Card-->
+                </div>
+                <!--end::Col-->
             </div>
-            <!--end::Col-->
-        </div>
+        </form>
         
     </div>
 </div>
 <!--end::Post-->
 
 <script>
+// Toggle representante
+document.getElementById('incluir_representante')?.addEventListener('change', function() {
+    const form = document.getElementById('representante_form');
+    const resumo = document.getElementById('resumo_representante');
+    const emailInput = document.getElementById('representante_email');
+    
+    if (this.checked) {
+        form.style.display = 'block';
+        resumo.style.display = 'block';
+        emailInput.setAttribute('required', 'required');
+    } else {
+        form.style.display = 'none';
+        resumo.style.display = 'none';
+        emailInput.removeAttribute('required');
+    }
+});
+
+// Atualiza resumo do representante ao digitar
+document.querySelector('[name="representante[nome]"]')?.addEventListener('input', function() {
+    document.getElementById('resumo_representante_nome').textContent = this.value || 'Nome não informado';
+});
+
+document.querySelector('[name="representante[email]"]')?.addEventListener('input', function() {
+    document.getElementById('resumo_representante_email').textContent = this.value;
+});
+
+// Máscara de CPF
+document.querySelectorAll('.cpf-mask').forEach(input => {
+    input.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length <= 11) {
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        }
+        e.target.value = value;
+    });
+});
+
 // Inicia o índice com o número de testemunhas já existentes
 let testemunhaIndex = <?= count($testemunhas_salvas) ?>;
 
@@ -466,7 +682,7 @@ document.getElementById('btn_adicionar_testemunha')?.addEventListener('click', f
                     </div>
                     <div class="col-md-12">
                         <label class="form-label">CPF</label>
-                        <input type="text" name="testemunhas[${index}][cpf]" class="form-control form-control-solid" 
+                        <input type="text" name="testemunhas[${index}][cpf]" class="form-control form-control-solid cpf-mask" 
                                placeholder="000.000.000-00" />
                     </div>
                 </div>
@@ -481,18 +697,55 @@ document.getElementById('btn_adicionar_testemunha')?.addEventListener('click', f
         this.closest('.testemunha-item').remove();
         atualizarNumerosTestemunhas();
     });
+    
+    // Adiciona máscara de CPF
+    container.querySelector(`.testemunha-item[data-index="${index}"] .cpf-mask`)?.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length <= 11) {
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        }
+        e.target.value = value;
+    });
 });
 
 // Confirmação antes de enviar
 document.getElementById('form_enviar')?.addEventListener('submit', function(e) {
+    // Valida email do representante se estiver habilitado
+    const incluirRepresentante = document.getElementById('incluir_representante')?.checked;
+    const emailRepresentante = document.getElementById('representante_email')?.value;
+    
+    if (incluirRepresentante && !emailRepresentante) {
+        e.preventDefault();
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Email obrigatório',
+                text: 'Por favor, informe o email do representante da empresa.',
+                icon: 'warning',
+                confirmButtonText: 'OK'
+            });
+        } else {
+            alert('Por favor, informe o email do representante da empresa.');
+        }
+        return false;
+    }
+    
     if (typeof Swal !== 'undefined') {
         e.preventDefault();
+        
+        let signatarios = '<li><strong>Colaborador:</strong> <?= htmlspecialchars($contrato['colaborador_nome']) ?></li>';
+        if (incluirRepresentante) {
+            const nomeRep = document.querySelector('[name="representante[nome]"]')?.value || 'Representante';
+            signatarios += `<li><strong>Representante:</strong> ${nomeRep}</li>`;
+        }
         
         Swal.fire({
             title: 'Confirmar Envio',
             html: `<p>Você está prestes a enviar este contrato para assinatura digital.</p>
-                   <p><strong>Após o envio, o contrato não poderá ser editado.</strong></p>
-                   <p>Os signatários receberão um email com o link para assinar.</p>`,
+                   <p><strong>Signatários:</strong></p>
+                   <ul class="text-start">${signatarios}</ul>
+                   <p class="text-warning"><strong>Após o envio, o contrato não poderá ser editado.</strong></p>`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Sim, Enviar',

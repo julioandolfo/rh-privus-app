@@ -8,7 +8,6 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/contratos_functions.php';
-require_once __DIR__ . '/../includes/autentique_service.php';
 require_once __DIR__ . '/../includes/select_colaborador.php';
 
 require_page_permission('contrato_add.php');
@@ -16,6 +15,25 @@ require_page_permission('contrato_add.php');
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 $colaborador_id = intval($_GET['colaborador_id'] ?? 0);
+
+// Verifica se Autentique está configurado e busca configuração
+$autentique_configurado = false;
+$autentique_config = null;
+try {
+    $stmt = $pdo->query("SHOW TABLES LIKE 'autentique_config'");
+    if ($stmt->fetch()) {
+        $stmt = $pdo->query("SELECT * FROM autentique_config WHERE ativo = 1 ORDER BY id DESC LIMIT 1");
+        $autentique_config = $stmt->fetch();
+        $autentique_configurado = ($autentique_config !== false);
+    }
+} catch (Exception $e) {
+    error_log('Erro ao verificar Autentique: ' . $e->getMessage());
+}
+
+// Só carrega o serviço se estiver configurado
+if ($autentique_configurado) {
+    require_once __DIR__ . '/../includes/autentique_service.php';
+}
 
 // Busca templates ativos
 $stmt = $pdo->query("SELECT id, nome FROM contratos_templates WHERE ativo = 1 ORDER BY nome");
@@ -150,6 +168,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Se for enviar, integra com Autentique
         if ($acao === 'enviar') {
+            if (!$autentique_configurado) {
+                $pdo->rollBack();
+                redirect('contrato_add.php?colaborador_id=' . $colaborador_id, 
+                    'Autentique não está configurado. Configure em Configurações > Integrações.', 'error');
+            }
+            
             try {
                 $service = new AutentiqueService();
                 
@@ -166,6 +190,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'y' => 100
                 ];
                 
+                // Representante da empresa (se habilitado)
+                $representante = $_POST['representante'] ?? [];
+                $incluir_representante = isset($_POST['incluir_representante']) && $_POST['incluir_representante'] === '1';
+                
+                if ($incluir_representante && !empty($representante['email'])) {
+                    $signatarios[] = [
+                        'email' => $representante['email'],
+                        'x' => 100,
+                        'y' => 250
+                    ];
+                }
+                
                 // Testemunhas (se houver)
                 $testemunhas = $_POST['testemunhas'] ?? [];
                 foreach ($testemunhas as $index => $testemunha) {
@@ -173,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $signatarios[] = [
                             'email' => $testemunha['email'],
                             'x' => 100,
-                            'y' => ($index + 2) * 150 + 100
+                            'y' => (count($signatarios) + 1) * 150 + 100
                         ];
                     }
                 }
@@ -202,6 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     // Insere signatários
                     $ordem = 0;
+                    $sigIndex = 0;
                     
                     // Colaborador (primeiro signatário)
                     $stmt = $pdo->prepare("
@@ -209,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
                         VALUES (?, 'colaborador', ?, ?, ?, ?, ?, ?)
                     ");
-                    $signer = $signatures[0] ?? null;
+                    $signer = $signatures[$sigIndex++] ?? null;
                     $link_assinatura = $signer['link']['short_link'] ?? null;
                     $stmt->execute([
                         $contrato_id,
@@ -221,10 +258,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $link_assinatura
                     ]);
                     
+                    // Representante da empresa (se habilitado)
+                    if ($incluir_representante && !empty($representante['email'])) {
+                        $signer = $signatures[$sigIndex++] ?? null;
+                        $link_publico = $signer['link']['short_link'] ?? null;
+                        
+                        $stmt = $pdo->prepare("
+                            INSERT INTO contratos_signatarios 
+                            (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
+                            VALUES (?, 'representante', ?, ?, ?, ?, ?, ?)
+                        ");
+                        $stmt->execute([
+                            $contrato_id,
+                            $representante['nome'] ?? '',
+                            $representante['email'],
+                            formatar_cpf($representante['cpf'] ?? ''),
+                            $signer['public_id'] ?? null,
+                            $ordem++,
+                            $link_publico
+                        ]);
+                    }
+                    
                     // Testemunhas
                     foreach ($testemunhas as $index => $testemunha) {
                         if (!empty($testemunha['email'])) {
-                            $signer = $signatures[$index + 1] ?? null;
+                            $signer = $signatures[$sigIndex++] ?? null;
                             $link_publico = $signer['link']['short_link'] ?? null;
                             
                             $stmt = $pdo->prepare("

@@ -345,8 +345,24 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="text-muted fs-7">CPF: <?= htmlspecialchars($signatario['cpf']) ?></div>
                                 <?php endif; ?>
                                 <div class="mt-2">
-                                    <span class="badge badge-light-<?= $signatario['tipo'] === 'colaborador' ? 'primary' : ($signatario['tipo'] === 'testemunha' ? 'info' : 'success') ?>">
-                                        <?= ucfirst($signatario['tipo']) ?>
+                                    <?php
+                                    $tipo_classes = [
+                                        'colaborador' => 'primary',
+                                        'representante' => 'success',
+                                        'testemunha' => 'info',
+                                        'rh' => 'warning'
+                                    ];
+                                    $tipo_labels = [
+                                        'colaborador' => 'Colaborador',
+                                        'representante' => 'Representante',
+                                        'testemunha' => 'Testemunha',
+                                        'rh' => 'RH'
+                                    ];
+                                    $tipo_class = $tipo_classes[$signatario['tipo']] ?? 'secondary';
+                                    $tipo_label = $tipo_labels[$signatario['tipo']] ?? ucfirst($signatario['tipo']);
+                                    ?>
+                                    <span class="badge badge-light-<?= $tipo_class ?>">
+                                        <?= $tipo_label ?>
                                     </span>
                                     <?php if ($signatario['assinado']): ?>
                                     <span class="badge badge-light-success ms-2">
@@ -379,7 +395,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     </button>
                                 </form>
                                 <?php endif; ?>
-                                <?php if ($signatario['link_publico'] && $signatario['tipo'] === 'testemunha'): ?>
+                                <?php if ($signatario['link_publico'] && in_array($signatario['tipo'], ['testemunha', 'representante'])): ?>
                                 <button type="button" class="btn btn-sm btn-light-info btn-copiar-link" 
                                         data-link="<?= htmlspecialchars($signatario['link_publico']) ?>"
                                         title="Copiar link público">
