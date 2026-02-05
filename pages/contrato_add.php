@@ -185,73 +185,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Atualiza contrato com dados do Autentique
                     $stmt = $pdo->prepare("
                         UPDATE contratos 
-                        SET autentique_document_id = ?, autentique_token = ?, status = 'enviado'
+                        SET autentique_document_id = ?, status = 'enviado'
                         WHERE id = ?
                     ");
                     $stmt->execute([
                         $resultado['id'],
-                        $resultado['token'],
                         $contrato_id
                     ]);
+                    
+                    // Obtém signatures da resposta
+                    $signatures = $resultado['signatures'] ?? [];
+                    
+                    // Remove signatários existentes (testemunhas salvas como rascunho) e recria
+                    $stmt = $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?");
+                    $stmt->execute([$contrato_id]);
                     
                     // Insere signatários
                     $ordem = 0;
                     
-                    // Colaborador
+                    // Colaborador (primeiro signatário)
                     $stmt = $pdo->prepare("
                         INSERT INTO contratos_signatarios 
-                        (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura)
-                        VALUES (?, 'colaborador', ?, ?, ?, ?, ?)
+                        (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
+                        VALUES (?, 'colaborador', ?, ?, ?, ?, ?, ?)
                     ");
-                    $signer = $resultado['signers'][0] ?? null;
+                    $signer = $signatures[0] ?? null;
+                    $link_assinatura = $signer['link']['short_link'] ?? null;
                     $stmt->execute([
                         $contrato_id,
                         $colaborador['nome_completo'],
-                        $colaborador['email_pessoal'] ?? $colaborador['email'] ?? '',
+                        $colaborador['email_pessoal'] ?? '',
                         formatar_cpf($colaborador['cpf'] ?? ''),
-                        $signer['id'] ?? null,
-                        $ordem++
+                        $signer['public_id'] ?? null,
+                        $ordem++,
+                        $link_assinatura
                     ]);
                     
                     // Testemunhas
                     foreach ($testemunhas as $index => $testemunha) {
                         if (!empty($testemunha['email'])) {
-                            $signer = $resultado['signers'][$index + 1] ?? null;
-                            
-                            // Cria link público para testemunha
-                            $link_publico = null;
-                            $link_expiracao = null;
-                            if ($signer && $signer['id']) {
-                                try {
-                                    $link_result = $service->criarLinkPublico($resultado['id'], $signer['id']);
-                                    if ($link_result) {
-                                        $link_publico = $link_result['link'];
-                                        $link_expiracao = $link_result['expiresAt'] ?? date('Y-m-d H:i:s', strtotime('+30 days'));
-                                    }
-                                } catch (Exception $e) {
-                                    error_log('Erro ao criar link público: ' . $e->getMessage());
-                                }
-                            }
+                            $signer = $signatures[$index + 1] ?? null;
+                            $link_publico = $signer['link']['short_link'] ?? null;
                             
                             $stmt = $pdo->prepare("
                                 INSERT INTO contratos_signatarios 
-                                (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico, link_expiracao)
-                                VALUES (?, 'testemunha', ?, ?, ?, ?, ?, ?, ?)
+                                (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
+                                VALUES (?, 'testemunha', ?, ?, ?, ?, ?, ?)
                             ");
                             $stmt->execute([
                                 $contrato_id,
                                 $testemunha['nome'] ?? '',
                                 $testemunha['email'],
                                 formatar_cpf($testemunha['cpf'] ?? ''),
-                                $signer['id'] ?? null,
+                                $signer['public_id'] ?? null,
                                 $ordem++,
-                                $link_publico,
-                                $link_expiracao
+                                $link_publico
                             ]);
                         }
                     }
-                    
-                    // TODO: Enviar notificações por email
                 }
             } catch (Exception $e) {
                 $pdo->rollBack();

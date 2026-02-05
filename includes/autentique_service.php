@@ -102,12 +102,18 @@ class AutentiqueService {
             mutation CreateDocument($document: DocumentInput!) {
                 createDocument(document: $document) {
                     id
-                    token
-                    link
-                    signers {
-                        id
+                    name
+                    refusable
+                    sortable
+                    created_at
+                    signatures {
+                        public_id
+                        name
                         email
-                        link
+                        created_at
+                        action { name }
+                        link { short_link }
+                        user { id name email }
                     }
                 }
             }
@@ -131,17 +137,17 @@ class AutentiqueService {
      */
     public function consultarStatus($documentId) {
         $query = '
-            query GetDocument($id: ID!) {
+            query GetDocument($id: UUID!) {
                 document(id: $id) {
                     id
-                    status
-                    link
-                    signers {
-                        id
+                    name
+                    created_at
+                    signatures {
+                        public_id
+                        name
                         email
-                        signed
-                        signedAt
-                        link
+                        signed { created_at }
+                        link { short_link }
                     }
                 }
             }
@@ -151,7 +157,23 @@ class AutentiqueService {
         
         $result = $this->executeGraphQL($query, $variables);
         
-        return $result['document'] ?? null;
+        // Transforma para formato compatível com código existente
+        $doc = $result['document'] ?? null;
+        if ($doc && isset($doc['signatures'])) {
+            $signers = [];
+            foreach ($doc['signatures'] as $sig) {
+                $signers[] = [
+                    'id' => $sig['public_id'] ?? null,
+                    'email' => $sig['email'] ?? null,
+                    'signed' => !empty($sig['signed']),
+                    'signedAt' => $sig['signed']['created_at'] ?? null,
+                    'link' => $sig['link']['short_link'] ?? null
+                ];
+            }
+            $doc['signers'] = $signers;
+        }
+        
+        return $doc;
     }
     
     /**
