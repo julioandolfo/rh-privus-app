@@ -1263,7 +1263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $empresa_id = $todas_empresas ? null : (int)$empresa_id_input;
         
         // Valida subtipo
-        $subtipos_validos = ['bonus_especifico', 'individual', 'grupal', 'adiantamento'];
+        $subtipos_validos = ['bonus_especifico', 'individual', 'grupal', 'adiantamento', 'acerto'];
         if (!in_array($subtipo_fechamento, $subtipos_validos)) {
             redirect('fechamento_pagamentos.php', 'Subtipo de fechamento inválido!', 'error');
         }
@@ -1279,6 +1279,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $colaboradores_input = $_POST['colaboradores'] ?? [];
                 } elseif ($subtipo_fechamento === 'individual' || $subtipo_fechamento === 'adiantamento') {
                     $colab_id = (int)($_POST['colaborador_id'] ?? 0);
+                    if ($colab_id) {
+                        $colaboradores_input = [$colab_id];
+                    }
+                } elseif ($subtipo_fechamento === 'acerto') {
+                    $colab_id = (int)($_POST['colaborador_desligado_id'] ?? 0);
                     if ($colab_id) {
                         $colaboradores_input = [$colab_id];
                     }
@@ -1979,6 +1984,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 
                 $total_pagamento = $valor_adiantamento;
+                
+            } elseif ($subtipo_fechamento === 'acerto') {
+                // Acerto: um colaborador desligado, múltiplas verbas rescisórias
+                $colab_id = ($colabs_fechamento !== null && is_array($colabs_fechamento) && !empty($colabs_fechamento)) 
+                    ? (int)$colabs_fechamento[0] 
+                    : (int)($_POST['colaborador_desligado_id'] ?? 0);
+                
+                // Valores do acerto
+                $valor_ferias = str_replace(['.', ','], ['', '.'], $_POST['acerto_valor_ferias'] ?? '0');
+                $valor_13 = str_replace(['.', ','], ['', '.'], $_POST['acerto_valor_13'] ?? '0');
+                $saldo_banco_horas = str_replace(['.', ','], ['', '.'], $_POST['acerto_saldo_banco_horas'] ?? '0');
+                $saldo_salario = str_replace(['.', ','], ['', '.'], $_POST['acerto_saldo_salario'] ?? '0');
+                $acerto_adicionais = str_replace(['.', ','], ['', '.'], $_POST['acerto_adicionais'] ?? '0');
+                $acerto_descontos = str_replace(['.', ','], ['', '.'], $_POST['acerto_descontos'] ?? '0');
+                $observacoes = trim($_POST['acerto_observacoes'] ?? '');
+                $dias_ferias = (int)($_POST['acerto_dias_ferias'] ?? 0);
+                $meses_13 = (int)($_POST['acerto_meses_13'] ?? 0);
+                
+                if (empty($colab_id)) {
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Selecione um colaborador desligado') WHERE id = ?");
+                    $stmt->execute([$fechamento_id]);
+                    continue;
+                }
+                
+                if (empty($observacoes)) {
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Observações são obrigatórias') WHERE id = ?");
+                    $stmt->execute([$fechamento_id]);
+                    continue;
+                }
+                
+                // Calcula totais
+                $total_adicionais = (float)$valor_ferias + (float)$valor_13 + (float)$saldo_banco_horas + (float)$saldo_salario + (float)$acerto_adicionais;
+                $total_descontos_acerto = (float)$acerto_descontos;
+                $valor_total = $total_adicionais - $total_descontos_acerto;
+                
+                if ($valor_total <= 0) {
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: O valor total do acerto deve ser maior que zero') WHERE id = ?");
+                    $stmt->execute([$fechamento_id]);
+                    continue;
+                }
+                
+                $colaboradores_ids = [$colab_id];
+                
+                // Busca dados do colaborador
+                $stmt = $pdo->prepare("SELECT salario, nome_completo, status FROM colaboradores WHERE id = ?");
+                $stmt->execute([$colab_id]);
+                $colab = $stmt->fetch();
+                
+                if (!$colab) {
+                    $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET descricao = CONCAT(COALESCE(descricao, ''), ' | ERRO: Colaborador não encontrado') WHERE id = ?");
+                    $stmt->execute([$fechamento_id]);
+                    continue;
+                }
+                
+                // Monta descrição detalhada do acerto
+                $detalhes_acerto = [];
+                if ((float)$saldo_salario > 0) $detalhes_acerto[] = "Saldo Salário: R$ " . number_format((float)$saldo_salario, 2, ',', '.');
+                if ((float)$valor_ferias > 0) $detalhes_acerto[] = "Férias + 1/3 ({$dias_ferias} dias): R$ " . number_format((float)$valor_ferias, 2, ',', '.');
+                if ((float)$valor_13 > 0) $detalhes_acerto[] = "13º Proporcional ({$meses_13}/12): R$ " . number_format((float)$valor_13, 2, ',', '.');
+                if ((float)$saldo_banco_horas > 0) $detalhes_acerto[] = "Banco de Horas: R$ " . number_format((float)$saldo_banco_horas, 2, ',', '.');
+                if ((float)$acerto_adicionais > 0) $detalhes_acerto[] = "Outros Adicionais: R$ " . number_format((float)$acerto_adicionais, 2, ',', '.');
+                if ((float)$acerto_descontos > 0) $detalhes_acerto[] = "Descontos: -R$ " . number_format((float)$acerto_descontos, 2, ',', '.');
+                
+                $motivo_completo = "ACERTO DE RESCISÃO - " . $colab['nome_completo'] . "\n";
+                $motivo_completo .= implode("\n", $detalhes_acerto) . "\n";
+                $motivo_completo .= "Total: R$ " . number_format($valor_total, 2, ',', '.') . "\n";
+                $motivo_completo .= "Obs: " . $observacoes;
+                
+                // Insere item do fechamento
+                $stmt = $pdo->prepare("
+                    INSERT INTO fechamentos_pagamento_itens 
+                    (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, adicionais, valor_total, valor_manual, inclui_salario, inclui_horas_extras, inclui_bonus_automaticos, motivo)
+                    VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, 0, 0, 0, ?)
+                ");
+                $stmt->execute([
+                    $fechamento_id,
+                    $colab_id,
+                    (float)$saldo_salario, // saldo_salario vai no salario_base
+                    $total_descontos_acerto,
+                    $total_adicionais - (float)$saldo_salario, // adicionais (sem o saldo salário que já está em salario_base)
+                    $valor_total,
+                    $valor_total,
+                    $motivo_completo
+                ]);
+                
+                $total_pagamento = $valor_total;
             }
             
             // Atualiza fechamento com totais
@@ -2003,7 +2094,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'bonus_especifico' => 'Bônus Específico',
                 'individual' => 'Bônus Individual',
                 'grupal' => 'Bônus Grupal',
-                'adiantamento' => 'Adiantamento'
+                'adiantamento' => 'Adiantamento',
+                'acerto' => 'Acerto de Rescisão'
             ];
             $subtipo_label = $subtipo_labels[$subtipo_fechamento] ?? 'Pagamento Extra';
             
@@ -3358,6 +3450,13 @@ require_once __DIR__ . '/../includes/header.php';
                                 </i>
                                 Adiantamento
                             </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="abrirModalFechamentoExtra('acerto'); return false;">
+                                <i class="ki-duotone ki-exit-left fs-5 me-2 text-danger">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Acerto (Desligado)
+                            </a></li>
                         </ul>
                     </div>
                 </div>
@@ -4547,6 +4646,92 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     
+                    <!-- Campos Acerto (Desligados) -->
+                    <div class="campo-acerto" style="display: none;">
+                        <div class="alert alert-warning d-flex align-items-center mb-7">
+                            <i class="ki-duotone ki-information-5 fs-2x text-warning me-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div>
+                                <strong>Acerto de Rescisão</strong><br>
+                                Este fechamento é destinado a colaboradores desligados para pagamento de verbas rescisórias.
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Colaborador Desligado</label>
+                                <div id="extra_colaboradores_desligados_container" class="border rounded p-4">
+                                    <p class="text-muted">Selecione uma empresa primeiro</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Saldo de Férias (dias)</label>
+                                <input type="number" name="acerto_dias_ferias" id="acerto_dias_ferias" class="form-control form-control-solid" placeholder="0" min="0" max="30" step="1" />
+                                <div class="form-text text-muted">Dias de férias proporcionais a pagar</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Valor Férias + 1/3</label>
+                                <input type="text" name="acerto_valor_ferias" id="acerto_valor_ferias" class="form-control form-control-solid" placeholder="0,00" />
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">13º Proporcional (meses)</label>
+                                <input type="number" name="acerto_meses_13" id="acerto_meses_13" class="form-control form-control-solid" placeholder="0" min="0" max="12" step="1" />
+                                <div class="form-text text-muted">Meses trabalhados para 13º</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Valor 13º Proporcional</label>
+                                <input type="text" name="acerto_valor_13" id="acerto_valor_13" class="form-control form-control-solid" placeholder="0,00" />
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Saldo Banco de Horas</label>
+                                <input type="text" name="acerto_saldo_banco_horas" id="acerto_saldo_banco_horas" class="form-control form-control-solid" placeholder="0,00" />
+                                <div class="form-text text-muted">Horas a serem pagas em R$</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Saldo de Salário</label>
+                                <input type="text" name="acerto_saldo_salario" id="acerto_saldo_salario" class="form-control form-control-solid" placeholder="0,00" />
+                                <div class="form-text text-muted">Dias trabalhados no último mês</div>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Outros Adicionais</label>
+                                <input type="text" name="acerto_adicionais" id="acerto_adicionais" class="form-control form-control-solid" placeholder="0,00" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Descontos</label>
+                                <input type="text" name="acerto_descontos" id="acerto_descontos" class="form-control form-control-solid" placeholder="0,00" />
+                                <div class="form-text text-muted">Adiantamentos, faltas, etc.</div>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <div class="card bg-light-primary">
+                                    <div class="card-body py-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="fw-bold fs-5">Total do Acerto:</span>
+                                            <span class="fw-bold fs-3 text-primary" id="acerto_total_display">R$ 0,00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-md-12">
+                                <label class="required fw-semibold fs-6 mb-2">Observações/Detalhamento</label>
+                                <textarea name="acerto_observacoes" id="acerto_observacoes" class="form-control form-control-solid" rows="4" required placeholder="Detalhe os valores e motivos do acerto..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="row mb-7">
                         <div class="col-md-12">
                             <label class="fw-semibold fs-6 mb-2">Descrição/Observações</label>
@@ -4919,12 +5104,12 @@ function aplicarFiltros() {
 // Função para gerenciar atributos required baseado no subtipo
 function gerenciarRequiredCampos(subtipo) {
     // Remove required de TODOS os campos primeiro (incluindo os que estão em divs ocultas)
-    document.querySelectorAll('input[name="valor_manual"], input[name="valor_adiantamento"], input[name="mes_desconto"], textarea[name="motivo"]').forEach(input => {
+    document.querySelectorAll('input[name="valor_manual"], input[name="valor_adiantamento"], input[name="mes_desconto"], textarea[name="motivo"], textarea[name="acerto_observacoes"]').forEach(input => {
         input.removeAttribute('required');
     });
     
     // Remove required de campos dentro de divs ocultas
-    document.querySelectorAll('.campo-bonus-especifico, .campo-individual, .campo-grupal, .campo-adiantamento').forEach(div => {
+    document.querySelectorAll('.campo-bonus-especifico, .campo-individual, .campo-grupal, .campo-adiantamento, .campo-acerto').forEach(div => {
         if (div.style.display === 'none' || !div.offsetParent) {
             div.querySelectorAll('input[required], textarea[required], select[required]').forEach(input => {
                 input.removeAttribute('required');
@@ -4974,6 +5159,13 @@ function gerenciarRequiredCampos(subtipo) {
                 input.setAttribute('required', 'required');
             }
         });
+    } else if (subtipo === 'acerto') {
+        // Acerto: apenas observações é obrigatório
+        document.querySelectorAll('.campo-acerto textarea[name="acerto_observacoes"]').forEach(input => {
+            if (input.closest('.campo-acerto').style.display !== 'none') {
+                input.setAttribute('required', 'required');
+            }
+        });
     }
     // bonus_especifico não precisa de required em valor_manual, valor_adiantamento ou mes_desconto
 }
@@ -4981,7 +5173,7 @@ function gerenciarRequiredCampos(subtipo) {
 // Abrir modal de fechamento extra
 function abrirModalFechamentoExtra(subtipo) {
     // Esconde todos os campos específicos
-    document.querySelectorAll('.campo-bonus-especifico, .campo-individual, .campo-grupal, .campo-adiantamento').forEach(el => {
+    document.querySelectorAll('.campo-bonus-especifico, .campo-individual, .campo-grupal, .campo-adiantamento, .campo-acerto').forEach(el => {
         el.style.display = 'none';
     });
     
@@ -4998,6 +5190,9 @@ function abrirModalFechamentoExtra(subtipo) {
     } else if (subtipo === 'adiantamento') {
         document.querySelectorAll('.campo-adiantamento').forEach(el => el.style.display = 'block');
         document.getElementById('extra_titulo').textContent = 'Novo Fechamento Extra - Adiantamento';
+    } else if (subtipo === 'acerto') {
+        document.querySelectorAll('.campo-acerto').forEach(el => el.style.display = 'block');
+        document.getElementById('extra_titulo').textContent = 'Acerto - Colaborador Desligado';
     }
     
     // Gerencia atributos required
@@ -5357,11 +5552,36 @@ document.getElementById('extra_empresa_id')?.addEventListener('change', function
     
     if (!empresaId || empresaId === '') {
         // Limpa todos os containers visíveis
-        document.querySelectorAll('#extra_colaboradores_container').forEach(container => {
-            if (container.closest('.campo-individual, .campo-adiantamento, .campo-bonus-especifico, .campo-grupal')?.style.display !== 'none') {
+        document.querySelectorAll('#extra_colaboradores_container, #extra_colaboradores_desligados_container').forEach(container => {
+            if (container.closest('.campo-individual, .campo-adiantamento, .campo-bonus-especifico, .campo-grupal, .campo-acerto')?.style.display !== 'none') {
                 container.innerHTML = '<p class="text-muted">Selecione uma empresa primeiro</p>';
             }
         });
+        return;
+    }
+    
+    // Se for subtipo acerto, busca colaboradores desligados
+    if (subtipo === 'acerto') {
+        const containerDesligados = document.getElementById('extra_colaboradores_desligados_container');
+        if (containerDesligados) {
+            containerDesligados.innerHTML = '<p class="text-muted">Carregando colaboradores desligados...</p>';
+            const urlDesligados = empresaId === 'todas' 
+                ? '../api/get_colaboradores.php?status=desligado'
+                : '../api/get_colaboradores.php?empresa_id=' + empresaId + '&status=desligado';
+            fetch(urlDesligados)
+                .then(r => r.json())
+                .then(data => {
+                    let html = '<select name="colaborador_desligado_id" id="extra_colaborador_desligado_id" class="form-select form-select-solid" required><option value="">Selecione um colaborador desligado...</option>';
+                    data.forEach(colab => {
+                        html += '<option value="' + colab.id + '" data-salario="' + (colab.salario || 0) + '">' + colab.nome_completo + (colab.empresa_nome ? ' - ' + colab.empresa_nome : '') + '</option>';
+                    });
+                    html += '</select>';
+                    containerDesligados.innerHTML = data.length > 0 ? html : '<p class="text-warning">Nenhum colaborador desligado encontrado nesta empresa</p>';
+                })
+                .catch(() => {
+                    containerDesligados.innerHTML = '<p class="text-danger">Erro ao carregar colaboradores</p>';
+                });
+        }
         return;
     }
     
@@ -5527,6 +5747,60 @@ document.getElementById('extra_motivo_adiantamento')?.addEventListener('input', 
     if (hiddenField) {
         hiddenField.value = this.value || '';
     }
+});
+
+// ======== ACERTO (DESLIGADOS) ========
+
+// Função para calcular e exibir o total do acerto
+function calcularTotalAcerto() {
+    const parseValor = (str) => {
+        if (!str) return 0;
+        // Remove pontos de milhar e converte vírgula para ponto
+        return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+    };
+    
+    const valorFerias = parseValor(document.getElementById('acerto_valor_ferias')?.value);
+    const valor13 = parseValor(document.getElementById('acerto_valor_13')?.value);
+    const saldoBancoHoras = parseValor(document.getElementById('acerto_saldo_banco_horas')?.value);
+    const saldoSalario = parseValor(document.getElementById('acerto_saldo_salario')?.value);
+    const adicionais = parseValor(document.getElementById('acerto_adicionais')?.value);
+    const descontos = parseValor(document.getElementById('acerto_descontos')?.value);
+    
+    const total = valorFerias + valor13 + saldoBancoHoras + saldoSalario + adicionais - descontos;
+    
+    const displayEl = document.getElementById('acerto_total_display');
+    if (displayEl) {
+        displayEl.textContent = 'R$ ' + total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        displayEl.classList.remove('text-primary', 'text-danger');
+        displayEl.classList.add(total > 0 ? 'text-primary' : 'text-danger');
+    }
+}
+
+// Adiciona listeners para calcular total do acerto
+['acerto_valor_ferias', 'acerto_valor_13', 'acerto_saldo_banco_horas', 'acerto_saldo_salario', 'acerto_adicionais', 'acerto_descontos'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', calcularTotalAcerto);
+    document.getElementById(id)?.addEventListener('change', calcularTotalAcerto);
+});
+
+// Aplica máscara de moeda aos campos de valor do acerto
+document.getElementById('kt_modal_fechamento_extra')?.addEventListener('shown.bs.modal', function() {
+    ['acerto_valor_ferias', 'acerto_valor_13', 'acerto_saldo_banco_horas', 'acerto_saldo_salario', 'acerto_adicionais', 'acerto_descontos'].forEach(id => {
+        const campo = document.getElementById(id);
+        if (campo && !campo.dataset.mascaraAplicada) {
+            campo.dataset.mascaraAplicada = 'true';
+            campo.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length === 0) {
+                    e.target.value = '';
+                    return;
+                }
+                value = (parseInt(value) / 100).toFixed(2);
+                value = value.replace('.', ',');
+                value = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                e.target.value = value;
+            });
+        }
+    });
 });
 
 // Função para verificar duplicações de bônus
