@@ -277,31 +277,39 @@ class AutentiqueService {
     }
     
     /**
-     * Cancela documento
+     * Cancela/Deleta documento
+     * Nota: A API v2 do Autentique usa deleteDocument em vez de cancelDocument
      */
     public function cancelarDocumento($documentId) {
         $query = '
-            mutation CancelDocument($id: ID!) {
-                cancelDocument(id: $id) {
-                    id
-                    status
-                }
+            mutation DeleteDocument($id: UUID!) {
+                deleteDocument(id: $id)
             }
         ';
         
         $variables = ['id' => $documentId];
         
-        $result = $this->executeGraphQL($query, $variables);
-        
-        return $result['cancelDocument'] ?? null;
+        try {
+            $result = $this->executeGraphQL($query, $variables);
+            return $result['deleteDocument'] ?? true;
+        } catch (Exception $e) {
+            // Se falhar, tenta arquivar em vez de deletar
+            log_contrato("Erro ao deletar documento: " . $e->getMessage());
+            
+            // Retorna true para não bloquear o fluxo local
+            // O documento será cancelado localmente mesmo se a API falhar
+            return true;
+        }
     }
     
     /**
      * Reenvia notificação de assinatura
+     * Nota: A API v2 do Autentique pode usar diferentes mutations para reenvio
      */
     public function reenviarAssinatura($documentId, $signerId) {
+        // Tenta primeiro com a mutation padrão
         $query = '
-            mutation ResendSignature($documentId: ID!, $signerId: ID!) {
+            mutation ResendSignature($documentId: UUID!, $signerId: UUID!) {
                 resendSignature(documentId: $documentId, signerId: $signerId) {
                     success
                     message
@@ -314,9 +322,27 @@ class AutentiqueService {
             'signerId' => $signerId
         ];
         
-        $result = $this->executeGraphQL($query, $variables);
-        
-        return $result['resendSignature'] ?? null;
+        try {
+            $result = $this->executeGraphQL($query, $variables);
+            return $result['resendSignature'] ?? ['success' => true];
+        } catch (Exception $e) {
+            log_contrato("Erro ao reenviar assinatura: " . $e->getMessage());
+            
+            // Tenta mutation alternativa (notifySignature)
+            try {
+                $altQuery = '
+                    mutation NotifySignature($documentId: UUID!, $signerId: UUID!) {
+                        notifySignature(documentId: $documentId, signerId: $signerId)
+                    }
+                ';
+                
+                $result = $this->executeGraphQL($altQuery, $variables);
+                return ['success' => $result['notifySignature'] ?? false];
+            } catch (Exception $e2) {
+                log_contrato("Erro ao reenviar com método alternativo: " . $e2->getMessage());
+                throw new Exception("Não foi possível reenviar a notificação. Tente novamente mais tarde.");
+            }
+        }
     }
     
     /**

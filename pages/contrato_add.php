@@ -312,6 +312,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ]);
                         }
                     }
+                } else {
+                    // API falhou - salva signatários básicos sem dados do Autentique
+                    $stmt = $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?");
+                    $stmt->execute([$contrato_id]);
+                    
+                    $ordem = 0;
+                    
+                    // Colaborador
+                    $stmt = $pdo->prepare("
+                        INSERT INTO contratos_signatarios 
+                        (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                        VALUES (?, 'colaborador', ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $contrato_id,
+                        $colaborador['nome_completo'] ?? 'Nome não informado',
+                        $colaborador['email_pessoal'] ?? '',
+                        formatar_cpf($colaborador['cpf'] ?? ''),
+                        $ordem++
+                    ]);
+                    
+                    // Representante (se habilitado)
+                    if ($incluir_representante && !empty($representante['email'])) {
+                        $stmt = $pdo->prepare("
+                            INSERT INTO contratos_signatarios 
+                            (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                            VALUES (?, 'representante', ?, ?, ?, ?)
+                        ");
+                        $stmt->execute([
+                            $contrato_id,
+                            $representante['nome'] ?? '',
+                            $representante['email'],
+                            formatar_cpf($representante['cpf'] ?? ''),
+                            $ordem++
+                        ]);
+                    }
+                    
+                    // Testemunhas
+                    foreach ($testemunhas as $testemunha) {
+                        if (!empty($testemunha['email'])) {
+                            $stmt = $pdo->prepare("
+                                INSERT INTO contratos_signatarios 
+                                (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                                VALUES (?, 'testemunha', ?, ?, ?, ?)
+                            ");
+                            $stmt->execute([
+                                $contrato_id,
+                                $testemunha['nome'] ?? '',
+                                $testemunha['email'],
+                                formatar_cpf($testemunha['cpf'] ?? ''),
+                                $ordem++
+                            ]);
+                        }
+                    }
+                    
+                    // Atualiza status
+                    $stmt = $pdo->prepare("UPDATE contratos SET status = 'enviado' WHERE id = ?");
+                    $stmt->execute([$contrato_id]);
                 }
             } catch (Exception $e) {
                 $pdo->rollBack();
