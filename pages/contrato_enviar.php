@@ -4,6 +4,14 @@
  */
 
 require_once __DIR__ . '/../includes/functions.php';
+
+// Função para log de contratos
+function log_contrato($message) {
+    $logFile = __DIR__ . '/../logs/contratos.log';
+    $timestamp = date('Y-m-d H:i:s');
+    $logMessage = "[$timestamp] $message" . PHP_EOL;
+    file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+}
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/contratos_functions.php';
@@ -156,13 +164,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Cria documento no Autentique
-        error_log("Enviando para Autentique - Signatários: " . count($signatarios));
+        log_contrato("Enviando para Autentique - Signatários: " . count($signatarios));
         $resultado = $service->criarDocumento($contrato['titulo'], $pdf_base64, $signatarios);
         
-        error_log("Resultado Autentique: " . print_r($resultado, true));
+        log_contrato("Resultado Autentique: " . json_encode($resultado, JSON_UNESCAPED_UNICODE));
         
         if ($resultado) {
-            error_log("API Autentique retornou sucesso");
+            log_contrato("API Autentique retornou sucesso");
             // Atualiza contrato com dados do Autentique
             $stmt = $pdo->prepare("
                 UPDATE contratos 
@@ -186,9 +194,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sigIndex = 0;
             
             // Log para debug
-            error_log("Contrato ID: $contrato_id - Iniciando inserção de signatários");
-            error_log("Colaborador: " . print_r($colaborador, true));
-            error_log("Signatures da API: " . print_r($signatures, true));
+            log_contrato("Contrato ID: $contrato_id - Iniciando inserção de signatários");
+            log_contrato("Colaborador: " . json_encode($colaborador, JSON_UNESCAPED_UNICODE));
+            log_contrato("Signatures da API: " . json_encode($signatures, JSON_UNESCAPED_UNICODE));
             
             // Colaborador (primeiro signatário)
             try {
@@ -209,18 +217,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $ordem++,
                     $link_assinatura
                 ];
-                error_log("Inserindo colaborador: " . print_r($dados_colaborador, true));
+                log_contrato("Inserindo colaborador: " . json_encode($dados_colaborador, JSON_UNESCAPED_UNICODE));
                 
                 $stmt->execute($dados_colaborador);
-                error_log("Colaborador inserido com sucesso");
+                log_contrato("Colaborador inserido com sucesso");
             } catch (Exception $e) {
-                error_log("ERRO ao inserir colaborador: " . $e->getMessage());
+                log_contrato("ERRO ao inserir colaborador: " . $e->getMessage());
                 throw $e;
             }
             
             // Representante da empresa (se habilitado)
-            error_log("Incluir representante: " . ($incluir_representante ? 'SIM' : 'NAO'));
-            error_log("Representante email: " . ($representante['email'] ?? 'VAZIO'));
+            log_contrato("Incluir representante: " . ($incluir_representante ? 'SIM' : 'NAO'));
+            log_contrato("Representante email: " . ($representante['email'] ?? 'VAZIO'));
             
             if ($incluir_representante && !empty($representante['email'])) {
                 try {
@@ -241,9 +249,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ordem++,
                         $link_publico
                     ]);
-                    error_log("Representante inserido com sucesso");
+                    log_contrato("Representante inserido com sucesso");
                 } catch (Exception $e) {
-                    error_log("ERRO ao inserir representante: " . $e->getMessage());
+                    log_contrato("ERRO ao inserir representante: " . $e->getMessage());
                     throw $e;
                 }
             }
@@ -272,7 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             // API falhou - salva signatários básicos sem dados do Autentique
-            error_log("API Autentique retornou falso/null - salvando signatários localmente");
+            log_contrato("API Autentique retornou falso/null - salvando signatários localmente");
             
             // Remove signatários existentes
             $stmt = $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?");
@@ -333,7 +341,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$contrato_id]);
         }
         
-        error_log("Finalizando transação - commit");
+        log_contrato("Finalizando transação - commit");
         $pdo->commit();
         
         redirect('contrato_view.php?id=' . $contrato_id, 'Contrato enviado para assinatura com sucesso!', 'success');

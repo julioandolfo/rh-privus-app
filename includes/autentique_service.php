@@ -6,6 +6,16 @@
 
 require_once __DIR__ . '/functions.php';
 
+// Função para log de contratos (se não existir)
+if (!function_exists('log_contrato')) {
+    function log_contrato($message) {
+        $logFile = __DIR__ . '/../logs/contratos.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[$timestamp] $message" . PHP_EOL;
+        file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+    }
+}
+
 class AutentiqueService {
     private $apiKey;
     private $endpoint;
@@ -185,16 +195,16 @@ class AutentiqueService {
         
         $data = json_decode($response, true);
         
-        error_log("Autentique Response: " . print_r($data, true));
+        log_contrato("Autentique Response: " . json_encode($data, JSON_UNESCAPED_UNICODE));
         
         if (isset($data['errors'])) {
             $errorMessage = $data['errors'][0]['message'] ?? 'Erro desconhecido';
-            error_log("Autentique Error: " . $errorMessage);
+            log_contrato("Autentique Error: " . $errorMessage);
             throw new Exception('Erro GraphQL: ' . $errorMessage);
         }
         
         $result = $data['data']['createDocument'] ?? null;
-        error_log("Autentique createDocument result: " . print_r($result, true));
+        log_contrato("Autentique createDocument result: " . json_encode($result, JSON_UNESCAPED_UNICODE));
         
         return $result;
     }
