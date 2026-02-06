@@ -100,33 +100,44 @@ try {
         delete_documento_pagamento($item['documento_anexo']);
     }
     
-    // Caminho completo do arquivo para validação
-    $pdf_path = __DIR__ . '/../' . $upload_result['path'];
-    
-    // Valor esperado é o valor_total do item
-    $valor_esperado = (float)($item['valor_total'] ?? 0);
-    
-    // Valida a NFS-e automaticamente
-    $validacao = validar_nfse($pdf_path, $valor_esperado, 30, 0.02); // 30 dias, 2% tolerância
-    
-    // Define status baseado na validação
+    // Define status inicial
     $documento_status = 'enviado';
     $documento_observacoes = '';
     $auto_aprovado = false;
+    $validacao = ['aprovado' => false, 'motivos' => [], 'dados_extraidos' => []];
     
-    if ($validacao['aprovado']) {
-        // Aprovação automática - data e valor OK
-        $documento_status = 'aprovado';
-        $documento_observacoes = 'Aprovado automaticamente pelo sistema. ';
-        $documento_observacoes .= 'Data NFS-e: ' . ($validacao['dados_extraidos']['data_emissao_formatada'] ?? '-') . '. ';
-        $documento_observacoes .= 'Valor NFS-e: ' . ($validacao['dados_extraidos']['valor_liquido_formatado'] ?? '-') . '.';
-        $auto_aprovado = true;
-    } elseif (!empty($validacao['motivos'])) {
-        // Rejeição automática - tem problemas
-        $documento_status = 'rejeitado';
-        $documento_observacoes = formatar_motivos_rejeicao($validacao['motivos']);
+    // Tenta validar a NFS-e automaticamente (apenas para PDFs)
+    $extensao = strtolower(pathinfo($upload_result['path'], PATHINFO_EXTENSION));
+    if ($extensao === 'pdf') {
+        try {
+            // Caminho completo do arquivo para validação
+            $pdf_path = __DIR__ . '/../' . $upload_result['path'];
+            
+            // Valor esperado é o valor_total do item
+            $valor_esperado = (float)($item['valor_total'] ?? 0);
+            
+            // Valida a NFS-e automaticamente
+            $validacao = validar_nfse($pdf_path, $valor_esperado, 30, 0.02); // 30 dias, 2% tolerância
+            
+            if ($validacao['aprovado']) {
+                // Aprovação automática - data e valor OK
+                $documento_status = 'aprovado';
+                $documento_observacoes = 'Aprovado automaticamente pelo sistema. ';
+                $documento_observacoes .= 'Data NFS-e: ' . ($validacao['dados_extraidos']['data_emissao_formatada'] ?? '-') . '. ';
+                $documento_observacoes .= 'Valor NFS-e: ' . ($validacao['dados_extraidos']['valor_liquido_formatado'] ?? '-') . '.';
+                $auto_aprovado = true;
+            } elseif (!empty($validacao['motivos']) && $validacao['dados_extraidos']['texto_extraido']) {
+                // Rejeição automática - tem problemas e conseguiu ler o PDF
+                $documento_status = 'rejeitado';
+                $documento_observacoes = formatar_motivos_rejeicao($validacao['motivos']);
+            }
+            // Se não conseguiu extrair dados, fica como 'enviado' para análise manual
+        } catch (Exception $e) {
+            // Erro na validação - deixa como 'enviado' para análise manual
+            error_log("Erro ao validar NFS-e: " . $e->getMessage());
+        }
     }
-    // Se não conseguiu extrair dados, fica como 'enviado' para análise manual
+    // Outros tipos de arquivo ficam como 'enviado' para análise manual
     
     // Atualiza item com novo documento e resultado da validação
     $stmt = $pdo->prepare("

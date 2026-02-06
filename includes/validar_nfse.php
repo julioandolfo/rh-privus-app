@@ -2,12 +2,13 @@
 /**
  * Funções para validar NFS-e em PDF
  * Extrai data de emissão e valor líquido, compara com dados do fechamento
+ * 
+ * Compatível com servidores sem bibliotecas externas (cPanel, etc)
  */
 
 /**
  * Extrai texto de um arquivo PDF
- * Requer a biblioteca pdfparser ou smalot/pdfparser
- * Se não disponível, tenta usar pdftotext (poppler-utils)
+ * Tenta múltiplos métodos em ordem de preferência
  * 
  * @param string $pdf_path Caminho completo do arquivo PDF
  * @return string|false Texto extraído ou false em caso de erro
@@ -15,6 +16,7 @@
 function extrair_texto_pdf($pdf_path) {
     // Verifica se o arquivo existe
     if (!file_exists($pdf_path)) {
+        error_log("validar_nfse: Arquivo não encontrado: $pdf_path");
         return false;
     }
     
@@ -29,23 +31,24 @@ function extrair_texto_pdf($pdf_path) {
                 $parser = new \Smalot\PdfParser\Parser();
                 $pdf = $parser->parseFile($pdf_path);
                 $texto = $pdf->getText();
-                if (!empty($texto)) {
+                if (!empty(trim($texto))) {
+                    error_log("validar_nfse: Texto extraído via smalot/pdfparser");
                     return $texto;
                 }
             }
         } catch (Exception $e) {
+            error_log("validar_nfse: Erro smalot/pdfparser: " . $e->getMessage());
             // Continua para próximo método
         }
     }
     
-    // Método 2: Tenta usar pdftotext (poppler-utils) - comum em Linux
-    if (function_exists('exec')) {
+    // Método 2: Tenta usar pdftotext (poppler-utils) - comum em Linux/cPanel
+    if (function_exists('exec') && !in_array('exec', array_map('trim', explode(',', ini_get('disable_functions'))))) {
         $output = [];
-        $pdftotext = 'pdftotext';
+        $pdftotext = '/usr/bin/pdftotext'; // Caminho comum em servidores Linux
         
-        // No Windows, pode estar em outro local
+        // No Windows, tenta outros caminhos
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            // Tenta caminhos comuns do Windows
             $possible_paths = [
                 'C:\\Program Files\\poppler\\bin\\pdftotext.exe',
                 'C:\\poppler\\bin\\pdftotext.exe',
@@ -57,32 +60,40 @@ function extrair_texto_pdf($pdf_path) {
                     break;
                 }
             }
+        } else {
+            // Linux - verifica se existe
+            if (!file_exists($pdftotext)) {
+                $pdftotext = 'pdftotext'; // Tenta no PATH
+            }
         }
         
         $temp_txt = sys_get_temp_dir() . '/nfse_' . uniqid() . '.txt';
         $cmd = escapeshellarg($pdftotext) . ' -layout ' . escapeshellarg($pdf_path) . ' ' . escapeshellarg($temp_txt) . ' 2>&1';
         
-        exec($cmd, $output, $return_code);
+        @exec($cmd, $output, $return_code);
         
         if ($return_code === 0 && file_exists($temp_txt)) {
-            $texto = file_get_contents($temp_txt);
-            unlink($temp_txt);
-            if (!empty($texto)) {
+            $texto = @file_get_contents($temp_txt);
+            @unlink($temp_txt);
+            if (!empty(trim($texto))) {
+                error_log("validar_nfse: Texto extraído via pdftotext");
                 return $texto;
             }
         }
     }
     
-    // Método 3: Leitura direta do PDF (funciona para PDFs simples com texto não comprimido)
-    $content = file_get_contents($pdf_path);
+    // Método 3: Leitura direta do PDF (funciona para PDFs com texto não comprimido)
+    $content = @file_get_contents($pdf_path);
     if ($content !== false) {
         // Tenta extrair streams de texto
         $texto = extrair_texto_pdf_raw($content);
-        if (!empty($texto)) {
+        if (!empty(trim($texto))) {
+            error_log("validar_nfse: Texto extraído via leitura raw");
             return $texto;
         }
     }
     
+    error_log("validar_nfse: Não foi possível extrair texto do PDF");
     return false;
 }
 
