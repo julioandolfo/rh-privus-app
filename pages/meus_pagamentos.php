@@ -1680,17 +1680,48 @@ function verDocumento(fechamentoId, itemId) {
                 downloadLink.href = '../' + doc.documento_anexo;
                 downloadLink.download = doc.documento_nome || 'documento';
                 
-                // Verifica se é imagem para preview
+                // Verifica tipo de arquivo
                 const isImage = doc.documento_anexo.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                const isPdf = doc.documento_anexo.toLowerCase().endsWith('.pdf');
+                
+                // Monta informações de status
+                let statusHtml = '';
+                if (doc.documento_status) {
+                    const statusClass = doc.documento_status === 'aprovado' ? 'success' : (doc.documento_status === 'rejeitado' ? 'danger' : 'warning');
+                    const statusText = doc.documento_status === 'aprovado' ? 'Aprovado' : (doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado');
+                    statusHtml = `<div class="mb-3"><span class="badge badge-light-${statusClass}">${statusText}</span></div>`;
+                }
+                
+                // Observações (motivo de rejeição)
+                let obsHtml = '';
+                if (doc.documento_observacoes) {
+                    const obsClass = doc.documento_status === 'rejeitado' ? 'danger' : (doc.documento_status === 'aprovado' ? 'success' : 'info');
+                    obsHtml = `<div class="alert alert-${obsClass} py-2 px-3 mb-3"><small>${doc.documento_observacoes}</small></div>`;
+                }
                 
                 if (isImage) {
                     container.innerHTML = `
-                        <div class="text-center">
-                            <img src="../${doc.documento_anexo}" class="img-fluid" alt="Documento" style="max-height: 600px;">
+                        ${statusHtml}
+                        ${obsHtml}
+                        <div class="text-center border rounded p-3 bg-light">
+                            <img src="../${doc.documento_anexo}" class="img-fluid" alt="Documento" style="max-height: 500px;">
+                        </div>
+                    `;
+                } else if (isPdf) {
+                    container.innerHTML = `
+                        ${statusHtml}
+                        ${obsHtml}
+                        <div class="border rounded overflow-hidden" style="height: 500px;">
+                            <iframe src="../${doc.documento_anexo}#toolbar=1&navpanes=0" width="100%" height="100%" style="border: none;"></iframe>
+                        </div>
+                        <div class="text-center mt-2">
+                            <small class="text-muted">Se o PDF não carregar, clique em "Download"</small>
                         </div>
                     `;
                 } else {
                     container.innerHTML = `
+                        ${statusHtml}
+                        ${obsHtml}
                         <div class="text-center py-10">
                             <i class="ki-duotone ki-file fs-3x text-primary mb-5">
                                 <span class="path1"></span>

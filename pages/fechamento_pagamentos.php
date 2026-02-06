@@ -7035,48 +7035,70 @@ function verDocumentoAdmin(fechamentoId, itemId) {
             if (data.success && data.data) {
                 var doc = data.data;
                 var isImage = doc.is_image;
+                var isPdf = doc.documento_anexo && doc.documento_anexo.toLowerCase().endsWith('.pdf');
                 var statusText = doc.documento_status === 'aprovado' ? 'Aprovado' : (doc.documento_status === 'rejeitado' ? 'Rejeitado' : 'Enviado');
+                var statusClass = doc.documento_status === 'aprovado' ? 'text-success' : (doc.documento_status === 'rejeitado' ? 'text-danger' : 'text-warning');
                 var html = '';
-                if (isImage) {
-                    html = '<div class="text-center"><img src="../' + doc.documento_anexo + '" class="img-fluid" alt="Documento" style="max-height: 600px;"></div><div class="mt-5"><div class="d-flex justify-content-between mb-2"><span class="text-muted">Status:</span><span class="fw-bold">' + statusText + '</span></div>';
-                    if (doc.documento_data_envio) {
-                        html += '<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>' + new Date(doc.documento_data_envio).toLocaleString('pt-BR') + '</span></div>';
-                    }
-                    if (doc.documento_data_aprovacao) {
-                        html += '<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovacao:</span><span>' + new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR') + '</span></div>';
-                    }
-                    if (doc.documento_observacoes) {
-                        html += '<div class="mt-3"><strong>Observacoes:</strong><div class="text-gray-600">' + doc.documento_observacoes + '</div></div>';
-                    }
-                    html += '</div>';
-                } else {
-                    html = '<div class="text-center py-10"><i class="ki-duotone ki-file fs-3x text-primary mb-5"><span class="path1"></span><span class="path2"></span></i><div class="text-gray-600 mb-3">Clique em "Download" para baixar o documento</div><div class="text-muted fs-7 mb-5">' + (doc.documento_nome || 'documento') + '</div><div class="text-start"><div class="d-flex justify-content-between mb-2"><span class="text-muted">Status:</span><span class="fw-bold">' + statusText + '</span></div>';
-                    if (doc.documento_data_envio) {
-                        html += '<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Envio:</span><span>' + new Date(doc.documento_data_envio).toLocaleString('pt-BR') + '</span></div>';
-                    }
-                    if (doc.documento_data_aprovacao) {
-                        html += '<div class="d-flex justify-content-between mb-2"><span class="text-muted">Data Aprovacao:</span><span>' + new Date(doc.documento_data_aprovacao).toLocaleString('pt-BR') + '</span></div>';
-                    }
-                    if (doc.documento_observacoes) {
-                        html += '<div class="mt-3"><strong>Observacoes:</strong><div class="text-gray-600">' + doc.documento_observacoes + '</div></div>';
-                    }
-                    html += '</div></div>';
+                
+                // Monta informações do documento
+                var infoHtml = '<div class="row g-3 mb-4">';
+                infoHtml += '<div class="col-6"><span class="text-muted d-block fs-7">Status</span><span class="fw-bold ' + statusClass + '">' + statusText + '</span></div>';
+                if (doc.documento_data_envio) {
+                    infoHtml += '<div class="col-6"><span class="text-muted d-block fs-7">Data Envio</span><span class="fw-semibold">' + new Date(doc.documento_data_envio).toLocaleString('pt-BR') + '</span></div>';
                 }
+                infoHtml += '</div>';
+                
+                if (doc.documento_observacoes) {
+                    var obsClass = doc.documento_status === 'rejeitado' ? 'alert-danger' : (doc.documento_status === 'aprovado' ? 'alert-success' : 'alert-info');
+                    infoHtml += '<div class="alert ' + obsClass + ' py-2 px-3 mb-4"><small><strong>Observações:</strong> ' + doc.documento_observacoes + '</small></div>';
+                }
+                
+                if (isImage) {
+                    // Imagem - exibe diretamente
+                    html = infoHtml;
+                    html += '<div class="text-center border rounded p-3 bg-light"><img src="../' + doc.documento_anexo + '" class="img-fluid" alt="Documento" style="max-height: 500px;"></div>';
+                } else if (isPdf) {
+                    // PDF - exibe no iframe com visualizador nativo do navegador
+                    html = infoHtml;
+                    html += '<div class="border rounded overflow-hidden" style="height: 500px;">';
+                    html += '<iframe src="../' + doc.documento_anexo + '#toolbar=1&navpanes=0" width="100%" height="100%" style="border: none;"></iframe>';
+                    html += '</div>';
+                    html += '<div class="text-center mt-3"><small class="text-muted">Se o PDF não carregar, clique em "Abrir em Nova Aba"</small></div>';
+                } else {
+                    // Outros tipos - apenas download
+                    html = infoHtml;
+                    html += '<div class="text-center py-8"><i class="ki-duotone ki-file fs-3x text-primary mb-4"><span class="path1"></span><span class="path2"></span></i>';
+                    html += '<div class="text-gray-600 mb-2">' + (doc.documento_nome || 'documento') + '</div>';
+                    html += '<div class="text-muted fs-7">Clique em "Download" para baixar</div></div>';
+                }
+                
                 Swal.fire({
                     title: 'Documento',
                     html: html,
-                    width: isImage ? '80%' : '700px',
+                    width: (isImage || isPdf) ? '900px' : '600px',
                     showCancelButton: true,
-                    confirmButtonText: 'Download',
+                    showDenyButton: isPdf,
+                    confirmButtonText: '<i class="ki-duotone ki-file-down fs-4 me-1"><span class="path1"></span><span class="path2"></span></i> Download',
+                    denyButtonText: '<i class="ki-duotone ki-exit-right-corner fs-4 me-1"><span class="path1"></span><span class="path2"></span></i> Abrir em Nova Aba',
                     cancelButtonText: 'Fechar',
                     buttonsStyling: false,
                     customClass: {
                         popup: 'text-start',
-                        confirmButton: "btn fw-bold btn-primary",
+                        confirmButton: "btn fw-bold btn-primary me-2",
+                        denyButton: "btn fw-bold btn-light-info me-2",
                         cancelButton: "btn fw-bold btn-active-light-primary"
                     }
                 }).then(function(result) {
                     if (result.isConfirmed) {
+                        // Download forçado
+                        var link = document.createElement('a');
+                        link.href = '../' + doc.documento_anexo;
+                        link.download = doc.documento_nome || 'documento';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    } else if (result.isDenied) {
+                        // Abre em nova aba
                         window.open('../' + doc.documento_anexo, '_blank');
                     }
                 });
