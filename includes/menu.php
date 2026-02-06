@@ -339,7 +339,7 @@ function getIcon($name) {
                 
                 <!--begin:Menu item-->
                 <?php if (can_access_feedbacks_menu()): ?>
-                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('feedback_enviar.php') || isActive('feedback_meus.php') || isActive('feedback_gestao.php')) ? 'here show' : '' ?>">
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('feedback_enviar.php') || isActive('feedback_solicitar.php') || isActive('feedback_solicitacoes.php') || isActive('feedback_meus.php') || isActive('feedback_gestao.php')) ? 'here show' : '' ?>">
                     <!--begin:Menu link-->
                     <span class="menu-link">
                         <span class="menu-icon">
@@ -363,6 +363,30 @@ function getIcon($name) {
                                     <span class="bullet bullet-dot"></span>
                                 </span>
                                 <span class="menu-title">Enviar Feedback</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <?php endif; ?>
+                        <?php if (can_access_page('feedback_solicitar.php')): ?>
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('feedback_solicitar.php') ?>" href="feedback_solicitar.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Solicitar Feedback</span>
+                            </a>
+                        </div>
+                        <!--end:Menu item-->
+                        <?php endif; ?>
+                        <?php if (can_access_page('feedback_solicitacoes.php')): ?>
+                        <!--begin:Menu item-->
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('feedback_solicitacoes.php') ?>" href="feedback_solicitacoes.php">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Minhas Solicitações</span>
                             </a>
                         </div>
                         <!--end:Menu item-->

@@ -174,8 +174,10 @@ function get_page_permissions() {
         'endomarketing_acoes.php' => ['ADMIN', 'RH', 'GESTOR'],
         'endomarketing_acao_view.php' => ['ADMIN', 'RH', 'GESTOR'],
         
-        // Feedbacks - todos podem enviar e ver seus próprios feedbacks
+        // Feedbacks - todos podem enviar, solicitar e ver seus próprios feedbacks
         'feedback_enviar.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'feedback_solicitar.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
+        'feedback_solicitacoes.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         'feedback_meus.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         'feedback_gestao.php' => ['ADMIN', 'RH'],
         'ver_feedback.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
