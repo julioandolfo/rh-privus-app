@@ -6,7 +6,7 @@
  */
 
 // Define se o modo debug está ativo
-define('DEBUG_MODE', true);
+define('DEBUG_MODE', false);
 
 if (DEBUG_MODE) {
     // Mostrar todos os erros
@@ -39,10 +39,7 @@ if (DEBUG_MODE) {
             E_USER_DEPRECATED => 'USER_DEPRECATED',
         ];
         
-        // E_STRICT foi removido no PHP 8.4, adiciona condicionalmente se existir
-        if (defined('E_STRICT')) {
-            $errorTypes[E_STRICT] = 'STRICT';
-        }
+        // E_STRICT foi removido no PHP 8.4 - pular para evitar deprecation warning
         
         $type = $errorTypes[$errno] ?? 'UNKNOWN';
         

@@ -2715,8 +2715,8 @@ if (isset($_GET['view'])) {
         }
         
         // Busca período do fechamento para buscar bônus ativos
-        $ano_mes = explode('-', $fechamento_view['mes_referencia']);
-        $data_inicio_periodo = $ano_mes[0] . '-' . $ano_mes[1] . '-01';
+        $ano_mes = explode('-', $fechamento_view['mes_referencia'] ?? '');
+        $data_inicio_periodo = ($ano_mes[0] ?? date('Y')) . '-' . ($ano_mes[1] ?? date('m')) . '-01';
         $data_fim_periodo = date('Y-m-t', strtotime($data_inicio_periodo));
         
         // Busca bônus de cada colaborador no fechamento

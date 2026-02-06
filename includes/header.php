@@ -332,7 +332,7 @@ $_header_saldo_dinheiro = ($usuario['colaborador_id'] ?? null) ? obter_saldo_din
                                         <span class="path3"></span>
                                         <span class="path4"></span>
                                     </i>
-                                    <span class="fw-bold text-gray-800" id="header_pontos_total"><?= number_format($_header_pontos['pontos_totais'] ?? 0, 0, ',', '.') ?></span>
+                                    <span class="fw-bold text-gray-800" id="header_pontos_total"><?= number_format((float)($_header_pontos['pontos_totais'] ?? 0), 0, ',', '.') ?></span>
                                     <span class="d-none d-lg-inline text-muted fs-8">pts</span>
                                 </a>
                                 <!--end::Pontos Badge-->
@@ -347,7 +347,7 @@ $_header_saldo_dinheiro = ($usuario['colaborador_id'] ?? null) ? obter_saldo_din
                                         <span class="path2"></span>
                                         <span class="path3"></span>
                                     </i>
-                                    <span class="fw-bold text-gray-800" id="header_saldo_dinheiro"><?= number_format($_header_saldo_dinheiro, 2, ',', '.') ?></span>
+                                    <span class="fw-bold text-gray-800" id="header_saldo_dinheiro"><?= number_format((float)($_header_saldo_dinheiro ?? 0), 2, ',', '.') ?></span>
                                 </a>
                                 <!--end::Saldo Badge-->
                             </div>
