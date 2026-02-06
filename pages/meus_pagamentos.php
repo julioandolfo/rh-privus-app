@@ -3,11 +3,6 @@
  * Meus Pagamentos - Página do Colaborador para ver e enviar documentos
  */
 
-// DEBUG - Ativar exibição de erros
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
@@ -359,33 +354,10 @@ require_once __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td>
                                         <?php if ($item['documento_observacoes']): ?>
-                                            <?php if ($status === 'rejeitado'): ?>
-                                                <div class="d-flex align-items-start">
-                                                    <i class="ki-duotone ki-cross-circle text-danger fs-4 me-1 mt-1">
-                                                        <span class="path1"></span>
-                                                        <span class="path2"></span>
-                                                    </i>
-                                                    <span class="text-danger small" title="<?= htmlspecialchars($item['documento_observacoes']) ?>">
-                                                        <?= nl2br(htmlspecialchars($item['documento_observacoes'])) ?>
-                                                    </span>
-                                                </div>
-                                            <?php elseif ($status === 'aprovado'): ?>
-                                                <div class="d-flex align-items-start">
-                                                    <i class="ki-duotone ki-check-circle text-success fs-4 me-1 mt-1">
-                                                        <span class="path1"></span>
-                                                        <span class="path2"></span>
-                                                    </i>
-                                                    <span class="text-success small">
-                                                        <?= htmlspecialchars(mb_substr($item['documento_observacoes'], 0, 50)) ?>
-                                                        <?= mb_strlen($item['documento_observacoes']) > 50 ? '...' : '' ?>
-                                                    </span>
-                                                </div>
-                                            <?php else: ?>
-                                                <span class="text-gray-600" title="<?= htmlspecialchars($item['documento_observacoes']) ?>">
-                                                    <?= htmlspecialchars(mb_substr($item['documento_observacoes'], 0, 50)) ?>
-                                                    <?= mb_strlen($item['documento_observacoes']) > 50 ? '...' : '' ?>
-                                                </span>
-                                            <?php endif; ?>
+                                            <span class="text-gray-600" title="<?= htmlspecialchars($item['documento_observacoes']) ?>">
+                                                <?= htmlspecialchars(mb_substr($item['documento_observacoes'], 0, 50)) ?>
+                                                <?= mb_strlen($item['documento_observacoes']) > 50 ? '...' : '' ?>
+                                            </span>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
@@ -486,33 +458,8 @@ require_once __DIR__ . '/../includes/header.php';
                                 
                                 <?php if ($item['documento_observacoes']): ?>
                                 <div class="mb-3">
-                                    <?php if ($status === 'rejeitado'): ?>
-                                    <div class="alert alert-danger py-2 px-3 mb-0">
-                                        <div class="d-flex align-items-start">
-                                            <i class="ki-duotone ki-cross-circle fs-2 text-danger me-2">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            <div>
-                                                <div class="fw-bold text-danger fs-7 mb-1">Motivo da Rejeição:</div>
-                                                <div class="text-dark fs-8"><?= nl2br(htmlspecialchars($item['documento_observacoes'])) ?></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <?php elseif ($status === 'aprovado'): ?>
-                                    <div class="alert alert-success py-2 px-3 mb-0">
-                                        <div class="d-flex align-items-start">
-                                            <i class="ki-duotone ki-check-circle fs-2 text-success me-2">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            <div class="text-dark fs-8"><?= htmlspecialchars($item['documento_observacoes']) ?></div>
-                                        </div>
-                                    </div>
-                                    <?php else: ?>
                                     <div class="text-muted fs-7 mb-1">Observações</div>
                                     <div class="text-gray-600"><?= htmlspecialchars($item['documento_observacoes']) ?></div>
-                                    <?php endif; ?>
                                 </div>
                                 <?php endif; ?>
                                 
@@ -1786,57 +1733,7 @@ document.getElementById('kt_form_enviar_documento')?.addEventListener('submit', 
         btn.disabled = false;
         
         if (data.success) {
-            // Verifica resultado da validação automática
-            const validacao = data.data?.validacao || {};
-            const status = data.data?.documento_status || 'enviado';
-            
-            let icon = 'success';
-            let title = 'Sucesso!';
-            let html = data.message;
-            
-            if (status === 'aprovado') {
-                icon = 'success';
-                title = '✅ Aprovado!';
-                html = '<div class="text-start">';
-                html += '<p class="mb-2">' + data.message + '</p>';
-                if (validacao.dados_extraidos) {
-                    html += '<div class="bg-light-success p-3 rounded">';
-                    html += '<strong>Dados validados:</strong><br>';
-                    if (validacao.dados_extraidos.data_emissao_formatada) {
-                        html += '• Data NFS-e: ' + validacao.dados_extraidos.data_emissao_formatada + '<br>';
-                    }
-                    if (validacao.dados_extraidos.valor_liquido_formatado) {
-                        html += '• Valor NFS-e: ' + validacao.dados_extraidos.valor_liquido_formatado;
-                    }
-                    html += '</div>';
-                }
-                html += '</div>';
-            } else if (status === 'rejeitado') {
-                icon = 'error';
-                title = '❌ Documento Rejeitado';
-                html = '<div class="text-start">';
-                html += '<p class="mb-2 text-danger fw-bold">' + data.message + '</p>';
-                if (validacao.motivos && validacao.motivos.length > 0) {
-                    html += '<div class="bg-light-danger p-3 rounded">';
-                    html += '<strong>Motivos:</strong><ul class="mb-0 mt-2">';
-                    validacao.motivos.forEach(function(motivo) {
-                        html += '<li>' + motivo + '</li>';
-                    });
-                    html += '</ul></div>';
-                }
-                html += '<p class="mt-3 mb-0"><strong>Por favor, corrija e envie novamente.</strong></p>';
-                html += '</div>';
-            } else {
-                icon = 'info';
-                title = 'Documento Enviado';
-            }
-            
-            Swal.fire({
-                icon: icon,
-                title: title,
-                html: html,
-                confirmButtonText: 'OK'
-            }).then(() => {
+            Swal.fire('Sucesso!', data.message, 'success').then(() => {
                 location.reload();
             });
         } else {
