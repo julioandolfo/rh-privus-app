@@ -62,8 +62,23 @@ if ($colaborador_id > 0) {
     }
 }
 
+// Define log_contrato se não existir
+if (!function_exists('log_contrato')) {
+    function log_contrato($message) {
+        $logFile = __DIR__ . '/../logs/contratos.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[$timestamp] $message" . PHP_EOL;
+        @file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+    }
+}
+
 // Processa POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    log_contrato("=== POST recebido em contrato_add.php ===");
+    log_contrato("POST acao: " . ($_POST['acao'] ?? 'NAO DEFINIDO'));
+    log_contrato("POST incluir_representante: " . ($_POST['incluir_representante'] ?? 'NAO DEFINIDO'));
+    log_contrato("POST representante: " . json_encode($_POST['representante'] ?? []));
+    
     $colaborador_id = intval($_POST['colaborador_id'] ?? 0);
     $template_id = intval($_POST['template_id'] ?? 0);
     $titulo = trim($_POST['titulo'] ?? '');
@@ -179,6 +194,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Se for enviar, integra com Autentique
         if ($acao === 'enviar') {
+            // Log inicial
+            if (function_exists('log_contrato')) {
+                log_contrato("=== INICIO contrato_add.php - Envio direto ===");
+                log_contrato("Contrato ID: $contrato_id");
+            }
+            
             if (!$autentique_configurado) {
                 $pdo->rollBack();
                 redirect('contrato_add.php?colaborador_id=' . $colaborador_id, 
@@ -191,8 +212,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Converte PDF para base64
                 $pdf_base64 = pdf_para_base64($pdf_path);
                 
-                // Prepara signatários
+                // Prepara signatários para API
                 $signatarios = [];
+                
+                // Representante da empresa (se habilitado) - captura antes para usar depois
+                $representante = $_POST['representante'] ?? [];
+                $incluir_representante = isset($_POST['incluir_representante']) && $_POST['incluir_representante'] === '1';
+                
+                if (function_exists('log_contrato')) {
+                    log_contrato("POST representante: " . json_encode($representante));
+                    log_contrato("POST incluir_representante: " . ($_POST['incluir_representante'] ?? 'NAO ENVIADO'));
+                    log_contrato("Incluir representante (bool): " . ($incluir_representante ? 'SIM' : 'NAO'));
+                }
                 
                 // Colaborador como primeiro signatário
                 $signatarios[] = [
@@ -200,10 +231,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'x' => 100,
                     'y' => 100
                 ];
-                
-                // Representante da empresa (se habilitado)
-                $representante = $_POST['representante'] ?? [];
-                $incluir_representante = isset($_POST['incluir_representante']) && $_POST['incluir_representante'] === '1';
                 
                 if ($incluir_representante && !empty($representante['email'])) {
                     $signatarios[] = [
@@ -223,6 +250,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'y' => (count($signatarios) + 1) * 150 + 100
                         ];
                     }
+                }
+                
+                if (function_exists('log_contrato')) {
+                    log_contrato("Signatários para API: " . json_encode($signatarios));
                 }
                 
                 // Cria documento no Autentique

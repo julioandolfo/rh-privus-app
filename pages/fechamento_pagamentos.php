@@ -1177,6 +1177,166 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao marcar como pago: ' . $e->getMessage(), 'error');
         }
+    } elseif ($action === 'marcar_item_pago') {
+        // Marca um item individual como pago
+        $item_id = (int)($_POST['item_id'] ?? 0);
+        $pago = (int)($_POST['pago'] ?? 0);
+        
+        try {
+            // Busca item e fechamento
+            $stmt = $pdo->prepare("
+                SELECT i.*, f.empresa_id, f.status as fechamento_status
+                FROM fechamentos_pagamento_itens i
+                INNER JOIN fechamentos_pagamento f ON i.fechamento_id = f.id
+                WHERE i.id = ?
+            ");
+            $stmt->execute([$item_id]);
+            $item = $stmt->fetch();
+            
+            if (!$item) {
+                if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'Item não encontrado!']);
+                    exit;
+                }
+                redirect('fechamento_pagamentos.php', 'Item não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $item['empresa_id'])) {
+                if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'Sem permissão!']);
+                    exit;
+                }
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para alterar este item!', 'error');
+            }
+            
+            // Só pode marcar em fechamentos fechados ou pagos
+            if (!in_array($item['fechamento_status'], ['fechado', 'pago'])) {
+                if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'O fechamento precisa estar fechado!']);
+                    exit;
+                }
+                redirect('fechamento_pagamentos.php?view=' . $item['fechamento_id'], 'Apenas itens de fechamentos fechados podem ser marcados como pago!', 'error');
+            }
+            
+            // Atualiza status do item
+            if ($pago) {
+                $stmt = $pdo->prepare("
+                    UPDATE fechamentos_pagamento_itens 
+                    SET pago = 1, data_pagamento_item = NOW(), usuario_pagamento_id = ?
+                    WHERE id = ?
+                ");
+                $stmt->execute([$usuario['id'], $item_id]);
+            } else {
+                $stmt = $pdo->prepare("
+                    UPDATE fechamentos_pagamento_itens 
+                    SET pago = 0, data_pagamento_item = NULL, usuario_pagamento_id = NULL
+                    WHERE id = ?
+                ");
+                $stmt->execute([$item_id]);
+            }
+            
+            // Verifica se todos os itens foram pagos para atualizar o status do fechamento
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*) as total, SUM(CASE WHEN pago = 1 THEN 1 ELSE 0 END) as pagos
+                FROM fechamentos_pagamento_itens WHERE fechamento_id = ?
+            ");
+            $stmt->execute([$item['fechamento_id']]);
+            $counts = $stmt->fetch();
+            
+            $todos_pagos = ($counts['total'] > 0 && $counts['total'] == $counts['pagos']);
+            
+            // Se todos pagos, atualiza status do fechamento para 'pago'
+            if ($todos_pagos && $item['fechamento_status'] === 'fechado') {
+                $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'pago' WHERE id = ?");
+                $stmt->execute([$item['fechamento_id']]);
+            }
+            // Se desmarcou algum e o fechamento estava como pago, volta para fechado
+            elseif (!$todos_pagos && $item['fechamento_status'] === 'pago') {
+                $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'fechado' WHERE id = ?");
+                $stmt->execute([$item['fechamento_id']]);
+            }
+            
+            // Resposta AJAX
+            if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true, 
+                    'pago' => $pago,
+                    'todos_pagos' => $todos_pagos,
+                    'total' => $counts['total'],
+                    'pagos' => $counts['pagos']
+                ]);
+                exit;
+            }
+            
+            redirect('fechamento_pagamentos.php?view=' . $item['fechamento_id'], 'Status de pagamento atualizado!');
+        } catch (PDOException $e) {
+            if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+                exit;
+            }
+            redirect('fechamento_pagamentos.php', 'Erro ao atualizar: ' . $e->getMessage(), 'error');
+        }
+    } elseif ($action === 'marcar_todos_pagos') {
+        // Marca todos os itens de um fechamento como pago
+        $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
+        $pago = (int)($_POST['pago'] ?? 1);
+        
+        try {
+            // Verifica permissão
+            $stmt = $pdo->prepare("SELECT empresa_id, status FROM fechamentos_pagamento WHERE id = ?");
+            $stmt->execute([$fechamento_id]);
+            $fechamento = $stmt->fetch();
+            
+            if (!$fechamento) {
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Sem permissão!', 'error');
+            }
+            
+            if (!in_array($fechamento['status'], ['fechado', 'pago'])) {
+                redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'O fechamento precisa estar fechado!', 'error');
+            }
+            
+            // Atualiza todos os itens
+            if ($pago) {
+                $stmt = $pdo->prepare("
+                    UPDATE fechamentos_pagamento_itens 
+                    SET pago = 1, data_pagamento_item = NOW(), usuario_pagamento_id = ?
+                    WHERE fechamento_id = ?
+                ");
+                $stmt->execute([$usuario['id'], $fechamento_id]);
+                
+                // Atualiza status do fechamento
+                $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'pago' WHERE id = ?");
+                $stmt->execute([$fechamento_id]);
+                
+                $msg = 'Todos os itens marcados como pagos!';
+            } else {
+                $stmt = $pdo->prepare("
+                    UPDATE fechamentos_pagamento_itens 
+                    SET pago = 0, data_pagamento_item = NULL, usuario_pagamento_id = NULL
+                    WHERE fechamento_id = ?
+                ");
+                $stmt->execute([$fechamento_id]);
+                
+                // Volta status do fechamento para fechado
+                $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'fechado' WHERE id = ?");
+                $stmt->execute([$fechamento_id]);
+                
+                $msg = 'Todos os itens desmarcados!';
+            }
+            
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, $msg);
+        } catch (PDOException $e) {
+            redirect('fechamento_pagamentos.php', 'Erro: ' . $e->getMessage(), 'error');
+        }
     } elseif ($action === 'reabrir_fechamento') {
         // Reabre um fechamento que estava fechado (permite editar novamente)
         $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
@@ -2744,7 +2904,8 @@ require_once __DIR__ . '/../includes/header.php';
                             Fechar Fechamento
                         </button>
                     </form>
-                    <?php elseif ($fechamento_view['status'] === 'fechado'): ?>
+                    <?php elseif (in_array($fechamento_view['status'], ['fechado', 'pago'])): ?>
+                    <?php if ($fechamento_view['status'] === 'fechado'): ?>
                     <button type="button" class="btn btn-warning me-2" onclick="reabrirFechamento(<?= $fechamento_view['id'] ?>)">
                         <i class="ki-duotone ki-arrow-circle-left fs-2">
                             <span class="path1"></span>
@@ -2752,17 +2913,23 @@ require_once __DIR__ . '/../includes/header.php';
                         </i>
                         Reabrir Fechamento
                     </button>
-                    <form method="POST" style="display: inline;" id="form_marcar_pago_<?= $fechamento_view['id'] ?>">
-                        <input type="hidden" name="action" value="marcar_pago">
-                        <input type="hidden" name="fechamento_id" value="<?= $fechamento_view['id'] ?>">
-                        <button type="button" class="btn btn-success" onclick="marcarComoPago(<?= $fechamento_view['id'] ?>)">
+                    <?php endif; ?>
+                    <div class="btn-group me-2">
+                        <button type="button" class="btn btn-success" onclick="marcarTodosPagos(<?= $fechamento_view['id'] ?>, true)">
                             <i class="ki-duotone ki-check-circle fs-2">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Marcar como Pago
+                            Marcar Todos Pagos
                         </button>
-                    </form>
+                        <button type="button" class="btn btn-light-warning" onclick="marcarTodosPagos(<?= $fechamento_view['id'] ?>, false)">
+                            <i class="ki-duotone ki-cross-circle fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Desmarcar Todos
+                        </button>
+                    </div>
                     <?php endif; ?>
                     <div class="btn-group ms-2">
                         <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
@@ -2881,21 +3048,33 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
                 <?php endif; ?>
                 
-                <?php if ($fechamento_view['status'] === 'fechado'): ?>
-                <!--begin::Estatísticas de Documentos-->
+                <?php if (in_array($fechamento_view['status'], ['fechado', 'pago'])): 
+                    // Conta itens pagos
+                    $total_itens = count($itens_fechamento);
+                    $itens_pagos = 0;
+                    foreach ($itens_fechamento as $item_count) {
+                        if (!empty($item_count['pago'])) $itens_pagos++;
+                    }
+                ?>
+                <!--begin::Estatísticas de Pagamentos Individuais-->
                 <div class="row g-3 mb-7">
                     <div class="col-md-3">
-                        <div class="card bg-light-danger">
+                        <div class="card bg-light-success">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
                                     <div class="flex-grow-1">
-                                        <span class="text-muted fw-semibold d-block">Pendentes</span>
-                                        <span class="text-gray-800 fw-bold fs-2"><?= $stats_pendentes ?></span>
+                                        <span class="text-muted fw-semibold d-block">Pagos</span>
+                                        <span class="text-gray-800 fw-bold fs-2" id="contador-pagos-num"><?= $itens_pagos ?></span>
+                                        <span class="text-muted fs-7">de <?= $total_itens ?></span>
                                     </div>
-                                    <i class="ki-duotone ki-time fs-1 text-danger">
+                                    <i class="ki-duotone ki-check-circle fs-1 text-success">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
+                                </div>
+                                <div class="progress h-6px mt-2">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: <?= $total_itens > 0 ? round(($itens_pagos / $total_itens) * 100) : 0 ?>%"></div>
                                 </div>
                             </div>
                         </div>
@@ -2905,10 +3084,10 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
                                     <div class="flex-grow-1">
-                                        <span class="text-muted fw-semibold d-block">Enviados</span>
-                                        <span class="text-gray-800 fw-bold fs-2"><?= $stats_enviados ?></span>
+                                        <span class="text-muted fw-semibold d-block">Pendentes</span>
+                                        <span class="text-gray-800 fw-bold fs-2"><?= $total_itens - $itens_pagos ?></span>
                                     </div>
-                                    <i class="ki-duotone ki-file-up fs-1 text-warning">
+                                    <i class="ki-duotone ki-time fs-1 text-warning">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
@@ -2916,31 +3095,16 @@ require_once __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-light-success">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center">
-                                    <div class="flex-grow-1">
-                                        <span class="text-muted fw-semibold d-block">Aprovados</span>
-                                        <span class="text-gray-800 fw-bold fs-2"><?= $stats_aprovados ?></span>
-                                    </div>
-                                    <i class="ki-duotone ki-check-circle fs-1 text-success">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <?php if ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
                     <div class="col-md-3">
                         <div class="card bg-light-info">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
                                     <div class="flex-grow-1">
-                                        <span class="text-muted fw-semibold d-block">Total Itens</span>
-                                        <span class="text-gray-800 fw-bold fs-2"><?= count($itens_fechamento) ?></span>
+                                        <span class="text-muted fw-semibold d-block">Docs Enviados</span>
+                                        <span class="text-gray-800 fw-bold fs-2"><?= $stats_enviados ?? 0 ?></span>
                                     </div>
-                                    <i class="ki-duotone ki-people fs-1 text-info">
+                                    <i class="ki-duotone ki-file-up fs-1 text-info">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
@@ -2948,8 +3112,58 @@ require_once __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
                     </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light-primary">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <span class="text-muted fw-semibold d-block">Docs Aprovados</span>
+                                        <span class="text-gray-800 fw-bold fs-2"><?= $stats_aprovados ?? 0 ?></span>
+                                    </div>
+                                    <i class="ki-duotone ki-check fs-1 text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php else: ?>
+                    <div class="col-md-3">
+                        <div class="card bg-light-info">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <span class="text-muted fw-semibold d-block">Total</span>
+                                        <span class="text-gray-800 fw-bold fs-2">R$ <?= number_format($fechamento_view['total_pagamento'], 2, ',', '.') ?></span>
+                                    </div>
+                                    <i class="ki-duotone ki-wallet fs-1 text-info">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light-primary">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <span class="text-muted fw-semibold d-block">Colaboradores</span>
+                                        <span class="text-gray-800 fw-bold fs-2"><?= $total_itens ?></span>
+                                    </div>
+                                    <i class="ki-duotone ki-people fs-1 text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
-                <!--end::Estatísticas de Documentos-->
+                <!--end::Estatísticas de Pagamentos Individuais-->
                 <?php endif; ?>
                 
                 <?php 
@@ -2979,6 +3193,9 @@ require_once __DIR__ . '/../includes/header.php';
                             <th>Motivo</th>
                             <?php endif; ?>
                             <th>Total</th>
+                            <?php if (in_array($fechamento_view['status'], ['fechado', 'pago'])): ?>
+                            <th class="text-center" style="width: 80px;">Pago</th>
+                            <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
                             <th>Documento</th>
                             <?php endif; ?>
@@ -3236,6 +3453,23 @@ require_once __DIR__ . '/../includes/header.php';
                             </td>
                             <?php endif; ?>
                             <td><strong>R$ <?= number_format($valor_total_com_bonus, 2, ',', '.') ?></strong></td>
+                            <?php if (in_array($fechamento_view['status'], ['fechado', 'pago'])): ?>
+                            <td class="text-center">
+                                <div class="form-check form-check-custom form-check-solid form-check-sm d-flex justify-content-center">
+                                    <input class="form-check-input item-pago-checkbox" 
+                                           type="checkbox" 
+                                           data-item-id="<?= $item['id'] ?>"
+                                           data-colaborador="<?= htmlspecialchars($item['colaborador_nome']) ?>"
+                                           <?= !empty($item['pago']) ? 'checked' : '' ?>
+                                           onchange="marcarItemPago(this)" />
+                                </div>
+                                <?php if (!empty($item['pago']) && !empty($item['data_pagamento_item'])): ?>
+                                <small class="text-muted d-block" style="font-size: 10px;">
+                                    <?= date('d/m H:i', strtotime($item['data_pagamento_item'])) ?>
+                                </small>
+                                <?php endif; ?>
+                            </td>
+                            <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'aberto'): ?>
                             <td>
                                 <div class="dropdown">
@@ -6241,6 +6475,124 @@ function waitForDependencies() {
     }
 }
 waitForDependencies();
+
+// ======== MARCAR ITEM COMO PAGO ========
+function marcarItemPago(checkbox) {
+    const itemId = checkbox.dataset.itemId;
+    const colaborador = checkbox.dataset.colaborador;
+    const pago = checkbox.checked ? 1 : 0;
+    
+    // Desabilita checkbox durante requisição
+    checkbox.disabled = true;
+    
+    fetch('fechamento_pagamentos.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: 'action=marcar_item_pago&item_id=' + itemId + '&pago=' + pago
+    })
+    .then(response => response.json())
+    .then(data => {
+        checkbox.disabled = false;
+        
+        if (data.success) {
+            // Atualiza contador
+            atualizarContadorPagos(data.pagos, data.total);
+            
+            // Mostra toast de sucesso
+            if (typeof Swal !== 'undefined') {
+                const Toast = Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    timerProgressBar: true
+                });
+                Toast.fire({
+                    icon: 'success',
+                    title: (pago ? 'Marcado como pago: ' : 'Desmarcado: ') + colaborador
+                });
+            }
+            
+            // Se todos pagos, atualiza status visual
+            if (data.todos_pagos) {
+                const badgeStatus = document.querySelector('.badge.badge-light-info');
+                if (badgeStatus && badgeStatus.textContent.trim() === 'Fechado') {
+                    badgeStatus.className = 'badge badge-light-success';
+                    badgeStatus.textContent = 'Pago';
+                }
+            } else {
+                const badgeStatus = document.querySelector('.badge.badge-light-success');
+                if (badgeStatus && badgeStatus.textContent.trim() === 'Pago') {
+                    badgeStatus.className = 'badge badge-light-info';
+                    badgeStatus.textContent = 'Fechado';
+                }
+            }
+        } else {
+            // Reverte checkbox
+            checkbox.checked = !checkbox.checked;
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Erro', data.message || 'Erro ao atualizar', 'error');
+            } else {
+                alert(data.message || 'Erro ao atualizar');
+            }
+        }
+    })
+    .catch(error => {
+        checkbox.disabled = false;
+        checkbox.checked = !checkbox.checked;
+        console.error('Erro:', error);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire('Erro', 'Erro na comunicação com o servidor', 'error');
+        }
+    });
+}
+
+function atualizarContadorPagos(pagos, total) {
+    const contador = document.getElementById('contador-pagos');
+    if (contador) {
+        contador.textContent = pagos + '/' + total;
+        if (pagos === total) {
+            contador.classList.remove('badge-light-warning');
+            contador.classList.add('badge-light-success');
+        } else {
+            contador.classList.remove('badge-light-success');
+            contador.classList.add('badge-light-warning');
+        }
+    }
+}
+
+function marcarTodosPagos(fechamentoId, marcar) {
+    const checkboxes = document.querySelectorAll('.item-pago-checkbox');
+    const total = checkboxes.length;
+    
+    Swal.fire({
+        text: marcar 
+            ? 'Marcar todos os ' + total + ' colaboradores como PAGOS?' 
+            : 'Desmarcar todos os ' + total + ' colaboradores?',
+        icon: 'question',
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: marcar ? 'Sim, marcar todos!' : 'Sim, desmarcar todos!',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: marcar ? 'btn fw-bold btn-success' : 'btn fw-bold btn-warning',
+            cancelButton: 'btn fw-bold btn-active-light-primary'
+        }
+    }).then(function(result) {
+        if (result.value) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = '<input type="hidden" name="action" value="marcar_todos_pagos">' +
+                             '<input type="hidden" name="fechamento_id" value="' + fechamentoId + '">' +
+                             '<input type="hidden" name="pago" value="' + (marcar ? 1 : 0) + '">';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
 
 function deletarFechamento(id, mesAno) {
     Swal.fire({

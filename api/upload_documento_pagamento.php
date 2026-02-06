@@ -1,6 +1,7 @@
 <?php
 /**
  * API para upload de documento de pagamento
+ * Com validação automática de NFS-e (data e valor)
  */
 
 header('Content-Type: application/json');
@@ -8,6 +9,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/upload_documento.php';
+require_once __DIR__ . '/../includes/validar_nfse.php';
 
 // Inicia sessão
 if (session_status() === PHP_SESSION_NONE) {
@@ -98,27 +100,75 @@ try {
         delete_documento_pagamento($item['documento_anexo']);
     }
     
-    // Atualiza item com novo documento
+    // Caminho completo do arquivo para validação
+    $pdf_path = __DIR__ . '/../' . $upload_result['path'];
+    
+    // Valor esperado é o valor_total do item
+    $valor_esperado = (float)($item['valor_total'] ?? 0);
+    
+    // Valida a NFS-e automaticamente
+    $validacao = validar_nfse($pdf_path, $valor_esperado, 30, 0.02); // 30 dias, 2% tolerância
+    
+    // Define status baseado na validação
+    $documento_status = 'enviado';
+    $documento_observacoes = '';
+    $auto_aprovado = false;
+    
+    if ($validacao['aprovado']) {
+        // Aprovação automática - data e valor OK
+        $documento_status = 'aprovado';
+        $documento_observacoes = 'Aprovado automaticamente pelo sistema. ';
+        $documento_observacoes .= 'Data NFS-e: ' . ($validacao['dados_extraidos']['data_emissao_formatada'] ?? '-') . '. ';
+        $documento_observacoes .= 'Valor NFS-e: ' . ($validacao['dados_extraidos']['valor_liquido_formatado'] ?? '-') . '.';
+        $auto_aprovado = true;
+    } elseif (!empty($validacao['motivos'])) {
+        // Rejeição automática - tem problemas
+        $documento_status = 'rejeitado';
+        $documento_observacoes = formatar_motivos_rejeicao($validacao['motivos']);
+    }
+    // Se não conseguiu extrair dados, fica como 'enviado' para análise manual
+    
+    // Atualiza item com novo documento e resultado da validação
     $stmt = $pdo->prepare("
         UPDATE fechamentos_pagamento_itens 
         SET documento_anexo = ?,
-            documento_status = 'enviado',
-            documento_data_envio = NOW()
+            documento_status = ?,
+            documento_data_envio = NOW(),
+            documento_observacoes = ?,
+            documento_data_aprovacao = " . ($auto_aprovado ? "NOW()" : "NULL") . ",
+            documento_aprovado_por = " . ($auto_aprovado ? "?" : "NULL") . "
         WHERE id = ?
     ");
-    $stmt->execute([$upload_result['path'], $item_id]);
+    
+    if ($auto_aprovado) {
+        $stmt->execute([$upload_result['path'], $documento_status, $documento_observacoes, $usuario['id'], $item_id]);
+    } else {
+        $stmt->execute([$upload_result['path'], $documento_status, $documento_observacoes, $item_id]);
+    }
     
     // Registra no histórico
+    $acao_historico = 'enviado';
+    $obs_historico = 'Documento enviado pelo colaborador';
+    
+    if ($auto_aprovado) {
+        $acao_historico = 'aprovado_auto';
+        $obs_historico = 'Aprovado automaticamente: ' . $documento_observacoes;
+    } elseif ($documento_status === 'rejeitado') {
+        $acao_historico = 'rejeitado_auto';
+        $obs_historico = 'Rejeitado automaticamente: ' . $documento_observacoes;
+    }
+    
     $stmt = $pdo->prepare("
         INSERT INTO fechamentos_pagamento_documentos_historico 
         (item_id, acao, documento_anexo, usuario_id, observacoes)
-        VALUES (?, 'enviado', ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $item_id,
+        $acao_historico,
         $upload_result['path'],
         $usuario['id'],
-        'Documento enviado pelo colaborador'
+        $obs_historico
     ]);
     
     // Envia notificação para admin/rh (se OneSignal configurado)
@@ -155,11 +205,26 @@ try {
     }
     
     $response['success'] = true;
-    $response['message'] = 'Documento enviado com sucesso!';
+    
+    // Mensagem baseada no resultado da validação
+    if ($auto_aprovado) {
+        $response['message'] = '✅ Documento APROVADO automaticamente! Data e valor conferidos com sucesso.';
+    } elseif ($documento_status === 'rejeitado') {
+        $response['message'] = '❌ Documento REJEITADO automaticamente. Verifique os motivos abaixo e envie novamente.';
+    } else {
+        $response['message'] = '📄 Documento enviado! Aguardando análise manual.';
+    }
+    
     $response['data'] = [
         'documento_path' => $upload_result['path'],
-        'documento_status' => 'enviado',
-        'documento_data_envio' => date('Y-m-d H:i:s')
+        'documento_status' => $documento_status,
+        'documento_data_envio' => date('Y-m-d H:i:s'),
+        'validacao' => [
+            'aprovado' => $validacao['aprovado'],
+            'motivos' => $validacao['motivos'] ?? [],
+            'dados_extraidos' => $validacao['dados_extraidos'] ?? [],
+            'observacoes' => $documento_observacoes
+        ]
     ];
     
 } catch (PDOException $e) {
