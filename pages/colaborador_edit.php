@@ -23,6 +23,27 @@ if (!$colaborador) {
     redirect('colaboradores.php', 'Colaborador não encontrado!', 'error');
 }
 
+// Busca data de desligamento se o colaborador estiver desligado
+$data_demissao_atual = null;
+$tipo_demissao_atual = null;
+$motivo_demissao_atual = null;
+if ($colaborador['status'] === 'desligado') {
+    $stmt_demissao = $pdo->prepare("
+        SELECT data_demissao, tipo_demissao, motivo 
+        FROM demissoes 
+        WHERE colaborador_id = ? 
+        ORDER BY data_demissao DESC, created_at DESC 
+        LIMIT 1
+    ");
+    $stmt_demissao->execute([$id]);
+    $demissao_existente = $stmt_demissao->fetch();
+    if ($demissao_existente) {
+        $data_demissao_atual = $demissao_existente['data_demissao'];
+        $tipo_demissao_atual = $demissao_existente['tipo_demissao'];
+        $motivo_demissao_atual = $demissao_existente['motivo'];
+    }
+}
+
 // Verifica permissão
 if (!can_access_colaborador($id)) {
     redirect('colaboradores.php', 'Você não tem permissão para editar este colaborador.', 'error');
@@ -56,6 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $observacoes = sanitize($_POST['observacoes'] ?? '');
     $nivel_hierarquico_id = !empty($_POST['nivel_hierarquico_id']) ? (int)$_POST['nivel_hierarquico_id'] : null;
     $lider_id = !empty($_POST['lider_id']) ? (int)$_POST['lider_id'] : null;
+    $data_demissao = $_POST['data_demissao'] ?? null;
+    $tipo_demissao = $_POST['tipo_demissao'] ?? null;
+    $motivo_demissao = sanitize($_POST['motivo_demissao'] ?? '');
     $senha = $_POST['senha'] ?? '';
     $salario = !empty($_POST['salario']) ? str_replace(['.', ','], ['', '.'], $_POST['salario']) : null;
     $pix = sanitize($_POST['pix'] ?? '');
@@ -80,6 +104,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (empty($nome_completo) || empty($empresa_id) || empty($setor_id) || empty($cargo_id) || empty($data_inicio)) {
         redirect('colaborador_edit.php?id=' . $id, 'Preencha os campos obrigatórios!', 'error');
+    }
+    
+    // Validação: se status for desligado, data de demissão é obrigatória
+    if ($status === 'desligado' && empty($data_demissao)) {
+        redirect('colaborador_edit.php?id=' . $id, 'Para desligar um colaborador, é necessário informar a data de desligamento!', 'error');
     }
     
     try {
@@ -177,6 +206,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
             }
+        }
+        
+        // Processa demissão se o status for desligado
+        if ($status === 'desligado' && $data_demissao) {
+            // Verifica se já existe um registro de demissão
+            $stmt_check_demissao = $pdo->prepare("SELECT id FROM demissoes WHERE colaborador_id = ? ORDER BY data_demissao DESC LIMIT 1");
+            $stmt_check_demissao->execute([$id]);
+            $demissao_existente = $stmt_check_demissao->fetch();
+            
+            if ($demissao_existente) {
+                // Atualiza registro existente
+                $stmt_update_demissao = $pdo->prepare("
+                    UPDATE demissoes 
+                    SET data_demissao = ?, tipo_demissao = ?, motivo = ?
+                    WHERE id = ?
+                ");
+                $stmt_update_demissao->execute([
+                    $data_demissao,
+                    $tipo_demissao,
+                    $motivo_demissao,
+                    $demissao_existente['id']
+                ]);
+            } else {
+                // Cria novo registro de demissão
+                $stmt_insert_demissao = $pdo->prepare("
+                    INSERT INTO demissoes (colaborador_id, data_demissao, tipo_demissao, motivo, usuario_id)
+                    VALUES (?, ?, ?, ?, ?)
+                ");
+                $stmt_insert_demissao->execute([
+                    $id,
+                    $data_demissao,
+                    $tipo_demissao,
+                    $motivo_demissao,
+                    $usuario['id']
+                ]);
+            }
+        } elseif ($status !== 'desligado') {
+            // Se o status não for mais desligado, remove o registro de demissão
+            $stmt_delete_demissao = $pdo->prepare("DELETE FROM demissoes WHERE colaborador_id = ?");
+            $stmt_delete_demissao->execute([$id]);
         }
         
         redirect('colaborador_view.php?id=' . $id, 'Colaborador atualizado com sucesso!');
@@ -431,7 +500,7 @@ require_once __DIR__ . '/../includes/header.php';
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Status</label>
-                                <select name="status" class="form-select">
+                                <select name="status" id="status" class="form-select">
                                     <option value="ativo" <?= $colaborador['status'] === 'ativo' ? 'selected' : '' ?>>Ativo</option>
                                     <option value="pausado" <?= $colaborador['status'] === 'pausado' ? 'selected' : '' ?>>Pausado</option>
                                     <option value="desligado" <?= $colaborador['status'] === 'desligado' ? 'selected' : '' ?>>Desligado</option>
@@ -440,6 +509,37 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Salário</label>
                                 <input type="text" name="salario" id="salario" class="form-control" value="<?= $colaborador['salario'] ? number_format($colaborador['salario'], 2, ',', '.') : '' ?>" placeholder="0,00">
+                            </div>
+                        </div>
+                        
+                        <!-- Campos de Desligamento - aparecem apenas quando status = desligado -->
+                        <div class="row" id="campos_desligamento" style="display: <?= $colaborador['status'] === 'desligado' ? 'flex' : 'none' ?>;">
+                            <div class="col-md-12 mb-2">
+                                <hr>
+                                <h5 class="text-danger mb-3"><i class="bi bi-exclamation-triangle"></i> Dados de Desligamento</h5>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Data de Desligamento *</label>
+                                <input type="date" name="data_demissao" id="data_demissao" class="form-control" value="<?= $data_demissao_atual ?? '' ?>" <?= $colaborador['status'] === 'desligado' ? 'required' : '' ?>>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Tipo de Demissão</label>
+                                <select name="tipo_demissao" id="tipo_demissao" class="form-select">
+                                    <option value="">Selecione...</option>
+                                    <option value="pedido_demissao" <?= ($tipo_demissao_atual ?? '') === 'pedido_demissao' ? 'selected' : '' ?>>Pedido de Demissão</option>
+                                    <option value="demissao_sem_justa_causa" <?= ($tipo_demissao_atual ?? '') === 'demissao_sem_justa_causa' ? 'selected' : '' ?>>Demissão sem Justa Causa</option>
+                                    <option value="demissao_justa_causa" <?= ($tipo_demissao_atual ?? '') === 'demissao_justa_causa' ? 'selected' : '' ?>>Demissão por Justa Causa</option>
+                                    <option value="acordo_mutuo" <?= ($tipo_demissao_atual ?? '') === 'acordo_mutuo' ? 'selected' : '' ?>>Acordo Mútuo</option>
+                                    <option value="termino_contrato" <?= ($tipo_demissao_atual ?? '') === 'termino_contrato' ? 'selected' : '' ?>>Término de Contrato</option>
+                                    <option value="outro" <?= ($tipo_demissao_atual ?? '') === 'outro' ? 'selected' : '' ?>>Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Motivo</label>
+                                <input type="text" name="motivo_demissao" id="motivo_demissao" class="form-control" value="<?= htmlspecialchars($motivo_demissao_atual ?? '') ?>" placeholder="Breve descrição do motivo">
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <hr>
                             </div>
                         </div>
                         
@@ -589,6 +689,7 @@ function carregarLideres() {
 // Carrega líderes ao carregar a página
 document.addEventListener('DOMContentLoaded', function() {
     carregarLideres();
+    toggleCamposDesligamento(); // Exibe campos de desligamento se necessário
 });
 
 // Event listeners para carregar líderes
@@ -863,6 +964,34 @@ document.getElementById('foto')?.addEventListener('change', function(e) {
         document.getElementById('foto_preview').style.display = 'none';
     }
 });
+
+// Função para mostrar/ocultar campos de desligamento
+function toggleCamposDesligamento() {
+    const status = document.getElementById('status')?.value;
+    const camposDesligamento = document.getElementById('campos_desligamento');
+    const dataDemissao = document.getElementById('data_demissao');
+    
+    if (camposDesligamento) {
+        if (status === 'desligado') {
+            camposDesligamento.style.display = 'flex';
+            if (dataDemissao) {
+                dataDemissao.setAttribute('required', 'required');
+                // Se não tiver data, preenche com data atual
+                if (!dataDemissao.value) {
+                    dataDemissao.value = new Date().toISOString().split('T')[0];
+                }
+            }
+        } else {
+            camposDesligamento.style.display = 'none';
+            if (dataDemissao) {
+                dataDemissao.removeAttribute('required');
+            }
+        }
+    }
+}
+
+// Event listener para mudança de status
+document.getElementById('status')?.addEventListener('change', toggleCamposDesligamento);
 </script>
 
 <script>
