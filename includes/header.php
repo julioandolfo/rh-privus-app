@@ -27,6 +27,27 @@ $usuario = $_SESSION['usuario'];
 require_once __DIR__ . '/pontuacao.php';
 $_header_pontos = obter_pontos($usuario['id'] ?? null, $usuario['colaborador_id'] ?? null);
 $_header_saldo_dinheiro = ($usuario['colaborador_id'] ?? null) ? obter_saldo_dinheiro($usuario['colaborador_id']) : 0;
+
+// Busca foto de perfil do usuário
+require_once __DIR__ . '/upload_foto.php';
+$pdo = getDB();
+$_foto_perfil_path = null;
+
+if ($usuario['colaborador_id'] ?? null) {
+    // Busca foto do colaborador
+    $stmt = $pdo->prepare("SELECT foto FROM colaboradores WHERE id = ?");
+    $stmt->execute([$usuario['colaborador_id']]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $_foto_perfil_path = $result['foto'] ?? null;
+} elseif ($usuario['id'] ?? null) {
+    // Busca foto do usuário
+    $stmt = $pdo->prepare("SELECT foto FROM usuarios WHERE id = ?");
+    $stmt->execute([$usuario['id']]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $_foto_perfil_path = $result['foto'] ?? null;
+}
+
+$_foto_perfil_url = get_foto_perfil($_foto_perfil_path, $usuario['nome']);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -404,11 +425,14 @@ $_header_saldo_dinheiro = ($usuario['colaborador_id'] ?? null) ? obter_saldo_din
                             <!--begin::User-->
                             <div class="d-flex align-items-center ms-1 ms-lg-3">
                                 <!--begin::Menu wrapper-->
-                                <div class="btn btn-icon btn-color-white btn-active-color-primary position-relative w-30px h-30px" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
-                                    <i class="ki-duotone ki-user fs-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
+                                <div class="cursor-pointer symbol symbol-30px symbol-md-35px" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                                    <?php if (!empty($_foto_perfil_path) && file_exists(__DIR__ . '/../' . $_foto_perfil_path)): ?>
+                                        <img src="<?= htmlspecialchars($_foto_perfil_url) ?>" alt="Foto de Perfil" class="rounded-circle" />
+                                    <?php else: ?>
+                                        <div class="symbol-label fs-6 fw-semibold bg-primary text-white">
+                                            <?= strtoupper(substr($usuario['nome'], 0, 1)) ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                                 <!--begin::Menu-->
                                 <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-800 menu-state-bg menu-state-color fw-semibold py-4 fs-6 w-275px" data-kt-menu="true">
@@ -417,9 +441,13 @@ $_header_saldo_dinheiro = ($usuario['colaborador_id'] ?? null) ? obter_saldo_din
                                         <div class="menu-content d-flex align-items-center px-3">
                                             <!--begin::Avatar-->
                                             <div class="symbol symbol-50px me-5">
-                                                <div class="symbol-label fs-2 fw-semibold bg-primary text-white">
-                                                    <?= strtoupper(substr($usuario['nome'], 0, 1)) ?>
-                                                </div>
+                                                <?php if (!empty($_foto_perfil_path) && file_exists(__DIR__ . '/../' . $_foto_perfil_path)): ?>
+                                                    <img src="<?= htmlspecialchars($_foto_perfil_url) ?>" alt="Foto de Perfil" class="rounded-circle" />
+                                                <?php else: ?>
+                                                    <div class="symbol-label fs-2 fw-semibold bg-primary text-white">
+                                                        <?= strtoupper(substr($usuario['nome'], 0, 1)) ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                             <!--end::Avatar-->
                                             <!--begin::Username-->
