@@ -34,11 +34,15 @@ if (DEBUG_MODE) {
             E_USER_ERROR => 'USER_ERROR',
             E_USER_WARNING => 'USER_WARNING',
             E_USER_NOTICE => 'USER_NOTICE',
-            E_STRICT => 'STRICT',
             E_RECOVERABLE_ERROR => 'RECOVERABLE_ERROR',
             E_DEPRECATED => 'DEPRECATED',
             E_USER_DEPRECATED => 'USER_DEPRECATED',
         ];
+        
+        // E_STRICT foi removido no PHP 8.4, adiciona condicionalmente se existir
+        if (defined('E_STRICT')) {
+            $errorTypes[E_STRICT] = 'STRICT';
+        }
         
         $type = $errorTypes[$errno] ?? 'UNKNOWN';
         
