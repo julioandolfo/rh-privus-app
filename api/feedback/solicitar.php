@@ -25,31 +25,73 @@ try {
     $solicitante_colaborador_id = $usuario['colaborador_id'] ?? null;
     $request_id = $_POST['request_id'] ?? null;
     
-    $solicitado_colaborador_id = $_POST['solicitado_colaborador_id'] ?? null;
+    $solicitado_id = $_POST['solicitado_colaborador_id'] ?? null;
     $mensagem = trim($_POST['mensagem'] ?? '');
     $prazo = $_POST['prazo'] ?? null;
     
     // Validações
-    if (empty($solicitado_colaborador_id)) {
+    if (empty($solicitado_id)) {
         throw new Exception('Selecione para quem você quer solicitar feedback.');
     }
     
-    // Verifica se colaborador existe e está ativo
-    $stmt = $pdo->prepare("SELECT id, status FROM colaboradores WHERE id = ?");
-    $stmt->execute([$solicitado_colaborador_id]);
-    $solicitado = $stmt->fetch();
+    // Decodifica o ID (formato: c_123 para colaborador ou u_456 para usuário)
+    $solicitado_colaborador_id = null;
+    $solicitado_usuario_id = null;
     
-    if (!$solicitado) {
-        throw new Exception('Colaborador não encontrado.');
-    }
-    
-    if ($solicitado['status'] !== 'ativo') {
-        throw new Exception('Não é possível solicitar feedback de colaborador inativo.');
-    }
-    
-    // Não permite solicitar feedback para si mesmo
-    if ($solicitante_colaborador_id && $solicitante_colaborador_id == $solicitado_colaborador_id) {
-        throw new Exception('Você não pode solicitar feedback para si mesmo.');
+    if (strpos($solicitado_id, 'c_') === 0) {
+        // É um colaborador
+        $solicitado_colaborador_id = intval(substr($solicitado_id, 2));
+        
+        // Verifica se colaborador existe e está ativo
+        $stmt = $pdo->prepare("SELECT id, status FROM colaboradores WHERE id = ?");
+        $stmt->execute([$solicitado_colaborador_id]);
+        $solicitado = $stmt->fetch();
+        
+        if (!$solicitado) {
+            throw new Exception('Colaborador não encontrado.');
+        }
+        
+        if ($solicitado['status'] !== 'ativo') {
+            throw new Exception('Não é possível solicitar feedback de colaborador inativo.');
+        }
+        
+        // Não permite solicitar feedback para si mesmo
+        if ($solicitante_colaborador_id && $solicitante_colaborador_id == $solicitado_colaborador_id) {
+            throw new Exception('Você não pode solicitar feedback para si mesmo.');
+        }
+        
+        // Busca usuario_id do colaborador se existir
+        $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE colaborador_id = ? LIMIT 1");
+        $stmt->execute([$solicitado_colaborador_id]);
+        $dest_usuario = $stmt->fetch();
+        if ($dest_usuario) {
+            $solicitado_usuario_id = $dest_usuario['id'];
+        }
+        
+    } elseif (strpos($solicitado_id, 'u_') === 0) {
+        // É um usuário sem colaborador
+        $solicitado_usuario_id = intval(substr($solicitado_id, 2));
+        
+        // Verifica se usuário existe e está ativo
+        $stmt = $pdo->prepare("SELECT id, status FROM usuarios WHERE id = ?");
+        $stmt->execute([$solicitado_usuario_id]);
+        $solicitado = $stmt->fetch();
+        
+        if (!$solicitado) {
+            throw new Exception('Usuário não encontrado.');
+        }
+        
+        if ($solicitado['status'] !== 'ativo') {
+            throw new Exception('Não é possível solicitar feedback de usuário inativo.');
+        }
+        
+        // Não permite solicitar feedback para si mesmo
+        if ($solicitante_usuario_id && $solicitante_usuario_id == $solicitado_usuario_id) {
+            throw new Exception('Você não pode solicitar feedback para si mesmo.');
+        }
+        
+    } else {
+        throw new Exception('ID inválido.');
     }
     
     // Verifica prazo (se informado, deve ser futuro e máximo 90 dias)
@@ -89,7 +131,9 @@ try {
         SELECT id FROM feedback_solicitacoes 
         WHERE solicitante_usuario_id <=> ? 
         AND COALESCE(solicitante_colaborador_id, 0) = COALESCE(?, 0)
-        AND solicitado_colaborador_id = ?
+        AND (
+            (solicitado_colaborador_id <=> ? AND solicitado_usuario_id <=> ?)
+        )
         AND status = 'pendente'
         AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
         LIMIT 1
@@ -97,7 +141,8 @@ try {
     $stmt_check->execute([
         $solicitante_usuario_id,
         $solicitante_colaborador_id,
-        $solicitado_colaborador_id
+        $solicitado_colaborador_id,
+        $solicitado_usuario_id
     ]);
     if ($stmt_check->fetch()) {
         if ($request_id) {
@@ -105,16 +150,7 @@ try {
             $stmt = $pdo->prepare("SELECT RELEASE_LOCK(?) as release_result");
             $stmt->execute([$lockName]);
         }
-        throw new Exception('Você já tem uma solicitação pendente para este colaborador.');
-    }
-    
-    // Busca usuario_id do solicitado se existir
-    $solicitado_usuario_id = null;
-    $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE colaborador_id = ? LIMIT 1");
-    $stmt->execute([$solicitado_colaborador_id]);
-    $dest_usuario = $stmt->fetch();
-    if ($dest_usuario) {
-        $solicitado_usuario_id = $dest_usuario['id'];
+        throw new Exception('Você já tem uma solicitação pendente para esta pessoa.');
     }
     
     // Inicia transação

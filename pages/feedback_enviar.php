@@ -16,6 +16,9 @@ $usuario = $_SESSION['usuario'];
 // Busca colaboradores disponíveis
 $colaboradores = get_colaboradores_disponiveis($pdo, $usuario);
 
+// Verifica se veio de uma solicitação aceita
+$destinatario_pre_selecionado = $_GET['destinatario_id'] ?? null;
+
 // Busca itens de avaliação ativos (sem duplicatas)
 $stmt_itens = $pdo->query("
     SELECT DISTINCT id, nome, descricao, ordem 
@@ -74,7 +77,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="row mb-7">
                         <div class="col-md-6">
                             <label class="required fw-semibold fs-6 mb-2">Selecione um colaborador</label>
-                            <?= render_select_colaborador('destinatario_colaborador_id', 'destinatario_colaborador_id', null, $colaboradores, true) ?>
+                            <?= render_select_colaborador('destinatario_colaborador_id', 'destinatario_colaborador_id', $destinatario_pre_selecionado, $colaboradores, true) ?>
                         </div>
                         <div class="col-md-6">
                             <label class="fw-semibold fs-6 mb-2">Feedback Anônimo</label>

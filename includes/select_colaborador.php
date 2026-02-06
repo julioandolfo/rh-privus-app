@@ -28,14 +28,15 @@ function get_empresas_disponiveis($pdo, $usuario) {
 }
 
 /**
- * Busca colaboradores disponíveis baseado no role do usuário
+ * Busca colaboradores E usuários disponíveis baseado no role do usuário
+ * Inclui tanto colaboradores quanto usuários sem colaborador vinculado
  * 
  * @param PDO $pdo Conexão com banco de dados
  * @param array $usuario Usuário logado da sessão
- * @return array Array de colaboradores com id, nome_completo e foto
+ * @return array Array de pessoas (colaboradores e usuários) com id, nome_completo, foto e tipo
  */
 function get_colaboradores_disponiveis($pdo, $usuario) {
-    $colaboradores = [];
+    $pessoas = [];
     
     try {
         // Validação básica
@@ -44,28 +45,89 @@ function get_colaboradores_disponiveis($pdo, $usuario) {
         }
         
         if ($usuario['role'] === 'ADMIN') {
+            // ADMIN vê todos: colaboradores ativos + usuários sem colaborador
             $stmt = $pdo->query("
-                SELECT id, nome_completo, foto 
-                FROM colaboradores 
-                WHERE status = 'ativo' 
+                SELECT 
+                    CONCAT('c_', c.id) as id,
+                    c.id as colaborador_id,
+                    NULL as usuario_id,
+                    c.nome_completo,
+                    c.foto,
+                    'colaborador' as tipo
+                FROM colaboradores c
+                WHERE c.status = 'ativo'
+                
+                UNION ALL
+                
+                SELECT 
+                    CONCAT('u_', u.id) as id,
+                    NULL as colaborador_id,
+                    u.id as usuario_id,
+                    u.nome as nome_completo,
+                    NULL as foto,
+                    'usuario' as tipo
+                FROM usuarios u
+                WHERE u.colaborador_id IS NULL
+                AND u.status = 'ativo'
+                
                 ORDER BY nome_completo
             ");
         } elseif ($usuario['role'] === 'RH') {
-            // Verifica se tem empresas_ids (novo formato) ou empresa_id (formato antigo)
+            // RH vê colaboradores da(s) empresa(s) dele + usuários sem colaborador
             if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
                 $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
                 $stmt = $pdo->prepare("
-                    SELECT id, nome_completo, foto 
-                    FROM colaboradores 
-                    WHERE empresa_id IN ($placeholders) AND status = 'ativo' 
+                    SELECT 
+                        CONCAT('c_', c.id) as id,
+                        c.id as colaborador_id,
+                        NULL as usuario_id,
+                        c.nome_completo,
+                        c.foto,
+                        'colaborador' as tipo
+                    FROM colaboradores c
+                    WHERE c.empresa_id IN ($placeholders) AND c.status = 'ativo'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        CONCAT('u_', u.id) as id,
+                        NULL as colaborador_id,
+                        u.id as usuario_id,
+                        u.nome as nome_completo,
+                        NULL as foto,
+                        'usuario' as tipo
+                    FROM usuarios u
+                    WHERE u.colaborador_id IS NULL
+                    AND u.status = 'ativo'
+                    
                     ORDER BY nome_completo
                 ");
                 $stmt->execute($usuario['empresas_ids']);
             } elseif (!empty($usuario['empresa_id'])) {
                 $stmt = $pdo->prepare("
-                    SELECT id, nome_completo, foto 
-                    FROM colaboradores 
-                    WHERE empresa_id = ? AND status = 'ativo' 
+                    SELECT 
+                        CONCAT('c_', c.id) as id,
+                        c.id as colaborador_id,
+                        NULL as usuario_id,
+                        c.nome_completo,
+                        c.foto,
+                        'colaborador' as tipo
+                    FROM colaboradores c
+                    WHERE c.empresa_id = ? AND c.status = 'ativo'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        CONCAT('u_', u.id) as id,
+                        NULL as colaborador_id,
+                        u.id as usuario_id,
+                        u.nome as nome_completo,
+                        NULL as foto,
+                        'usuario' as tipo
+                    FROM usuarios u
+                    WHERE u.colaborador_id IS NULL
+                    AND u.status = 'ativo'
+                    
                     ORDER BY nome_completo
                 ");
                 $stmt->execute([$usuario['empresa_id']]);
@@ -86,15 +148,36 @@ function get_colaboradores_disponiveis($pdo, $usuario) {
                 return [];
             }
             
+            // GESTOR vê colaboradores do setor dele + usuários sem colaborador
             $stmt = $pdo->prepare("
-                SELECT id, nome_completo, foto 
-                FROM colaboradores 
-                WHERE setor_id = ? AND status = 'ativo' 
+                SELECT 
+                    CONCAT('c_', c.id) as id,
+                    c.id as colaborador_id,
+                    NULL as usuario_id,
+                    c.nome_completo,
+                    c.foto,
+                    'colaborador' as tipo
+                FROM colaboradores c
+                WHERE c.setor_id = ? AND c.status = 'ativo'
+                
+                UNION ALL
+                
+                SELECT 
+                    CONCAT('u_', u.id) as id,
+                    NULL as colaborador_id,
+                    u.id as usuario_id,
+                    u.nome as nome_completo,
+                    NULL as foto,
+                    'usuario' as tipo
+                FROM usuarios u
+                WHERE u.colaborador_id IS NULL
+                AND u.status = 'ativo'
+                
                 ORDER BY nome_completo
             ");
             $stmt->execute([$setor_id]);
         } elseif ($usuario['role'] === 'COLABORADOR') {
-            // Colaboradores podem ver outros colaboradores da mesma empresa para enviar feedbacks
+            // Colaboradores podem ver outros da mesma empresa + usuários sem colaborador
             $colaborador_id = $usuario['colaborador_id'] ?? null;
             $empresa_id = $usuario['empresa_id'] ?? null;
             
@@ -114,11 +197,31 @@ function get_colaboradores_disponiveis($pdo, $usuario) {
                 return [];
             }
             
-            // Busca todos os colaboradores da mesma empresa, exceto ele mesmo
+            // Busca todos da mesma empresa exceto ele mesmo + usuários sem colaborador
             $stmt = $pdo->prepare("
-                SELECT id, nome_completo, foto 
-                FROM colaboradores 
-                WHERE empresa_id = ? AND id != ? AND status = 'ativo' 
+                SELECT 
+                    CONCAT('c_', c.id) as id,
+                    c.id as colaborador_id,
+                    NULL as usuario_id,
+                    c.nome_completo,
+                    c.foto,
+                    'colaborador' as tipo
+                FROM colaboradores c
+                WHERE c.empresa_id = ? AND c.id != ? AND c.status = 'ativo'
+                
+                UNION ALL
+                
+                SELECT 
+                    CONCAT('u_', u.id) as id,
+                    NULL as colaborador_id,
+                    u.id as usuario_id,
+                    u.nome as nome_completo,
+                    NULL as foto,
+                    'usuario' as tipo
+                FROM usuarios u
+                WHERE u.colaborador_id IS NULL
+                AND u.status = 'ativo'
+                
                 ORDER BY nome_completo
             ");
             $stmt->execute([$empresa_id, $colaborador_id]);
@@ -130,21 +233,25 @@ function get_colaboradores_disponiveis($pdo, $usuario) {
             return [];
         }
         
-        $colaboradores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $pessoas = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Garante que foto sempre tenha um valor padrão
-        foreach ($colaboradores as &$colab) {
-            if (empty($colab['foto'])) {
-                $colab['foto'] = null;
+        // Garante que foto sempre tenha um valor padrão e adiciona badge de tipo
+        foreach ($pessoas as &$pessoa) {
+            if (empty($pessoa['foto'])) {
+                $pessoa['foto'] = null;
+            }
+            // Adiciona indicador visual no nome se for usuário
+            if ($pessoa['tipo'] === 'usuario') {
+                $pessoa['nome_completo'] .= ' (Usuário)';
             }
         }
         
     } catch (PDOException $e) {
-        error_log("Erro ao buscar colaboradores: " . $e->getMessage());
+        error_log("Erro ao buscar colaboradores e usuários: " . $e->getMessage());
         return [];
     }
     
-    return $colaboradores;
+    return $pessoas;
 }
 
 /**

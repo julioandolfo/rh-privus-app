@@ -89,7 +89,7 @@ try {
         logFeedback("✅ Lock obtido com sucesso! Continuando...");
     }
     
-    $destinatario_colaborador_id = $_POST['destinatario_colaborador_id'] ?? null;
+    $destinatario_id = $_POST['destinatario_colaborador_id'] ?? null;
     $template_id = $_POST['template_id'] ?? 0;
     $conteudo = trim($_POST['conteudo'] ?? '');
     $anonimo = isset($_POST['anonimo']) && $_POST['anonimo'] == '1';
@@ -98,34 +98,76 @@ try {
     $avaliacoes = $_POST['avaliacoes'] ?? [];
     
     // Validações
-    if (empty($destinatario_colaborador_id)) {
-        throw new Exception('Selecione um colaborador para enviar o feedback.');
+    if (empty($destinatario_id)) {
+        throw new Exception('Selecione uma pessoa para enviar o feedback.');
     }
     
     if (empty($conteudo)) {
         throw new Exception('O conteúdo do feedback é obrigatório.');
     }
     
-    // Verifica se colaborador existe e está ativo
-    $stmt = $pdo->prepare("SELECT id, status FROM colaboradores WHERE id = ?");
-    $stmt->execute([$destinatario_colaborador_id]);
-    $destinatario = $stmt->fetch();
+    // Decodifica o ID (formato: c_123 para colaborador ou u_456 para usuário)
+    $destinatario_colaborador_id = null;
+    $destinatario_usuario_id = null;
     
-    if (!$destinatario) {
-        throw new Exception('Colaborador não encontrado.');
-    }
-    
-    if ($destinatario['status'] !== 'ativo') {
-        throw new Exception('Não é possível enviar feedback para colaborador inativo.');
-    }
-    
-    // Não permite enviar feedback para si mesmo
-    if ($remetente_colaborador_id && $remetente_colaborador_id == $destinatario_colaborador_id) {
-        throw new Exception('Você não pode enviar feedback para si mesmo.');
+    if (strpos($destinatario_id, 'c_') === 0) {
+        // É um colaborador
+        $destinatario_colaborador_id = intval(substr($destinatario_id, 2));
+        
+        // Verifica se colaborador existe e está ativo
+        $stmt = $pdo->prepare("SELECT id, status FROM colaboradores WHERE id = ?");
+        $stmt->execute([$destinatario_colaborador_id]);
+        $destinatario = $stmt->fetch();
+        
+        if (!$destinatario) {
+            throw new Exception('Colaborador não encontrado.');
+        }
+        
+        if ($destinatario['status'] !== 'ativo') {
+            throw new Exception('Não é possível enviar feedback para colaborador inativo.');
+        }
+        
+        // Não permite enviar feedback para si mesmo
+        if ($remetente_colaborador_id && $remetente_colaborador_id == $destinatario_colaborador_id) {
+            throw new Exception('Você não pode enviar feedback para si mesmo.');
+        }
+        
+        // Busca usuario_id do colaborador se existir
+        $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE colaborador_id = ? LIMIT 1");
+        $stmt->execute([$destinatario_colaborador_id]);
+        $dest_usuario = $stmt->fetch();
+        if ($dest_usuario) {
+            $destinatario_usuario_id = $dest_usuario['id'];
+        }
+        
+    } elseif (strpos($destinatario_id, 'u_') === 0) {
+        // É um usuário sem colaborador
+        $destinatario_usuario_id = intval(substr($destinatario_id, 2));
+        
+        // Verifica se usuário existe e está ativo
+        $stmt = $pdo->prepare("SELECT id, status FROM usuarios WHERE id = ?");
+        $stmt->execute([$destinatario_usuario_id]);
+        $destinatario = $stmt->fetch();
+        
+        if (!$destinatario) {
+            throw new Exception('Usuário não encontrado.');
+        }
+        
+        if ($destinatario['status'] !== 'ativo') {
+            throw new Exception('Não é possível enviar feedback para usuário inativo.');
+        }
+        
+        // Não permite enviar feedback para si mesmo
+        if ($remetente_usuario_id && $remetente_usuario_id == $destinatario_usuario_id) {
+            throw new Exception('Você não pode enviar feedback para si mesmo.');
+        }
+        
+    } else {
+        throw new Exception('ID inválido.');
     }
     
     // Verifica permissão para acessar este colaborador (se aplicável)
-    if (!has_role(['ADMIN']) && !empty($usuario['empresa_id'])) {
+    if (!has_role(['ADMIN']) && !empty($usuario['empresa_id']) && $destinatario_colaborador_id) {
         $stmt = $pdo->prepare("SELECT empresa_id FROM colaboradores WHERE id = ?");
         $stmt->execute([$destinatario_colaborador_id]);
         $dest_empresa = $stmt->fetch();
@@ -138,9 +180,10 @@ try {
     // Verifica duplicação: feedback idêntico nos últimos 30 segundos
     $stmt_check = $pdo->prepare("
         SELECT id FROM feedbacks 
-        WHERE remetente_usuario_id = ? 
+        WHERE remetente_usuario_id <=> ? 
         AND COALESCE(remetente_colaborador_id, 0) = COALESCE(?, 0)
-        AND destinatario_colaborador_id = ?
+        AND destinatario_usuario_id <=> ?
+        AND COALESCE(destinatario_colaborador_id, 0) = COALESCE(?, 0)
         AND conteudo = ?
         AND COALESCE(template_id, 0) = COALESCE(?, 0)
         AND created_at > DATE_SUB(NOW(), INTERVAL 30 SECOND)
@@ -149,6 +192,7 @@ try {
     $stmt_check->execute([
         $remetente_usuario_id,
         $remetente_colaborador_id,
+        $destinatario_usuario_id,
         $destinatario_colaborador_id,
         $conteudo,
         $template_id > 0 ? $template_id : 0
@@ -166,15 +210,6 @@ try {
     
     logFeedback("✅ Verificação de duplicação passou, iniciando transação...");
     
-    // Busca usuario_id do destinatário se existir
-    $destinatario_usuario_id = null;
-    $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE colaborador_id = ? LIMIT 1");
-    $stmt->execute([$destinatario_colaborador_id]);
-    $dest_usuario = $stmt->fetch();
-    if ($dest_usuario) {
-        $destinatario_usuario_id = $dest_usuario['id'];
-    }
-    
     // Inicia transação
     $pdo->beginTransaction();
     
@@ -182,9 +217,10 @@ try {
         // Verifica novamente dentro da transação com lock (double-check)
         $stmt_check2 = $pdo->prepare("
             SELECT id FROM feedbacks 
-            WHERE remetente_usuario_id = ? 
+            WHERE remetente_usuario_id <=> ? 
             AND COALESCE(remetente_colaborador_id, 0) = COALESCE(?, 0)
-            AND destinatario_colaborador_id = ?
+            AND destinatario_usuario_id <=> ?
+            AND COALESCE(destinatario_colaborador_id, 0) = COALESCE(?, 0)
             AND conteudo = ?
             AND COALESCE(template_id, 0) = COALESCE(?, 0)
             AND created_at > DATE_SUB(NOW(), INTERVAL 30 SECOND)
@@ -194,6 +230,7 @@ try {
         $stmt_check2->execute([
             $remetente_usuario_id,
             $remetente_colaborador_id,
+            $destinatario_usuario_id,
             $destinatario_colaborador_id,
             $conteudo,
             $template_id > 0 ? $template_id : 0

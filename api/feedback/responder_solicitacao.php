@@ -102,10 +102,18 @@ try {
     
     // Se aceitar, redireciona para enviar feedback
     if ($acao === 'aceitar') {
+        // Monta o ID no formato correto (c_ para colaborador, u_ para usuário)
+        $destinatario_id = '';
+        if ($solicitacao['solicitante_colaborador_id']) {
+            $destinatario_id = 'c_' . $solicitacao['solicitante_colaborador_id'];
+        } elseif ($solicitacao['solicitante_usuario_id']) {
+            $destinatario_id = 'u_' . $solicitacao['solicitante_usuario_id'];
+        }
+        
         $response = [
             'success' => true,
             'message' => 'Solicitação aceita! Você será redirecionado para enviar o feedback.',
-            'redirect' => '../pages/feedback_enviar.php?solicitacao_id=' . $solicitacao_id . '&destinatario_id=' . $solicitacao['solicitante_colaborador_id']
+            'redirect' => '../pages/feedback_enviar.php?solicitacao_id=' . $solicitacao_id . '&destinatario_id=' . urlencode($destinatario_id)
         ];
     } else {
         $response = [
