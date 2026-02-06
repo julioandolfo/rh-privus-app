@@ -2622,6 +2622,9 @@ if (isset($_GET['view'])) {
         $flags_por_colaborador = [];
         if (!empty($itens_fechamento)) {
             $colaboradores_ids_flags = array_unique(array_column($itens_fechamento, 'colaborador_id'));
+            // Remove valores vazios/null e reindexar o array
+            $colaboradores_ids_flags = array_values(array_filter($colaboradores_ids_flags));
+            
             if (!empty($colaboradores_ids_flags)) {
                 $placeholders_flags = implode(',', array_fill(0, count($colaboradores_ids_flags), '?'));
                 $stmt_flags = $pdo->prepare("
@@ -2672,6 +2675,9 @@ if (isset($_GET['view'])) {
             // (para fechamentos criados antes da implementação completa)
             if (empty($adiantamentos_por_colaborador)) {
                 $colaboradores_ids = array_column($itens_fechamento, 'colaborador_id');
+                // Remove valores vazios/null e reindexar o array
+                $colaboradores_ids = array_values(array_filter($colaboradores_ids));
+                
                 if (!empty($colaboradores_ids)) {
                     $placeholders = implode(',', array_fill(0, count($colaboradores_ids), '?'));
                     $stmt = $pdo->prepare("
