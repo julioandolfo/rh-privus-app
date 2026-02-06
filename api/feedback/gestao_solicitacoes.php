@@ -91,10 +91,10 @@ try {
             fs.*,
             COALESCE(su.nome, sc.nome_completo) as solicitante_nome,
             COALESCE(sc.foto, NULL) as solicitante_foto,
-            COALESCE(sc.email_corporativo, sc.email_pessoal) as solicitante_email,
+            COALESCE(su.email, sc.email_pessoal) as solicitante_email,
             COALESCE(slu.nome, slc.nome_completo) as solicitado_nome,
             COALESCE(slc.foto, NULL) as solicitado_foto,
-            COALESCE(slc.email_corporativo, slc.email_pessoal) as solicitado_email
+            COALESCE(slu.email, slc.email_pessoal) as solicitado_email
         FROM feedback_solicitacoes fs
         LEFT JOIN usuarios su ON fs.solicitante_usuario_id = su.id
         LEFT JOIN colaboradores sc ON fs.solicitante_colaborador_id = sc.id OR (fs.solicitante_usuario_id = su.id AND su.colaborador_id = sc.id)
