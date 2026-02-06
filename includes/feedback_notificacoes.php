@@ -293,3 +293,279 @@ function notificar_feedback_recebido($feedback_id) {
     }
 }
 
+/**
+ * Notifica sobre solicitação de feedback recebida
+ */
+function notificar_solicitacao_feedback($solicitacao_id) {
+    try {
+        $pdo = getDB();
+        
+        // Busca dados da solicitação
+        $stmt = $pdo->prepare("
+            SELECT 
+                fs.*,
+                COALESCE(su.nome, sc.nome_completo) as solicitante_nome,
+                COALESCE(slu.nome, slc.nome_completo) as solicitado_nome,
+                COALESCE(slu.email, slc.email_pessoal) as solicitado_email
+            FROM feedback_solicitacoes fs
+            LEFT JOIN usuarios su ON fs.solicitante_usuario_id = su.id
+            LEFT JOIN colaboradores sc ON fs.solicitante_colaborador_id = sc.id OR (fs.solicitante_usuario_id = su.id AND su.colaborador_id = sc.id)
+            LEFT JOIN usuarios slu ON fs.solicitado_usuario_id = slu.id
+            LEFT JOIN colaboradores slc ON fs.solicitado_colaborador_id = slc.id OR (fs.solicitado_usuario_id = slu.id AND slu.colaborador_id = slc.id)
+            WHERE fs.id = ?
+        ");
+        $stmt->execute([$solicitacao_id]);
+        $solicitacao = $stmt->fetch();
+        
+        if (!$solicitacao) {
+            return false;
+        }
+        
+        // 1. Cria notificação interna
+        $titulo = 'Nova Solicitação de Feedback';
+        $mensagem = $solicitacao['solicitante_nome'] . ' está pedindo que você envie um feedback sobre ele(a)';
+        $link = '../pages/feedback_solicitacoes.php?tipo=recebidas';
+        
+        criar_notificacao(
+            $solicitacao['solicitado_usuario_id'],
+            $solicitacao['solicitado_colaborador_id'],
+            'feedback_solicitacao',
+            $titulo,
+            $mensagem,
+            $link,
+            $solicitacao_id,
+            'feedback_solicitacao'
+        );
+        
+        // 2. Envia email
+        enviar_email_solicitacao_feedback($solicitacao_id);
+        
+        // 3. Envia push notification
+        enviar_push_solicitacao_feedback($solicitacao_id);
+        
+        return true;
+        
+    } catch (Exception $e) {
+        error_log("Erro ao notificar solicitação de feedback: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Envia email de solicitação de feedback
+ */
+function enviar_email_solicitacao_feedback($solicitacao_id) {
+    try {
+        $pdo = getDB();
+        
+        // Busca dados da solicitação
+        $stmt = $pdo->prepare("
+            SELECT 
+                fs.*,
+                COALESCE(su.nome, sc.nome_completo) as solicitante_nome,
+                COALESCE(slu.nome, slc.nome_completo) as solicitado_nome,
+                COALESCE(slu.email, slc.email_pessoal) as solicitado_email
+            FROM feedback_solicitacoes fs
+            LEFT JOIN usuarios su ON fs.solicitante_usuario_id = su.id
+            LEFT JOIN colaboradores sc ON fs.solicitante_colaborador_id = sc.id OR (fs.solicitante_usuario_id = su.id AND su.colaborador_id = sc.id)
+            LEFT JOIN usuarios slu ON fs.solicitado_usuario_id = slu.id
+            LEFT JOIN colaboradores slc ON fs.solicitado_colaborador_id = slc.id OR (fs.solicitado_usuario_id = slu.id AND slu.colaborador_id = slc.id)
+            WHERE fs.id = ?
+        ");
+        $stmt->execute([$solicitacao_id]);
+        $solicitacao = $stmt->fetch();
+        
+        if (!$solicitacao || empty($solicitacao['solicitado_email'])) {
+            return ['success' => false, 'message' => 'Solicitação não encontrada ou solicitado sem email.'];
+        }
+        
+        $baseUrl = get_base_url();
+        $link_solicitacao = $baseUrl . '/pages/feedback_solicitacoes.php?tipo=recebidas';
+        
+        // Tenta usar template de email se existir
+        $template = buscar_template_email('solicitacao_feedback');
+        
+        if ($template) {
+            $variaveis = [
+                'nome_completo' => $solicitacao['solicitado_nome'],
+                'solicitante_nome' => $solicitacao['solicitante_nome'],
+                'mensagem' => $solicitacao['mensagem'] ? nl2br(htmlspecialchars($solicitacao['mensagem'])) : '<p style="color: #999; font-style: italic;">Nenhuma mensagem adicional.</p>',
+                'prazo' => $solicitacao['prazo'] ? date('d/m/Y', strtotime($solicitacao['prazo'])) : 'Sem prazo definido',
+                'link_solicitacao' => $link_solicitacao
+            ];
+            
+            return enviar_email_template('solicitacao_feedback', $solicitacao['solicitado_email'], $variaveis);
+        } else {
+            // Email padrão se não houver template
+            $assunto = 'Solicitação de Feedback - RH Privus';
+            $mensagem_html = "
+                <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background-color: #009ef7; color: white; padding: 20px; text-align: center; }
+                        .content { background-color: #f9f9f9; padding: 30px; }
+                        .button { display: inline-block; background-color: #009ef7; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+                    </style>
+                </head>
+                <body>
+                    <div class='container'>
+                        <div class='header'>
+                            <h2>RH Privus</h2>
+                        </div>
+                        <div class='content'>
+                            <p>Olá, <strong>{$solicitacao['solicitado_nome']}</strong>!</p>
+                            <p><strong>{$solicitacao['solicitante_nome']}</strong> está solicitando que você envie um feedback sobre ele(a).</p>
+                            " . ($solicitacao['mensagem'] ? "
+                            <div style='background-color: white; padding: 15px; border-left: 4px solid #009ef7; margin: 15px 0;'>
+                                <strong>Mensagem:</strong><br>
+                                " . nl2br(htmlspecialchars($solicitacao['mensagem'])) . "
+                            </div>
+                            " : "") . "
+                            " . ($solicitacao['prazo'] ? "<p><strong>Prazo sugerido:</strong> " . date('d/m/Y', strtotime($solicitacao['prazo'])) . "</p>" : "") . "
+                            <p style='text-align: center;'>
+                                <a href='{$link_solicitacao}' class='button'>Ver Solicitação</a>
+                            </p>
+                        </div>
+                        <div class='footer'>
+                            <p>Este é um email automático, por favor não responda.</p>
+                            <p>&copy; " . date('Y') . " RH Privus - Todos os direitos reservados</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            ";
+            
+            require_once __DIR__ . '/email.php';
+            return enviar_email($solicitacao['solicitado_email'], $assunto, $mensagem_html, [
+                'nome_destinatario' => $solicitacao['solicitado_nome']
+            ]);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Erro ao enviar email de solicitação de feedback: " . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Envia push de solicitação de feedback
+ */
+function enviar_push_solicitacao_feedback($solicitacao_id) {
+    try {
+        $pdo = getDB();
+        
+        // Busca dados da solicitação
+        $stmt = $pdo->prepare("
+            SELECT 
+                fs.*,
+                COALESCE(su.nome, sc.nome_completo) as solicitante_nome
+            FROM feedback_solicitacoes fs
+            LEFT JOIN usuarios su ON fs.solicitante_usuario_id = su.id
+            LEFT JOIN colaboradores sc ON fs.solicitante_colaborador_id = sc.id OR (fs.solicitante_usuario_id = su.id AND su.colaborador_id = sc.id)
+            WHERE fs.id = ?
+        ");
+        $stmt->execute([$solicitacao_id]);
+        $solicitacao = $stmt->fetch();
+        
+        if (!$solicitacao) {
+            return ['success' => false, 'message' => 'Solicitação não encontrada'];
+        }
+        
+        // Verifica preferência de notificação push
+        require_once __DIR__ . '/push_preferences.php';
+        
+        if (!verificar_preferencia_push($solicitacao['solicitado_usuario_id'], $solicitacao['solicitado_colaborador_id'], 'feedback_solicitacao')) {
+            return [
+                'success' => true, 
+                'enviadas' => 0,
+                'message' => 'Notificação push desativada pelo usuário'
+            ];
+        }
+        
+        $titulo = 'Nova Solicitação de Feedback';
+        $mensagem = $solicitacao['solicitante_nome'] . ' está pedindo que você envie um feedback';
+        $url = '../pages/feedback_solicitacoes.php?tipo=recebidas';
+        
+        if ($solicitacao['solicitado_usuario_id']) {
+            require_once __DIR__ . '/push_notifications.php';
+            return enviar_push_usuario($solicitacao['solicitado_usuario_id'], $titulo, $mensagem, $url);
+        } elseif ($solicitacao['solicitado_colaborador_id']) {
+            require_once __DIR__ . '/push_notifications.php';
+            return enviar_push_colaborador($solicitacao['solicitado_colaborador_id'], $titulo, $mensagem, $url);
+        }
+        
+        return ['success' => false, 'message' => 'Solicitado não identificado'];
+        
+    } catch (Exception $e) {
+        error_log("Erro ao enviar push de solicitação de feedback: " . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Notifica sobre resposta de solicitação (aceita/recusada)
+ */
+function notificar_resposta_solicitacao($solicitacao_id, $acao) {
+    try {
+        $pdo = getDB();
+        
+        // Busca dados da solicitação
+        $stmt = $pdo->prepare("
+            SELECT 
+                fs.*,
+                COALESCE(su.nome, sc.nome_completo) as solicitante_nome,
+                COALESCE(slu.nome, slc.nome_completo) as solicitado_nome,
+                COALESCE(su.email, sc.email_pessoal) as solicitante_email
+            FROM feedback_solicitacoes fs
+            LEFT JOIN usuarios su ON fs.solicitante_usuario_id = su.id
+            LEFT JOIN colaboradores sc ON fs.solicitante_colaborador_id = sc.id OR (fs.solicitante_usuario_id = su.id AND su.colaborador_id = sc.id)
+            LEFT JOIN usuarios slu ON fs.solicitado_usuario_id = slu.id
+            LEFT JOIN colaboradores slc ON fs.solicitado_colaborador_id = slc.id OR (fs.solicitado_usuario_id = slu.id AND slu.colaborador_id = slc.id)
+            WHERE fs.id = ?
+        ");
+        $stmt->execute([$solicitacao_id]);
+        $solicitacao = $stmt->fetch();
+        
+        if (!$solicitacao) {
+            return false;
+        }
+        
+        // 1. Cria notificação interna
+        $titulo = $acao === 'aceitar' ? 'Solicitação de Feedback Aceita' : 'Solicitação de Feedback Recusada';
+        $mensagem = $solicitacao['solicitado_nome'] . ($acao === 'aceitar' ? ' aceitou sua solicitação de feedback' : ' recusou sua solicitação de feedback');
+        $link = '../pages/feedback_solicitacoes.php?tipo=enviadas';
+        
+        criar_notificacao(
+            $solicitacao['solicitante_usuario_id'],
+            $solicitacao['solicitante_colaborador_id'],
+            'feedback_solicitacao_resposta',
+            $titulo,
+            $mensagem,
+            $link,
+            $solicitacao_id,
+            'feedback_solicitacao'
+        );
+        
+        // 2. Envia push notification
+        $titulo_push = $acao === 'aceitar' ? 'Solicitação Aceita!' : 'Solicitação Recusada';
+        $mensagem_push = $mensagem;
+        
+        if ($solicitacao['solicitante_usuario_id']) {
+            require_once __DIR__ . '/push_notifications.php';
+            enviar_push_usuario($solicitacao['solicitante_usuario_id'], $titulo_push, $mensagem_push, $link);
+        } elseif ($solicitacao['solicitante_colaborador_id']) {
+            require_once __DIR__ . '/push_notifications.php';
+            enviar_push_colaborador($solicitacao['solicitante_colaborador_id'], $titulo_push, $mensagem_push, $link);
+        }
+        
+        return true;
+        
+    } catch (Exception $e) {
+        error_log("Erro ao notificar resposta de solicitação: " . $e->getMessage());
+        return false;
+    }
+}
+
