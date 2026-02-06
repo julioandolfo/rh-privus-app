@@ -1177,6 +1177,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $e) {
             redirect('fechamento_pagamentos.php', 'Erro ao marcar como pago: ' . $e->getMessage(), 'error');
         }
+    } elseif ($action === 'reverter_pago') {
+        // Reverte fechamento de "pago" para "fechado"
+        $fechamento_id = (int)($_POST['fechamento_id'] ?? 0);
+        try {
+            // Verifica permissão
+            $stmt = $pdo->prepare("SELECT empresa_id, status FROM fechamentos_pagamento WHERE id = ?");
+            $stmt->execute([$fechamento_id]);
+            $fechamento = $stmt->fetch();
+            
+            if (!$fechamento) {
+                redirect('fechamento_pagamentos.php', 'Fechamento não encontrado!', 'error');
+            }
+            
+            if (!usuario_tem_permissao_empresa($usuario, $fechamento['empresa_id'])) {
+                redirect('fechamento_pagamentos.php', 'Você não tem permissão para alterar este fechamento!', 'error');
+            }
+            
+            // Só pode reverter se estiver como pago
+            if ($fechamento['status'] !== 'pago') {
+                redirect('fechamento_pagamentos.php', 'Apenas fechamentos com status "Pago" podem ser revertidos!', 'error');
+            }
+            
+            // Reverte para fechado
+            $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'fechado' WHERE id = ?");
+            $stmt->execute([$fechamento_id]);
+            
+            // Também desmarca todos os itens como não pagos
+            $stmt = $pdo->prepare("
+                UPDATE fechamentos_pagamento_itens 
+                SET pago = 0, data_pagamento_item = NULL, usuario_pagamento_id = NULL
+                WHERE fechamento_id = ?
+            ");
+            $stmt->execute([$fechamento_id]);
+            
+            redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento revertido para "Fechado" com sucesso!');
+        } catch (PDOException $e) {
+            redirect('fechamento_pagamentos.php', 'Erro ao reverter: ' . $e->getMessage(), 'error');
+        }
     } elseif ($action === 'marcar_item_pago') {
         // Marca um item individual como pago
         $item_id = (int)($_POST['item_id'] ?? 0);
@@ -2919,6 +2957,14 @@ require_once __DIR__ . '/../includes/header.php';
                         </i>
                         Reabrir Fechamento
                     </button>
+                    <?php elseif ($fechamento_view['status'] === 'pago'): ?>
+                    <button type="button" class="btn btn-warning me-2" onclick="reverterPago(<?= $fechamento_view['id'] ?>)">
+                        <i class="ki-duotone ki-arrow-circle-left fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Reverter para Fechado
+                    </button>
                     <?php endif; ?>
                     <div class="btn-group me-2">
                         <button type="button" class="btn btn-success" onclick="marcarTodosPagos(<?= $fechamento_view['id'] ?>, true)">
@@ -3810,6 +3856,13 @@ require_once __DIR__ . '/../includes/header.php';
                                 <?php if ($fechamento['status'] === 'fechado'): ?>
                                 <button type="button" class="btn btn-sm btn-light-success me-2" onclick="marcarComoPagoLista(<?= $fechamento['id'] ?>, '<?= date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')) ?>')" title="Marcar como Pago">
                                     <i class="ki-duotone ki-check-circle fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </button>
+                                <?php elseif ($fechamento['status'] === 'pago'): ?>
+                                <button type="button" class="btn btn-sm btn-light-warning me-2" onclick="reverterPagoLista(<?= $fechamento['id'] ?>, '<?= date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')) ?>')" title="Reverter para Fechado">
+                                    <i class="ki-duotone ki-arrow-circle-left fs-5">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
@@ -6814,6 +6867,56 @@ function marcarComoPagoLista(id, mesAno) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.innerHTML = '<input type="hidden" name="action" value="marcar_pago"><input type="hidden" name="fechamento_id" value="' + id + '">';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
+// Reverter de Pago para Fechado (a partir da listagem)
+function reverterPagoLista(id, mesAno) {
+    Swal.fire({
+        title: "Reverter para Fechado?",
+        text: 'O fechamento de ' + mesAno + ' voltará ao status "Fechado" e todos os itens serão desmarcados como pagos.',
+        icon: "warning",
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: "Sim, reverter!",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn fw-bold btn-warning",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then(function(result) {
+        if (result.value) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = '<input type="hidden" name="action" value="reverter_pago"><input type="hidden" name="fechamento_id" value="' + id + '">';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
+// Reverter de Pago para Fechado (dentro da visualização)
+function reverterPago(id) {
+    Swal.fire({
+        title: "Reverter para Fechado?",
+        text: 'O fechamento voltará ao status "Fechado" e todos os itens serão desmarcados como pagos.',
+        icon: "warning",
+        showCancelButton: true,
+        buttonsStyling: false,
+        confirmButtonText: "Sim, reverter!",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn fw-bold btn-warning",
+            cancelButton: "btn fw-bold btn-active-light-primary"
+        }
+    }).then(function(result) {
+        if (result.value) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = '<input type="hidden" name="action" value="reverter_pago"><input type="hidden" name="fechamento_id" value="' + id + '">';
             document.body.appendChild(form);
             form.submit();
         }
