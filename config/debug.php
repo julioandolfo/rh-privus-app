@@ -6,7 +6,7 @@
  */
 
 // Define se o modo debug está ativo
-define('DEBUG_MODE', false);
+define('DEBUG_MODE', true);
 
 if (DEBUG_MODE) {
     // Mostrar todos os erros

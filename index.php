@@ -6,10 +6,10 @@
 // IMPORTANTE: Garante que nenhum output seja enviado antes dos headers
 ob_start();
 
-// Configuração de erros
+// Configuração de erros - DEBUG MODE ATIVADO
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
-ini_set('display_startup_errors', 0);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 ini_set('log_errors', 1);
 
 // Carrega configuração de sessão ANTES de iniciar
