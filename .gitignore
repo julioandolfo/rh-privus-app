@@ -14,7 +14,7 @@ cache/*
 !cache/.gitkeep
 
 # Vendor (Composer)
-vendor/
+# vendor/ - COMENTADO: versionando vendor pois servidor não tem composer
 
 # Node modules
 node_modules/
