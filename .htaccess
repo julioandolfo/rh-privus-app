@@ -1,0 +1,43 @@
+# Configurações do Apache para o Sistema RH Privus
+
+# Habilitar display de erros PHP (modo debug)
+php_flag display_errors On
+php_flag display_startup_errors On
+php_value error_reporting E_ALL
+
+# Aumentar limites para processamento
+php_value max_execution_time 300
+php_value max_input_time 300
+php_value memory_limit 256M
+php_value post_max_size 100M
+php_value upload_max_filesize 100M
+
+# Configurações de segurança e performance
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Desabilitar listagem de diretórios
+Options -Indexes
+
+# Rewrite Engine (se necessário)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirecionar erro 500 para página customizada (comentado durante debug)
+    # ErrorDocument 500 /rh-privus/erro500.php
+</IfModule>
+
+# Proteger arquivos sensíveis
+<FilesMatch "\.(env|sql|log|bak)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Permitir acesso aos arquivos de teste durante debug
+<FilesMatch "test_debug\.php">
+    Order allow,deny
+    Allow from all
+</FilesMatch>

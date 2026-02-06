@@ -3,6 +3,11 @@
  * Funções Auxiliares do Sistema
  */
 
+// Carrega configuração de debug
+if (file_exists(__DIR__ . '/../config/debug.php')) {
+    require_once __DIR__ . '/../config/debug.php';
+}
+
 // Carrega o autoloader do Composer (apenas uma vez)
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
@@ -26,7 +31,18 @@ function getDB() {
             $pdo = new PDO($dsn, $config['username'], $config['password']);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         } catch (PDOException $e) {
+            if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                echo "<div style='background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;padding:15px;margin:10px;border-radius:5px;font-family:monospace;'>";
+                echo "<strong>[ERRO DE CONEXÃO COM BANCO DE DADOS]</strong><br>";
+                echo "Mensagem: " . $e->getMessage() . "<br>";
+                echo "Host: " . $config['host'] . "<br>";
+                echo "Database: " . $config['dbname'] . "<br>";
+                echo "Username: " . $config['username'] . "<br>";
+                echo "<pre style='margin-top:10px;background:#fff;padding:10px;border-radius:3px;overflow-x:auto;'>" . $e->getTraceAsString() . "</pre>";
+                echo "</div>";
+            }
             die('Erro ao conectar ao banco de dados: ' . $e->getMessage());
         }
     }
