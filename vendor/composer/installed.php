@@ -3,7 +3,7 @@
         'name' => 'rh-privus/rh-privus',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '6ca90dd148e39b02c0cd06eac68d26e6e0a83f67',
+        'reference' => 'f3f1247f44cbcd50312e74f69e8ea219df6d54de',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -130,7 +130,7 @@
         'rh-privus/rh-privus' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '6ca90dd148e39b02c0cd06eac68d26e6e0a83f67',
+            'reference' => 'f3f1247f44cbcd50312e74f69e8ea219df6d54de',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
