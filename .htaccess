@@ -1,9 +1,8 @@
 # Configurações do Apache para o Sistema RH Privus
 
-# Display de erros PHP (debug habilitado)
-php_flag display_errors On
-php_flag display_startup_errors On
-php_value error_reporting E_ALL
+# Display de erros PHP (debug desabilitado)
+php_flag display_errors Off
+php_flag display_startup_errors Off
 
 # Aumentar limites para processamento
 php_value max_execution_time 300

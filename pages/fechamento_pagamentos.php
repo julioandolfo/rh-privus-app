@@ -6513,12 +6513,16 @@ function marcarItemPago(checkbox) {
                     toast: true,
                     position: 'top-end',
                     showConfirmButton: false,
-                    timer: 2000,
-                    timerProgressBar: true
+                    timer: 2500,
+                    timerProgressBar: true,
+                    customClass: {
+                        popup: 'colored-toast'
+                    }
                 });
                 Toast.fire({
                     icon: 'success',
-                    title: (pago ? 'Marcado como pago: ' : 'Desmarcado: ') + colaborador
+                    title: pago ? 'Pago' : 'Pendente',
+                    text: colaborador
                 });
             }
             
