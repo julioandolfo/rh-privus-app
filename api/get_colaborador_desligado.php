@@ -122,17 +122,31 @@ if ($colaborador['tipo_contrato'] === 'CLT' && $colaborador['data_inicio'] && $d
 }
 
 // Calcula saldo de salário (dias não pagos)
-// Verifica o último fechamento pago para este colaborador
+// Considera a data de admissão se for no mesmo mês do desligamento
 $saldo_salario_dias = 0;
 $valor_saldo_salario = 0;
 
-if ($data_desligamento) {
+if ($data_desligamento && $colaborador['data_inicio']) {
     $data_saida = new DateTime($data_desligamento);
-    $dia_desligamento = (int)$data_saida->format('d');
+    $data_admissao = new DateTime($colaborador['data_inicio']);
     
-    // Assume que foi pago até o dia do desligamento
-    // Isso pode ser ajustado conforme a política da empresa
-    $saldo_salario_dias = $dia_desligamento;
+    $dia_desligamento = (int)$data_saida->format('d');
+    $dia_admissao = (int)$data_admissao->format('d');
+    
+    // Verifica se admissão e desligamento são no mesmo mês/ano
+    $mesmo_mes = ($data_admissao->format('Y-m') === $data_saida->format('Y-m'));
+    
+    if ($mesmo_mes) {
+        // Se admissão e desligamento no mesmo mês, conta os dias entre eles
+        // +1 porque conta o dia de admissão e o dia de desligamento
+        $saldo_salario_dias = $dia_desligamento - $dia_admissao + 1;
+    } else {
+        // Se meses diferentes, conta do início do mês até o desligamento
+        $saldo_salario_dias = $dia_desligamento;
+    }
+    
+    // Garante que não seja negativo
+    $saldo_salario_dias = max(0, $saldo_salario_dias);
     
     $salario = (float)($colaborador['salario'] ?? 0);
     if ($salario > 0) {
