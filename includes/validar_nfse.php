@@ -6,6 +6,11 @@
  * Compatível com servidores sem bibliotecas externas (cPanel, etc)
  */
 
+// DEBUG - Ativar exibição de erros
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 /**
  * Extrai texto de um arquivo PDF
  * Tenta múltiplos métodos em ordem de preferência
