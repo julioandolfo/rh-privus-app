@@ -7060,7 +7060,7 @@ function verDocumentoAdmin(fechamentoId, itemId) {
                 } else if (isPdf) {
                     // PDF - exibe no iframe com visualizador nativo do navegador
                     html = infoHtml;
-                    html += '<div class="border rounded overflow-hidden" style="height: 500px;">';
+                    html += '<div class="border rounded overflow-hidden" style="height: 75vh; min-height: 600px;">';
                     html += '<iframe src="../' + doc.documento_anexo + '#toolbar=1&navpanes=0" width="100%" height="100%" style="border: none;"></iframe>';
                     html += '</div>';
                     html += '<div class="text-center mt-3"><small class="text-muted">Se o PDF não carregar, clique em "Abrir em Nova Aba"</small></div>';

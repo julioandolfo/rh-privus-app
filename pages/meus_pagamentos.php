@@ -1711,7 +1711,7 @@ function verDocumento(fechamentoId, itemId) {
                     container.innerHTML = `
                         ${statusHtml}
                         ${obsHtml}
-                        <div class="border rounded overflow-hidden" style="height: 500px;">
+                        <div class="border rounded overflow-hidden" style="height: 75vh; min-height: 600px;">
                             <iframe src="../${doc.documento_anexo}#toolbar=1&navpanes=0" width="100%" height="100%" style="border: none;"></iframe>
                         </div>
                         <div class="text-center mt-2">
