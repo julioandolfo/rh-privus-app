@@ -47,6 +47,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             require_once __DIR__ . '/../includes/email_templates.php';
             enviar_email_nova_promocao($promocao_id);
             
+            // Envia notificação push para o colaborador
+            require_once __DIR__ . '/../includes/push_notifications.php';
+            $push_result = enviar_push_colaborador(
+                $colaborador_id,
+                'Parabéns pela Promoção! 🎉',
+                'Você recebeu uma promoção. Confira os detalhes agora!',
+                'pages/colaborador_view.php?id=' . $colaborador_id
+            );
+            
             redirect('promocoes.php', 'Promoção registrada com sucesso!');
         } catch (PDOException $e) {
             redirect('promocoes.php', 'Erro ao salvar: ' . $e->getMessage(), 'error');
