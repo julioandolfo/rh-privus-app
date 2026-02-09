@@ -32,7 +32,16 @@ $template_id = intval($_GET['template_id'] ?? $input['template_id'] ?? 0);
 
 if ($colaborador_id <= 0) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'ID do colaborador inválido']);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'ID do colaborador inválido',
+        'debug' => [
+            'GET' => $_GET,
+            'input_colaborador_id' => $input['colaborador_id'] ?? 'nao_definido',
+            'raw_input_length' => strlen($raw_input),
+            'raw_input_preview' => substr($raw_input, 0, 200)
+        ]
+    ]);
     exit;
 }
 
