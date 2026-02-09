@@ -18,7 +18,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'add') {
-        $colaborador_id = (int)($_POST['colaborador_id'] ?? 0);
+        // Extrai ID do colaborador (formato pode ser 'c_123' ou '123')
+        $colaborador_id_raw = $_POST['colaborador_id'] ?? '';
+        if (strpos($colaborador_id_raw, 'c_') === 0) {
+            $colaborador_id = (int)substr($colaborador_id_raw, 2); // Remove 'c_' e converte para int
+        } else {
+            $colaborador_id = (int)$colaborador_id_raw;
+        }
+        
         $salario_anterior = str_replace(['.', ','], ['', '.'], $_POST['salario_anterior'] ?? '0');
         $salario_novo = str_replace(['.', ','], ['', '.'], $_POST['salario_novo'] ?? '0');
         $motivo = sanitize($_POST['motivo'] ?? '');
@@ -139,8 +146,15 @@ $colaboradores_raw = get_colaboradores_disponiveis($pdo, $usuario);
 // Adiciona dados extras necessários (salario, empresa_id)
 $colaboradores = [];
 foreach ($colaboradores_raw as $colab) {
+    // A função retorna IDs no formato 'c_123' ou 'u_456', então precisamos extrair o ID real
+    // Para promoções, só usamos colaboradores (tipo 'c_')
+    if ($colab['tipo'] !== 'colaborador' || empty($colab['colaborador_id'])) {
+        continue; // Pula usuários sem colaborador vinculado
+    }
+    
+    $colaborador_id = $colab['colaborador_id'];
     $stmt = $pdo->prepare("SELECT salario, empresa_id FROM colaboradores WHERE id = ?");
-    $stmt->execute([$colab['id']]);
+    $stmt->execute([$colaborador_id]);
     $colab_data = $stmt->fetch();
     if ($colab_data) {
         $colaboradores[] = array_merge($colab, [
@@ -308,7 +322,12 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="path2"></span>
                                     <span class="path3"></span>
                                 </i>
-                                <strong>Atenção:</strong> Nenhum colaborador encontrado.
+                                <strong>Atenção:</strong> Nenhum colaborador ativo encontrado.
+                                <?php if ($usuario['role'] === 'RH'): ?>
+                                    <br><small>Verifique se há colaboradores ativos cadastrados na(s) empresa(s): <?= htmlspecialchars($usuario['empresa_nome'] ?? 'N/A') ?></small>
+                                <?php elseif ($usuario['role'] === 'GESTOR'): ?>
+                                    <br><small>Verifique se há colaboradores ativos no seu setor.</small>
+                                <?php endif; ?>
                             </div>
                             <?php else: ?>
                             <small class="text-muted"><?= count($colaboradores) ?> colaborador(es) disponível(is)</small>
