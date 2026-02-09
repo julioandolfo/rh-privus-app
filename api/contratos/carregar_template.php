@@ -16,7 +16,8 @@ if (!isset($_SESSION['usuario'])) {
 }
 
 $template_id = intval($_GET['template_id'] ?? 0);
-$colaborador_id = intval($_GET['colaborador_id'] ?? 0);
+$raw_colab_id = $_GET['colaborador_id'] ?? '0';
+$colaborador_id = intval(preg_replace('/^[cu]_/', '', $raw_colab_id));
 
 if ($template_id <= 0) {
     http_response_code(400);

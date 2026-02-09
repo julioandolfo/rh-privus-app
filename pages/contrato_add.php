@@ -79,7 +79,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     log_contrato("POST incluir_representante: " . ($_POST['incluir_representante'] ?? 'NAO DEFINIDO'));
     log_contrato("POST representante: " . json_encode($_POST['representante'] ?? []));
     
-    $colaborador_id = intval($_POST['colaborador_id'] ?? 0);
+    // O select de colaborador retorna IDs no formato "c_45" ou "u_12"
+    // Extrai apenas o número
+    $raw_colaborador_id = $_POST['colaborador_id'] ?? '0';
+    $colaborador_id = intval(preg_replace('/^[cu]_/', '', $raw_colaborador_id));
+    
+    log_contrato("POST colaborador_id raw: $raw_colaborador_id => parsed: $colaborador_id");
+    
     $template_id = intval($_POST['template_id'] ?? 0);
     $titulo = trim($_POST['titulo'] ?? '');
     $descricao_funcao = trim($_POST['descricao_funcao'] ?? '');
@@ -837,15 +843,24 @@ document.getElementById('template_id')?.addEventListener('change', function() {
 });
 
 // Helper para obter o valor do colaborador (compatível com Select2)
+// O select retorna IDs no formato "c_45" (colaborador) ou "u_12" (usuário)
+// Esta função extrai apenas o número
 function getColaboradorId() {
+    let val = '';
     // Tenta via jQuery/Select2 primeiro
     if (typeof jQuery !== 'undefined' && jQuery('#colaborador_id').length) {
-        const val = jQuery('#colaborador_id').val();
-        if (val) return val;
+        val = jQuery('#colaborador_id').val() || '';
     }
     // Fallback para vanilla JS
-    const el = document.getElementById('colaborador_id');
-    return el ? el.value : '';
+    if (!val) {
+        const el = document.getElementById('colaborador_id');
+        val = el ? el.value : '';
+    }
+    // Remove prefixo c_ ou u_ se existir
+    if (val && typeof val === 'string') {
+        val = val.replace(/^[cu]_/, '');
+    }
+    return val;
 }
 
 // Função para buscar dados do colaborador e preencher descrição da função
