@@ -836,17 +836,31 @@ document.getElementById('template_id')?.addEventListener('change', function() {
     }
 });
 
+// Helper para obter o valor do colaborador (compatível com Select2)
+function getColaboradorId() {
+    // Tenta via jQuery/Select2 primeiro
+    if (typeof jQuery !== 'undefined' && jQuery('#colaborador_id').length) {
+        const val = jQuery('#colaborador_id').val();
+        if (val) return val;
+    }
+    // Fallback para vanilla JS
+    const el = document.getElementById('colaborador_id');
+    return el ? el.value : '';
+}
+
 // Função para buscar dados do colaborador e preencher descrição da função
 function buscarDadosColaborador(colaboradorId) {
     if (!colaboradorId) return;
     
     // Faz uma requisição simples para buscar dados do colaborador
-    fetch(`../api/contratos/preview.php?colaborador_id=${colaboradorId}&template_id=0`, {
+    fetch(`../api/contratos/preview.php?colaborador_id=${encodeURIComponent(colaboradorId)}&template_id=0`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+            colaborador_id: colaboradorId,
+            template_id: 0,
             titulo: '',
             descricao_funcao: '',
             data_criacao: '',
@@ -876,16 +890,25 @@ function buscarDadosColaborador(colaboradorId) {
 // Listener para Select2 (quando usar Select2)
 if (typeof jQuery !== 'undefined') {
     jQuery(document).on('select2:select', '#colaborador_id', function() {
-        const colaboradorId = this.value;
+        const colaboradorId = jQuery(this).val();
         buscarDadosColaborador(colaboradorId);
         atualizarPreview();
+    });
+    
+    // Também captura quando limpar Select2
+    jQuery(document).on('select2:clear', '#colaborador_id', function() {
+        document.getElementById('preview_contrato').innerHTML = '<p class="text-muted text-center py-10">Selecione um colaborador</p>';
+        atualizarCamposFaltantes([]);
     });
 }
 
 // Listener padrão também (fallback)
 document.getElementById('colaborador_id')?.addEventListener('change', function() {
-    buscarDadosColaborador(this.value);
-    atualizarPreview();
+    const colaboradorId = getColaboradorId();
+    if (colaboradorId) {
+        buscarDadosColaborador(colaboradorId);
+        atualizarPreview();
+    }
 });
 
 // Coleta campos manuais preenchidos
@@ -1009,7 +1032,7 @@ function atualizarCamposFaltantes(campos) {
 }
 
 function atualizarPreview() {
-    const colaboradorId = document.getElementById('colaborador_id').value;
+    const colaboradorId = getColaboradorId();
     const templateId = document.getElementById('template_id').value;
     const titulo = document.querySelector('[name="titulo"]').value;
     const descricaoFuncao = document.querySelector('[name="descricao_funcao"]').value;
@@ -1036,12 +1059,14 @@ function atualizarPreview() {
     // Coleta campos manuais
     const camposManuais = coletarCamposManuais();
     
-    fetch(`../api/contratos/preview.php?colaborador_id=${colaboradorId}&template_id=${templateId}`, {
+    fetch(`../api/contratos/preview.php?colaborador_id=${encodeURIComponent(colaboradorId)}&template_id=${encodeURIComponent(templateId)}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+            colaborador_id: colaboradorId,
+            template_id: templateId,
             titulo: titulo,
             descricao_funcao: descricaoFuncao,
             data_criacao: dataCriacao,
@@ -1160,6 +1185,25 @@ document.getElementById('form_contrato')?.addEventListener('submit', function(e)
         submitBtn.disabled = true;
     }
 });
+
+// Auto-trigger preview se já tem colaborador e template selecionados ao carregar a página
+(function autoTriggerPreview() {
+    function tentarPreview() {
+        const colaboradorId = getColaboradorId();
+        const templateId = document.getElementById('template_id')?.value;
+        
+        if (colaboradorId && templateId) {
+            atualizarPreview();
+        }
+    }
+    
+    // Tenta imediatamente
+    tentarPreview();
+    
+    // Tenta novamente após Select2 inicializar (pode demorar)
+    setTimeout(tentarPreview, 500);
+    setTimeout(tentarPreview, 1500);
+})();
 
 </script>
 

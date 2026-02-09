@@ -20,8 +20,15 @@ if (!isset($_SESSION['usuario'])) {
     exit;
 }
 
-$colaborador_id = intval($_GET['colaborador_id'] ?? 0);
-$template_id = intval($_GET['template_id'] ?? 0);
+// Lê body JSON uma única vez
+$raw_input = file_get_contents('php://input');
+$input = json_decode($raw_input, true);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    $input = [];
+}
+
+$colaborador_id = intval($_GET['colaborador_id'] ?? $input['colaborador_id'] ?? 0);
+$template_id = intval($_GET['template_id'] ?? $input['template_id'] ?? 0);
 
 if ($colaborador_id <= 0) {
     http_response_code(400);
@@ -36,12 +43,6 @@ try {
     $colaborador = buscar_dados_colaborador_completos($colaborador_id);
     if (!$colaborador) {
         throw new Exception('Colaborador não encontrado');
-    }
-    
-    // Lê dados do POST uma única vez
-    $input = json_decode(file_get_contents('php://input'), true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $input = [];
     }
     
     // Busca template ou usa conteúdo customizado
