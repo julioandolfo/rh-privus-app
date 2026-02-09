@@ -405,10 +405,8 @@ function gerenciar_saldo_dinheiro($colaborador_id, $valor, $descricao, $usuario_
         $saldo_anterior = obter_saldo_dinheiro($colaborador_id);
         $saldo_posterior = $saldo_anterior + $valor;
         
-        // Verifica se terá saldo negativo (não permitido para débitos)
-        if ($saldo_posterior < 0) {
-            return ['success' => false, 'message' => 'Saldo insuficiente. Saldo atual: R$ ' . number_format($saldo_anterior, 2, ',', '.')];
-        }
+        // Saldo negativo é permitido (adiantamentos, produtos da empresa, etc.)
+        // Será descontado no fechamento de pagamentos
         
         $pdo->beginTransaction();
         

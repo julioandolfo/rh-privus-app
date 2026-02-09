@@ -360,10 +360,16 @@ $_foto_perfil_url = get_foto_perfil($_foto_perfil_path, $usuario['nome']);
                             </div>
                             <!--end::Pontos-->
                             <!--begin::Saldo R$-->
+                            <?php 
+                            $_saldo_negativo = ($_header_saldo_dinheiro ?? 0) < 0;
+                            $_cor_btn_saldo = $_saldo_negativo ? 'btn-light-danger' : 'btn-light-success';
+                            $_cor_icone_saldo = $_saldo_negativo ? 'text-danger' : 'text-success';
+                            $_titulo_saldo = $_saldo_negativo ? 'Débito a descontar no fechamento' : 'Seu saldo em créditos R$';
+                            ?>
                             <div class="d-flex align-items-center ms-1 ms-lg-2">
                                 <!--begin::Saldo Badge-->
-                                <a href="loja.php" class="btn btn-sm btn-light-success d-flex align-items-center gap-2 px-3 py-2" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Seu saldo em créditos R$">
-                                    <i class="ki-duotone ki-dollar fs-3 text-success">
+                                <a href="loja.php" class="btn btn-sm <?= $_cor_btn_saldo ?> d-flex align-items-center gap-2 px-3 py-2" data-bs-toggle="tooltip" data-bs-placement="bottom" title="<?= $_titulo_saldo ?>">
+                                    <i class="ki-duotone ki-dollar fs-3 <?= $_cor_icone_saldo ?>">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                         <span class="path3"></span>

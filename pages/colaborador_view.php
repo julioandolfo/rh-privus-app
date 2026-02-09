@@ -1813,7 +1813,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
-                                    <span class="d-none d-md-inline">Remover</span> R$
+                                    <span class="d-none d-md-inline">Débito</span> R$
                                 </button>
                             </div>
                         </div>
@@ -1877,12 +1877,19 @@ require_once __DIR__ . '/../includes/header.php';
                                 </div>
                             </div>
                             <div class="col-12 col-md-8 col-xl-4">
-                                <div class="card card-flush h-100" style="background: linear-gradient(135deg, #1e7e34 0%, #28a745 100%);">
+                                <?php 
+                                $saldo_negativo = $saldo_dinheiro < 0;
+                                $cor_saldo = $saldo_negativo 
+                                    ? 'background: linear-gradient(135deg, #c82333 0%, #dc3545 100%);' 
+                                    : 'background: linear-gradient(135deg, #1e7e34 0%, #28a745 100%);';
+                                $texto_saldo = $saldo_negativo ? 'Débito a descontar no fechamento' : 'Disponível para uso na loja';
+                                ?>
+                                <div class="card card-flush h-100" style="<?= $cor_saldo ?>">
                                     <div class="card-body d-flex align-items-center justify-content-between p-4">
                                         <div>
                                             <div class="text-white opacity-75 fs-7 mb-1">Saldo em Créditos</div>
                                             <div class="fs-2hx fw-bold text-white" id="saldo_dinheiro_display">R$ <?= number_format($saldo_dinheiro, 2, ',', '.') ?></div>
-                                            <div class="text-white opacity-75 fs-8 mt-1">Disponível para uso na loja</div>
+                                            <div class="text-white opacity-75 fs-8 mt-1"><?= $texto_saldo ?></div>
                                         </div>
                                         <div class="d-flex flex-column align-items-center">
                                             <i class="ki-duotone ki-dollar fs-4x text-white opacity-50">
@@ -2355,7 +2362,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <span class="path2"></span>
                         <span class="path3"></span>
                     </i>
-                    Remover Créditos (R$)
+                    Débito / Adiantamento (R$)
                 </h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
@@ -2376,8 +2383,11 @@ require_once __DIR__ . '/../includes/header.php';
                             <span class="path3"></span>
                         </i>
                         <div class="d-flex flex-column">
-                            <span class="fw-semibold text-gray-800">Remover créditos em R$</span>
-                            <span class="text-gray-600 fs-7">Use para correções ou ajustes necessários.</span>
+                            <span class="fw-semibold text-gray-800">Débito / Adiantamento / Remover créditos</span>
+                            <span class="text-gray-600 fs-7">
+                                Use para adiantamentos, produtos retirados da empresa, ou correções.
+                                <br><strong>O saldo pode ficar negativo</strong> e será descontado automaticamente no fechamento de pagamento.
+                            </span>
                         </div>
                     </div>
                     

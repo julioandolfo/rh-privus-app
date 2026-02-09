@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/pontuacao.php';
 
 header('Content-Type: text/html; charset=utf-8');
 
@@ -517,6 +518,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Adiciona adiantamentos aos descontos (apenas os do mês de referência)
                 $total_descontos_ocorrencias += $total_adiantamentos;
                 
+                // Verifica saldo negativo em R$ do colaborador (adiantamentos, produtos da empresa, etc.)
+                $saldo_dinheiro_colaborador = obter_saldo_dinheiro($colab_id);
+                $desconto_saldo_negativo = 0;
+                if ($saldo_dinheiro_colaborador < 0) {
+                    // Saldo negativo = valor a ser descontado
+                    $desconto_saldo_negativo = abs($saldo_dinheiro_colaborador);
+                    $total_descontos_ocorrencias += $desconto_saldo_negativo;
+                }
+                
                 // Insere bônus no fechamento (incluindo informativos para registro)
                 foreach ($bonus_list_calc as $bonus) {
                     $tipo_valor = $bonus['tipo_valor'] ?? 'variavel';
@@ -719,6 +729,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ");
                     $params = array_merge([$fechamento_id], $adiantamentos_ids);
                     $stmt->execute($params);
+                }
+                
+                // Zera saldo negativo do colaborador (após desconto no fechamento)
+                if ($desconto_saldo_negativo > 0) {
+                    gerenciar_saldo_dinheiro(
+                        $colab_id,
+                        $desconto_saldo_negativo, // Valor positivo para zerar o negativo
+                        "Desconto aplicado no fechamento de pagamento #{$fechamento_id} - Ref: {$mes_referencia}",
+                        $usuario['id'],
+                        'fechamento_pagamento',
+                        $fechamento_id
+                    );
                 }
                 
                 // Marca horas extras como pagas neste fechamento

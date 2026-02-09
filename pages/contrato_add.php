@@ -179,7 +179,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $contrato_id = $pdo->lastInsertId();
         
-        // Salva testemunhas (mesmo em rascunho)
+        // Salva TODOS os signatários (colaborador, representante e testemunhas)
+        $ordem = 0;
+        
+        // Colaborador (sempre)
+        $stmt = $pdo->prepare("
+            INSERT INTO contratos_signatarios 
+            (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+            VALUES (?, 'colaborador', ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $contrato_id,
+            $colaborador['nome_completo'] ?? 'Nome não informado',
+            $colaborador['email_pessoal'] ?? '',
+            formatar_cpf($colaborador['cpf'] ?? ''),
+            $ordem++
+        ]);
+        
+        // Representante da empresa (se habilitado)
+        $representante = $_POST['representante'] ?? [];
+        $incluir_representante = isset($_POST['incluir_representante']) && $_POST['incluir_representante'] === '1';
+        
+        if ($incluir_representante && !empty($representante['email'])) {
+            $stmt = $pdo->prepare("
+                INSERT INTO contratos_signatarios 
+                (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                VALUES (?, 'representante', ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $contrato_id,
+                $representante['nome'] ?? '',
+                $representante['email'],
+                formatar_cpf($representante['cpf'] ?? ''),
+                $ordem++
+            ]);
+        }
+        
+        // Testemunhas
         $testemunhas = $_POST['testemunhas'] ?? [];
         foreach ($testemunhas as $index => $testemunha) {
             if (!empty($testemunha['email'])) {
@@ -193,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $testemunha['nome'] ?? '',
                     $testemunha['email'],
                     formatar_cpf($testemunha['cpf'] ?? ''),
-                    $index + 1
+                    $ordem++
                 ]);
             }
         }
