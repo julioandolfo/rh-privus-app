@@ -216,16 +216,32 @@ function enviar_push_feedback_recebido($feedback_id, $destinatario_usuario_id, $
             ];
         }
         
-        $titulo = 'Novo Feedback Recebido';
+        $titulo = 'Novo Feedback Recebido 💬';
         $mensagem = $anonimo ? 'Você recebeu um feedback anônimo' : "$remetente_nome enviou um feedback para você";
-        $url = '../pages/feedback_meus.php?tipo=recebidos';
+        $url = 'pages/feedback_meus.php?tipo=recebidos';
         
         if ($destinatario_usuario_id) {
             require_once __DIR__ . '/push_notifications.php';
-            return enviar_push_usuario($destinatario_usuario_id, $titulo, $mensagem, $url);
+            return enviar_push_usuario(
+                $destinatario_usuario_id,
+                $titulo,
+                $mensagem,
+                $url,
+                'feedback',
+                $feedback_id,
+                'feedback'
+            );
         } elseif ($destinatario_colaborador_id) {
             require_once __DIR__ . '/push_notifications.php';
-            return enviar_push_colaborador($destinatario_colaborador_id, $titulo, $mensagem, $url);
+            return enviar_push_colaborador(
+                $destinatario_colaborador_id,
+                $titulo,
+                $mensagem,
+                $url,
+                'feedback',
+                $feedback_id,
+                'feedback'
+            );
         }
         
         return ['success' => false, 'message' => 'Destinatário não identificado'];
@@ -485,16 +501,32 @@ function enviar_push_solicitacao_feedback($solicitacao_id) {
             ];
         }
         
-        $titulo = 'Nova Solicitação de Feedback';
+        $titulo = 'Nova Solicitação de Feedback 💭';
         $mensagem = $solicitacao['solicitante_nome'] . ' está pedindo que você envie um feedback';
-        $url = '../pages/feedback_solicitacoes.php?tipo=recebidas';
+        $url = 'pages/feedback_solicitacoes.php?tipo=recebidas';
         
         if ($solicitacao['solicitado_usuario_id']) {
             require_once __DIR__ . '/push_notifications.php';
-            return enviar_push_usuario($solicitacao['solicitado_usuario_id'], $titulo, $mensagem, $url);
+            return enviar_push_usuario(
+                $solicitacao['solicitado_usuario_id'],
+                $titulo,
+                $mensagem,
+                $url,
+                'feedback',
+                $solicitacao_id,
+                'feedback_solicitacao'
+            );
         } elseif ($solicitacao['solicitado_colaborador_id']) {
             require_once __DIR__ . '/push_notifications.php';
-            return enviar_push_colaborador($solicitacao['solicitado_colaborador_id'], $titulo, $mensagem, $url);
+            return enviar_push_colaborador(
+                $solicitacao['solicitado_colaborador_id'],
+                $titulo,
+                $mensagem,
+                $url,
+                'feedback',
+                $solicitacao_id,
+                'feedback_solicitacao'
+            );
         }
         
         return ['success' => false, 'message' => 'Solicitado não identificado'];
@@ -550,15 +582,33 @@ function notificar_resposta_solicitacao($solicitacao_id, $acao) {
         );
         
         // 2. Envia push notification
-        $titulo_push = $acao === 'aceitar' ? 'Solicitação Aceita!' : 'Solicitação Recusada';
+        $emoji = $acao === 'aceitar' ? '✅' : '❌';
+        $titulo_push = $acao === 'aceitar' ? 'Solicitação Aceita! ' . $emoji : 'Solicitação Recusada ' . $emoji;
         $mensagem_push = $mensagem;
+        $link_push = 'pages/feedback_solicitacoes.php?tipo=enviadas';
         
         if ($solicitacao['solicitante_usuario_id']) {
             require_once __DIR__ . '/push_notifications.php';
-            enviar_push_usuario($solicitacao['solicitante_usuario_id'], $titulo_push, $mensagem_push, $link);
+            enviar_push_usuario(
+                $solicitacao['solicitante_usuario_id'],
+                $titulo_push,
+                $mensagem_push,
+                $link_push,
+                'feedback',
+                $solicitacao_id,
+                'feedback_resposta'
+            );
         } elseif ($solicitacao['solicitante_colaborador_id']) {
             require_once __DIR__ . '/push_notifications.php';
-            enviar_push_colaborador($solicitacao['solicitante_colaborador_id'], $titulo_push, $mensagem_push, $link);
+            enviar_push_colaborador(
+                $solicitacao['solicitante_colaborador_id'],
+                $titulo_push,
+                $mensagem_push,
+                $link_push,
+                'feedback',
+                $solicitacao_id,
+                'feedback_resposta'
+            );
         }
         
         return true;

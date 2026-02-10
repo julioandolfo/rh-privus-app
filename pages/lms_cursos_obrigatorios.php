@@ -31,6 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         try {
+            // Busca título do curso para notificação
+            $stmt_curso = $pdo->prepare("SELECT titulo FROM lms_cursos WHERE id = ?");
+            $stmt_curso->execute([$curso_id]);
+            $curso = $stmt_curso->fetch();
+            $titulo_curso = $curso['titulo'] ?? 'Curso';
+            
             $atribuidos = 0;
             $erros = 0;
             foreach ($colaborador_ids as $colab_id) {
@@ -56,7 +62,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             VALUES (?, ?, ?, CURDATE(), ?, 'pendente')
                         ");
                         $stmt->execute([$curso_id, $colab_id, $usuario['id'], $data_limite_final]);
+                        $atribuicao_id = $pdo->lastInsertId();
                         $atribuidos++;
+                        
+                        // Envia push notification
+                        require_once __DIR__ . '/../includes/push_notifications.php';
+                        try {
+                            $prazo_texto = $data_limite_final ? ' Prazo: ' . date('d/m/Y', strtotime($data_limite_final)) : '';
+                            enviar_push_colaborador(
+                                $colab_id,
+                                'Novo Curso Atribuído 📚',
+                                'O curso "' . $titulo_curso . '" foi atribuído para você.' . $prazo_texto,
+                                'pages/lms_meus_cursos.php',
+                                'curso',
+                                $atribuicao_id,
+                                'lms_atribuicao'
+                            );
+                        } catch (Exception $e) {
+                            error_log("Erro ao enviar push de curso: " . $e->getMessage());
+                        }
                     } else {
                         $erros++;
                     }

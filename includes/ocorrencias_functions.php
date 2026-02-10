@@ -438,13 +438,16 @@ function enviar_notificacoes_ocorrencia($ocorrencia_id) {
         // Push notification para colaborador
         if ($ocorrencia['notificar_colaborador_push']) {
             try {
-                if ($usuario_colab && $usuario_colab['id']) {
-                    // Se tem usuário vinculado, envia por usuario_id
-                    enviar_push_usuario($usuario_colab['id'], $titulo_colaborador, $mensagem_colaborador, $link_ocorrencia);
-                } else {
-                    // Se não tem usuário, envia por colaborador_id
-                    enviar_push_colaborador($ocorrencia['colaborador_id'], $titulo_colaborador, $mensagem_colaborador, $link_ocorrencia);
-                }
+                // Envia push com novo sistema (login automático e detalhes)
+                enviar_push_colaborador(
+                    $ocorrencia['colaborador_id'],
+                    $titulo_colaborador . ' ⚠️',
+                    $mensagem_colaborador . ' Clique para ver os detalhes.',
+                    $link_ocorrencia_relativo,
+                    'ocorrencia',
+                    $ocorrencia_id,
+                    'ocorrencia'
+                );
             } catch (Exception $e) {
                 error_log("Erro ao enviar push para colaborador: " . $e->getMessage());
             }

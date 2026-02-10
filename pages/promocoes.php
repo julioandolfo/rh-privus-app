@@ -59,8 +59,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $push_result = enviar_push_colaborador(
                 $colaborador_id,
                 'Parabéns pela Promoção! 🎉',
-                'Você recebeu uma promoção. Confira os detalhes agora!',
-                'pages/colaborador_view.php?id=' . $colaborador_id
+                'Você recebeu uma promoção. Seu novo salário é R$ ' . number_format($salario_novo, 2, ',', '.') . '. Confira os detalhes agora!',
+                'pages/promocoes.php', // URL original para referência
+                'promocao', // Tipo da notificação
+                $promocao_id, // ID da promoção
+                'promocao' // Tipo da referência
             );
             
             redirect('promocoes.php', 'Promoção registrada com sucesso!');

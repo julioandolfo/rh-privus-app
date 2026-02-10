@@ -324,18 +324,34 @@ document.addEventListener('DOMContentLoaded', function() {
                         window.processarRespostaPontos(data, 'responder_solicitacao_feedback');
                     }
                     
-                    Swal.fire({
-                        text: data.message,
-                        icon: "success",
-                        buttonsStyling: false,
-                        confirmButtonText: "Ok",
-                        customClass: {
-                            confirmButton: "btn btn-primary"
-                        }
-                    }).then(function() {
-                        bootstrap.Modal.getInstance(document.getElementById('modal_responder')).hide();
-                        carregarSolicitacoes();
-                    });
+                    // Se tiver redirect (aceitar solicitação), redireciona após o SweetAlert
+                    if (data.redirect) {
+                        Swal.fire({
+                            text: data.message,
+                            icon: "success",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok, enviar feedback agora",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        }).then(function() {
+                            window.location.href = data.redirect;
+                        });
+                    } else {
+                        // Apenas recarrega a lista se não tiver redirect (recusar solicitação)
+                        Swal.fire({
+                            text: data.message,
+                            icon: "success",
+                            buttonsStyling: false,
+                            confirmButtonText: "Ok",
+                            customClass: {
+                                confirmButton: "btn btn-primary"
+                            }
+                        }).then(function() {
+                            bootstrap.Modal.getInstance(document.getElementById('modal_responder')).hide();
+                            carregarSolicitacoes();
+                        });
+                    }
                 } else {
                     Swal.fire({
                         text: data.message,

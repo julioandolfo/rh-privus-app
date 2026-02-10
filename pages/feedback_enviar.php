@@ -581,6 +581,62 @@ document.addEventListener('DOMContentLoaded', function() {
 </style>
 <!--end::Scripts-->
 
+<!--begin::Script para pré-selecionar destinatário de solicitação-->
+<?php if (!empty($destinatario_pre_selecionado)): ?>
+<script>
+// Garante que o destinatário seja selecionado quando vier de uma solicitação aceita
+document.addEventListener('DOMContentLoaded', function() {
+    var destinatarioId = <?= json_encode($destinatario_pre_selecionado) ?>;
+    
+    if (destinatarioId) {
+        console.log('📋 Pré-selecionando destinatário da solicitação:', destinatarioId);
+        
+        // Função para tentar selecionar o destinatário
+        function trySelectDestinatario() {
+            // Verifica se jQuery e Select2 estão disponíveis
+            if (typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.select2 === 'undefined') {
+                setTimeout(trySelectDestinatario, 100);
+                return;
+            }
+            
+            var $ = window.jQuery;
+            var $select = $('#destinatario_colaborador_id');
+            
+            // Verifica se o select existe
+            if (!$select.length) {
+                setTimeout(trySelectDestinatario, 100);
+                return;
+            }
+            
+            // Aguarda o Select2 ser inicializado
+            if (!$select.hasClass('select2-hidden-accessible')) {
+                setTimeout(trySelectDestinatario, 100);
+                return;
+            }
+            
+            // Define o valor e dispara eventos para o Select2 atualizar
+            $select.val(destinatarioId).trigger('change.select2');
+            
+            console.log('✅ Destinatário pré-selecionado:', destinatarioId);
+            
+            // Scroll suave para o campo de conteúdo após selecionar
+            setTimeout(function() {
+                var conteudoField = document.getElementById('feedback_conteudo');
+                if (conteudoField) {
+                    conteudoField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    conteudoField.focus();
+                }
+            }, 500);
+        }
+        
+        // Inicia tentativa após um delay para garantir que tudo está carregado
+        setTimeout(trySelectDestinatario, 500);
+    }
+});
+</script>
+<?php endif; ?>
+<!--end::Script para pré-selecionar destinatário de solicitação-->
+
 <!--begin::Tutorial System-->
 <link href="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/introjs.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/intro.min.js"></script>

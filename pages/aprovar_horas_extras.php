@@ -109,6 +109,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Envia email de notificação se template estiver ativo
                 require_once __DIR__ . '/../includes/email_templates.php';
                 enviar_email_horas_extras($hora_extra_id);
+                
+                // Envia notificação push para o colaborador
+                require_once __DIR__ . '/../includes/push_notifications.php';
+                enviar_push_colaborador(
+                    $solicitacao['colaborador_id'],
+                    'Horas Extras Aprovadas! ⏰',
+                    'Suas ' . number_format($solicitacao['quantidade_horas'], 2, ',', '.') . ' horas extras foram aprovadas e serão pagas.',
+                    'pages/meus_pagamentos.php',
+                    'horas_extras',
+                    $hora_extra_id,
+                    'hora_extra'
+                );
             }
             
             $pdo->commit();

@@ -748,6 +748,22 @@ function enviar_convites_evento($evento_id, $colaboradores_ids = []) {
                 WHERE id = ?
             ");
             $stmt_update->execute([$p['id']]);
+            
+            // Envia push notification
+            require_once __DIR__ . '/push_notifications.php';
+            try {
+                enviar_push_colaborador(
+                    $p['colaborador_id'],
+                    'Convite: ' . $evento['titulo'] . ' 📅',
+                    'Você foi convidado para um evento em ' . $data_formatada,
+                    'pages/meus_eventos.php',
+                    'evento',
+                    $evento_id,
+                    'evento'
+                );
+            } catch (Exception $e) {
+                error_log("Erro ao enviar push de evento: " . $e->getMessage());
+            }
         } else {
             $erros++;
         }

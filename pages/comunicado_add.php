@@ -69,20 +69,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $comunicado_id = $pdo->lastInsertId();
         
-        // Se o comunicado foi publicado, envia emails para todos os colaboradores
+        // Se o comunicado foi publicado, envia emails e push para todos os colaboradores
         if ($status === 'publicado') {
             require_once __DIR__ . '/../includes/email_templates.php';
+            require_once __DIR__ . '/../includes/push_notifications.php';
             
             // Envia emails em background (não bloqueia a resposta)
             $resultado_email = enviar_email_novo_comunicado($comunicado_id);
             
+            // Envia push notifications para todos colaboradores ativos
+            $stmt_colabs = $pdo->query("SELECT id, nome_completo FROM colaboradores WHERE status = 'ativo'");
+            $colaboradores = $stmt_colabs->fetchAll();
+            
+            $push_enviados = 0;
+            $titulo_preview = strlen($titulo) > 50 ? substr($titulo, 0, 50) . '...' : $titulo;
+            
+            foreach ($colaboradores as $colab) {
+                try {
+                    $resultado_push = enviar_push_colaborador(
+                        $colab['id'],
+                        'Novo Comunicado 📢',
+                        $titulo_preview,
+                        'pages/comunicado_view.php?id=' . $comunicado_id,
+                        'comunicado',
+                        $comunicado_id,
+                        'comunicado'
+                    );
+                    if ($resultado_push['success']) {
+                        $push_enviados++;
+                    }
+                } catch (Exception $e) {
+                    error_log("Erro ao enviar push para colaborador {$colab['id']}: " . $e->getMessage());
+                }
+            }
+            
             if ($resultado_email['success']) {
-                $mensagem = 'Comunicado criado e emails enviados! ';
-                $mensagem .= "({$resultado_email['enviados']} enviados";
+                $mensagem = 'Comunicado criado e notificações enviadas! ';
+                $mensagem .= "({$resultado_email['enviados']} emails";
                 if ($resultado_email['erros'] > 0) {
                     $mensagem .= ", {$resultado_email['erros']} erros";
                 }
-                $mensagem .= ")";
+                $mensagem .= ", {$push_enviados} push)";
                 redirect('comunicados.php', $mensagem, 'success');
             } else {
                 redirect('comunicados.php', 'Comunicado criado mas houve erro ao enviar emails: ' . $resultado_email['message'], 'warning');

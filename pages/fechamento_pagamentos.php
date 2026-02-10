@@ -1156,14 +1156,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE fechamentos_pagamento SET status = 'fechado' WHERE id = ?");
             $stmt->execute([$fechamento_id]);
             
-            // Envia emails para cada colaborador do fechamento
+            // Envia emails e notificações push para cada colaborador do fechamento
             require_once __DIR__ . '/../includes/email_templates.php';
-            $stmt_itens = $pdo->prepare("SELECT colaborador_id FROM fechamentos_pagamento_itens WHERE fechamento_id = ?");
+            require_once __DIR__ . '/../includes/push_notifications.php';
+            
+            $stmt_itens = $pdo->prepare("
+                SELECT i.colaborador_id, i.valor_total, c.nome_completo
+                FROM fechamentos_pagamento_itens i
+                INNER JOIN colaboradores c ON i.colaborador_id = c.id
+                WHERE i.fechamento_id = ?
+            ");
             $stmt_itens->execute([$fechamento_id]);
             $itens = $stmt_itens->fetchAll();
             
             foreach ($itens as $item) {
+                // Envia email
                 enviar_email_fechamento_pagamento($fechamento_id, $item['colaborador_id']);
+                
+                // Envia push notification
+                enviar_push_colaborador(
+                    $item['colaborador_id'],
+                    'Pagamento Processado 💰',
+                    'Seu pagamento de ' . $fechamento['mes_referencia'] . ' foi processado. Valor: R$ ' . number_format($item['valor_total'], 2, ',', '.'),
+                    'pages/meus_pagamentos.php',
+                    'fechamento_pagamento',
+                    $fechamento_id,
+                    'pagamento'
+                );
             }
             
             redirect('fechamento_pagamentos.php?view=' . $fechamento_id, 'Fechamento concluído!');
