@@ -317,7 +317,9 @@ $tempo_contratacao = $stmt->fetch();
                                     </div>
                                     <div class="mb-3">
                                         <span class="text-muted fw-semibold d-block">Vagas Preenchidas</span>
-                                        <span class="fw-bold fs-4"><?= $vaga['quantidade_preenchida'] ?>/<?= $vaga['quantidade_vagas'] ?></span>
+                                        <span class="fw-bold fs-4">
+                                            <?= $vaga['quantidade_preenchida'] ?>/<?= $vaga['quantidade_vagas'] ? $vaga['quantidade_vagas'] : '<span class="badge badge-light-success">Ilimitado</span>' ?>
+                                        </span>
                                     </div>
                                     <?php if ($vaga['salario_min'] || $vaga['salario_max']): ?>
                                     <div class="mb-3">

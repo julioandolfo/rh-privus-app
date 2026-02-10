@@ -142,12 +142,14 @@ $empresas = get_empresas_disponiveis($pdo, $usuario);
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <?= $vaga['quantidade_preenchida'] ?>/<?= $vaga['quantidade_vagas'] ?>
-                                            <?php if ($vaga['quantidade_vagas'] > 0): ?>
-                                            <?php $percentual = ($vaga['quantidade_preenchida'] / $vaga['quantidade_vagas']) * 100; ?>
-                                            <div class="progress" style="height: 20px; width: 100px;">
-                                                <div class="progress-bar" style="width: <?= $percentual ?>%"></div>
-                                            </div>
+                                            <?php if ($vaga['quantidade_vagas']): ?>
+                                                <?= $vaga['quantidade_preenchida'] ?>/<?= $vaga['quantidade_vagas'] ?>
+                                                <?php $percentual = ($vaga['quantidade_preenchida'] / $vaga['quantidade_vagas']) * 100; ?>
+                                                <div class="progress" style="height: 20px; width: 100px;">
+                                                    <div class="progress-bar" style="width: <?= $percentual ?>%"></div>
+                                                </div>
+                                            <?php else: ?>
+                                                <?= $vaga['quantidade_preenchida'] ?>/<span class="badge badge-light-success">Ilimitado</span>
                                             <?php endif; ?>
                                         </td>
                                         <td>

@@ -141,7 +141,18 @@ $beneficios_padrao = [
                             
                             <div class="col-md-4">
                                 <label class="form-label">Quantidade de Vagas</label>
-                                <input type="number" name="quantidade_vagas" class="form-control" value="<?= $vaga['quantidade_vagas'] ?>" min="1">
+                                <div class="input-group">
+                                    <input type="number" name="quantidade_vagas" id="quantidade_vagas" class="form-control" 
+                                           value="<?= $vaga['quantidade_vagas'] ?? '' ?>" min="1" 
+                                           <?= empty($vaga['quantidade_vagas']) ? 'disabled' : '' ?>>
+                                    <div class="input-group-text">
+                                        <input class="form-check-input mt-0" type="checkbox" id="quantidade_ilimitada" value="1"
+                                               <?= empty($vaga['quantidade_vagas']) ? 'checked' : '' ?>>
+                                        <label class="form-check-label ms-2" for="quantidade_ilimitada">
+                                            Ilimitado
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="col-12">
@@ -393,6 +404,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Controla quantidade de vagas ilimitada
+document.getElementById('quantidade_ilimitada').addEventListener('change', function() {
+    const quantidadeInput = document.getElementById('quantidade_vagas');
+    if (this.checked) {
+        quantidadeInput.value = '';
+        quantidadeInput.disabled = true;
+        quantidadeInput.removeAttribute('required');
+    } else {
+        quantidadeInput.disabled = false;
+        quantidadeInput.value = '1';
+    }
+});
+
 // Aplica máscaras de moeda
 (function waitForDependencies() {
     if (typeof jQuery === 'undefined' || typeof $ === 'undefined') {
@@ -456,6 +480,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (salarioMax && salarioMax.value) {
             const valorMax = salarioMax.value.replace(/\./g, '').replace(',', '.');
             formData.set('salario_max', valorMax);
+        }
+        
+        // Se quantidade ilimitada marcada, envia NULL
+        const quantidadeIlimitada = document.getElementById('quantidade_ilimitada');
+        if (quantidadeIlimitada && quantidadeIlimitada.checked) {
+            formData.set('quantidade_vagas', '');
+            formData.set('quantidade_ilimitada', '1');
         }
         
         try {

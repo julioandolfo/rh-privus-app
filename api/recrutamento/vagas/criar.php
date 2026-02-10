@@ -114,7 +114,7 @@ try {
         $_POST['localizacao'] ?? null,
         $_POST['horario_trabalho'] ?? null,
         $_POST['dias_trabalho'] ?? null,
-        (int)($_POST['quantidade_vagas'] ?? 1),
+        (!empty($_POST['quantidade_ilimitada']) || empty($_POST['quantidade_vagas'])) ? null : (int)$_POST['quantidade_vagas'],
         isset($_POST['publicar_portal']) ? (int)$_POST['publicar_portal'] : 1,
         isset($_POST['usar_landing_page_customizada']) ? (int)$_POST['usar_landing_page_customizada'] : 0,
         $usuario['id']
