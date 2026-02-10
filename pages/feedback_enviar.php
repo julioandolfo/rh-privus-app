@@ -493,7 +493,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('📡 Status da resposta:', response.status);
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                }
+                return response.text().then(text => {
+                    console.log('📄 Resposta raw:', text.substring(0, 200));
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        console.error('❌ Erro ao fazer parse do JSON:', e);
+                        console.error('Resposta recebida:', text);
+                        throw new Error('Resposta inválida do servidor. Verifique o console.');
+                    }
+                });
+            })
             .then(data => {
                 console.log('📨 Resposta da API:', data);
                 if (data.success) {
@@ -518,7 +533,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     console.error('❌ Erro na API:', data.message);
                     Swal.fire({
-                        text: data.message,
+                        text: data.message || 'Erro ao enviar feedback',
                         icon: "error",
                         buttonsStyling: false,
                         confirmButtonText: "Ok",
@@ -535,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('❌ Erro ao enviar:', error);
                 Swal.fire({
-                    text: 'Erro ao enviar feedback',
+                    text: 'Erro ao enviar feedback: ' + error.message,
                     icon: "error",
                     buttonsStyling: false,
                     confirmButtonText: "Ok",
