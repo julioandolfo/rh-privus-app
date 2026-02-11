@@ -140,6 +140,25 @@ try {
         ");
         $stmt->execute([$coluna_codigo, $etapa_id, $candidatura_id_int]);
         
+        // Atualiza quantidade_preenchida da vaga se moveu para/de aprovados
+        if ($coluna_codigo === 'aprovados' && $coluna_anterior !== 'aprovados') {
+            // Moveu PARA aprovados: incrementa quantidade_preenchida
+            $stmt = $pdo->prepare("
+                UPDATE vagas 
+                SET quantidade_preenchida = quantidade_preenchida + 1
+                WHERE id = ?
+            ");
+            $stmt->execute([$candidatura['vaga_id']]);
+        } elseif ($coluna_anterior === 'aprovados' && $coluna_codigo !== 'aprovados') {
+            // Moveu DE aprovados: decrementa quantidade_preenchida (não pode ficar negativo)
+            $stmt = $pdo->prepare("
+                UPDATE vagas 
+                SET quantidade_preenchida = GREATEST(0, quantidade_preenchida - 1)
+                WHERE id = ?
+            ");
+            $stmt->execute([$candidatura['vaga_id']]);
+        }
+        
         // Registra histórico
         registrar_historico_candidatura(
             $candidatura_id_int,

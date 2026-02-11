@@ -125,7 +125,8 @@ try {
         $caminho_completo = $upload_dir . $nome_arquivo;
         
         if (move_uploaded_file($_FILES['curriculo']['tmp_name'], $caminho_completo)) {
-            $caminho_relativo = '/rh/uploads/candidaturas/' . $candidatura_id . '/' . $nome_arquivo;
+            // Salva apenas o caminho relativo SEM /rh/ pois get_base_url() já inclui
+            $caminho_relativo = '/uploads/candidaturas/' . $candidatura_id . '/' . $nome_arquivo;
             
             $stmt = $pdo->prepare("
                 INSERT INTO candidaturas_anexos 

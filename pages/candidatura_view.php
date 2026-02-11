@@ -116,14 +116,11 @@ $comentarios = $stmt->fetchAll();
                             // Constrói URL completa do arquivo
                             $caminho_arquivo = $anexo['caminho_arquivo'];
                             if (!preg_match('/^https?:\/\//', $caminho_arquivo)) {
-                                // Se o caminho já começa com /rh/, usa diretamente
-                                // Se não, adiciona /rh/ antes
-                                if (strpos($caminho_arquivo, '/rh/') === 0) {
-                                    $caminho_arquivo = get_base_url() . $caminho_arquivo;
-                                } else {
-                                    // Remove barra inicial se houver e adiciona /rh/
-                                    $caminho_arquivo = get_base_url() . '/rh' . ltrim($caminho_arquivo, '/');
-                                }
+                                // get_base_url() já inclui /rh ou /rh-privus
+                                // Garante que tenha exatamente uma barra entre base_url e caminho
+                                $base = rtrim(get_base_url(), '/');
+                                $caminho = '/' . ltrim($caminho_arquivo, '/');
+                                $caminho_arquivo = $base . $caminho;
                             }
                             ?>
                             <a href="<?= htmlspecialchars($caminho_arquivo) ?>" target="_blank" class="btn btn-light-primary me-2">

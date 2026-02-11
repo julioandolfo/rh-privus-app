@@ -93,6 +93,11 @@ try {
     if (!$is_entrevista && $candidatura_id) {
         $id_limpo = str_replace('entrevista_', '', $candidatura_id);
         
+        // Busca a candidatura para verificar se já estava em aprovados
+        $stmt = $pdo->prepare("SELECT vaga_id, coluna_kanban FROM candidaturas WHERE id = ?");
+        $stmt->execute([$id_limpo]);
+        $candidatura_atual = $stmt->fetch();
+        
         // Atualiza candidatura para aprovada
         $stmt = $pdo->prepare("
             UPDATE candidaturas 
@@ -102,6 +107,16 @@ try {
             WHERE id = ?
         ");
         $stmt->execute([$id_limpo]);
+        
+        // Se não estava em aprovados ainda, incrementa quantidade_preenchida
+        if ($candidatura_atual && $candidatura_atual['coluna_kanban'] !== 'aprovados') {
+            $stmt = $pdo->prepare("
+                UPDATE vagas 
+                SET quantidade_preenchida = quantidade_preenchida + 1
+                WHERE id = ?
+            ");
+            $stmt->execute([$candidatura_atual['vaga_id']]);
+        }
         
         // Cria processo de onboarding
         $stmt = $pdo->prepare("
