@@ -329,18 +329,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("DELETE FROM contratos_signatarios WHERE contrato_id = ?");
                     $stmt->execute([$contrato_id]);
                     
-                    // Insere signatários
+                    // Insere signatários - match por EMAIL (a API pode retornar o dono da conta como extra)
                     $ordem = 0;
-                    $sigIndex = 0;
+                    
+                    // Cria mapa de signatures por email para lookup correto
+                    $sig_map = [];
+                    foreach ($signatures as $sig) {
+                        $sig_email = strtolower($sig['email'] ?? '');
+                        if ($sig_email) {
+                            $sig_map[$sig_email] = $sig;
+                        }
+                    }
+                    if (function_exists('log_contrato')) {
+                        log_contrato("contrato_add.php - Mapa signatures por email: " . implode(', ', array_keys($sig_map)));
+                    }
                     
                     // Colaborador (primeiro signatário)
+                    $colab_email = strtolower($colaborador['email_pessoal'] ?? '');
+                    $signer = $sig_map[$colab_email] ?? null;
+                    $link_assinatura = $signer['link']['short_link'] ?? null;
+                    
                     $stmt = $pdo->prepare("
                         INSERT INTO contratos_signatarios 
                         (contrato_id, tipo, nome, email, cpf, autentique_signer_id, ordem_assinatura, link_publico)
                         VALUES (?, 'colaborador', ?, ?, ?, ?, ?, ?)
                     ");
-                    $signer = $signatures[$sigIndex++] ?? null;
-                    $link_assinatura = $signer['link']['short_link'] ?? null;
                     $stmt->execute([
                         $contrato_id,
                         $colaborador['nome_completo'],
@@ -352,12 +365,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                     
                     if (function_exists('log_contrato')) {
-                        log_contrato("contrato_add.php - Colaborador inserido: " . $colaborador['nome_completo']);
+                        log_contrato("contrato_add.php - Colaborador inserido: " . $colaborador['nome_completo'] . " email=$colab_email signer_id=" . ($signer['public_id'] ?? 'null'));
                     }
                     
                     // Representante da empresa (se habilitado)
                     if ($incluir_representante && !empty($representante['email'])) {
-                        $signer = $signatures[$sigIndex++] ?? null;
+                        $rep_email = strtolower($representante['email']);
+                        $signer = $sig_map[$rep_email] ?? null;
                         $link_publico = $signer['link']['short_link'] ?? null;
                         
                         $stmt = $pdo->prepare("
@@ -376,14 +390,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ]);
                         
                         if (function_exists('log_contrato')) {
-                            log_contrato("contrato_add.php - Representante inserido: " . ($representante['nome'] ?? 'sem nome'));
+                            log_contrato("contrato_add.php - Representante inserido: " . ($representante['nome'] ?? 'sem nome') . " email=$rep_email signer_id=" . ($signer['public_id'] ?? 'null'));
                         }
                     }
                     
                     // Testemunhas
                     foreach ($testemunhas as $index => $testemunha) {
                         if (!empty($testemunha['email'])) {
-                            $signer = $signatures[$sigIndex++] ?? null;
+                            $test_email = strtolower($testemunha['email']);
+                            $signer = $sig_map[$test_email] ?? null;
                             $link_publico = $signer['link']['short_link'] ?? null;
                             
                             $stmt = $pdo->prepare("
@@ -400,6 +415,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $ordem++,
                                 $link_publico
                             ]);
+                            
+                            if (function_exists('log_contrato')) {
+                                log_contrato("contrato_add.php - Testemunha inserida: " . ($testemunha['nome'] ?? '') . " email=$test_email signer_id=" . ($signer['public_id'] ?? 'null'));
+                            }
                         }
                     }
                 } else {

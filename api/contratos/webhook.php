@@ -173,8 +173,20 @@ try {
         
         $updated = false;
         
-        // 1. Tenta match por autentique_signer_id (public_id)
-        if ($signer_public_id) {
+        // 1. Prioriza match por EMAIL (mais confiável - signer_ids podem estar desalinhados)
+        if ($signer_email) {
+            $stmt = $pdo->prepare("
+                UPDATE contratos_signatarios 
+                SET assinado = 1, data_assinatura = ?, autentique_signer_id = ?
+                WHERE LOWER(email) = LOWER(?) AND contrato_id = ?
+            ");
+            $stmt->execute([$signed_at, $signer_public_id, $signer_email, $contrato_id]);
+            $updated = $stmt->rowCount() > 0;
+            log_webhook("Match por email ($signer_email): " . ($updated ? 'SIM' : 'NÃO'));
+        }
+        
+        // 2. Fallback: tenta por autentique_signer_id
+        if (!$updated && $signer_public_id) {
             $stmt = $pdo->prepare("
                 UPDATE contratos_signatarios 
                 SET assinado = 1, data_assinatura = ?
@@ -183,19 +195,6 @@ try {
             $stmt->execute([$signed_at, $signer_public_id, $contrato_id]);
             $updated = $stmt->rowCount() > 0;
             log_webhook("Match por autentique_signer_id ($signer_public_id): " . ($updated ? 'SIM' : 'NÃO'));
-        }
-        
-        // 2. Se não encontrou, tenta por email
-        if (!$updated && $signer_email) {
-            $stmt = $pdo->prepare("
-                UPDATE contratos_signatarios 
-                SET assinado = 1, data_assinatura = ?, autentique_signer_id = ?
-                WHERE email = ? AND contrato_id = ? AND assinado = 0
-                LIMIT 1
-            ");
-            $stmt->execute([$signed_at, $signer_public_id, $signer_email, $contrato_id]);
-            $updated = $stmt->rowCount() > 0;
-            log_webhook("Match por email ($signer_email): " . ($updated ? 'SIM' : 'NÃO'));
         }
         
         // 3. Se ainda não encontrou, loga todos os signatários para debug
@@ -242,23 +241,23 @@ try {
             log_webhook("signature.updated com signed_at - processando como assinatura");
             
             $updated = false;
-            if ($signer_public_id) {
+            // Prioriza email
+            if ($signer_email) {
+                $stmt = $pdo->prepare("
+                    UPDATE contratos_signatarios 
+                    SET assinado = 1, data_assinatura = ?, autentique_signer_id = ?
+                    WHERE LOWER(email) = LOWER(?) AND contrato_id = ?
+                ");
+                $stmt->execute([$signed_at, $signer_public_id, $signer_email, $contrato_id]);
+                $updated = $stmt->rowCount() > 0;
+            }
+            if (!$updated && $signer_public_id) {
                 $stmt = $pdo->prepare("
                     UPDATE contratos_signatarios 
                     SET assinado = 1, data_assinatura = ?
                     WHERE autentique_signer_id = ? AND contrato_id = ?
                 ");
                 $stmt->execute([$signed_at, $signer_public_id, $contrato_id]);
-                $updated = $stmt->rowCount() > 0;
-            }
-            if (!$updated && $signer_email) {
-                $stmt = $pdo->prepare("
-                    UPDATE contratos_signatarios 
-                    SET assinado = 1, data_assinatura = ?, autentique_signer_id = ?
-                    WHERE email = ? AND contrato_id = ? AND assinado = 0
-                    LIMIT 1
-                ");
-                $stmt->execute([$signed_at, $signer_public_id, $signer_email, $contrato_id]);
                 $updated = $stmt->rowCount() > 0;
             }
             

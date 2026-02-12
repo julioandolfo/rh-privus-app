@@ -145,47 +145,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         log_contrato("API Signer: ID=$signer_id Email=$signer_email Signed=" . ($signer_signed ? 'SIM' : 'NAO'));
                         
+                        // Verifica se este email existe localmente (ignora signatários extras como o dono da conta)
+                        $stmt_check = $pdo->prepare("SELECT id, email, assinado FROM contratos_signatarios WHERE contrato_id = ? AND LOWER(email) = LOWER(?)");
+                        $stmt_check->execute([$contrato_id, $signer_email]);
+                        $local_match = $stmt_check->fetch();
+                        
+                        if (!$local_match) {
+                            log_contrato("  -> Email $signer_email NÃO existe localmente (provavelmente dono da conta) - IGNORANDO");
+                            continue; // Pula este signer - não é um signatário nosso
+                        }
+                        
                         if (!$signer_signed) {
                             $todos_assinados = false;
                         } else {
                             $algum_assinado = true;
                         }
                         
-                        // Tenta match por autentique_signer_id
-                        $updated = false;
-                        if ($signer_id) {
-                            $stmt = $pdo->prepare("
-                                UPDATE contratos_signatarios 
-                                SET assinado = ?, data_assinatura = ?, autentique_signer_id = COALESCE(autentique_signer_id, ?), link_publico = COALESCE(link_publico, ?)
-                                WHERE autentique_signer_id = ? AND contrato_id = ?
-                            ");
-                            $stmt->execute([
-                                $signer_signed ? 1 : 0,
-                                $signer_signed_at,
-                                $signer_id,
-                                $signer_link,
-                                $signer_id,
-                                $contrato_id
-                            ]);
-                            $updated = $stmt->rowCount() > 0;
-                        }
+                        // Match por EMAIL (mais confiável que signer_id devido a bug de offset)
+                        $stmt = $pdo->prepare("
+                            UPDATE contratos_signatarios 
+                            SET assinado = ?, 
+                                data_assinatura = ?, 
+                                autentique_signer_id = ?,
+                                link_publico = COALESCE(?, link_publico)
+                            WHERE LOWER(email) = LOWER(?) AND contrato_id = ?
+                        ");
+                        $stmt->execute([
+                            $signer_signed ? 1 : 0,
+                            $signer_signed_at,
+                            $signer_id,
+                            $signer_link,
+                            $signer_email,
+                            $contrato_id
+                        ]);
+                        $updated = $stmt->rowCount() > 0;
                         
-                        // Se não encontrou por ID, tenta por email
-                        if (!$updated && $signer_email) {
-                            $stmt = $pdo->prepare("
-                                UPDATE contratos_signatarios 
-                                SET assinado = ?, data_assinatura = ?, autentique_signer_id = COALESCE(autentique_signer_id, ?), link_publico = COALESCE(link_publico, ?)
-                                WHERE email = ? AND contrato_id = ?
-                            ");
-                            $stmt->execute([
-                                $signer_signed ? 1 : 0,
-                                $signer_signed_at,
-                                $signer_id,
-                                $signer_link,
-                                $signer_email,
-                                $contrato_id
-                            ]);
-                            $updated = $stmt->rowCount() > 0;
+                        // rowCount pode retornar 0 se dados não mudaram - verifica se o registro existe
+                        if (!$updated && $local_match) {
+                            $updated = true; // O registro existe, só não mudou
+                            log_contrato("  -> Registro existe mas dados não mudaram");
                         }
                         
                         $atualizacoes[] = [
@@ -194,8 +192,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'matched' => $updated
                         ];
                         
-                        log_contrato("Match local: " . ($updated ? 'SIM' : 'NÃO'));
+                        log_contrato("  -> Match: " . ($updated ? 'SIM' : 'NÃO') . " | Assinado localmente: " . ($local_match['assinado'] ? 'SIM' : 'NAO') . " -> " . ($signer_signed ? 'SIM' : 'NAO'));
                     }
+                    
+                    // Recheck: verifica todos_assinados apenas com signatários locais
+                    $stmt_recheck = $pdo->prepare("SELECT COUNT(*) as total, SUM(assinado) as assinados FROM contratos_signatarios WHERE contrato_id = ?");
+                    $stmt_recheck->execute([$contrato_id]);
+                    $check = $stmt_recheck->fetch();
+                    log_contrato("Check final local: {$check['assinados']}/{$check['total']} assinados");
+                    
+                    $todos_assinados = ($check['total'] > 0 && $check['assinados'] == $check['total']);
+                    $algum_assinado = ($check['assinados'] > 0);
                     
                     // Atualiza status do contrato
                     if ($todos_assinados && count($signers_api) > 0) {
@@ -212,10 +219,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         log_contrato("Status atualizado: {$contrato['status']} -> $novo_status");
                     }
                     
-                    // Monta mensagem de feedback
-                    $matched = count(array_filter($atualizacoes, fn($a) => $a['matched']));
-                    $signed = count(array_filter($atualizacoes, fn($a) => $a['signed']));
-                    $msg = "Sincronizado! $signed/" . count($signers_api) . " assinatura(s). $matched signatário(s) atualizados.";
+                    // Monta mensagem de feedback usando dados locais (mais preciso)
+                    $assinados_local = (int)($check['assinados'] ?? 0);
+                    $total_local = (int)($check['total'] ?? 0);
+                    $msg = "Sincronizado! $assinados_local/$total_local signatário(s) assinaram.";
                     
                     if ($novo_status !== $contrato['status']) {
                         $msg .= " Status: " . ucfirst($novo_status) . ".";
