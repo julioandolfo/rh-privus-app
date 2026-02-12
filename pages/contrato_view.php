@@ -68,6 +68,7 @@ $eventos = $stmt->fetchAll();
 // Processa ações
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
+    log_contrato("contrato_view.php - POST recebido: acao=$acao, contrato_id=$contrato_id");
     
     if ($acao === 'cancelar' && $contrato['status'] !== 'assinado') {
         try {
@@ -107,10 +108,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($acao === 'sincronizar') {
         // Sincroniza status consultando a API do Autentique
+        log_contrato("=== SINCRONIZAÇÃO MANUAL INICIADA ===");
+        log_contrato("Contrato ID: $contrato_id");
+        log_contrato("autentique_document_id: " . ($contrato['autentique_document_id'] ?? 'VAZIO'));
+        
         if ($contrato['autentique_document_id']) {
             try {
+                log_contrato("Criando AutentiqueService...");
                 $service = new AutentiqueService();
-                log_contrato("=== SINCRONIZAÇÃO MANUAL - Contrato ID: $contrato_id ===");
+                log_contrato("AutentiqueService criado com sucesso");
                 log_contrato("Document ID Autentique: " . $contrato['autentique_document_id']);
                 
                 $status_autentique = $service->consultarStatus($contrato['autentique_document_id']);
@@ -221,8 +227,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     redirect('contrato_view.php?id=' . $contrato_id, 'Não foi possível obter dados do Autentique.', 'warning');
                 }
             } catch (Exception $e) {
-                log_contrato("ERRO sincronização: " . $e->getMessage());
+                log_contrato("ERRO sincronização (Exception): " . $e->getMessage());
+                log_contrato("Arquivo: " . $e->getFile() . ":" . $e->getLine());
                 redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao sincronizar: ' . $e->getMessage(), 'error');
+            } catch (Error $e) {
+                log_contrato("ERRO FATAL sincronização (Error): " . $e->getMessage());
+                log_contrato("Arquivo: " . $e->getFile() . ":" . $e->getLine());
+                redirect('contrato_view.php?id=' . $contrato_id, 'Erro fatal ao sincronizar: ' . $e->getMessage(), 'error');
             }
         } else {
             redirect('contrato_view.php?id=' . $contrato_id, 'Este contrato não possui ID do Autentique.', 'warning');

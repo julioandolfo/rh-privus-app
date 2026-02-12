@@ -213,6 +213,8 @@ class AutentiqueService {
      * Consulta status do documento
      */
     public function consultarStatus($documentId) {
+        log_contrato("consultarStatus: Consultando documento $documentId");
+        
         $query = '
             query GetDocument($id: UUID!) {
                 document(id: $id) {
@@ -232,22 +234,39 @@ class AutentiqueService {
         
         $variables = ['id' => $documentId];
         
-        $result = $this->executeGraphQL($query, $variables);
+        try {
+            $result = $this->executeGraphQL($query, $variables);
+            log_contrato("consultarStatus: Resposta bruta: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+        } catch (Exception $e) {
+            log_contrato("consultarStatus: ERRO na query - " . $e->getMessage());
+            throw $e;
+        }
         
         // Transforma para formato compatível com código existente
         $doc = $result['document'] ?? null;
-        if ($doc && isset($doc['signatures'])) {
+        
+        if (!$doc) {
+            log_contrato("consultarStatus: document é NULL na resposta");
+            return null;
+        }
+        
+        if (isset($doc['signatures'])) {
             $signers = [];
             foreach ($doc['signatures'] as $sig) {
-                $signers[] = [
+                $signer = [
                     'id' => $sig['public_id'] ?? null,
                     'email' => $sig['email'] ?? null,
+                    'name' => $sig['name'] ?? null,
                     'signed' => !empty($sig['signed']),
                     'signedAt' => $sig['signed']['created_at'] ?? null,
                     'link' => $sig['link']['short_link'] ?? null
                 ];
+                $signers[] = $signer;
+                log_contrato("consultarStatus: Signer - email={$signer['email']} signed=" . ($signer['signed'] ? 'SIM' : 'NAO') . " id={$signer['id']}");
             }
             $doc['signers'] = $signers;
+        } else {
+            log_contrato("consultarStatus: Sem campo signatures na resposta");
         }
         
         return $doc;
