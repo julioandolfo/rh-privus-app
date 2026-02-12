@@ -2,11 +2,28 @@
 /**
  * Webhook Handler para Autentique
  * Recebe eventos do Autentique e atualiza status dos contratos
+ * 
+ * Estrutura real do payload Autentique:
+ * {
+ *   "id": "base64_webhook_id",
+ *   "object": "webhook",
+ *   "event": {
+ *     "type": "signature.accepted|signature.viewed|signature.updated|signature.rejected",
+ *     "data": {
+ *       "public_id": "signer_uuid",
+ *       "user": { "name", "email", "cpf" },
+ *       "document": "document_hash",
+ *       "signed": "datetime|null",
+ *       "viewed": "datetime|null",
+ *       "rejected": "datetime|null"
+ *     }
+ *   }
+ * }
  */
 
 require_once __DIR__ . '/../../includes/functions.php';
 
-// Log de requisições (para debug)
+// Log de requisições
 $log_file = __DIR__ . '/../../logs/webhook_autentique.log';
 $log_dir = dirname($log_file);
 if (!is_dir($log_dir)) {
@@ -22,10 +39,8 @@ function log_webhook($message) {
 log_webhook("=== REQUISIÇÃO RECEBIDA ===");
 log_webhook("Método: " . $_SERVER['REQUEST_METHOD']);
 log_webhook("IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconhecido'));
-log_webhook("User-Agent: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'desconhecido'));
-log_webhook("Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'não definido'));
 
-// Loga todos os headers
+// Headers relevantes
 $headers = [];
 foreach ($_SERVER as $key => $value) {
     if (strpos($key, 'HTTP_') === 0) {
@@ -45,132 +60,78 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // Lê payload
 $payload = file_get_contents('php://input');
-log_webhook("Payload bruto (primeiros 2000 chars): " . substr($payload, 0, 2000));
+log_webhook("Payload (primeiros 500 chars): " . substr($payload, 0, 500));
 
 $data = json_decode($payload, true);
 
 if (!$data) {
-    log_webhook('Payload inválido - JSON decode falhou: ' . json_last_error_msg());
-    // Tenta parse como form-urlencoded
-    parse_str($payload, $data);
-    if (!empty($data)) {
-        log_webhook('Payload parseado como form-urlencoded: ' . json_encode($data));
-    } else {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Payload inválido']);
-        exit;
-    }
+    log_webhook('JSON inválido: ' . json_last_error_msg());
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Payload inválido']);
+    exit;
 }
 
-log_webhook("Payload decodificado: " . json_encode($data, JSON_UNESCAPED_UNICODE));
-
-// Carrega serviço Autentique (após log inicial para não falhar antes de logar)
+// Carrega serviço Autentique
 require_once __DIR__ . '/../../includes/autentique_service.php';
 
-// Valida secret do webhook (se configurado)
+// ============================================================
+// EXTRAI DADOS DO PAYLOAD AUTENTIQUE
+// ============================================================
+
+// Tipo de evento: $data['event']['type']
+$event = $data['event'] ?? [];
+$evento_tipo = $event['type'] ?? 'unknown';
+$event_data = $event['data'] ?? [];
+
+// Document ID: $data['event']['data']['document']
+$document_id = $event_data['document'] ?? null;
+
+// Signer info
+$signer_public_id = $event_data['public_id'] ?? null;
+$signer_user = $event_data['user'] ?? [];
+$signer_email = $signer_user['email'] ?? null;
+$signer_name = $signer_user['name'] ?? null;
+$signer_cpf = $signer_user['cpf'] ?? null;
+$signed_at = $event_data['signed'] ?? null;
+$viewed_at = $event_data['viewed'] ?? null;
+$rejected_at = $event_data['rejected'] ?? null;
+
+log_webhook("Evento: $evento_tipo");
+log_webhook("Document ID: " . ($document_id ?? 'NULL'));
+log_webhook("Signer: public_id=$signer_public_id email=$signer_email nome=$signer_name");
+log_webhook("Signed: " . ($signed_at ?? 'NULL') . " | Viewed: " . ($viewed_at ?? 'NULL'));
+
+// Validação do secret (via X-AUTENTIQUE-SIGNATURE header)
 try {
     $pdo = getDB();
     $stmt = $pdo->query("SELECT * FROM autentique_config WHERE ativo = 1 ORDER BY id DESC LIMIT 1");
     $config = $stmt->fetch();
     
-    if ($config) {
-        $evento_tipo = $data['event'] ?? $data['type'] ?? $data['action'] ?? 'unknown';
-        log_webhook("Tipo de evento: $evento_tipo");
-        
-        // Pega o secret apropriado
-        $expected_secret = null;
-        if (!empty($config['webhook_documento_secret'])) {
-            $expected_secret = $config['webhook_documento_secret'];
-        } elseif (!empty($config['webhook_assinatura_secret'])) {
-            $expected_secret = $config['webhook_assinatura_secret'];
-        } elseif (!empty($config['webhook_secret'])) {
-            $expected_secret = $config['webhook_secret'];
-        }
-        
-        // Valida secret se estiver configurado
-        if ($expected_secret) {
-            $received_secret = null;
-            
-            // Verifica headers comuns
-            $possible_headers = [
-                'X-AUTENTIQUE-SECRET', 'X-WEBHOOK-SECRET', 'X-SECRET', 
-                'AUTHORIZATION', 'X-SIGNATURE'
-            ];
-            
-            foreach ($possible_headers as $header_name) {
-                $normalized = str_replace('-', '_', $header_name);
-                if (isset($headers[$header_name])) {
-                    $received_secret = $headers[$header_name];
-                    break;
-                }
-                // Tenta com diferentes capitalizações
-                foreach ($headers as $hk => $hv) {
-                    if (strtoupper($hk) === $header_name) {
-                        $received_secret = $hv;
-                        break 2;
-                    }
-                }
-            }
-            
-            // Se for Authorization Bearer, extrai o token
-            if ($received_secret && strpos($received_secret, 'Bearer ') === 0) {
-                $received_secret = substr($received_secret, 7);
-            }
-            
-            // Tenta no payload
-            if (!$received_secret && isset($data['secret'])) {
-                $received_secret = $data['secret'];
-            }
-            
-            if (!$received_secret || $received_secret !== $expected_secret) {
-                log_webhook("AVISO: Secret não corresponde (evento: $evento_tipo)");
-                log_webhook("Secret esperado (10 chars): " . substr($expected_secret, 0, 10) . '...');
-                log_webhook("Secret recebido: " . ($received_secret ? substr($received_secret, 0, 10) . '...' : 'NÃO FORNECIDO'));
-                // NÃO bloqueia - apenas loga o aviso
-                // Alguns webhooks do Autentique podem não enviar secret
-            } else {
-                log_webhook("Secret validado com sucesso");
-            }
-        } else {
-            log_webhook("Nenhum webhook secret configurado - aceitando sem validação");
-        }
+    // O Autentique envia X-AUTENTIQUE-SIGNATURE como HMAC
+    // Por enquanto apenas logamos - não bloqueia o processamento
+    $autentique_signature = $headers['X-AUTENTIQUE-SIGNATURE'] ?? null;
+    if ($autentique_signature) {
+        log_webhook("X-Autentique-Signature recebida: " . substr($autentique_signature, 0, 20) . "...");
     } else {
-        log_webhook("Nenhuma configuração Autentique ativa encontrada");
+        log_webhook("X-Autentique-Signature: não enviada");
     }
 } catch (Exception $e) {
-    log_webhook('Erro ao validar secret: ' . $e->getMessage());
+    log_webhook('Erro ao carregar config: ' . $e->getMessage());
+}
+
+// ============================================================
+// PROCESSA O EVENTO
+// ============================================================
+
+if (!$document_id) {
+    log_webhook("Document ID não encontrado no payload - ignorando");
+    http_response_code(200);
+    echo json_encode(['success' => true, 'message' => 'Document ID não encontrado']);
+    exit;
 }
 
 try {
     $pdo = getDB();
-    
-    // Identifica tipo de evento - tenta vários formatos do Autentique
-    $evento_tipo = $data['event'] ?? $data['type'] ?? $data['action'] ?? 'unknown';
-    
-    // Tenta extrair document_id de várias formas
-    $document_id = $data['document']['id'] 
-        ?? $data['documentId'] 
-        ?? $data['document_id'] 
-        ?? $data['data']['document']['id'] 
-        ?? $data['data']['id'] 
-        ?? $data['id'] 
-        ?? null;
-    
-    log_webhook("Evento: $evento_tipo | Document ID: " . ($document_id ?? 'NÃO ENCONTRADO'));
-    
-    // Se o payload tem estrutura diferente, tenta encontrar nas chaves
-    if (!$document_id) {
-        log_webhook("Tentando encontrar document_id em chaves alternativas...");
-        log_webhook("Chaves do payload: " . implode(', ', array_keys($data)));
-        if (isset($data['data'])) {
-            log_webhook("Chaves de data: " . implode(', ', array_keys($data['data'])));
-        }
-        
-        // Responde 200 para não bloquear o Autentique, mas loga que não conseguiu processar
-        http_response_code(200);
-        echo json_encode(['success' => true, 'message' => 'Evento recebido mas document_id não encontrado']);
-        exit;
-    }
     
     // Busca contrato pelo document_id do Autentique
     $stmt = $pdo->prepare("SELECT id, status, titulo FROM contratos WHERE autentique_document_id = ?");
@@ -179,16 +140,15 @@ try {
     
     if (!$contrato) {
         log_webhook("Contrato NÃO ENCONTRADO para document_id: $document_id");
-        // Responde 200 para não gerar retries
         http_response_code(200);
         echo json_encode(['success' => true, 'message' => 'Contrato não encontrado']);
         exit;
     }
     
     $contrato_id = $contrato['id'];
-    log_webhook("Contrato encontrado: ID=$contrato_id, Titulo={$contrato['titulo']}, Status={$contrato['status']}");
+    log_webhook("Contrato encontrado: ID=$contrato_id | Titulo={$contrato['titulo']} | Status={$contrato['status']}");
     
-    // Registra evento
+    // Registra evento no histórico
     try {
         $stmt = $pdo->prepare("
             INSERT INTO contratos_eventos (contrato_id, tipo_evento, dados_json)
@@ -199,75 +159,56 @@ try {
             $evento_tipo,
             json_encode($data, JSON_UNESCAPED_UNICODE)
         ]);
-        log_webhook("Evento registrado na tabela contratos_eventos");
     } catch (Exception $e) {
         log_webhook("Erro ao registrar evento: " . $e->getMessage());
     }
     
-    // Extrai informações do signatário de vários formatos
-    $signer_data = $data['signer'] ?? $data['signature'] ?? $data['data']['signer'] ?? $data['data']['signature'] ?? null;
-    $signer_id = $signer_data['id'] ?? $signer_data['public_id'] ?? $data['signerId'] ?? $data['signer_id'] ?? null;
-    $signer_email = $signer_data['email'] ?? $data['email'] ?? null;
-    $signed_at = $signer_data['signed_at'] ?? $signer_data['signedAt'] ?? $signer_data['created_at'] ?? $data['signedAt'] ?? date('Y-m-d H:i:s');
+    // ============================================================
+    // PROCESSA POR TIPO DE EVENTO
+    // ============================================================
     
-    log_webhook("Signer ID: " . ($signer_id ?? 'NULL') . " | Signer Email: " . ($signer_email ?? 'NULL'));
-    
-    // Processa eventos específicos
-    $evento_lower = strtolower($evento_tipo);
-    $is_signed = in_array($evento_lower, [
-        'document.signed', 'signer.signed', 'signature.signed',
-        'signed', 'document_signed', 'signer_signed'
-    ]);
-    $is_cancelled = in_array($evento_lower, [
-        'document.cancelled', 'document.canceled', 'cancelled', 'canceled',
-        'document_cancelled', 'document.deleted'
-    ]);
-    $is_viewed = in_array($evento_lower, [
-        'document.viewed', 'viewed', 'document_viewed'
-    ]);
-    
-    if ($is_signed) {
+    // signature.accepted = signatário assinou
+    if ($evento_tipo === 'signature.accepted' && $signed_at) {
         log_webhook("=== PROCESSANDO ASSINATURA ===");
         
         $updated = false;
         
-        // Tenta atualizar por autentique_signer_id
-        if ($signer_id) {
+        // 1. Tenta match por autentique_signer_id (public_id)
+        if ($signer_public_id) {
             $stmt = $pdo->prepare("
                 UPDATE contratos_signatarios 
                 SET assinado = 1, data_assinatura = ?
                 WHERE autentique_signer_id = ? AND contrato_id = ?
             ");
-            $stmt->execute([$signed_at, $signer_id, $contrato_id]);
+            $stmt->execute([$signed_at, $signer_public_id, $contrato_id]);
             $updated = $stmt->rowCount() > 0;
-            log_webhook("Atualização por signer_id ($signer_id): " . ($updated ? 'SUCESSO' : 'NÃO ENCONTRADO'));
+            log_webhook("Match por autentique_signer_id ($signer_public_id): " . ($updated ? 'SIM' : 'NÃO'));
         }
         
-        // Se não encontrou por signer_id, tenta por email
+        // 2. Se não encontrou, tenta por email
         if (!$updated && $signer_email) {
             $stmt = $pdo->prepare("
                 UPDATE contratos_signatarios 
-                SET assinado = 1, data_assinatura = ?
+                SET assinado = 1, data_assinatura = ?, autentique_signer_id = ?
                 WHERE email = ? AND contrato_id = ? AND assinado = 0
                 LIMIT 1
             ");
-            $stmt->execute([$signed_at, $signer_email, $contrato_id]);
+            $stmt->execute([$signed_at, $signer_public_id, $signer_email, $contrato_id]);
             $updated = $stmt->rowCount() > 0;
-            log_webhook("Atualização por email ($signer_email): " . ($updated ? 'SUCESSO' : 'NÃO ENCONTRADO'));
+            log_webhook("Match por email ($signer_email): " . ($updated ? 'SIM' : 'NÃO'));
         }
         
+        // 3. Se ainda não encontrou, loga todos os signatários para debug
         if (!$updated) {
-            log_webhook("AVISO: Não foi possível atualizar nenhum signatário!");
-            log_webhook("Signatários do contrato:");
+            log_webhook("AVISO: Nenhum signatário atualizado!");
             $stmt = $pdo->prepare("SELECT id, tipo, nome, email, autentique_signer_id, assinado FROM contratos_signatarios WHERE contrato_id = ?");
             $stmt->execute([$contrato_id]);
-            $sigs = $stmt->fetchAll();
-            foreach ($sigs as $s) {
-                log_webhook("  - ID:{$s['id']} Tipo:{$s['tipo']} Nome:{$s['nome']} Email:{$s['email']} AutentiqueID:{$s['autentique_signer_id']} Assinado:{$s['assinado']}");
+            foreach ($stmt->fetchAll() as $s) {
+                log_webhook("  Signatário local: tipo={$s['tipo']} email={$s['email']} autentique_id={$s['autentique_signer_id']} assinado={$s['assinado']}");
             }
         }
         
-        // Verifica se todos assinaram
+        // Verifica se TODOS assinaram
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as total, SUM(assinado) as assinados
             FROM contratos_signatarios 
@@ -276,41 +217,95 @@ try {
         $stmt->execute([$contrato_id]);
         $stats = $stmt->fetch();
         
-        log_webhook("Status signatários: {$stats['assinados']}/{$stats['total']} assinaram");
+        log_webhook("Progresso: {$stats['assinados']}/{$stats['total']} assinaram");
         
         if ($stats && $stats['total'] > 0 && $stats['assinados'] == $stats['total']) {
             $stmt = $pdo->prepare("UPDATE contratos SET status = 'assinado' WHERE id = ?");
             $stmt->execute([$contrato_id]);
-            log_webhook("Contrato $contrato_id atualizado para ASSINADO (todos assinaram)");
-        } else {
-            // Só muda para aguardando se estiver em enviado
-            if (in_array($contrato['status'], ['enviado', 'rascunho'])) {
+            log_webhook(">>> Contrato $contrato_id TOTALMENTE ASSINADO!");
+        } elseif ($stats['assinados'] > 0 && $contrato['status'] !== 'assinado') {
+            $stmt = $pdo->prepare("UPDATE contratos SET status = 'aguardando' WHERE id = ?");
+            $stmt->execute([$contrato_id]);
+            log_webhook(">>> Contrato $contrato_id atualizado para AGUARDANDO");
+        }
+        
+    // signature.viewed = signatário visualizou
+    } elseif ($evento_tipo === 'signature.viewed') {
+        log_webhook("Documento visualizado por: $signer_email ($signer_name)");
+        
+    // signature.updated = atualização de signatário    
+    } elseif ($evento_tipo === 'signature.updated') {
+        log_webhook("Signatário atualizado: $signer_email ($signer_name)");
+        
+        // Se tem assinatura, processa como assinatura
+        if ($signed_at) {
+            log_webhook("signature.updated com signed_at - processando como assinatura");
+            
+            $updated = false;
+            if ($signer_public_id) {
+                $stmt = $pdo->prepare("
+                    UPDATE contratos_signatarios 
+                    SET assinado = 1, data_assinatura = ?
+                    WHERE autentique_signer_id = ? AND contrato_id = ?
+                ");
+                $stmt->execute([$signed_at, $signer_public_id, $contrato_id]);
+                $updated = $stmt->rowCount() > 0;
+            }
+            if (!$updated && $signer_email) {
+                $stmt = $pdo->prepare("
+                    UPDATE contratos_signatarios 
+                    SET assinado = 1, data_assinatura = ?, autentique_signer_id = ?
+                    WHERE email = ? AND contrato_id = ? AND assinado = 0
+                    LIMIT 1
+                ");
+                $stmt->execute([$signed_at, $signer_public_id, $signer_email, $contrato_id]);
+                $updated = $stmt->rowCount() > 0;
+            }
+            
+            log_webhook("Atualização: " . ($updated ? 'SUCESSO' : 'NÃO ENCONTRADO'));
+            
+            // Verifica se todos assinaram
+            $stmt = $pdo->prepare("SELECT COUNT(*) as total, SUM(assinado) as assinados FROM contratos_signatarios WHERE contrato_id = ?");
+            $stmt->execute([$contrato_id]);
+            $stats = $stmt->fetch();
+            
+            if ($stats && $stats['total'] > 0 && $stats['assinados'] == $stats['total']) {
+                $stmt = $pdo->prepare("UPDATE contratos SET status = 'assinado' WHERE id = ?");
+                $stmt->execute([$contrato_id]);
+                log_webhook(">>> Contrato $contrato_id TOTALMENTE ASSINADO!");
+            } elseif ($stats['assinados'] > 0) {
                 $stmt = $pdo->prepare("UPDATE contratos SET status = 'aguardando' WHERE id = ?");
                 $stmt->execute([$contrato_id]);
-                log_webhook("Contrato $contrato_id atualizado para AGUARDANDO");
             }
         }
         
-    } elseif ($is_cancelled) {
-        $stmt = $pdo->prepare("UPDATE contratos SET status = 'cancelado' WHERE id = ?");
-        $stmt->execute([$contrato_id]);
-        log_webhook("Contrato $contrato_id atualizado para CANCELADO");
+    // signature.rejected = signatário rejeitou
+    } elseif ($evento_tipo === 'signature.rejected') {
+        log_webhook("Assinatura REJEITADA por: $signer_email ($signer_name)");
+        $reason = $event_data['reason'] ?? 'Sem motivo informado';
+        log_webhook("Motivo: $reason");
         
-    } elseif ($is_viewed) {
-        log_webhook("Contrato $contrato_id foi visualizado");
+    // document.* = eventos de documento
+    } elseif (strpos($evento_tipo, 'document.') === 0) {
+        log_webhook("Evento de documento: $evento_tipo");
+        
+        if ($evento_tipo === 'document.cancelled' || $evento_tipo === 'document.deleted') {
+            $stmt = $pdo->prepare("UPDATE contratos SET status = 'cancelado' WHERE id = ?");
+            $stmt->execute([$contrato_id]);
+            log_webhook(">>> Contrato $contrato_id CANCELADO");
+        }
         
     } else {
-        log_webhook("Evento não reconhecido: $evento_tipo - nenhuma ação tomada");
+        log_webhook("Evento não tratado: $evento_tipo");
     }
     
-    // Resposta de sucesso
     http_response_code(200);
     echo json_encode(['success' => true, 'message' => 'Evento processado']);
-    log_webhook("=== FIM DO PROCESSAMENTO ===");
+    log_webhook("=== FIM ===");
     
 } catch (Exception $e) {
-    log_webhook('ERRO ao processar webhook: ' . $e->getMessage());
-    log_webhook('Stack trace: ' . $e->getTraceAsString());
-    http_response_code(200); // Responde 200 mesmo com erro para evitar retries
+    log_webhook('ERRO: ' . $e->getMessage());
+    log_webhook('Stack: ' . $e->getTraceAsString());
+    http_response_code(200); // Sempre 200 para evitar retries
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
