@@ -105,52 +105,127 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao reenviar: ' . $e->getMessage(), 'error');
             }
         }
-    } elseif ($acao === 'atualizar_status') {
-        // Atualiza status consultando Autentique
+    } elseif ($acao === 'sincronizar') {
+        // Sincroniza status consultando a API do Autentique
         if ($contrato['autentique_document_id']) {
             try {
                 $service = new AutentiqueService();
+                log_contrato("=== SINCRONIZAÇÃO MANUAL - Contrato ID: $contrato_id ===");
+                log_contrato("Document ID Autentique: " . $contrato['autentique_document_id']);
+                
                 $status_autentique = $service->consultarStatus($contrato['autentique_document_id']);
+                log_contrato("Resposta Autentique: " . json_encode($status_autentique, JSON_UNESCAPED_UNICODE));
                 
                 if ($status_autentique) {
-                    // Atualiza status do contrato
-                    $novo_status = 'aguardando';
+                    $signers_api = $status_autentique['signers'] ?? [];
                     $todos_assinados = true;
+                    $algum_assinado = false;
+                    $atualizacoes = [];
                     
-                    foreach ($status_autentique['signers'] ?? [] as $signer) {
-                        if (!$signer['signed']) {
+                    // Busca signatários locais
+                    $stmt_local = $pdo->prepare("SELECT * FROM contratos_signatarios WHERE contrato_id = ? ORDER BY ordem_assinatura");
+                    $stmt_local->execute([$contrato_id]);
+                    $signatarios_locais = $stmt_local->fetchAll();
+                    
+                    log_contrato("Signatários da API: " . count($signers_api));
+                    log_contrato("Signatários locais: " . count($signatarios_locais));
+                    
+                    foreach ($signers_api as $signer) {
+                        $signer_id = $signer['id'] ?? null;
+                        $signer_email = $signer['email'] ?? null;
+                        $signer_signed = $signer['signed'] ?? false;
+                        $signer_signed_at = $signer['signedAt'] ?? null;
+                        $signer_link = $signer['link'] ?? null;
+                        
+                        log_contrato("API Signer: ID=$signer_id Email=$signer_email Signed=" . ($signer_signed ? 'SIM' : 'NAO'));
+                        
+                        if (!$signer_signed) {
                             $todos_assinados = false;
-                            break;
+                        } else {
+                            $algum_assinado = true;
                         }
+                        
+                        // Tenta match por autentique_signer_id
+                        $updated = false;
+                        if ($signer_id) {
+                            $stmt = $pdo->prepare("
+                                UPDATE contratos_signatarios 
+                                SET assinado = ?, data_assinatura = ?, autentique_signer_id = COALESCE(autentique_signer_id, ?), link_publico = COALESCE(link_publico, ?)
+                                WHERE autentique_signer_id = ? AND contrato_id = ?
+                            ");
+                            $stmt->execute([
+                                $signer_signed ? 1 : 0,
+                                $signer_signed_at,
+                                $signer_id,
+                                $signer_link,
+                                $signer_id,
+                                $contrato_id
+                            ]);
+                            $updated = $stmt->rowCount() > 0;
+                        }
+                        
+                        // Se não encontrou por ID, tenta por email
+                        if (!$updated && $signer_email) {
+                            $stmt = $pdo->prepare("
+                                UPDATE contratos_signatarios 
+                                SET assinado = ?, data_assinatura = ?, autentique_signer_id = COALESCE(autentique_signer_id, ?), link_publico = COALESCE(link_publico, ?)
+                                WHERE email = ? AND contrato_id = ?
+                            ");
+                            $stmt->execute([
+                                $signer_signed ? 1 : 0,
+                                $signer_signed_at,
+                                $signer_id,
+                                $signer_link,
+                                $signer_email,
+                                $contrato_id
+                            ]);
+                            $updated = $stmt->rowCount() > 0;
+                        }
+                        
+                        $atualizacoes[] = [
+                            'email' => $signer_email,
+                            'signed' => $signer_signed,
+                            'matched' => $updated
+                        ];
+                        
+                        log_contrato("Match local: " . ($updated ? 'SIM' : 'NÃO'));
                     }
                     
-                    if ($todos_assinados) {
+                    // Atualiza status do contrato
+                    if ($todos_assinados && count($signers_api) > 0) {
                         $novo_status = 'assinado';
+                    } elseif ($algum_assinado) {
+                        $novo_status = 'aguardando';
+                    } else {
+                        $novo_status = $contrato['status']; // Mantém
                     }
                     
-                    $stmt = $pdo->prepare("UPDATE contratos SET status = ? WHERE id = ?");
-                    $stmt->execute([$novo_status, $contrato_id]);
-                    
-                    // Atualiza signatários
-                    foreach ($status_autentique['signers'] ?? [] as $signer) {
-                        $stmt = $pdo->prepare("
-                            UPDATE contratos_signatarios 
-                            SET assinado = ?, data_assinatura = ?
-                            WHERE autentique_signer_id = ? AND contrato_id = ?
-                        ");
-                        $stmt->execute([
-                            $signer['signed'] ? 1 : 0,
-                            $signer['signedAt'] ?? null,
-                            $signer['id'],
-                            $contrato_id
-                        ]);
+                    if ($novo_status !== $contrato['status']) {
+                        $stmt = $pdo->prepare("UPDATE contratos SET status = ? WHERE id = ?");
+                        $stmt->execute([$novo_status, $contrato_id]);
+                        log_contrato("Status atualizado: {$contrato['status']} -> $novo_status");
                     }
                     
-                    redirect('contrato_view.php?id=' . $contrato_id, 'Status atualizado com sucesso!', 'success');
+                    // Monta mensagem de feedback
+                    $matched = count(array_filter($atualizacoes, fn($a) => $a['matched']));
+                    $signed = count(array_filter($atualizacoes, fn($a) => $a['signed']));
+                    $msg = "Sincronizado! $signed/" . count($signers_api) . " assinatura(s). $matched signatário(s) atualizados.";
+                    
+                    if ($novo_status !== $contrato['status']) {
+                        $msg .= " Status: " . ucfirst($novo_status) . ".";
+                    }
+                    
+                    log_contrato("=== FIM SINCRONIZAÇÃO ===");
+                    redirect('contrato_view.php?id=' . $contrato_id, $msg, 'success');
+                } else {
+                    redirect('contrato_view.php?id=' . $contrato_id, 'Não foi possível obter dados do Autentique.', 'warning');
                 }
             } catch (Exception $e) {
-                redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao atualizar: ' . $e->getMessage(), 'error');
+                log_contrato("ERRO sincronização: " . $e->getMessage());
+                redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao sincronizar: ' . $e->getMessage(), 'error');
             }
+        } else {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Este contrato não possui ID do Autentique.', 'warning');
         }
     }
 }
@@ -203,16 +278,40 @@ require_once __DIR__ . '/../includes/header.php';
             </ul>
         </div>
         <div class="d-flex align-items-center gap-2 gap-lg-3">
-            <?php if ($contrato['status'] !== 'assinado' && $contrato['status'] !== 'cancelado'): ?>
-            <form method="POST" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja cancelar este contrato?');">
-                <input type="hidden" name="acao" value="cancelar">
-                <button type="submit" class="btn btn-light-danger">Cancelar Contrato</button>
+            <?php if ($contrato['autentique_document_id']): ?>
+            <form method="POST" style="display: inline;" id="form_sincronizar">
+                <input type="hidden" name="acao" value="sincronizar">
+                <button type="submit" class="btn btn-primary" id="btn_sincronizar">
+                    <i class="ki-duotone ki-arrows-circle fs-4 me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <span class="indicator-label">Sincronizar com Autentique</span>
+                    <span class="indicator-progress">Sincronizando...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                    </span>
+                </button>
             </form>
             <?php endif; ?>
-            <?php if ($contrato['autentique_document_id']): ?>
-            <form method="POST" style="display: inline;">
-                <input type="hidden" name="acao" value="atualizar_status">
-                <button type="submit" class="btn btn-light-primary">Atualizar Status</button>
+            <?php if ($contrato['status'] === 'rascunho'): ?>
+            <a href="contrato_enviar.php?id=<?= $contrato_id ?>" class="btn btn-light-success">
+                <i class="ki-duotone ki-send fs-4 me-1">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Enviar para Assinatura
+            </a>
+            <?php endif; ?>
+            <?php if ($contrato['status'] !== 'assinado' && $contrato['status'] !== 'cancelado'): ?>
+            <form method="POST" style="display: inline;" id="form_cancelar">
+                <input type="hidden" name="acao" value="cancelar">
+                <button type="button" class="btn btn-light-danger" id="btn_cancelar">
+                    <i class="ki-duotone ki-cross-circle fs-4 me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Cancelar Contrato
+                </button>
             </form>
             <?php endif; ?>
             <a href="contratos.php" class="btn btn-light">Voltar</a>
@@ -427,9 +526,51 @@ document.querySelectorAll('.btn-copiar-link').forEach(btn => {
     btn.addEventListener('click', function() {
         const link = this.getAttribute('data-link');
         navigator.clipboard.writeText(link).then(() => {
-            alert('Link copiado para a área de transferência!');
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Link copiado!',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+            } else {
+                alert('Link copiado para a área de transferência!');
+            }
         });
     });
+});
+
+// Botão sincronizar - loading
+document.getElementById('form_sincronizar')?.addEventListener('submit', function() {
+    const btn = document.getElementById('btn_sincronizar');
+    if (btn) {
+        btn.setAttribute('data-kt-indicator', 'on');
+        btn.disabled = true;
+    }
+});
+
+// Botão cancelar - confirmação com SweetAlert
+document.getElementById('btn_cancelar')?.addEventListener('click', function() {
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: 'Cancelar Contrato',
+            html: 'Tem certeza que deseja cancelar este contrato?<br><small class="text-muted">Esta ação tentará cancelar também no Autentique.</small>',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sim, cancelar',
+            cancelButtonText: 'Não'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('form_cancelar').submit();
+            }
+        });
+    } else {
+        if (confirm('Tem certeza que deseja cancelar este contrato?')) {
+            document.getElementById('form_cancelar').submit();
+        }
+    }
 });
 </script>
 
