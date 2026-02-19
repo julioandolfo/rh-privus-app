@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'add') {
-        $colaborador_id = (int)($_POST['colaborador_id'] ?? 0);
+        $colaborador_id = parse_colaborador_id($_POST['colaborador_id'] ?? '');
         $data_trabalho = $_POST['data_trabalho'] ?? date('Y-m-d');
         $quantidade_horas = str_replace(',', '.', $_POST['quantidade_horas'] ?? '0');
         $observacoes = sanitize($_POST['observacoes'] ?? '');
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('horas_extras.php', 'Erro ao salvar: ' . $e->getMessage(), 'error');
         }
     } elseif ($action === 'remover_horas') {
-        $colaborador_id = (int)($_POST['colaborador_id'] ?? 0);
+        $colaborador_id = parse_colaborador_id($_POST['colaborador_id'] ?? '');
         $quantidade_horas = str_replace(',', '.', $_POST['quantidade_horas'] ?? '0');
         $motivo = sanitize($_POST['motivo'] ?? '');
         $observacoes = sanitize($_POST['observacoes'] ?? '');

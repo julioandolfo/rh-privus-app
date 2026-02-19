@@ -17,7 +17,7 @@ $colaborador_id = $_GET['colaborador_id'] ?? null;
 
 // Processa POST ANTES de incluir o header (para evitar erro de headers already sent)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $colaborador_id = $_POST['colaborador_id'] ?? null;
+    $colaborador_id = parse_colaborador_id($_POST['colaborador_id'] ?? '') ?: null;
     $tipo_ocorrencia_id = $_POST['tipo_ocorrencia_id'] ?? null;
     $tipo = sanitize($_POST['tipo'] ?? ''); // Mantido para compatibilidade
     $descricao = sanitize($_POST['descricao'] ?? '');

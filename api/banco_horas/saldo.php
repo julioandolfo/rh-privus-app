@@ -22,8 +22,7 @@ if (empty($colaborador_id)) {
 }
 
 // Remove prefixo c_ ou u_ (gerado pelo select de colaboradores)
-$colaborador_id = preg_replace('/^[cu]_/', '', trim($colaborador_id));
-$colaborador_id = (int)$colaborador_id;
+$colaborador_id = parse_colaborador_id($colaborador_id);
 
 // Verifica permissão
 if (!can_access_colaborador($colaborador_id)) {

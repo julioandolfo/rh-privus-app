@@ -306,6 +306,14 @@ function sanitize($data) {
 }
 
 /**
+ * Converte colaborador_id do formato do select (c_45, u_12) para inteiro puro
+ */
+function parse_colaborador_id($value) {
+    if (empty($value)) return 0;
+    return (int)preg_replace('/^[cu]_/', '', trim($value));
+}
+
+/**
  * Retorna mensagem de alerta (Metronic Theme)
  */
 function get_alert($tipo, $mensagem) {

@@ -20,7 +20,7 @@ $colaborador_id = $_GET['colaborador_id'] ?? null;
 
 // Processa POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $colaborador_id = $_POST['colaborador_id'] ?? null;
+    $colaborador_id = parse_colaborador_id($_POST['colaborador_id'] ?? '') ?: null;
     $tipo_ocorrencia_id = !empty($_POST['tipo_ocorrencia_id']) ? (int)$_POST['tipo_ocorrencia_id'] : null;
     $severidade = $_POST['severidade'] ?? 'moderada';
     $motivo = sanitize($_POST['motivo'] ?? '');

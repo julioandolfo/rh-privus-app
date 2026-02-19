@@ -45,7 +45,7 @@ $colaborador_id = $ocorrencia_existente['colaborador_id'];
 // Processa POST ANTES de incluir o header (para evitar erro de headers already sent)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ocorrencia_id_edit = $_POST['ocorrencia_id'] ?? $ocorrencia_id;
-    $colaborador_id = $_POST['colaborador_id'] ?? null;
+    $colaborador_id = parse_colaborador_id($_POST['colaborador_id'] ?? '') ?: null;
     // TIPO DE OCORRÊNCIA NÃO PODE SER ALTERADO - usa o existente
     $tipo_ocorrencia_id = $ocorrencia_existente['tipo_ocorrencia_id'];
     $tipo = sanitize($_POST['tipo'] ?? ''); // Mantido para compatibilidade
