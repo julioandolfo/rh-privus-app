@@ -1,23 +1,4 @@
--- =============================================================
--- Migração: Template de Contrato de Representação Comercial
--- Versão com estilos inline (corrigido)
--- =============================================================
-
--- Remove template anterior se existir
-DELETE FROM contratos_templates WHERE nome = 'Contrato de Representação Comercial';
-
--- Insere o template de Representação Comercial (com estilos inline)
-INSERT INTO contratos_templates (
-    nome,
-    descricao,
-    conteudo_html,
-    variaveis_disponiveis,
-    ativo,
-    criado_por_usuario_id
-) VALUES (
-    'Contrato de Representação Comercial',
-    'Contrato padrão de representação comercial conforme Lei 4.886/65. Inclui cláusulas de não exclusividade, comissões, sigilo e demais obrigações das partes.',
-    '<div style="font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; max-width: 800px; margin: 0 auto; padding: 20px;">
+<div style="font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; max-width: 800px; margin: 0 auto; padding: 20px;">
 
 <h1 style="text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 30px; text-transform: uppercase;">CONTRATO DE REPRESENTAÇÃO COMERCIAL</h1>
 
@@ -154,44 +135,4 @@ INSERT INTO contratos_templates (
 </div>
 </div>
 
-</div>',
-    '[
-        "colaborador.nome_completo",
-        "colaborador.cpf",
-        "colaborador.endereco_completo",
-        "colaborador.cidade",
-        "colaborador.regiao",
-        "empresa.razao_social",
-        "empresa.nome_fantasia",
-        "empresa.cnpj",
-        "empresa.endereco",
-        "empresa.cidade",
-        "empresa.estado",
-        "empresa.email",
-        "representante.nome",
-        "representante.cpf",
-        "representante.endereco",
-        "representante.cidade",
-        "contrato.valor_pedido",
-        "contrato.valor_pedido_extenso",
-        "contrato.valor_cliente_novo",
-        "contrato.valor_cliente_novo_extenso",
-        "contrato.ajuda_custo",
-        "contrato.ajuda_custo_extenso",
-        "contrato.percentual_minimo",
-        "contrato.percentual_minimo_extenso",
-        "contrato.percentual_maximo",
-        "contrato.percentual_maximo_extenso",
-        "contrato.bonificacao",
-        "contrato.bonificacao_extenso",
-        "contrato.valor_kit",
-        "contrato.valor_kit_extenso",
-        "testemunha1.nome",
-        "testemunha1.cpf",
-        "testemunha2.nome",
-        "testemunha2.cpf",
-        "data_formatada"
-    ]',
-    1,
-    1
-);
+</div>
