@@ -67,6 +67,7 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
         '{{colaborador.salario}}' => formatar_moeda($colaborador['salario'] ?? 0),
         '{{colaborador.salario_extenso}}' => numero_por_extenso($colaborador['salario'] ?? 0),
         '{{colaborador.data_admissao}}' => formatar_data($colaborador['data_admissao'] ?? ''),
+        '{{colaborador.regiao}}' => $colaborador['regiao'] ?? '',
     ];
     
     // Dados da empresa (contratante)
@@ -221,6 +222,7 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
         'colaborador.estado' => ['valor' => $colaborador['estado_endereco'] ?? $colaborador['estado'] ?? '', 'label' => 'Estado do Colaborador', 'tipo' => 'text'],
         'colaborador.cep' => ['valor' => $colaborador['cep'] ?? '', 'label' => 'CEP do Colaborador', 'tipo' => 'text'],
         'colaborador.salario' => ['valor' => $colaborador['salario'] ?? 0, 'label' => 'Salário/Valor Mensal', 'tipo' => 'number'],
+        'colaborador.regiao' => ['valor' => $colaborador['regiao'] ?? '', 'label' => 'Região do Colaborador', 'tipo' => 'text'],
         
         // Empresa
         'empresa.nome_fantasia' => ['valor' => $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '', 'label' => 'Nome Fantasia da Empresa', 'tipo' => 'text'],
@@ -351,6 +353,7 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
         '{{colaborador.salario}}' => formatar_moeda($colaborador['salario'] ?? 0),
         '{{colaborador.salario_extenso}}' => numero_por_extenso($colaborador['salario'] ?? 0),
         '{{colaborador.data_admissao}}' => formatar_data($colaborador['data_admissao'] ?? ''),
+        '{{colaborador.regiao}}' => $colaborador['regiao'] ?? '',
     ];
     
     // Dados da empresa (contratante)

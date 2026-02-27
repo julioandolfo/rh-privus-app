@@ -14,6 +14,17 @@ $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 $id = $_GET['id'] ?? 0;
 
+// Migração automática: verifica e adiciona coluna 'regiao' se não existir
+try {
+    $stmt_check = $pdo->query("SHOW COLUMNS FROM colaboradores LIKE 'regiao'");
+    if (!$stmt_check->fetch()) {
+        $pdo->exec("ALTER TABLE colaboradores ADD COLUMN regiao VARCHAR(100) NULL COMMENT 'Região do colaborador para uso em contratos' AFTER estado_endereco");
+        error_log('Migração automática: Coluna regiao adicionada à tabela colaboradores');
+    }
+} catch (Exception $e) {
+    error_log('Erro na migração automática do campo regiao: ' . $e->getMessage());
+}
+
 // Busca colaborador
 $stmt = $pdo->prepare("SELECT * FROM colaboradores WHERE id = ?");
 $stmt->execute([$id]);
@@ -95,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bairro = sanitize($_POST['bairro'] ?? '');
     $cidade_endereco = sanitize($_POST['cidade_endereco'] ?? '');
     $estado_endereco = strtoupper(sanitize($_POST['estado_endereco'] ?? ''));
+    $regiao = sanitize($_POST['regiao'] ?? '');
     $descricao_funcao = sanitize($_POST['descricao_funcao'] ?? '');
     
     // Validação: não pode ser líder de si mesmo
@@ -142,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             SET empresa_id = ?, setor_id = ?, cargo_id = ?, nivel_hierarquico_id = ?, lider_id = ?, 
                 nome_completo = ?, cpf = ?, cnpj = ?, rg = ?, data_nascimento = ?, estado_civil = ?, telefone = ?, email_pessoal = ?, 
                 data_inicio = ?, status = ?, tipo_contrato = ?, salario = ?, pix = ?, banco = ?, agencia = ?, conta = ?, tipo_conta = ?, 
-                cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade_endereco = ?, estado_endereco = ?, 
+                cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade_endereco = ?, estado_endereco = ?, regiao = ?,
                 descricao_funcao = ?, observacoes = ?, foto = ?, senha_hash = ?
             WHERE id = ?
         ");
@@ -150,8 +162,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $empresa_id, $setor_id, $cargo_id, $nivel_hierarquico_id, $lider_id, $nome_completo, $cpf, 
             !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $estado_civil ?: null, $telefone, $email_pessoal, $data_inicio, 
             $status, $tipo_contrato, $salario, $pix, $banco, $agencia, $conta, $tipo_conta, 
-            !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco, 
-            !empty($estado_endereco) ? $estado_endereco : null, $descricao_funcao, $observacoes, $foto_path, $senha_hash, $id
+            !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco,
+            !empty($estado_endereco) ? $estado_endereco : null, $regiao, $descricao_funcao, $observacoes, $foto_path, $senha_hash, $id
         ]);
         
         // Processa filhos (remove todos e adiciona novamente)
@@ -593,8 +605,13 @@ require_once __DIR__ . '/../includes/header.php';
                                 <label class="form-label">Estado (UF)</label>
                                 <input type="text" name="estado_endereco" id="estado_endereco" class="form-control" maxlength="2" value="<?= htmlspecialchars($colaborador['estado_endereco'] ?? '') ?>" placeholder="SP">
                             </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Região</label>
+                                <input type="text" name="regiao" id="regiao" class="form-control" value="<?= htmlspecialchars($colaborador['regiao'] ?? '') ?>" placeholder="Ex: Sudeste, Nordeste, etc">
+                                <div class="form-text">Usado em templates de contrato</div>
+                            </div>
                         </div>
-                        
+
                         <hr>
                         <h5 class="mb-3">Dados Bancários</h5>
                         

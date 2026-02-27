@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Contrato de Representação Comercial</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12pt;
+            line-height: 1.5;
+            text-align: justify;
+            margin: 2cm;
+        }
+        h1 {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .clausula {
+            font-weight: bold;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+        .subclausula {
+            margin-left: 20px;
+            margin-bottom: 5px;
+        }
+        .bullet {
+            margin-left: 40px;
+            margin-bottom: 5px;
+        }
+        .assinatura {
+            margin-top: 40px;
+            text-align: center;
+        }
+        .data-local {
+            text-align: center;
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        .testemunhas {
+            margin-top: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        td {
+            vertical-align: top;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>CONTRATO DE REPRESENTAÇÃO COMERCIAL</h1>
+
+<p>Pelo presente instrumento particular de contrato de representação comercial que fazem entre si de um lado,</p>
+
+<p><strong>A)</strong> {{empresa.razao_social}}, pessoa jurídica de direito privado, devidamente inscrita no CNPJ/MF sob nº {{empresa.cnpj}}, estabelecida na {{empresa.endereco}}, na cidade de {{empresa.cidade}}/{{empresa.estado}}, neste ato representada por seu sócio administrador, Sr. {{representante.nome}}, brasileiro, casado, empresário, devidamente inscrito no CPF/MF sob nº {{representante.cpf}}, residente e domiciliado na {{representante.endereco}}, na cidade de {{representante.cidade}}, de ora em diante denominada simplesmente <strong>REPRESENTADA</strong> e, de outro lado,</p>
+
+<p><strong>B)</strong> {{colaborador.nome_completo}}, brasileiro, empresário, devidamente inscrito no CPF/MF sob nº {{colaborador.cpf}}, residente e domiciliado na {{colaborador.endereco_completo}}, na cidade de {{colaborador.cidade}}, doravante denominado simplesmente <strong>REPRESENTANTE</strong>, resolvem regular suas relações de representação comercial segundo as cláusulas e condições seguintes:</p>
+
+<div class="clausula">CLÁUSULA PRIMEIRA</div>
+<div class="subclausula">1.1 A REPRESENTADA confere à REPRESENTANTE, a representação comercial de todos os artigos de sua revenda com as marcas representadas pela {{empresa.nome_fantasia}}.</div>
+
+<div class="clausula">CLÁUSULA SEGUNDA</div>
+<div class="subclausula">2.1 O presente contrato inicia-se nesta data e terá prazo indeterminado de duração.</div>
+
+<div class="clausula">CLÁUSULA TERCEIRA</div>
+<div class="subclausula">3.1 A REPRESENTANTE desempenhará suas atividades de representação comercial promovendo a venda dos produtos da REPRESENTADA nas seguintes cidades: <strong>{{colaborador.regiao}}</strong>.</div>
+<div class="subclausula">3.2 A região de atuação do REPRESENTANTE compreende a seguinte área: <strong>{{colaborador.regiao}}</strong>, conforme detalhamento acima.</div>
+
+<div class="clausula">CLÁUSULA QUARTA</div>
+<div class="subclausula">4.1 A REPRESENTANTE receberá o valor de R$ {{contrato.valor_pedido}},00 ({{contrato.valor_pedido_extenso}}) por pedido efetivamente realizado. Caso o pedido seja de um cliente novo, será acrescido o valor adicional de R$ {{contrato.valor_cliente_novo}},00 ({{contrato.valor_cliente_novo_extenso}}). Os valores referentes à bonificação semanal serão pagos sempre na segunda-feira subsequente ao fechamento da respectiva semana. Além disso, será concedida uma ajuda de custo no valor de R$ {{contrato.ajuda_custo}},00 ({{contrato.ajuda_custo_extenso}}) mensais, limitada aos três primeiros meses de vigência do presente contrato.</div>
+
+<div class="subclausula">4.2 Sobre a comissão, esta corresponderá a um percentual variável sobre as vendas mensais líquidas (aquelas vendas que auferirem os valores contidos na cláusula 4.1), sendo esse percentual entre {{contrato.percentual_minimo}}% ({{contrato.percentual_minimo_extenso}}) a {{contrato.percentual_maximo}}% ({{contrato.percentual_maximo_extenso}}), conforme política comercial adotada sobre os produtos comercializados, sabendo-se que a REPRESENTADA poderá implementar campanhas que gerem à REPRESENTANTE comissões adicionais (prêmios e/ou acréscimo percentual nas comissões já estabelecidas).</div>
+
+<div class="subclausula">4.3 A REPRESENTANTE receberá as comissões semanalmente, em todo 2º (segundo) dia útil da semana subsequente aos pedidos de venda da semana anterior que estiverem com status de "entregue" no sistema, entretanto, caso haja inadimplemento por parte do comprador, após 07 (sete) dias de vencimento da duplicata, o valor total da comissão recebida pela venda será descontado dos pagamentos das comissões futuras e no que se refere às comissões adicionais (prêmios e/ou percentual nas comissões já estabelecidas), convenciona-se que os pagamentos serão realizados toda terça-feira após o dia 15 (quinze) do mês subsequente à realização das referidas campanhas.</div>
+
+<div class="subclausula">4.4 Sendo o prêmio não oneroso, ou seja, que não tenha a sua natureza em espécie (dinheiro), por exemplo: vale jantar, tanque cheio, vale almoço, "day use", hospedagem, etc., este deverá ser usufruído em até 15(quinze) dias após o anúncio do recebimento, sob pena de expirar o direito de fruição.</div>
+
+<div class="subclausula">4.5 Fica expressamente estabelecido que a representação comercial objeto deste contrato é concedida em caráter <strong>NÃO EXCLUSIVO</strong>. A REPRESENTADA reserva-se o direito de, na mesma zona de atuação do REPRESENTANTE, nomear outros representantes, realizar vendas diretas ou efetuar negócios por meio de quaisquer outros canais que julgar convenientes.</div>
+
+<div class="bullet">• Em decorrência da não exclusividade, o REPRESENTANTE fará jus à comissão exclusivamente sobre os pedidos de venda por ele diretamente prospectados e intermediados, não lhe sendo devida qualquer remuneração sobre negócios realizados na mesma zona pela REPRESENTADA ou por terceiros.</div>
+
+<div class="subclausula">4.6 Nenhuma retribuição será devida à REPRESENTANTE se a falta de pagamento resultar de insolvência do comprador, bem como se o negócio vier a ser por ele desfeito, ou for sustada a entrega da mercadoria por ser duvidosa a liquidação.</div>
+
+<div class="subclausula">4.7 A título de bonificação por produtividade, a REPRESENTANTE receberá o valor de R$ {{contrato.bonificacao}},00 ({{contrato.bonificacao_extenso}}) por pedido de venda efetivamente realizado e faturado pela REPRESENTADA. Os valores referentes à bonificação por produtividade serão apurados semanalmente e pagos à REPRESENTANTE na semana subsequente à da realização dos pedidos.</div>
+
+<div class="subclausula">4.8 No ato da assinatura do presente instrumento, o REPRESENTANTE receberá uma pasta/bolsa contendo alguns produtos comercializados e distribuídos pela REPRESENTADA, avaliados em R$ {{contrato.valor_kit}},00 ({{contrato.valor_kit_extenso}}) (pasta + produtos + catálogos e outros itens), podendo utilizar-se deste instrumento para realizar as vendas, proceder à demonstração dos produtos aos clientes, ficando certo entre as partes que o REPRESENTANTE deve zelar pela pasta/bolsa, assim como pelos os objetos ali contidos, não devendo rasurar catálogos e documentos, alterar preços, recortar ou mudar layout, estragar os produtos ou usá-los, sabendo-se inclusive que ao término do presente contrato, os objetos, bolsa/pasta, catálogos e demais itens devem ser integralmente restituídos à REPRESENTADA, da mesma maneira que no início foi fornecida, sob pena de ser descontado o valor de eventuais comissões.</div>
+
+<div class="clausula">CLÁUSULA QUINTA</div>
+<div class="subclausula">5.1 A REPRESENTANTE poderá exercer suas atividades para outras representadas ou efetuar negócios em seu nome e por conta própria, desde que não se trate de atividade que resulte em concorrência à REPRESENTADA e desde que a carteira de clientes desta seja integralmente atendida de acordo com as regiões referidas na Cláusula 3.1.</div>
+
+<div class="subclausula">5.2 Em caso de rescisão do presente contrato, por qualquer motivo, o REPRESENTANTE se obriga a não exercer, por si ou por intermédio de terceiros, atividades de representação comercial de produtos concorrentes aos da REPRESENTADA, na mesma zona de atuação descrita na Cláusula Terceira, pelo prazo de 12 (doze) meses.</div>
+
+<div class="clausula">CLÁUSULA SEXTA</div>
+<div class="subclausula">6.1 São deveres da REPRESENTANTE para com a REPRESENTADA:</div>
+<div class="bullet">a) ofertar aos compradores/clientes todos os produtos disponibilizados pela REPRESENTADA;</div>
+<div class="bullet">b) oferecer acompanhamento periódico e sucessivo aos compradores/clientes;</div>
+<div class="bullet">c) adquirir conhecimentos técnicos dos produtos da REPRESENTADA, quando for o caso;</div>
+<div class="bullet">d) estabelecer rotas de atendimento e de vendas a todos os clientes ativos da região estabelecida de forma que o abastecimento e reposição sejam feitas dentro das necessidades que o mercado requer, tudo a sua livre escolha;</div>
+<div class="bullet">e) defender e informar a REPRESENTADA sobre qualquer irregularidade que possa denegrir o nome desta ou dos produtos;</div>
+<div class="bullet">f) fornecer todas as informações solicitadas dos negócios em andamento;</div>
+<div class="bullet">g) expandir e promover os produtos oferecidos pela REPRESENTADA, realizando visitas periódicas aos clientes efetivos e potenciais de modo a alcançar uma maior integração com os mesmos;</div>
+<div class="bullet">h) arcar com todos os encargos de natureza previdenciária, tributária (federal, estadual e municipal), trabalhista e outras que incidam sobre sua atividade, bem como as decorrentes da presente representação comercial;</div>
+<div class="bullet">i) apresentar todos os documentos fiscais e contábeis para conferência de regularidade das suas obrigações para com o Fisco;</div>
+<div class="bullet">j) não conceder descontos, abatimentos ou dilações, salvo autorização expressa e por escrito da REPRESENTADA;</div>
+<div class="bullet">k) informar e manter atualizado um cadastro dos clientes;</div>
+<div class="bullet">l) manter-se registrado junto ao Conselho Regional dos Representantes Comerciais;</div>
+<div class="bullet">m) comunicar imediatamente a REPRESENTADA no caso de ocorrer qualquer problema com seus registros junto ao CORE.</div>
+<div class="bullet">n) emitir Notas Fiscais referente os valores de respectivas comissões e ajudas de custo (se aplicável) a serem recebidas até o 1º (primeiro) dia útil subsequente à apuração das comissões, informando inclusive chave PIX ou conta bancária de titularidade da Pessoa Jurídica a que faz uso para a representação ajustada pelo presente instrumento, com o envio para o e-mail financeiro@{{empresa.email}}.</div>
+<div class="bullet">o) o conhecimento e participação dos assuntos tratados em reuniões semanais do tipo "on line" e mensalmente do tipo presencial, ocasiões em que serão tratados os casos relacionados às vendas, apresentação de campanhas, apresentação de resultados, etc.</div>
+<div class="bullet">p) a indicação e preenchimento via sistema dos clientes e cidades visitados enquanto durar a prestação de serviços, a fim de que a REPRESENTADA faça as devidas apurações de atendimento das rotas e clientes.</div>
+<div class="bullet">q) Cumprir integralmente as disposições da Lei Geral de Proteção de Dados Pessoais (Lei n.º 13.709/2018), tratando os dados pessoais de clientes e potenciais clientes a que tiver acesso exclusivamente para os fins deste contrato, agindo na qualidade de Operador de Dados e sob as diretrizes da REPRESENTADA (Controladora). Fica o REPRESENTANTE obrigado a adotar medidas de segurança para proteger os dados e a comunicar imediatamente à REPRESENTADA qualquer incidente de segurança que possa acarretar risco ou dano relevante aos titulares, responsabilizando-se integralmente por quaisquer multas, sanções ou indenizações decorrentes de sua negligência ou descumprimento da legislação.</div>
+
+<div class="subclausula">6.2 A REPRESENTANTE não exerce nenhuma espécie de subordinação em relação à REPRESENTADA, tendo a mesmo total autonomia para organizar e administrar suas atividades de representante comercial, devendo se insurgir de imediato e por escrito caso considere que referida cláusula não esteja sendo atendida, por qualquer motivo, respeitando assim a boa-fé objetiva da presente contratação.</div>
+
+<div class="clausula">CLÁUSULA SÉTIMA</div>
+<div class="subclausula">7.1 A REPRESENTANTE poderá possuir empregados, terceirizados, auxiliares etc., porém todos os custos, encargos e remunerações serão de sua exclusiva responsabilidade.</div>
+
+<div class="subclausula">7.2 A REPRESENTANTE, seus empregados ou colaboradores, prestarão serviços com ampla, total e irrestrita autonomia, sem qualquer tipo de subordinação jurídica com a REPRESENTADA, não estabelecendo nenhum tipo de vínculo empregatício entre as partes.</div>
+
+<div class="subclausula">7.3 Eventual demanda civil ou trabalhista envolvendo a REPRESENTADA em virtude de relações com a REPRESENTANTE, deve-se, em um prazo de 24 (vinte e quatro) horas, ser reembolsado por esta, todas as despesas e custas advindas, sob pena de ter suas comissões retidas até que o débito seja quitado.</div>
+
+<div class="clausula">CLÁUSULA OITAVA</div>
+<div class="subclausula">8.1 São deveres da REPRESENTADA para com a REPRESENTANTE:</div>
+<div class="bullet">a) fabricar e/ou fornecer os produtos divulgados em suas listas de preços e objeto de agenciamento por parte do Representante;</div>
+<div class="bullet">b) faturar e entregar em tempo hábil aos compradores/clientes todos os pedidos aprovados segundo as normas internas da REPRESENTADA;</div>
+<div class="bullet">c) dar suporte à REPRESENTANTE no tocante à apresentação da empresa e dos produtos oferecidos, como manual de apresentação de produtos;</div>
+<div class="bullet">d) suprir a REPRESENTANTE com materiais de apoio para o abastecimento PDV;</div>
+<div class="bullet">e) fornecer as informações sobre vendas parciais ou totais do mês à REPRESENTANTE, quando solicitadas;</div>
+<div class="bullet">f) fornecer formulários de pedidos de vendas e outros materiais de controles personalizados;</div>
+<div class="bullet">g) promover, sempre que possível, abatimento sobre preços dos produtos em forma de "Promoção", a fim de fazer frente aos concorrentes;</div>
+<div class="bullet">h) manter sigilo sobre os valores das comissões recebidas e das atividades decorrentes deste contrato;</div>
+<div class="bullet">i) satisfazer as comissões devidas à REPRESENTANTE, conforme previsto em cláusula específica deste contrato;</div>
+<div class="bullet">j) manter relatório sintético dos pedidos sujeitos às comissões devidas a REPRESENTANTE.</div>
+
+<div class="clausula">CLÁUSULA NONA</div>
+<div class="subclausula">9.1 A REPRESENTANTE fica obrigada a fornecer à REPRESENTADA, quando lhe for solicitado, informações detalhadas sobre o andamento dos negócios a seu cargo, devendo dedicar-se à representação de modo a expandir os negócios da REPRESENTADA promovendo os seus produtos.</div>
+
+<div class="clausula">10 CLÁUSULA DÉCIMA</div>
+<div class="subclausula">10.1 O REPRESENTANTE obriga-se, por si e por seus eventuais prepostos, a manter o mais absoluto sigilo e confidencialidade sobre toda e qualquer informação técnica, comercial, financeira, estratégica, listas de clientes, políticas de preço, campanhas promocionais e know-how ("Informações Confidenciais") pertencentes à REPRESENTADA ou a seus clientes, a que venha a ter acesso em decorrência da execução deste contrato.</div>
+
+<div class="subclausula">10.2 É vedado ao REPRESENTANTE utilizar as Informações Confidenciais para fins outros que não o estrito cumprimento das obrigações aqui previstas, bem como divulgá-las ou repassá-las a terceiros sem a prévia e expressa autorização por escrito da REPRESENTADA.</div>
+
+<div class="subclausula">10.3 A obrigação de sigilo e confidencialidade aqui estabelecida permanecerá em vigor durante toda a execução do contrato e se estenderá por um período de 5 (cinco) anos após o seu término ou rescisão, por qualquer motivo.</div>
+
+<div class="subclausula">10.4 A violação desta cláusula será considerada justo motivo para a rescisão imediata do contrato, nos termos do Art. 35, alínea "a", da Lei n.º 4.886/65, sem prejuízo da apuração das perdas e danos correspondentes.</div>
+
+<div class="clausula">CLÁUSULA DÉCIMA PRIMEIRA</div>
+<div class="subclausula">11.1 As partes reconhecem que o sucesso desta parceria comercial depende do desempenho ativo do REPRESENTANTE na promoção e venda dos produtos da REPRESENTADA.</div>
+
+<div class="subclausula">11.2 A não realização de vendas que resultem em comissionamento por 3 (três) meses consecutivos, ou o não cumprimento de metas mínimas de desempenho que venham a ser acordadas por escrito entre as partes, poderá ser considerado como desídia do REPRESENTANTE no cumprimento de suas obrigações contratuais, configurando justo motivo para a rescisão do presente contrato pela REPRESENTADA, nos termos do Art. 35, alínea "c", da Lei n.º 4.886/65</div>
+
+<div class="clausula">CLÁUSULA DÉCIMA SEGUNDA</div>
+<div class="subclausula">12.1 A rescisão, sem motivo, do presente contrato pela REPRESENTADA, fora dos casos previstos no artigo 35 da Lei n.º 4886/65, dará à REPRESENTANTE o direito a indenização de 1/12 (um doze avos) do total das comissões auferidas durante o tempo em que for exercida a representação.</div>
+
+<div class="subclausula">12.2 Não existindo motivo justo para rescisão contratual, a parte que resolver por fim ao presente contrato deverá notificar a outra com 30 (trinta) dias de antecedência a teor do disposto no art. 34 da lei 4.886/65.</div>
+
+<div class="clausula">CLÁUSULA DÉCIMA TERCEIRA</div>
+<div class="subclausula">13.1 O fato da REPRESENTANTE dever dedicar-se à representação com zelo e lealdade, de modo a expandir os negócios da REPRESENTADA, de prestar as informações que lhes forem solicitadas sobre o andamento dos negócios a seu cargo, de prestar colaboração excepcional a pedido da REPRESENTADA com encargos ou atribuições diversos dos previstos neste contrato (art. 38 da Lei n° 4.886/65), não desclassifica a relação de representação comercial em relação de emprego.</div>
+
+<div class="clausula">CLÁUSULA DÉCIMA QUARTA</div>
+<div class="subclausula">14.1 Os casos omissos serão regulados pelos preceitos da Lei n.º 4.886/65 e suas alterações, sobretudo as da Lei nº 8.420/92, pelo Código Civil e pelos princípios gerais de direito.</div>
+
+<p>E por estarem assim justos e contratados, REPRESENTANTE e REPRESENTADA firmam o presente instrumento em duas vias, de igual teor e forma, perante as testemunhas que com elas subscrevem abaixo, para que produza seus jurídicos e legais efeitos, elegendo o foro do domicílio da REPRESENTANTE (art. 39 da Lei n.º 4886/65 com a nova redação dada pela Lei n.º 8420) para dirimir quaisquer controvérsias decorrentes do presente contrato.</p>
+
+<div class="data-local">
+    {{empresa.cidade}}/{{empresa.estado}}, {{data_formatada}}.
+</div>
+
+<table class="assinatura">
+    <tr>
+        <td style="width: 50%; text-align: center;">
+            <strong>{{empresa.razao_social}} – REPRESENTADA</strong><br><br><br><br>
+            _________________________________<br>
+            {{representante.nome}}<br>
+            CPF: {{representante.cpf}}
+        </td>
+        <td style="width: 50%; text-align: center;">
+            <strong>REPRESENTANTE</strong><br><br><br><br>
+            _________________________________<br>
+            {{colaborador.nome_completo}}<br>
+            CPF: {{colaborador.cpf}}
+        </td>
+    </tr>
+</table>
+
+<div class="testemunhas">
+    <p><strong>Testemunhas:</strong></p>
+    <table>
+        <tr>
+            <td style="width: 50%;">
+                1) _________________________________<br>
+                Nome: {{testemunha1.nome}}<br>
+                CPF: {{testemunha1.cpf}}
+            </td>
+            <td style="width: 50%;">
+                2) _________________________________<br>
+                Nome: {{testemunha2.nome}}<br>
+                CPF: {{testemunha2.cpf}}
+            </td>
+        </tr>
+    </table>
+</div>
+
+</body>
+</html>

@@ -26,13 +26,21 @@ $status_info = $status_labels[$contrato['status']] ?? ['label' => ucfirst($contr
         <div class="text-gray-600 fs-7 mb-2">
             Criado: <?= date('d/m/Y', strtotime($contrato['created_at'])) ?>
         </div>
-        <?php if ($contrato['assinaturas_pendentes'] > 0): ?>
+        <?php if ($contrato['status'] !== 'assinado' && $contrato['assinaturas_pendentes'] > 0): ?>
         <div class="text-warning fs-7 mb-2">
             <i class="ki-duotone ki-clock fs-6">
                 <span class="path1"></span>
                 <span class="path2"></span>
             </i>
             <?= $contrato['assinaturas_pendentes'] ?> assinatura(s) pendente(s)
+        </div>
+        <?php elseif ($contrato['status'] === 'assinado'): ?>
+        <div class="text-success fs-7 mb-2">
+            <i class="ki-duotone ki-check-circle fs-6">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
+            Totalmente assinado
         </div>
         <?php endif; ?>
         <?php if ($contrato['total_signatarios'] > 0): ?>

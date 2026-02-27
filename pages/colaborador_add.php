@@ -13,6 +13,17 @@ require_page_permission('colaborador_add.php');
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
+// Migração automática: verifica e adiciona coluna 'regiao' se não existir
+try {
+    $stmt = $pdo->query("SHOW COLUMNS FROM colaboradores LIKE 'regiao'");
+    if (!$stmt->fetch()) {
+        $pdo->exec("ALTER TABLE colaboradores ADD COLUMN regiao VARCHAR(100) NULL COMMENT 'Região do colaborador para uso em contratos' AFTER estado_endereco");
+        error_log('Migração automática: Coluna regiao adicionada à tabela colaboradores');
+    }
+} catch (Exception $e) {
+    error_log('Erro na migração automática do campo regiao: ' . $e->getMessage());
+}
+
 // Processa POST ANTES de incluir o header (para evitar erro de headers already sent)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Para RH, valida se a empresa selecionada está nas empresas permitidas
@@ -63,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bairro = sanitize($_POST['bairro'] ?? '');
     $cidade_endereco = sanitize($_POST['cidade_endereco'] ?? '');
     $estado_endereco = strtoupper(sanitize($_POST['estado_endereco'] ?? ''));
+    $regiao = sanitize($_POST['regiao'] ?? '');
     $descricao_funcao = sanitize($_POST['descricao_funcao'] ?? '');
     
     if (empty($nome_completo) || empty($empresa_id) || empty($setor_id) || empty($cargo_id) || empty($data_inicio)) {
@@ -92,15 +104,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $stmt = $pdo->prepare("
             INSERT INTO colaboradores 
-            (empresa_id, setor_id, cargo_id, nivel_hierarquico_id, lider_id, nome_completo, cpf, cnpj, rg, data_nascimento, estado_civil, telefone, email_pessoal, data_inicio, status, tipo_contrato, salario, pix, banco, agencia, conta, tipo_conta, cep, logradouro, numero, complemento, bairro, cidade_endereco, estado_endereco, descricao_funcao, observacoes, foto, senha_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, setor_id, cargo_id, nivel_hierarquico_id, lider_id, nome_completo, cpf, cnpj, rg, data_nascimento, estado_civil, telefone, email_pessoal, data_inicio, status, tipo_contrato, salario, pix, banco, agencia, conta, tipo_conta, cep, logradouro, numero, complemento, bairro, cidade_endereco, estado_endereco, regiao, descricao_funcao, observacoes, foto, senha_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $empresa_id, $setor_id, $cargo_id, $nivel_hierarquico_id, $lider_id, $nome_completo, $cpf, 
             !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $estado_civil ?: null, $telefone, $email_pessoal, $data_inicio, 
             $status, $tipo_contrato, $salario, $pix, $banco, $agencia, $conta, $tipo_conta, 
-            !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco, 
-            !empty($estado_endereco) ? $estado_endereco : null, $descricao_funcao, $observacoes, $foto_path, $senha_hash
+            !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco,
+            !empty($estado_endereco) ? $estado_endereco : null, $regiao, $descricao_funcao, $observacoes, $foto_path, $senha_hash
         ]);
         
         $colaborador_id = $pdo->lastInsertId();
@@ -447,8 +459,13 @@ require_once __DIR__ . '/../includes/header.php';
                                 <label class="form-label">Estado (UF)</label>
                                 <input type="text" name="estado_endereco" id="estado_endereco" class="form-control" maxlength="2" placeholder="SP">
                             </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Região</label>
+                                <input type="text" name="regiao" id="regiao" class="form-control" placeholder="Ex: Sudeste, Nordeste, etc">
+                                <div class="form-text">Usado em templates de contrato</div>
+                            </div>
                         </div>
-                        
+
                         <hr>
                         <h5 class="mb-3">Dados Bancários</h5>
                         
