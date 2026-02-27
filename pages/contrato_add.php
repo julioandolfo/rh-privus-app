@@ -994,20 +994,20 @@ function coletarCamposManuais() {
 }
 
 // Atualiza interface de campos faltantes
-function atualizarCamposFaltantes(campos) {
+function atualizarCamposFaltantes(campos, valoresPrePreenchidos = {}) {
     camposFaltantes = campos || [];
     const container = document.getElementById('campos_faltantes_container');
     const card = document.getElementById('card_campos_faltantes');
     const btnEnviar = document.getElementById('btn_enviar');
     const statusEnvio = document.getElementById('status_envio');
-    
+
     if (camposFaltantes.length === 0) {
         card.style.display = 'none';
         btnEnviar.disabled = false;
         btnEnviar.classList.remove('btn-secondary');
         btnEnviar.classList.add('btn-primary');
         podeEnviar = true;
-        
+
         // Mostra status de OK
         statusEnvio.style.display = 'flex !important';
         statusEnvio.innerHTML = `
@@ -1025,7 +1025,7 @@ function atualizarCamposFaltantes(campos) {
         btnEnviar.classList.remove('btn-primary');
         btnEnviar.classList.add('btn-secondary');
         podeEnviar = false;
-        
+
         // Mostra status de pendência
         statusEnvio.style.display = 'flex !important';
         statusEnvio.innerHTML = `
@@ -1038,27 +1038,28 @@ function atualizarCamposFaltantes(campos) {
                 ${camposFaltantes.length} campo(s) faltante(s)
             </span>
         `;
-        
+
         // Gera formulário de campos faltantes
         let html = '<div class="row">';
         camposFaltantes.forEach((campo, index) => {
             const colSize = campo.tipo === 'textarea' ? '12' : '6';
             const inputType = campo.tipo === 'number' ? 'text' : campo.tipo;
-            const valorAtual = document.querySelector(`[data-campo-manual="${campo.variavel}"]`)?.value || '';
-            
+            // Usa valor pre-preenchido se existir, senão tenta pegar do input atual
+            const valorAtual = valoresPrePreenchidos[campo.variavel] || document.querySelector(`[data-campo-manual="${campo.variavel}"]`)?.value || '';
+
             html += `
                 <div class="col-md-${colSize} mb-5">
                     <label class="form-label required">${campo.label}</label>
-                    ${campo.tipo === 'textarea' ? 
-                        `<textarea 
-                            class="form-control form-control-solid campo-manual-input" 
+                    ${campo.tipo === 'textarea' ?
+                        `<textarea
+                            class="form-control form-control-solid campo-manual-input"
                             data-campo-manual="${campo.variavel}"
                             rows="3"
                             placeholder="${campo.placeholder}"
                         >${valorAtual}</textarea>` :
-                        `<input 
-                            type="${inputType}" 
-                            class="form-control form-control-solid campo-manual-input" 
+                        `<input
+                            type="${inputType}"
+                            class="form-control form-control-solid campo-manual-input"
                             data-campo-manual="${campo.variavel}"
                             placeholder="${campo.placeholder}"
                             value="${valorAtual}"
@@ -1069,7 +1070,7 @@ function atualizarCamposFaltantes(campos) {
             `;
         });
         html += '</div>';
-        
+
         html += `
             <div class="d-flex justify-content-end mt-5">
                 <button type="button" class="btn btn-light-primary" id="btn_aplicar_campos">
@@ -1081,14 +1082,14 @@ function atualizarCamposFaltantes(campos) {
                 </button>
             </div>
         `;
-        
+
         container.innerHTML = html;
-        
+
         // Adiciona evento ao botão de aplicar
         document.getElementById('btn_aplicar_campos')?.addEventListener('click', function() {
             atualizarPreview();
         });
-        
+
         // Adiciona evento de Enter nos campos
         container.querySelectorAll('.campo-manual-input').forEach(input => {
             input.addEventListener('keypress', function(e) {
@@ -1159,9 +1160,9 @@ function atualizarPreview() {
     .then(data => {
         if (data.success) {
             preview.innerHTML = data.html;
-            
-            // Atualiza campos faltantes
-            atualizarCamposFaltantes(data.campos_faltantes || []);
+
+            // Atualiza campos faltantes (passando valores já preenchidos para não perder)
+            atualizarCamposFaltantes(data.campos_faltantes || [], camposManuais);
             podeEnviar = data.pode_enviar || false;
             
             // Preenche descrição da função do colaborador se o campo estiver vazio
@@ -1231,22 +1232,20 @@ document.getElementById('form_contrato')?.addEventListener('submit', function(e)
         return false;
     }
     
-    // Se for enviar, adiciona campos manuais ao formulário
-    if (acao === 'enviar') {
-        const camposManuais = coletarCamposManuais();
-        
-        // Remove inputs anteriores
-        document.querySelectorAll('input[name^="campos_manuais["]').forEach(el => el.remove());
-        
-        // Adiciona novos inputs hidden
-        Object.keys(camposManuais).forEach(variavel => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = `campos_manuais[${variavel}]`;
-            input.value = camposManuais[variavel];
-            this.appendChild(input);
-        });
-    }
+    // Sempre adiciona campos manuais ao formulário (tanto para rascunho quanto enviar)
+    const camposManuaisParaSalvar = coletarCamposManuais();
+
+    // Remove inputs anteriores
+    document.querySelectorAll('input[name^="campos_manuais["]').forEach(el => el.remove());
+
+    // Adiciona novos inputs hidden
+    Object.keys(camposManuaisParaSalvar).forEach(variavel => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = `campos_manuais[${variavel}]`;
+        input.value = camposManuaisParaSalvar[variavel];
+        this.appendChild(input);
+    });
     
     // Loading no botão
     const submitBtn = this.querySelector('button[type="submit"][value="enviar"]');
