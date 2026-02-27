@@ -238,11 +238,27 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
         
         // Contrato (descrição da função pode vir do contrato ou do cadastro do colaborador)
         'contrato.descricao_funcao' => [
-            'valor' => !empty($contrato_data['descricao_funcao']) ? $contrato_data['descricao_funcao'] : ($colaborador['descricao_funcao'] ?? ''), 
-            'label' => 'Descrição da Função', 
+            'valor' => !empty($contrato_data['descricao_funcao']) ? $contrato_data['descricao_funcao'] : ($colaborador['descricao_funcao'] ?? ''),
+            'label' => 'Descrição da Função',
             'tipo' => 'textarea'
         ],
         'colaborador.descricao_funcao' => ['valor' => $colaborador['descricao_funcao'] ?? '', 'label' => 'Descrição da Função do Colaborador', 'tipo' => 'textarea'],
+
+        // Valores financeiros do contrato (para templates de representação comercial)
+        'contrato.valor_pedido' => ['valor' => $contrato_data['valor_pedido'] ?? '', 'label' => 'Valor por Pedido (R$)', 'tipo' => 'number'],
+        'contrato.valor_pedido_extenso' => ['valor' => $contrato_data['valor_pedido_extenso'] ?? '', 'label' => 'Valor por Pedido (por extenso)', 'tipo' => 'text'],
+        'contrato.valor_cliente_novo' => ['valor' => $contrato_data['valor_cliente_novo'] ?? '', 'label' => 'Valor Cliente Novo (R$)', 'tipo' => 'number'],
+        'contrato.valor_cliente_novo_extenso' => ['valor' => $contrato_data['valor_cliente_novo_extenso'] ?? '', 'label' => 'Valor Cliente Novo (por extenso)', 'tipo' => 'text'],
+        'contrato.ajuda_custo' => ['valor' => $contrato_data['ajuda_custo'] ?? '', 'label' => 'Ajuda de Custo (R$)', 'tipo' => 'number'],
+        'contrato.ajuda_custo_extenso' => ['valor' => $contrato_data['ajuda_custo_extenso'] ?? '', 'label' => 'Ajuda de Custo (por extenso)', 'tipo' => 'text'],
+        'contrato.percentual_minimo' => ['valor' => $contrato_data['percentual_minimo'] ?? '', 'label' => 'Percentual Mínimo Comissão (%)', 'tipo' => 'number'],
+        'contrato.percentual_minimo_extenso' => ['valor' => $contrato_data['percentual_minimo_extenso'] ?? '', 'label' => 'Percentual Mínimo (por extenso)', 'tipo' => 'text'],
+        'contrato.percentual_maximo' => ['valor' => $contrato_data['percentual_maximo'] ?? '', 'label' => 'Percentual Máximo Comissão (%)', 'tipo' => 'number'],
+        'contrato.percentual_maximo_extenso' => ['valor' => $contrato_data['percentual_maximo_extenso'] ?? '', 'label' => 'Percentual Máximo (por extenso)', 'tipo' => 'text'],
+        'contrato.bonificacao' => ['valor' => $contrato_data['bonificacao'] ?? '', 'label' => 'Bonificação por Produtividade (R$)', 'tipo' => 'number'],
+        'contrato.bonificacao_extenso' => ['valor' => $contrato_data['bonificacao_extenso'] ?? '', 'label' => 'Bonificação (por extenso)', 'tipo' => 'text'],
+        'contrato.valor_kit' => ['valor' => $contrato_data['valor_kit'] ?? '', 'label' => 'Valor do Kit de Produtos (R$)', 'tipo' => 'number'],
+        'contrato.valor_kit_extenso' => ['valor' => $contrato_data['valor_kit_extenso'] ?? '', 'label' => 'Valor do Kit (por extenso)', 'tipo' => 'text'],
     ];
     
     // Extrai variáveis usadas no template
@@ -379,12 +395,28 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';
-    
+
+    // Valores financeiros do contrato (para templates de representação comercial)
+    $variaveis['{{contrato.valor_pedido}}'] = $contrato_data['valor_pedido'] ?? '';
+    $variaveis['{{contrato.valor_pedido_extenso}}'] = $contrato_data['valor_pedido_extenso'] ?? '';
+    $variaveis['{{contrato.valor_cliente_novo}}'] = $contrato_data['valor_cliente_novo'] ?? '';
+    $variaveis['{{contrato.valor_cliente_novo_extenso}}'] = $contrato_data['valor_cliente_novo_extenso'] ?? '';
+    $variaveis['{{contrato.ajuda_custo}}'] = $contrato_data['ajuda_custo'] ?? '';
+    $variaveis['{{contrato.ajuda_custo_extenso}}'] = $contrato_data['ajuda_custo_extenso'] ?? '';
+    $variaveis['{{contrato.percentual_minimo}}'] = $contrato_data['percentual_minimo'] ?? '';
+    $variaveis['{{contrato.percentual_minimo_extenso}}'] = $contrato_data['percentual_minimo_extenso'] ?? '';
+    $variaveis['{{contrato.percentual_maximo}}'] = $contrato_data['percentual_maximo'] ?? '';
+    $variaveis['{{contrato.percentual_maximo_extenso}}'] = $contrato_data['percentual_maximo_extenso'] ?? '';
+    $variaveis['{{contrato.bonificacao}}'] = $contrato_data['bonificacao'] ?? '';
+    $variaveis['{{contrato.bonificacao_extenso}}'] = $contrato_data['bonificacao_extenso'] ?? '';
+    $variaveis['{{contrato.valor_kit}}'] = $contrato_data['valor_kit'] ?? '';
+    $variaveis['{{contrato.valor_kit_extenso}}'] = $contrato_data['valor_kit_extenso'] ?? '';
+
     // Dados de data/hora
     $variaveis['{{data_atual}}'] = date('d/m/Y');
     $variaveis['{{hora_atual}}'] = date('H:i');
     $variaveis['{{data_formatada}}'] = date('d') . ' de ' . getNomeMes(date('m')) . ' de ' . date('Y');
-    
+
     // Aplica campos manuais (sobrescreve valores vazios)
     foreach ($campos_manuais as $variavel => $valor) {
         $chave = '{{' . $variavel . '}}';
