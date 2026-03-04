@@ -74,6 +74,32 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $horas_extras_colaborador = $stmt->fetchAll();
 
+// Busca documentos enviados pelo colaborador nos fechamentos de pagamento
+$stmt = $pdo->prepare("
+    SELECT 
+        i.id as item_id,
+        i.documento_anexo,
+        i.documento_status,
+        i.documento_data_envio,
+        i.documento_data_aprovacao,
+        i.documento_observacoes,
+        f.id as fechamento_id,
+        f.mes_referencia,
+        f.tipo_fechamento,
+        f.subtipo_fechamento,
+        f.status as fechamento_status,
+        u_aprovador.nome as aprovador_nome
+    FROM fechamentos_pagamento_itens i
+    INNER JOIN fechamentos_pagamento f ON i.fechamento_id = f.id
+    LEFT JOIN usuarios u_aprovador ON i.documento_aprovado_por = u_aprovador.id
+    WHERE i.colaborador_id = ?
+    AND i.documento_anexo IS NOT NULL
+    AND i.documento_anexo != ''
+    ORDER BY i.documento_data_envio DESC
+");
+$stmt->execute([$id]);
+$documentos_colaborador = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Busca bônus do colaborador (ativos ou permanentes)
 $stmt = $pdo->prepare("
     SELECT cb.*, tb.nome as tipo_bonus_nome, tb.descricao as tipo_bonus_descricao
@@ -464,6 +490,19 @@ require_once __DIR__ . '/../includes/header.php';
                                 </i>
                                 <span class="d-none d-md-inline">Pontos</span>
                                 <span class="d-md-none">Pts</span>
+                            </a>
+                        </li>
+                        <li class="nav-item mt-2 flex-shrink-0">
+                            <a class="nav-link text-active-primary py-5" data-bs-toggle="tab" href="#kt_tab_pane_documentos">
+                                <i class="ki-duotone ki-folder-down fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <span class="d-none d-md-inline">Documentos</span>
+                                <span class="d-md-none">Docs</span>
+                                <?php if (!empty($documentos_colaborador)): ?>
+                                <span class="badge badge-circle badge-light-primary fs-9 ms-1"><?= count($documentos_colaborador) ?></span>
+                                <?php endif; ?>
                             </a>
                         </li>
                     </ul>
@@ -2058,6 +2097,133 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     <!--end::Tab Pane - Pontos-->
+
+                    <!--begin::Tab Pane - Documentos-->
+                    <div class="tab-pane fade" id="kt_tab_pane_documentos" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-7">
+                            <h3 class="fw-bold text-gray-800 mb-0">Documentos Enviados</h3>
+                            <span class="text-muted fs-7"><?= count($documentos_colaborador) ?> documento<?= count($documentos_colaborador) != 1 ? 's' : '' ?> encontrado<?= count($documentos_colaborador) != 1 ? 's' : '' ?></span>
+                        </div>
+
+                        <?php if (empty($documentos_colaborador)): ?>
+                        <div class="text-center py-15">
+                            <i class="ki-duotone ki-folder-down fs-5x text-gray-300 mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="text-gray-500 fw-semibold fs-5">Nenhum documento enviado ainda</div>
+                            <div class="text-muted fs-7 mt-2">Os documentos enviados pelo colaborador em Meus Pagamentos aparecerão aqui.</div>
+                        </div>
+                        <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                <thead>
+                                    <tr class="fw-bold text-muted bg-light">
+                                        <th class="ps-4 min-w-130px rounded-start">Mês/Ano</th>
+                                        <th class="min-w-120px">Tipo Fechamento</th>
+                                        <th class="min-w-120px">Status</th>
+                                        <th class="min-w-140px">Data Envio</th>
+                                        <th class="min-w-140px">Data Aprovação</th>
+                                        <th class="min-w-150px">Aprovado por</th>
+                                        <th class="min-w-200px">Observações</th>
+                                        <th class="text-end min-w-100px rounded-end pe-4">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($documentos_colaborador as $doc):
+                                        $subtipo_labels = [
+                                            'bonus_especifico' => 'Bônus Específico',
+                                            'individual'       => 'Individual',
+                                            'grupal'           => 'Grupal',
+                                            'adiantamento'     => 'Adiantamento',
+                                            'acerto'           => 'Acerto',
+                                        ];
+                                        $tipo_label = $doc['tipo_fechamento'] === 'extra'
+                                            ? 'Extra' . (!empty($doc['subtipo_fechamento']) ? ' — ' . ($subtipo_labels[$doc['subtipo_fechamento']] ?? $doc['subtipo_fechamento']) : '')
+                                            : 'Regular';
+                                        $status_cfg = [
+                                            'pendente'  => ['label' => 'Pendente',  'class' => 'danger'],
+                                            'enviado'   => ['label' => 'Enviado',   'class' => 'warning'],
+                                            'aprovado'  => ['label' => 'Aprovado',  'class' => 'success'],
+                                            'rejeitado' => ['label' => 'Rejeitado', 'class' => 'danger'],
+                                        ];
+                                        $st = $status_cfg[$doc['documento_status']] ?? ['label' => ucfirst($doc['documento_status']), 'class' => 'secondary'];
+                                        $ext = strtolower(pathinfo($doc['documento_anexo'], PATHINFO_EXTENSION));
+                                        $is_image = in_array($ext, ['jpg','jpeg','png','gif','webp']);
+                                        $is_pdf   = $ext === 'pdf';
+                                    ?>
+                                    <tr>
+                                        <td class="ps-4">
+                                            <span class="fw-bold text-gray-800 d-block">
+                                                <?= date('m/Y', strtotime($doc['mes_referencia'] . '-01')) ?>
+                                            </span>
+                                            <span class="text-muted fs-7">
+                                                <?php
+                                                $fst_cfg = ['aberto' => 'Aberto', 'fechado' => 'Fechado', 'pago' => 'Pago'];
+                                                echo $fst_cfg[$doc['fechamento_status']] ?? ucfirst($doc['fechamento_status']);
+                                                ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <?php if ($doc['tipo_fechamento'] === 'extra'): ?>
+                                                <span class="badge badge-light-primary">EXTRA</span>
+                                                <?php if (!empty($doc['subtipo_fechamento'])): ?>
+                                                    <br><small class="text-muted"><?= htmlspecialchars($subtipo_labels[$doc['subtipo_fechamento']] ?? $doc['subtipo_fechamento']) ?></small>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <span class="badge badge-light-secondary">REGULAR</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-light-<?= $st['class'] ?>"><?= $st['label'] ?></span>
+                                        </td>
+                                        <td>
+                                            <?php if ($doc['documento_data_envio']): ?>
+                                                <?= date('d/m/Y H:i', strtotime($doc['documento_data_envio'])) ?>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($doc['documento_data_aprovacao']): ?>
+                                                <?= date('d/m/Y H:i', strtotime($doc['documento_data_aprovacao'])) ?>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?= $doc['aprovador_nome'] ? htmlspecialchars($doc['aprovador_nome']) : '<span class="text-muted">-</span>' ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($doc['documento_observacoes']): ?>
+                                                <span class="text-gray-600" title="<?= htmlspecialchars($doc['documento_observacoes']) ?>">
+                                                    <?= htmlspecialchars(mb_substr($doc['documento_observacoes'], 0, 60)) ?>
+                                                    <?= mb_strlen($doc['documento_observacoes']) > 60 ? '...' : '' ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-light-info"
+                                                    onclick="verDocumentoColabView('<?= addslashes($doc['documento_anexo']) ?>', '<?= $is_image ? 'image' : ($is_pdf ? 'pdf' : 'other') ?>', '<?= date('m/Y', strtotime($doc['mes_referencia'] . '-01')) ?>')">
+                                                <i class="ki-duotone ki-eye fs-5">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                </i>
+                                                Ver
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <!--end::Tab Pane - Documentos-->
                 </div>
                 <!--end::Tab Content-->
             </div>
@@ -3916,6 +4082,37 @@ function enviarDadosAcesso(colaboradorId) {
                 });
             });
         }
+    });
+}
+
+function verDocumentoColabView(caminho, tipo, mesAno) {
+    const url = '../' + caminho;
+    let conteudo = '';
+    if (tipo === 'image') {
+        conteudo = `<img src="${url}" class="img-fluid rounded" alt="Documento ${mesAno}" style="max-height:70vh;">`;
+    } else if (tipo === 'pdf') {
+        conteudo = `<iframe src="${url}#toolbar=1&navpanes=0" width="100%" height="600px" style="border:none;border-radius:8px;"></iframe>`;
+    } else {
+        conteudo = `<div class="text-center py-10">
+            <i class="ki-duotone ki-file fs-5x text-gray-400 mb-4"><span class="path1"></span><span class="path2"></span></i>
+            <p class="text-gray-600 mb-4">Pré-visualização não disponível para este tipo de arquivo.</p>
+            <a href="${url}" target="_blank" class="btn btn-primary">
+                <i class="ki-duotone ki-download fs-4 me-2"><span class="path1"></span><span class="path2"></span></i>
+                Baixar Arquivo
+            </a>
+        </div>`;
+    }
+    Swal.fire({
+        title: 'Documento — ' + mesAno,
+        html: conteudo,
+        width: tipo === 'pdf' ? '900px' : 'auto',
+        showConfirmButton: false,
+        showCloseButton: true,
+        customClass: { popup: 'p-4' },
+        footer: `<a href="${url}" target="_blank" class="btn btn-sm btn-light-primary">
+            <i class="ki-duotone ki-download fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+            Baixar
+        </a>`
     });
 }
 </script>
