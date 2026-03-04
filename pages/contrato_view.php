@@ -70,7 +70,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
     log_contrato("contrato_view.php - POST recebido: acao=$acao, contrato_id=$contrato_id");
     
-    if ($acao === 'cancelar' && $contrato['status'] !== 'assinado') {
+    if ($acao === 'duplicar') {
+        try {
+            $pdo->beginTransaction();
+
+            // Insere novo contrato como rascunho, zerando campos do Autentique
+            $stmt = $pdo->prepare("
+                INSERT INTO contratos (
+                    colaborador_id, template_id, titulo, descricao_funcao,
+                    conteudo_final_html, pdf_path, status,
+                    autentique_document_id, autentique_token,
+                    criado_por_usuario_id, data_criacao, data_vencimento, observacoes
+                ) VALUES (
+                    ?, ?, ?, ?,
+                    ?, NULL, 'rascunho',
+                    NULL, NULL,
+                    ?, ?, ?, ?
+                )
+            ");
+            $stmt->execute([
+                $contrato['colaborador_id'],
+                $contrato['template_id'],
+                'Cópia - ' . $contrato['titulo'],
+                $contrato['descricao_funcao'],
+                $contrato['conteudo_final_html'],
+                $usuario['id'],
+                $contrato['data_criacao'],
+                $contrato['data_vencimento'],
+                $contrato['observacoes'],
+            ]);
+            $novo_id = $pdo->lastInsertId();
+
+            // Copia signatários zerando dados de assinatura e Autentique
+            $stmt_insert = $pdo->prepare("
+                INSERT INTO contratos_signatarios
+                    (contrato_id, tipo, nome, email, cpf, ordem_assinatura)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            foreach ($signatarios as $s) {
+                $stmt_insert->execute([
+                    $novo_id,
+                    $s['tipo'],
+                    $s['nome'],
+                    $s['email'],
+                    $s['cpf'],
+                    $s['ordem_assinatura'],
+                ]);
+            }
+
+            $pdo->commit();
+
+            redirect(
+                'contrato_enviar.php?id=' . $novo_id,
+                'Contrato duplicado! Revise os dados e envie para assinatura.',
+                'success'
+            );
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao duplicar: ' . $e->getMessage(), 'error');
+        }
+
+    } elseif ($acao === 'cancelar' && $contrato['status'] !== 'assinado') {
         try {
             // Cancela no Autentique se tiver document_id
             if ($contrato['autentique_document_id']) {
@@ -491,6 +551,17 @@ require_once __DIR__ . '/../includes/header.php';
                 Enviar para Assinatura
             </a>
             <?php endif; ?>
+            <form method="POST" style="display: inline;" id="form_duplicar">
+                <input type="hidden" name="acao" value="duplicar">
+                <button type="button" class="btn btn-light-success" id="btn_duplicar">
+                    <i class="ki-duotone ki-copy fs-4 me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Duplicar
+                </button>
+            </form>
             <?php if ($contrato['status'] !== 'assinado' && $contrato['status'] !== 'cancelado'): ?>
             <form method="POST" style="display: inline;" id="form_cancelar">
                 <input type="hidden" name="acao" value="cancelar">
@@ -907,6 +978,33 @@ document.querySelectorAll('.btn-reenviar-link').forEach(btn => {
             }
         }
     });
+});
+
+// Botão duplicar - confirmação com SweetAlert
+document.getElementById('btn_duplicar')?.addEventListener('click', function() {
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: 'Duplicar Contrato?',
+            html: 'Será criada uma cópia como <strong>rascunho</strong> com os mesmos signatários.<br><small class="text-muted">Você poderá revisar antes de enviar para assinatura.</small>',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#50cd89',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sim, duplicar',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const btn = document.getElementById('btn_duplicar');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Duplicando...';
+                document.getElementById('form_duplicar').submit();
+            }
+        });
+    } else {
+        if (confirm('Duplicar este contrato?')) {
+            document.getElementById('form_duplicar').submit();
+        }
+    }
 });
 
 // Botão cancelar - confirmação com SweetAlert
