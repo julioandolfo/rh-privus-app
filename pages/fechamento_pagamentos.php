@@ -2495,151 +2495,29 @@ $fechamentos = $stmt->fetchAll();
 $fechamentos_ativos = array_values(array_filter($fechamentos, fn($f) => $f['status'] !== 'pago'));
 $fechamentos_arquivados = array_values(array_filter($fechamentos, fn($f) => $f['status'] === 'pago'));
 
-// Calcula totais de pagamento para o card de informações
-$total_folha = 0;
-$total_bonus = 0;
-$total_extras = 0;
-$total_folha_bonus = 0;
+// Calcula totais de pagamento diretamente dos fechamentos já buscados
+$resumo_aberto     = ['valor' => 0, 'he' => 0, 'qtd' => 0];
+$resumo_fechado    = ['valor' => 0, 'he' => 0, 'qtd' => 0];
+$resumo_pago       = ['valor' => 0, 'he' => 0, 'qtd' => 0];
 
-// Busca total de folha (soma de salários de todos os colaboradores ativos)
-$where_colaboradores = [];
-$params_colaboradores = [];
-
-if ($usuario['role'] === 'ADMIN') {
-    // ADMIN vê todos
-} elseif ($usuario['role'] === 'RH') {
-    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
-        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where_colaboradores[] = "c.empresa_id IN ($placeholders)";
-        $params_colaboradores = array_merge($params_colaboradores, $usuario['empresas_ids']);
-    } else {
-        $where_colaboradores[] = "c.empresa_id = ?";
-        $params_colaboradores[] = $usuario['empresa_id'] ?? 0;
+foreach ($fechamentos as $f) {
+    $val = (float)($f['total_pagamento'] ?? 0);
+    $he  = (float)($f['total_horas_extras'] ?? 0);
+    if ($f['status'] === 'aberto') {
+        $resumo_aberto['valor'] += $val;
+        $resumo_aberto['he']    += $he;
+        $resumo_aberto['qtd']++;
+    } elseif ($f['status'] === 'fechado') {
+        $resumo_fechado['valor'] += $val;
+        $resumo_fechado['he']    += $he;
+        $resumo_fechado['qtd']++;
+    } elseif ($f['status'] === 'pago') {
+        $resumo_pago['valor'] += $val;
+        $resumo_pago['he']    += $he;
+        $resumo_pago['qtd']++;
     }
-} else {
-    $where_colaboradores[] = "c.empresa_id = ?";
-    $params_colaboradores[] = $usuario['empresa_id'] ?? 0;
 }
-
-$where_colaboradores[] = "c.status = 'ativo'";
-$where_colaboradores[] = "c.salario IS NOT NULL AND c.salario > 0";
-
-$where_colab_sql = !empty($where_colaboradores) ? 'WHERE ' . implode(' AND ', $where_colaboradores) : '';
-
-$stmt = $pdo->prepare("
-    SELECT COALESCE(SUM(c.salario), 0) as total_folha
-    FROM colaboradores c
-    $where_colab_sql
-");
-$stmt->execute($params_colaboradores);
-$result_folha = $stmt->fetch();
-$total_folha = (float)($result_folha['total_folha'] ?? 0);
-
-// Busca total de bônus cadastrados nos colaboradores (ativos e não informativos)
-$where_bonus = [];
-$params_bonus = [];
-
-if ($usuario['role'] === 'ADMIN') {
-    // ADMIN vê todos
-} elseif ($usuario['role'] === 'RH') {
-    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
-        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where_bonus[] = "c.empresa_id IN ($placeholders)";
-        $params_bonus = array_merge($params_bonus, $usuario['empresas_ids']);
-    } else {
-        $where_bonus[] = "c.empresa_id = ?";
-        $params_bonus[] = $usuario['empresa_id'] ?? 0;
-    }
-} else {
-    $where_bonus[] = "c.empresa_id = ?";
-    $params_bonus[] = $usuario['empresa_id'] ?? 0;
-}
-
-$where_bonus[] = "c.status = 'ativo'";
-$where_bonus[] = "tb.tipo_valor != 'informativo'";
-// Verifica se o bônus está ativo (data_inicio e data_fim válidas ou NULL)
-$where_bonus[] = "(cb.data_inicio IS NULL OR cb.data_inicio <= CURDATE())";
-$where_bonus[] = "(cb.data_fim IS NULL OR cb.data_fim >= CURDATE())";
-$where_bonus_sql = !empty($where_bonus) ? 'WHERE ' . implode(' AND ', $where_bonus) : '';
-
-$stmt = $pdo->prepare("
-    SELECT COALESCE(SUM(
-        CASE 
-            WHEN tb.tipo_valor = 'fixo' THEN COALESCE(tb.valor_fixo, 0)
-            ELSE COALESCE(cb.valor, 0)
-        END
-    ), 0) as total_bonus
-    FROM colaboradores_bonus cb
-    INNER JOIN colaboradores c ON cb.colaborador_id = c.id
-    INNER JOIN tipos_bonus tb ON cb.tipo_bonus_id = tb.id
-    $where_bonus_sql
-");
-$stmt->execute($params_bonus);
-$result_bonus = $stmt->fetch();
-$total_bonus = (float)($result_bonus['total_bonus'] ?? 0);
-
-// Busca total de horas extras cadastradas que ainda não foram pagas
-// Horas extras não pagas são aquelas cuja data_trabalho não está dentro do período de nenhum fechamento fechado/pago
-$where_extras = [];
-$params_extras = [];
-
-if ($usuario['role'] === 'ADMIN') {
-    // ADMIN vê todos
-} elseif ($usuario['role'] === 'RH') {
-    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
-        $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where_extras[] = "c.empresa_id IN ($placeholders)";
-        $params_extras = array_merge($params_extras, $usuario['empresas_ids']);
-    } else {
-        $where_extras[] = "c.empresa_id = ?";
-        $params_extras[] = $usuario['empresa_id'] ?? 0;
-    }
-} else {
-    $where_extras[] = "c.empresa_id = ?";
-    $params_extras[] = $usuario['empresa_id'] ?? 0;
-}
-
-$where_extras[] = "c.status = 'ativo'";
-$where_extras[] = "(he.tipo_pagamento = 'dinheiro' OR he.tipo_pagamento IS NULL)"; // Apenas horas extras pagas em dinheiro
-
-// Monta subquery para verificar fechamentos fechados/pagos
-$where_fechamentos = ["fp.status IN ('fechado', 'pago')", "fp.tipo_fechamento = 'regular'"];
-$params_fechamentos = [];
-
-if ($usuario['role'] === 'ADMIN') {
-    // ADMIN vê todos
-} elseif ($usuario['role'] === 'RH') {
-    if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
-        $placeholders_fp = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
-        $where_fechamentos[] = "fp.empresa_id IN ($placeholders_fp)";
-        $params_fechamentos = array_merge($params_fechamentos, $usuario['empresas_ids']);
-    } else {
-        $where_fechamentos[] = "fp.empresa_id = ?";
-        $params_fechamentos[] = $usuario['empresa_id'] ?? 0;
-    }
-} else {
-    $where_fechamentos[] = "fp.empresa_id = ?";
-    $params_fechamentos[] = $usuario['empresa_id'] ?? 0;
-}
-
-$where_extras_sql = !empty($where_extras) ? 'WHERE ' . implode(' AND ', $where_extras) : '';
-$where_fechamentos_sql = 'WHERE ' . implode(' AND ', $where_fechamentos);
-
-// Busca horas extras não pagas (tipo dinheiro e não incluídas em nenhum fechamento)
-$stmt = $pdo->prepare("
-    SELECT COALESCE(SUM(he.valor_total), 0) as total_extras
-    FROM horas_extras he
-    INNER JOIN colaboradores c ON he.colaborador_id = c.id
-    $where_extras_sql
-    " . (!empty($where_extras) ? 'AND' : 'WHERE') . " he.fechamento_pagamento_id IS NULL
-    AND (he.tipo_pagamento = 'dinheiro' OR he.tipo_pagamento IS NULL)
-");
-$stmt->execute($params_extras);
-$result_extras = $stmt->fetch();
-$total_extras = (float)($result_extras['total_extras'] ?? 0);
-
-// Calcula folha + bônus
-$total_folha_bonus = $total_folha + $total_bonus;
+$resumo_total_geral = $resumo_aberto['valor'] + $resumo_fechado['valor'] + $resumo_pago['valor'];
 
 // Busca empresas para o select
 if ($usuario['role'] === 'ADMIN') {
@@ -4063,81 +3941,68 @@ require_once __DIR__ . '/../includes/header.php';
                         <span class="card-label fw-bold fs-3 mb-1">Informações de Pagamento</span>
                         <span class="text-muted mt-1 fw-semibold fs-7">Resumo financeiro dos pagamentos</span>
                     </div>
-                    <div class="d-flex align-items-center gap-3">
-                        <select id="filtro_resumo_tipo" class="form-select form-select-sm w-auto">
-                            <option value="total">Total</option>
-                            <option value="empresa">Por Empresa</option>
-                            <option value="setor">Por Setor</option>
-                        </select>
-                        <select id="filtro_resumo_id" class="form-select form-select-sm w-auto" style="display: none;">
-                            <option value="">Selecione...</option>
-                        </select>
-                    </div>
                 </div>
             </div>
             <div class="card-body" id="resumo_pagamentos_body">
                 <div class="row g-5 g-xl-8">
-                    <!-- Total de Folha -->
-                    <div class="col-xl-3">
-                        <div class="card bg-light-primary h-100">
+                    <!-- Em Aberto -->
+                    <div class="col-xl-4">
+                        <div class="card border border-warning h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex align-items-center gap-2 mb-3">
+                                    <span class="badge badge-light-warning fs-8">Aberto</span>
+                                    <span class="text-muted fs-7"><?= $resumo_aberto['qtd'] ?> fechamento<?= $resumo_aberto['qtd'] != 1 ? 's' : '' ?></span>
+                                </div>
                                 <div>
-                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Total de Folha</span>
-                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_folha, 2, ',', '.') ?></span>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-1">Total em Aberto</span>
+                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($resumo_aberto['valor'], 2, ',', '.') ?></span>
                                 </div>
                                 <div class="mt-3">
-                                    <span class="text-gray-500 fs-7">Soma de todos os salários</span>
+                                    <span class="text-muted fs-7">H.E.: R$ <?= number_format($resumo_aberto['he'], 2, ',', '.') ?></span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Apenas Bônus -->
-                    <div class="col-xl-3">
-                        <div class="card bg-light-success h-100">
+
+                    <!-- Fechados -->
+                    <div class="col-xl-4">
+                        <div class="card border border-info h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex align-items-center gap-2 mb-3">
+                                    <span class="badge badge-light-info fs-8">Fechado</span>
+                                    <span class="text-muted fs-7"><?= $resumo_fechado['qtd'] ?> fechamento<?= $resumo_fechado['qtd'] != 1 ? 's' : '' ?></span>
+                                </div>
                                 <div>
-                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Apenas Bônus</span>
-                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_bonus, 2, ',', '.') ?></span>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-1">Total Fechado</span>
+                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($resumo_fechado['valor'], 2, ',', '.') ?></span>
                                 </div>
                                 <div class="mt-3">
-                                    <span class="text-gray-500 fs-7">Total de bônus pagos</span>
+                                    <span class="text-muted fs-7">H.E.: R$ <?= number_format($resumo_fechado['he'], 2, ',', '.') ?></span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Extras Somados -->
-                    <div class="col-xl-3">
-                        <div class="card bg-light-info h-100">
+
+                    <!-- Pagos (Arquivados) -->
+                    <div class="col-xl-4">
+                        <div class="card border border-success h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
+                                <div class="d-flex align-items-center gap-2 mb-3">
+                                    <span class="badge badge-light-success fs-8">Pago</span>
+                                    <span class="text-muted fs-7"><?= $resumo_pago['qtd'] ?> fechamento<?= $resumo_pago['qtd'] != 1 ? 's' : '' ?></span>
+                                </div>
                                 <div>
-                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Extras Somados</span>
-                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_extras, 2, ',', '.') ?></span>
+                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-1">Total Pago</span>
+                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($resumo_pago['valor'], 2, ',', '.') ?></span>
                                 </div>
                                 <div class="mt-3">
-                                    <span class="text-gray-500 fs-7">Total de horas extras pagas</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Folha + Bônus -->
-                    <div class="col-xl-3">
-                        <div class="card bg-light-warning h-100">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Folha + Bônus</span>
-                                    <span class="text-gray-800 fw-bold fs-2x">R$ <?= number_format($total_folha_bonus, 2, ',', '.') ?></span>
-                                </div>
-                                <div class="mt-3">
-                                    <span class="text-gray-500 fs-7">Total de folha com bônus</span>
+                                    <span class="text-muted fs-7">H.E.: R$ <?= number_format($resumo_pago['he'], 2, ',', '.') ?></span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Total Geral -->
                 <div class="row mt-5">
                     <div class="col-12">
@@ -4146,10 +4011,10 @@ require_once __DIR__ . '/../includes/header.php';
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <span class="text-white fw-semibold fs-6 d-block mb-1">Total Geral</span>
-                                        <span class="text-white-50 fs-7">Folha + Bônus + Extras</span>
+                                        <span class="text-white-50 fs-7">Aberto + Fechado + Pago</span>
                                     </div>
                                     <div class="text-end">
-                                        <span class="text-white fw-bold fs-2x">R$ <?= number_format($total_folha_bonus + $total_extras, 2, ',', '.') ?></span>
+                                        <span class="text-white fw-bold fs-2x">R$ <?= number_format($resumo_total_geral, 2, ',', '.') ?></span>
                                     </div>
                                 </div>
                             </div>
@@ -4163,134 +4028,6 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endif; ?>
         
         <script>
-        console.log('[DEBUG] Script 1 - Filtros iniciado');
-        // Dados para filtros
-        var empresasData = <?= json_encode($empresas ?? []) ?>;
-        let setoresData = [];
-        
-        // Busca setores quando necessario
-        function buscarSetores(empresaId) {
-            var url = empresaId 
-                ? '../api/get_setores.php?empresa_id=' + empresaId
-                : '../api/get_setores.php';
-            
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        setoresData = data.data || [];
-                        if (document.getElementById('filtro_resumo_tipo').value === 'setor') {
-                            atualizarSelectFiltro();
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao buscar setores:', error);
-                });
-        }
-        
-        // Atualiza o select de filtro baseado no tipo selecionado
-        function atualizarSelectFiltro() {
-            const tipoSelect = document.getElementById('filtro_resumo_tipo');
-            const selectId = document.getElementById('filtro_resumo_id');
-            if (!tipoSelect || !selectId) {
-                return;
-            }
-            const tipoFiltro = tipoSelect.value;
-            
-            selectId.innerHTML = '<option value="">Selecione...</option>';
-            
-            if (tipoFiltro === 'total') {
-                selectId.style.display = 'none';
-                carregarResumo('total', null);
-            } else if (tipoFiltro === 'empresa') {
-                selectId.style.display = 'block';
-                empresasData.forEach(empresa => {
-                    const option = document.createElement('option');
-                    option.value = empresa.id;
-                    option.textContent = empresa.nome_fantasia;
-                    selectId.appendChild(option);
-                });
-                carregarResumo('empresa', null);
-            } else if (tipoFiltro === 'setor') {
-                selectId.style.display = 'block';
-                if (setoresData.length === 0) {
-                    buscarSetores();
-                } else {
-                    setoresData.forEach(function(setor) {
-                        var option = document.createElement('option');
-                        option.value = setor.id;
-                        option.textContent = setor.nome_setor + (setor.empresa_nome ? ' - ' + setor.empresa_nome : '');
-                        selectId.appendChild(option);
-                    });
-                }
-                carregarResumo('setor', null);
-            }
-        }
-        
-        // Carrega o resumo de pagamentos
-        function carregarResumo(tipo, filtroId) {
-            var url = '../api/get_resumo_pagamentos.php?filtro_tipo=' + tipo + (filtroId ? '&filtro_id=' + filtroId : '');
-            
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        atualizarCards(data.data, tipo);
-                    } else {
-                        console.error('Erro ao carregar resumo:', data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar resumo:', error);
-                });
-        }
-        
-        // Atualiza os cards com os dados recebidos
-        function atualizarCards(dados, tipo) {
-            var container = document.getElementById('resumo_pagamentos_body');
-            if (!container) return;
-            
-            if (tipo === 'total') {
-                // Exibe valores totais simples
-                var h = '';
-                h += '<div class="row g-5 g-xl-8">';
-                h += '<div class="col-xl-3"><div class="card bg-light-primary h-100"><div class="card-body d-flex flex-column justify-content-between"><div><span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Total de Folha</span><span class="text-gray-800 fw-bold fs-2x">R$ ' + formatarMoeda(dados.total_folha) + '</span></div><div class="mt-3"><span class="text-gray-500 fs-7">Soma de todos os salarios</span></div></div></div></div>';
-                h += '<div class="col-xl-3"><div class="card bg-light-success h-100"><div class="card-body d-flex flex-column justify-content-between"><div><span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Apenas Bonus</span><span class="text-gray-800 fw-bold fs-2x">R$ ' + formatarMoeda(dados.total_bonus) + '</span></div><div class="mt-3"><span class="text-gray-500 fs-7">Total de bonus cadastrados</span></div></div></div></div>';
-                h += '<div class="col-xl-3"><div class="card bg-light-info h-100"><div class="card-body d-flex flex-column justify-content-between"><div><span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Extras Somados</span><span class="text-gray-800 fw-bold fs-2x">R$ ' + formatarMoeda(dados.total_extras) + '</span></div><div class="mt-3"><span class="text-gray-500 fs-7">Total de horas extras nao pagas</span></div></div></div></div>';
-                h += '<div class="col-xl-3"><div class="card bg-light-warning h-100"><div class="card-body d-flex flex-column justify-content-between"><div><span class="text-gray-600 fw-semibold fs-6 d-block mb-2">Folha + Bonus</span><span class="text-gray-800 fw-bold fs-2x">R$ ' + formatarMoeda(dados.total_folha_bonus) + '</span></div><div class="mt-3"><span class="text-gray-500 fs-7">Total de folha com bonus</span></div></div></div></div>';
-                h += '</div>';
-                h += '<div class="row mt-5"><div class="col-12"><div class="card bg-light-dark h-100"><div class="card-body"><div class="d-flex justify-content-between align-items-center"><div><span class="text-white fw-semibold fs-6 d-block mb-1">Total Geral</span><span class="text-white-50 fs-7">Folha + Bonus + Extras</span></div><div class="text-end"><span class="text-white fw-bold fs-2x">R$ ' + formatarMoeda(dados.total_geral) + '</span></div></div></div></div></div></div>';
-                container.innerHTML = h;
-            } else {
-                // Exibe valores agrupados por empresa ou setor
-                var items = dados.total_folha_bonus || [];
-                var html = '<div class="row g-5 g-xl-8">';
-                
-                items.forEach(function(item) {
-                    var folhaItem = dados.total_folha.find(function(d) { return d.id === item.id; });
-                    var bonusItem = dados.total_bonus.find(function(d) { return d.id === item.id; });
-                    var extrasItem = dados.total_extras.find(function(d) { return d.id === item.id; });
-                    var geralItem = dados.total_geral.find(function(d) { return d.id === item.id; });
-                    var folha = folhaItem ? folhaItem.valor : 0;
-                    var bonus = bonusItem ? bonusItem.valor : 0;
-                    var extras = extrasItem ? extrasItem.valor : 0;
-                    var geral = geralItem ? geralItem.valor : 0;
-                    
-                    html += '<div class="col-xl-6 mb-5"><div class="card"><div class="card-header"><h4 class="card-title">' + item.nome + (item.empresa ? ' - ' + item.empresa : '') + '</h4></div><div class="card-body"><div class="row g-3">';
-                    html += '<div class="col-6"><div class="card bg-light-primary"><div class="card-body p-3"><span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Total de Folha</span><span class="text-gray-800 fw-bold fs-3">R$ ' + formatarMoeda(folha) + '</span></div></div></div>';
-                    html += '<div class="col-6"><div class="card bg-light-success"><div class="card-body p-3"><span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Apenas Bonus</span><span class="text-gray-800 fw-bold fs-3">R$ ' + formatarMoeda(bonus) + '</span></div></div></div>';
-                    html += '<div class="col-6"><div class="card bg-light-info"><div class="card-body p-3"><span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Extras Somados</span><span class="text-gray-800 fw-bold fs-3">R$ ' + formatarMoeda(extras) + '</span></div></div></div>';
-                    html += '<div class="col-6"><div class="card bg-light-warning"><div class="card-body p-3"><span class="text-gray-600 fw-semibold fs-7 d-block mb-1">Folha + Bonus</span><span class="text-gray-800 fw-bold fs-3">R$ ' + formatarMoeda(item.valor) + '</span></div></div></div>';
-                    html += '<div class="col-12"><div class="card bg-light-dark"><div class="card-body p-3"><div class="d-flex justify-content-between align-items-center"><span class="text-white fw-semibold fs-6">Total Geral</span><span class="text-white fw-bold fs-2x">R$ ' + formatarMoeda(geral) + '</span></div></div></div></div>';
-                    html += '</div></div></div></div>';
-                });
-                
-                html += '</div>';
-                container.innerHTML = html;
-            }
-        }
-        
         // Formata valor monetário
         function formatarMoeda(valor) {
             return parseFloat(valor || 0).toLocaleString('pt-BR', {
@@ -4298,23 +4035,6 @@ require_once __DIR__ . '/../includes/header.php';
                 maximumFractionDigits: 2
             });
         }
-        
-        // Event listeners
-        document.getElementById('filtro_resumo_tipo')?.addEventListener('change', function() {
-            atualizarSelectFiltro();
-        });
-        
-        document.getElementById('filtro_resumo_id')?.addEventListener('change', function() {
-            const tipo = document.getElementById('filtro_resumo_tipo')?.value || 'total';
-            const filtroId = this.value || null;
-            carregarResumo(tipo, filtroId);
-        });
-        
-        // Inicializa ao carregar a pagina
-        document.addEventListener('DOMContentLoaded', function() {
-            atualizarSelectFiltro();
-        });
-        console.log('[DEBUG] Script 1 - Filtros carregado com sucesso!');
         </script>
         
     </div>
