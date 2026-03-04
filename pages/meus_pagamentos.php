@@ -49,7 +49,7 @@ $stmt = $pdo->prepare("
     INNER JOIN fechamentos_pagamento_itens i ON f.id = i.fechamento_id
     LEFT JOIN empresas e ON f.empresa_id = e.id
     LEFT JOIN usuarios u_aprovador ON i.documento_aprovado_por = u_aprovador.id
-    WHERE i.colaborador_id = ? AND f.status = 'fechado'
+    WHERE i.colaborador_id = ? AND f.status IN ('fechado', 'pago')
     ORDER BY f.mes_referencia DESC, f.data_fechamento DESC
 ");
 $stmt->execute([$colaborador_id]);
