@@ -2491,6 +2491,10 @@ $stmt = $pdo->prepare("
 $stmt->execute($params);
 $fechamentos = $stmt->fetchAll();
 
+// Separa fechamentos ativos (aberto/fechado) dos arquivados (pago)
+$fechamentos_ativos = array_values(array_filter($fechamentos, fn($f) => $f['status'] !== 'pago'));
+$fechamentos_arquivados = array_values(array_filter($fechamentos, fn($f) => $f['status'] === 'pago'));
+
 // Calcula totais de pagamento para o card de informações
 $total_folha = 0;
 $total_bonus = 0;
@@ -3832,7 +3836,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </tr>
                     </thead>
                     <tbody class="fw-semibold text-gray-600">
-                        <?php foreach ($fechamentos as $fechamento): 
+                        <?php foreach ($fechamentos_ativos as $fechamento): 
                             $tipo_fechamento = $fechamento['tipo_fechamento'] ?? 'regular';
                             $subtipo_fechamento = $fechamento['subtipo_fechamento'] ?? '';
                             $data_pagamento = $fechamento['data_pagamento'] ?? null;
@@ -3919,10 +3923,137 @@ require_once __DIR__ . '/../includes/header.php';
                             </td>
                         </tr>
                         <?php endforeach; ?>
+                        <?php if (empty($fechamentos_ativos)): ?>
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-10">
+                                <i class="ki-duotone ki-document fs-3x mb-3 d-block">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Nenhum fechamento em aberto ou fechado.
+                            </td>
+                        </tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
         </div>
+
+        <!-- Seção de Arquivados (Pagos) -->
+        <?php if (!empty($fechamentos_arquivados)): ?>
+        <div class="card mt-5" id="card_arquivados">
+            <div class="card-header border-0 cursor-pointer" role="button" data-bs-toggle="collapse" data-bs-target="#collapse_arquivados" aria-expanded="false">
+                <div class="card-title">
+                    <i class="ki-duotone ki-archive fs-2 me-2 text-success">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <span class="fw-bold fs-4">Arquivados</span>
+                    <span class="badge badge-light-success ms-3"><?= count($fechamentos_arquivados) ?></span>
+                    <span class="text-muted ms-3 fs-7 fw-normal">Fechamentos marcados como Pago</span>
+                </div>
+                <div class="card-toolbar">
+                    <i class="ki-duotone ki-down fs-3 text-muted collapse-icon">
+                        <span class="path1"></span>
+                    </i>
+                </div>
+            </div>
+            <div id="collapse_arquivados" class="collapse">
+                <div class="card-body pt-0">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5" id="kt_arquivados_table">
+                        <thead>
+                            <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
+                                <th class="min-w-50px">ID</th>
+                                <th class="min-w-150px">Tipo</th>
+                                <th class="min-w-150px">Empresa</th>
+                                <th class="min-w-100px">Mês/Ano</th>
+                                <th class="min-w-100px">Data Pagamento</th>
+                                <th class="min-w-100px">Colaboradores</th>
+                                <th class="min-w-120px">Total Pagamento</th>
+                                <th class="min-w-120px">Total H.E.</th>
+                                <th class="min-w-100px">Status</th>
+                                <th class="text-end min-w-70px">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="fw-semibold text-gray-600">
+                            <?php foreach ($fechamentos_arquivados as $fechamento):
+                                $tipo_fechamento = $fechamento['tipo_fechamento'] ?? 'regular';
+                                $subtipo_fechamento = $fechamento['subtipo_fechamento'] ?? '';
+                                $data_pagamento = $fechamento['data_pagamento'] ?? null;
+                                $referencia_externa = $fechamento['referencia_externa'] ?? '';
+                            ?>
+                            <tr class="bg-light-success">
+                                <td><?= $fechamento['id'] ?></td>
+                                <td>
+                                    <?php if ($tipo_fechamento === 'extra'): ?>
+                                        <span class="badge badge-light-primary">EXTRA</span>
+                                        <?php if ($subtipo_fechamento): ?>
+                                            <br><small class="text-muted">
+                                                <?php
+                                                $subtipo_labels = [
+                                                    'bonus_especifico' => 'Bônus Específico',
+                                                    'individual' => 'Individual',
+                                                    'grupal' => 'Grupal',
+                                                    'adiantamento' => 'Adiantamento'
+                                                ];
+                                                echo htmlspecialchars($subtipo_labels[$subtipo_fechamento] ?? $subtipo_fechamento);
+                                                ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <span class="badge badge-light-secondary">REGULAR</span>
+                                    <?php endif; ?>
+                                    <?php if ($referencia_externa): ?>
+                                        <br><small class="text-info"><?= htmlspecialchars($referencia_externa) ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= htmlspecialchars($fechamento['empresa_nome']) ?></td>
+                                <td><?= date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')) ?></td>
+                                <td>
+                                    <?php if ($data_pagamento): ?>
+                                        <strong><?= date('d/m/Y', strtotime($data_pagamento)) ?></strong>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= $fechamento['total_colaboradores'] ?></td>
+                                <td><strong>R$ <?= number_format($fechamento['total_pagamento'], 2, ',', '.') ?></strong></td>
+                                <td>
+                                    <?php if ($tipo_fechamento === 'regular'): ?>
+                                        R$ <?= number_format($fechamento['total_horas_extras'], 2, ',', '.') ?>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <span class="badge badge-light-success">Pago</span>
+                                </td>
+                                <td class="text-end">
+                                    <a href="fechamento_pagamentos.php?view=<?= $fechamento['id'] ?>" class="btn btn-sm btn-light-primary me-2">
+                                        Ver
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-light-warning me-2" onclick="reverterPagoLista(<?= $fechamento['id'] ?>, '<?= date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')) ?>')" title="Reverter para Fechado">
+                                        <i class="ki-duotone ki-arrow-circle-left fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light-danger" onclick="deletarFechamento(<?= $fechamento['id'] ?>, '<?= date('m/Y', strtotime($fechamento['mes_referencia'] . '-01')) ?>')">
+                                        <i class="ki-duotone ki-trash fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <!-- Card de Informações de Pagamento -->
         <div class="card mt-5">
@@ -6570,11 +6701,38 @@ var KTFechamentosList = function() {
 function waitForDependencies() {
     if (typeof jQuery !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
         KTFechamentosList.init();
+        // Inicializa DataTable para arquivados se existir
+        const tabelaArquivados = document.getElementById('kt_arquivados_table');
+        if (tabelaArquivados) {
+            $(tabelaArquivados).DataTable({
+                "info": true,
+                "order": [],
+                "pageLength": 10,
+                "lengthMenu": [[10, 25, 50], [10, 25, 50]],
+                "language": {
+                    "url": "https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json"
+                }
+            });
+        }
     } else {
         setTimeout(waitForDependencies, 100);
     }
 }
 waitForDependencies();
+
+// Rotaciona ícone do collapse de arquivados
+(function() {
+    const collapseEl = document.getElementById('collapse_arquivados');
+    if (!collapseEl) return;
+    const icon = document.querySelector('#card_arquivados .collapse-icon');
+    if (icon) icon.style.transition = 'transform 0.3s ease';
+    collapseEl.addEventListener('show.bs.collapse', function() {
+        if (icon) icon.style.transform = 'rotate(180deg)';
+    });
+    collapseEl.addEventListener('hide.bs.collapse', function() {
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    });
+})();
 
 // ======== MARCAR ITEM COMO PAGO ========
 function marcarItemPago(checkbox) {

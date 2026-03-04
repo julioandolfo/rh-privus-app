@@ -1015,7 +1015,7 @@ const colaboradoresData = {
     <?php foreach ($colaboradores as $colab): ?>
     <?= $colab['id'] ?>: {
         salario: <?= $colab['salario'] ?? 0 ?>,
-        empresa_id: <?= $colab['empresa_id'] ?>
+        empresa_id: <?= $colab['empresa_id'] !== null ? $colab['empresa_id'] : 'null' ?>
     },
     <?php endforeach; ?>
 };
@@ -1259,6 +1259,7 @@ if (quantidadeHorasRemoverInput) {
     
     waitForjQueryAndDataTables(function() {
         window.KTHorasExtrasList = initKTHorasExtrasList();
+        window.KTHorasExtrasList.init();
         
         // Máscara para quantidade de horas (após jQuery estar disponível)
         if (typeof window.jQuery !== 'undefined' && window.jQuery.fn.mask) {
