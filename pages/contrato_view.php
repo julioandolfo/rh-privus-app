@@ -178,6 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Adiciona nova testemunha ao contrato já enviado ao Autentique
         $nome  = trim($_POST['novo_nome'] ?? '');
         $email = trim($_POST['novo_email'] ?? '');
+        $cpf   = function_exists('formatar_cpf') ? formatar_cpf(trim($_POST['novo_cpf'] ?? '')) : trim($_POST['novo_cpf'] ?? '');
 
         if (!$nome || !$email) {
             redirect('contrato_view.php?id=' . $contrato_id, 'Nome e e-mail são obrigatórios.', 'error');
@@ -201,13 +202,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $pdo->prepare("
                     INSERT INTO contratos_signatarios
-                        (contrato_id, tipo, nome, email, autentique_signer_id, link_publico, assinado, ordem_assinatura)
-                    VALUES (?, 'testemunha', ?, ?, ?, ?, 0, ?)
+                        (contrato_id, tipo, nome, email, cpf, autentique_signer_id, link_publico, assinado, ordem_assinatura)
+                    VALUES (?, 'testemunha', ?, ?, ?, ?, ?, 0, ?)
                 ");
                 $stmt->execute([
                     $contrato_id,
                     $nome,
                     $email,
+                    $cpf ?: null,
                     $resultado['public_id'],
                     $resultado['link']['short_link'] ?? null,
                     $ordem_max + 1
@@ -266,6 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $signer_id  = intval($_POST['signer_id'] ?? 0);
         $novo_nome  = trim($_POST['novo_nome'] ?? '');
         $novo_email = trim($_POST['novo_email'] ?? '');
+        $novo_cpf   = function_exists('formatar_cpf') ? formatar_cpf(trim($_POST['novo_cpf'] ?? '')) : trim($_POST['novo_cpf'] ?? '');
 
         if ($signer_id <= 0 || !$novo_nome || !$novo_email) {
             redirect('contrato_view.php?id=' . $contrato_id, 'Preencha todos os campos.', 'error');
@@ -310,13 +313,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $stmt = $pdo->prepare("
                         INSERT INTO contratos_signatarios
-                            (contrato_id, tipo, nome, email, autentique_signer_id, link_publico, assinado, ordem_assinatura, substituido_por)
-                        VALUES (?, 'testemunha', ?, ?, ?, ?, 0, ?, ?)
+                            (contrato_id, tipo, nome, email, cpf, autentique_signer_id, link_publico, assinado, ordem_assinatura, substituido_por)
+                        VALUES (?, 'testemunha', ?, ?, ?, ?, ?, 0, ?, ?)
                     ");
                     $stmt->execute([
                         $contrato_id,
                         $novo_nome,
                         $novo_email,
+                        $novo_cpf ?: null,
                         $resultado['public_id'],
                         $resultado['link']['short_link'] ?? null,
                         $signatario['ordem_assinatura'],
@@ -858,12 +862,16 @@ require_once __DIR__ . '/../includes/header.php';
                                         <small class="text-muted">O link atual será invalidado e um novo e-mail será enviado.</small>
                                     </div>
                                     <div class="mb-4">
-                                        <label class="form-label required">Nome da nova testemunha</label>
+                                        <label class="form-label required">Nome completo</label>
                                         <input type="text" name="novo_nome" class="form-control" placeholder="Nome completo" required>
                                     </div>
                                     <div class="mb-4">
-                                        <label class="form-label required">E-mail da nova testemunha</label>
+                                        <label class="form-label required">E-mail</label>
                                         <input type="email" name="novo_email" class="form-control" placeholder="email@exemplo.com" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label">CPF <span class="text-muted fs-7">(opcional)</span></label>
+                                        <input type="text" name="novo_cpf" class="form-control cpf-mask" placeholder="000.000.000-00" maxlength="14">
                                     </div>
                                 </div>
                                 <div class="modal-footer">
@@ -892,12 +900,16 @@ require_once __DIR__ . '/../includes/header.php';
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-4">
-                                        <label class="form-label required">Nome</label>
+                                        <label class="form-label required">Nome completo</label>
                                         <input type="text" name="novo_nome" class="form-control" placeholder="Nome completo" required>
                                     </div>
                                     <div class="mb-4">
                                         <label class="form-label required">E-mail</label>
                                         <input type="email" name="novo_email" class="form-control" placeholder="email@exemplo.com" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label">CPF <span class="text-muted fs-7">(opcional)</span></label>
+                                        <input type="text" name="novo_cpf" class="form-control cpf-mask" placeholder="000.000.000-00" maxlength="14">
                                     </div>
                                 </div>
                                 <div class="modal-footer">
@@ -1083,6 +1095,17 @@ document.getElementById('btn-adicionar-testemunha')?.addEventListener('click', f
     form.querySelector('[name="novo_email"]').value = '';
     const modal = new bootstrap.Modal(document.getElementById('modal_adicionar_testemunha'));
     modal.show();
+});
+
+// Máscara de CPF nos campos dos modais
+document.querySelectorAll('.cpf-mask').forEach(input => {
+    input.addEventListener('input', function() {
+        let v = this.value.replace(/\D/g, '').substring(0, 11);
+        if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
+        else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3');
+        else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/, '$1.$2');
+        this.value = v;
+    });
 });
 
 // Loading nos forms de modal ao submeter

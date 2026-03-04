@@ -322,45 +322,37 @@ class AutentiqueService {
     }
     
     /**
-     * Reenvia notificação de assinatura
-     * Nota: A API v2 do Autentique pode usar diferentes mutations para reenvio
+     * Reenvia notificação de assinatura via resendSignatures (API v2)
+     * Aceita um ou mais public_ids de signatários
      */
     public function reenviarAssinatura($documentId, $signerId) {
-        // Tenta primeiro com a mutation padrão
+        // A API v2 usa resendSignatures com array de public_ids
         $query = '
-            mutation ResendSignature($documentId: UUID!, $signerId: UUID!) {
-                resendSignature(documentId: $documentId, signerId: $signerId) {
-                    success
-                    message
-                }
+            mutation ResendSignatures($public_ids: [String!]!) {
+                resendSignatures(public_ids: $public_ids)
             }
         ';
-        
+
         $variables = [
-            'documentId' => $documentId,
-            'signerId' => $signerId
+            'public_ids' => [$signerId]
         ];
-        
+
         try {
             $result = $this->executeGraphQL($query, $variables);
-            return $result['resendSignature'] ?? ['success' => true];
+            log_contrato("reenviarAssinatura ($signerId): " . json_encode($result, JSON_UNESCAPED_UNICODE));
+
+            // resendSignatures retorna true ou lança erro too_many_resent_emails
+            return ['success' => $result['resendSignatures'] ?? true];
         } catch (Exception $e) {
-            log_contrato("Erro ao reenviar assinatura: " . $e->getMessage());
-            
-            // Tenta mutation alternativa (notifySignature)
-            try {
-                $altQuery = '
-                    mutation NotifySignature($documentId: UUID!, $signerId: UUID!) {
-                        notifySignature(documentId: $documentId, signerId: $signerId)
-                    }
-                ';
-                
-                $result = $this->executeGraphQL($altQuery, $variables);
-                return ['success' => $result['notifySignature'] ?? false];
-            } catch (Exception $e2) {
-                log_contrato("Erro ao reenviar com método alternativo: " . $e2->getMessage());
-                throw new Exception("Não foi possível reenviar a notificação. Tente novamente mais tarde.");
+            $msg = $e->getMessage();
+            log_contrato("Erro ao reenviar assinatura ($signerId): " . $msg);
+
+            // Erro específico de reenvio recente (limite de frequência do Autentique)
+            if (stripos($msg, 'too_many_resent_emails') !== false || stripos($msg, 'many_resent') !== false) {
+                throw new Exception('Este signatário já recebeu um reenvio recentemente. Aguarde alguns minutos antes de tentar novamente.');
             }
+
+            throw new Exception('Erro ao reenviar notificação: ' . $msg);
         }
     }
     
