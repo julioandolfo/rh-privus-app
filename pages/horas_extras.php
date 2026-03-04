@@ -1256,8 +1256,24 @@ if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
     });
 }
 
-// DataTables com Filtros Avançados
-var KTHorasExtrasList = function() {
+// DataTables com Filtros Avançados - Aguarda jQuery estar carregado
+(function() {
+    function waitForjQueryAndDataTables(callback) {
+        if (typeof window.jQuery !== 'undefined' && typeof window.jQuery.fn.DataTable !== 'undefined') {
+            callback();
+        } else {
+            setTimeout(function() {
+                waitForjQueryAndDataTables(callback);
+            }, 100);
+        }
+    }
+    
+    waitForjQueryAndDataTables(function() {
+        window.KTHorasExtrasList = initKTHorasExtrasList();
+    });
+})();
+
+function initKTHorasExtrasList() {
     var table;
     var datatable;
     
@@ -1265,7 +1281,7 @@ var KTHorasExtrasList = function() {
         table = document.getElementById('kt_horas_extras_table');
         if (!table) return;
         
-        datatable = $(table).DataTable({
+        datatable = jQuery(table).DataTable({
             "info": true,
             "order": [[3, 'desc']], // Ordena por data (coluna 3) decrescente
             "pageLength": 25,
@@ -1313,7 +1329,7 @@ var KTHorasExtrasList = function() {
             if (!datatable) return;
             
             // Remove filtros anteriores
-            $.fn.dataTable.ext.search = [];
+            jQuery.fn.dataTable.ext.search = [];
             
             // Pega valores dos filtros
             const colaboradorId = document.getElementById('filtro_colaborador')?.value;
@@ -1329,7 +1345,7 @@ var KTHorasExtrasList = function() {
             let textoFiltros = [];
             
             // Adiciona filtro customizado
-            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            jQuery.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
                 // data[1] = colaborador nome
                 // data[3] = data (formato dd/mm/yyyy)
                 // data[4] = quantidade horas
@@ -1518,7 +1534,7 @@ var KTHorasExtrasList = function() {
                 document.getElementById('filtro_valor_max').value = '';
                 
                 // Remove filtros do DataTable
-                $.fn.dataTable.ext.search = [];
+                jQuery.fn.dataTable.ext.search = [];
                 
                 // Esconde resumo
                 document.getElementById('filtros_ativos_resumo').classList.add('d-none');
@@ -1619,7 +1635,7 @@ var KTHorasExtrasList = function() {
         },
         atualizarEstatisticas: atualizarEstatisticas
     };
-}();
+}
 
 // Deletar hora extra
 function deletarHoraExtra(id) {
@@ -1645,15 +1661,7 @@ function deletarHoraExtra(id) {
     });
 }
 
-// Inicializa quando jQuery e DataTables estiverem prontos
-function waitForDependencies() {
-    if (typeof jQuery !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
-        KTHorasExtrasList.init();
-    } else {
-        setTimeout(waitForDependencies, 100);
-    }
-}
-waitForDependencies();
+// Inicialização já tratada pelo wrapper waitForjQueryAndDataTables acima
 
 // ========================================
 // FUNÇÕES DE EXPORTAÇÃO
@@ -2877,19 +2885,26 @@ function verificarCamposPreenchidos() {
 }
 
 // Adiciona listeners para mudanças nos campos
-jQuery(document).ready(function() {
-    initFiltroColaboradorSelect2();
-    
-    // Listeners para inputs de data e number
-    jQuery('#kt_filtros_avancados_content input').on('change input', function() {
-        verificarCamposPreenchidos();
-    });
-    
-    // Listener para selects nativos
-    jQuery('#kt_filtros_avancados_content select:not(.select2-hidden-accessible)').on('change', function() {
-        verificarCamposPreenchidos();
-    });
-});
+// Aguarda jQuery estar disponível antes de executar
+(function waitForjQueryFinal() {
+    if (typeof window.jQuery !== 'undefined') {
+        window.jQuery(document).ready(function() {
+            initFiltroColaboradorSelect2();
+            
+            // Listeners para inputs de data e number
+            window.jQuery('#kt_filtros_avancados_content input').on('change input', function() {
+                verificarCamposPreenchidos();
+            });
+            
+            // Listener para selects nativos
+            window.jQuery('#kt_filtros_avancados_content select:not(.select2-hidden-accessible)').on('change', function() {
+                verificarCamposPreenchidos();
+            });
+        });
+    } else {
+        setTimeout(waitForjQueryFinal, 100);
+    }
+})();
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
