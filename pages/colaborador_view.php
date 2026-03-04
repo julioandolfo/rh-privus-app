@@ -2101,8 +2101,21 @@ require_once __DIR__ . '/../includes/header.php';
                     <!--begin::Tab Pane - Documentos-->
                     <div class="tab-pane fade" id="kt_tab_pane_documentos" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-7">
-                            <h3 class="fw-bold text-gray-800 mb-0">Documentos Enviados</h3>
-                            <span class="text-muted fs-7"><?= count($documentos_colaborador) ?> documento<?= count($documentos_colaborador) != 1 ? 's' : '' ?> encontrado<?= count($documentos_colaborador) != 1 ? 's' : '' ?></span>
+                            <div>
+                                <h3 class="fw-bold text-gray-800 mb-1">Documentos Enviados</h3>
+                                <span class="text-muted fs-7"><?= count($documentos_colaborador) ?> documento<?= count($documentos_colaborador) != 1 ? 's' : '' ?> encontrado<?= count($documentos_colaborador) != 1 ? 's' : '' ?></span>
+                            </div>
+                            <?php if (!empty($documentos_colaborador)): ?>
+                            <a href="../api/download_documentos_colaborador.php?colaborador_id=<?= $id ?>"
+                               class="btn btn-light-primary btn-sm"
+                               title="Baixar todos os documentos em um arquivo ZIP">
+                                <i class="ki-duotone ki-folder-down fs-4 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Baixar Todos (ZIP)
+                            </a>
+                            <?php endif; ?>
                         </div>
 
                         <?php if (empty($documentos_colaborador)): ?>
