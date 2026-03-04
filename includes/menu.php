@@ -316,12 +316,12 @@ function getIcon($name) {
                 <?php endif; ?>
                 
                 <?php 
-                // Verifica se há menus de desenvolvimento para ADMIN/RH
+                // Verifica se há menus de desenvolvimento para ADMIN/RH/GESTOR
                 $tem_desenvolvimento_admin = false;
                 if ($is_admin_rh) {
-                    $tem_desenvolvimento_admin = can_access_feedbacks_menu() || can_access_endomarketing_menu() || 
-                                                 (can_show_menu(['ADMIN', 'RH']) && 
-                                                  (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') || 
+                    $tem_desenvolvimento_admin = can_access_feedbacks_menu() || can_access_endomarketing_menu() ||
+                                                 (can_show_menu(['ADMIN', 'RH', 'GESTOR']) &&
+                                                  (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') ||
                                                    can_access_page('lms_cursos_obrigatorios.php') || can_access_page('lms_relatorios.php')));
                 }
                 
@@ -473,18 +473,18 @@ function getIcon($name) {
                 // Inicializa variável para evitar erro
                 $mostrar_separacao_gestao_escola = false;
                 
-                // Verifica se há menus de gestão para ADMIN/RH
+                // Verifica se há menus de gestão para ADMIN/RH/GESTOR
                 $tem_gestao_admin = false;
                 if ($is_admin_rh) {
-                    $tem_gestao_admin = can_access_recrutamento() || can_access_colaboradores_menu() || 
-                                       can_access_ocorrencias_menu() || can_access_engajamento_menu() || 
+                    $tem_gestao_admin = can_access_recrutamento() || can_access_colaboradores_menu() ||
+                                       can_access_ocorrencias_menu() || can_access_engajamento_menu() ||
                                        can_access_notificacoes_push_menu();
-                    
+
                     // Verifica se Escola Privus vai mostrar separação de gestão
-                    if (can_show_menu(['ADMIN', 'RH']) && 
-                        (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') || 
+                    if (can_show_menu(['ADMIN', 'RH', 'GESTOR']) &&
+                        (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') ||
                          can_access_page('lms_cursos_obrigatorios.php') || can_access_page('lms_relatorios.php'))) {
-                        $tem_outros_menus_gestao = can_access_engajamento_menu() || can_access_colaboradores_menu() || 
+                        $tem_outros_menus_gestao = can_access_engajamento_menu() || can_access_colaboradores_menu() ||
                                                    can_access_ocorrencias_menu() || can_access_notificacoes_push_menu();
                         if (!$tem_outros_menus_gestao) {
                             $mostrar_separacao_gestao_escola = true;
@@ -789,15 +789,15 @@ function getIcon($name) {
                     $mostrar_escola_privus = true;
                 }
                 
-                // Verifica itens de gestão (ADMIN/RH)
-                if (can_show_menu(['ADMIN', 'RH']) && 
-                    (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') || 
+                // Verifica itens de gestão (ADMIN/RH/GESTOR)
+                if (can_show_menu(['ADMIN', 'RH', 'GESTOR']) &&
+                    (can_access_page('lms_cursos.php') || can_access_page('lms_categorias_cursos.php') ||
                      can_access_page('lms_cursos_obrigatorios.php') || can_access_page('lms_relatorios.php'))) {
                     $tem_itens_gestao = true;
                     $mostrar_escola_privus = true;
-                    
+
                     // Verifica se há outros menus de gestão depois para não duplicar separação
-                    $tem_outros_menus_gestao = can_access_engajamento_menu() || can_access_colaboradores_menu() || 
+                    $tem_outros_menus_gestao = can_access_engajamento_menu() || can_access_colaboradores_menu() ||
                                                can_access_ocorrencias_menu() || can_access_notificacoes_push_menu();
                     if (!$tem_outros_menus_gestao) {
                         $mostrar_separacao_gestao_escola = true;
@@ -907,7 +907,7 @@ function getIcon($name) {
                                 <!--end:Menu item-->
                                 <?php endif; ?>
                             <?php else: ?>
-                                <!-- Itens de Gestão para ADMIN/RH -->
+                                <!-- Itens de Gestão para ADMIN/RH/GESTOR -->
                                 <?php if (can_access_page('lms_cursos.php')): ?>
                                 <!--begin:Menu item-->
                                 <div class="menu-item">

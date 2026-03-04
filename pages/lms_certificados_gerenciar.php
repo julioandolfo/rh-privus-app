@@ -38,8 +38,8 @@ if ($filtro_status) {
     $params[] = $filtro_status;
 }
 
-// Restrições por role
-if ($usuario['role'] === 'RH') {
+// Restrições por role (RH e GESTOR)
+if ($usuario['role'] === 'RH' || $usuario['role'] === 'GESTOR') {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
         $where[] = "col.empresa_id IN ($placeholders)";

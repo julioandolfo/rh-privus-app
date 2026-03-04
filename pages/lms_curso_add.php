@@ -40,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('lms_curso_add.php', 'Preencha o título do curso!', 'error');
     }
     
-    // Valida empresa para RH
-    if ($usuario['role'] === 'RH' && $empresa_id) {
+    // Valida empresa para RH e GESTOR
+    if (($usuario['role'] === 'RH' || $usuario['role'] === 'GESTOR') && $empresa_id) {
         if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
             if (!in_array($empresa_id, $usuario['empresas_ids'])) {
                 redirect('lms_curso_add.php', 'Você não tem permissão para criar cursos nesta empresa!', 'error');
@@ -179,7 +179,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </select>
                     </div>
                     
-                    <?php if ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)): ?>
+                    <?php if ($usuario['role'] === 'ADMIN' || (($usuario['role'] === 'RH' || $usuario['role'] === 'GESTOR') && count($empresas) > 1)): ?>
                     <div class="col-md-6">
                         <label class="form-label">Empresa</label>
                         <select name="empresa_id" class="form-select" id="empresaSelect">

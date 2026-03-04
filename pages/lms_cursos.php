@@ -41,9 +41,9 @@ if ($filtro_busca) {
     $params[] = $busca;
 }
 
-// Restrições por role
-if ($usuario['role'] === 'RH') {
-    // RH vê apenas cursos das empresas que tem acesso
+// Restrições por role (RH e GESTOR)
+if ($usuario['role'] === 'RH' || $usuario['role'] === 'GESTOR') {
+    // RH e GESTOR veem apenas cursos das empresas que tem acesso
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
         $where[] = "(c.empresa_id IN ($placeholders) OR c.empresa_id IS NULL)";

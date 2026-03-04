@@ -41,7 +41,7 @@ if (!$curso) {
 }
 
 // Valida acesso
-if ($usuario['role'] === 'RH' && $curso['empresa_id']) {
+if (($usuario['role'] === 'RH' || $usuario['role'] === 'GESTOR') && $curso['empresa_id']) {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         if (!in_array($curso['empresa_id'], $usuario['empresas_ids'])) {
             redirect('lms_cursos.php', 'Você não tem permissão para editar aulas deste curso', 'error');

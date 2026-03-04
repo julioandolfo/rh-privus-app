@@ -29,7 +29,7 @@ if (!$curso) {
 }
 
 // Valida acesso
-if ($usuario['role'] === 'RH' && $curso['empresa_id']) {
+if (($usuario['role'] === 'RH' || $usuario['role'] === 'GESTOR') && $curso['empresa_id']) {
     if (isset($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
         if (!in_array($curso['empresa_id'], $usuario['empresas_ids'])) {
             redirect('lms_cursos.php', 'Você não tem permissão para editar este curso', 'error');
@@ -203,7 +203,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </select>
                     </div>
                     
-                    <?php if ($usuario['role'] === 'ADMIN' || ($usuario['role'] === 'RH' && count($empresas) > 1)): ?>
+                    <?php if ($usuario['role'] === 'ADMIN' || (($usuario['role'] === 'RH' || $usuario['role'] === 'GESTOR') && count($empresas) > 1)): ?>
                     <div class="col-md-6">
                         <label class="form-label">Empresa</label>
                         <select name="empresa_id" class="form-select" id="empresaSelect">
