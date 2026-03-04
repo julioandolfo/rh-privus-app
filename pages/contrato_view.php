@@ -87,7 +87,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($acao === 'reenviar_link') {
         $signer_id = intval($_POST['signer_id'] ?? 0);
-        if ($signer_id > 0 && $contrato['autentique_document_id']) {
+        if ($signer_id <= 0) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Signatário inválido.', 'error');
+        } elseif (!$contrato['autentique_document_id']) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Este contrato não está vinculado ao Autentique.', 'error');
+        } else {
             try {
                 $service = new AutentiqueService();
                 $signatario = null;
@@ -98,9 +102,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                if ($signatario && $signatario['autentique_signer_id']) {
+                if (!$signatario) {
+                    redirect('contrato_view.php?id=' . $contrato_id, 'Signatário não encontrado.', 'error');
+                } elseif (!$signatario['autentique_signer_id']) {
+                    redirect('contrato_view.php?id=' . $contrato_id, 'Este signatário não possui ID no Autentique. Sincronize o contrato primeiro.', 'warning');
+                } else {
                     $service->reenviarAssinatura($contrato['autentique_document_id'], $signatario['autentique_signer_id']);
-                    redirect('contrato_view.php?id=' . $contrato_id, 'Link reenviado com sucesso!', 'success');
+                    redirect('contrato_view.php?id=' . $contrato_id, 'Link reenviado com sucesso para ' . htmlspecialchars($signatario['email']) . '!', 'success');
                 }
             } catch (Exception $e) {
                 redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao reenviar: ' . $e->getMessage(), 'error');
@@ -501,10 +509,10 @@ require_once __DIR__ . '/../includes/header.php';
                             </div>
                             <div class="ms-3">
                                 <?php if (!$signatario['assinado'] && $contrato['autentique_document_id']): ?>
-                                <form method="POST" style="display: inline;">
+                                <form method="POST" style="display: inline;" class="form-reenviar-link">
                                     <input type="hidden" name="acao" value="reenviar_link">
                                     <input type="hidden" name="signer_id" value="<?= $signatario['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-light-primary" title="Reenviar link">
+                                    <button type="button" class="btn btn-sm btn-light-primary btn-reenviar-link" title="Reenviar link de assinatura">
                                         <i class="ki-duotone ki-send fs-4">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
@@ -565,6 +573,36 @@ document.getElementById('form_sincronizar')?.addEventListener('submit', function
         btn.setAttribute('data-kt-indicator', 'on');
         btn.disabled = true;
     }
+});
+
+// Botão reenviar link - confirmação com SweetAlert
+document.querySelectorAll('.btn-reenviar-link').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const form = this.closest('form');
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Reenviar link de assinatura?',
+                text: 'Um novo e-mail com o link de assinatura será enviado para este signatário.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#009ef7',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sim, reenviar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                    form.submit();
+                }
+            });
+        } else {
+            if (confirm('Reenviar link de assinatura para este signatário?')) {
+                btn.disabled = true;
+                form.submit();
+            }
+        }
+    });
 });
 
 // Botão cancelar - confirmação com SweetAlert
