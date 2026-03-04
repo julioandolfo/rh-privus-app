@@ -406,6 +406,21 @@ function decimalParaHorasMinutos($valor) {
     $minutos = round(($valor - $horas) * 60);
     return sprintf('%02d:%02d', $horas, $minutos);
 }
+
+// Retorna o dia da semana em português
+function diaDaSemana($data) {
+    $dias = [
+        'Sunday' => 'Domingo',
+        'Monday' => 'Segunda',
+        'Tuesday' => 'Terça',
+        'Wednesday' => 'Quarta',
+        'Thursday' => 'Quinta',
+        'Friday' => 'Sexta',
+        'Saturday' => 'Sábado'
+    ];
+    $dia = date('l', strtotime($data));
+    return $dias[$dia] ?? $dia;
+}
 ?>
 
 <div class="d-flex flex-column flex-column-fluid">
@@ -470,11 +485,11 @@ function decimalParaHorasMinutos($valor) {
                                             </th>
                                             <th class="min-w-150px">Colaborador</th>
                                             <th class="min-w-100px">Empresa</th>
-                                            <th class="min-w-100px">Data do Trabalho</th>
+                                            <th class="min-w-120px">Data do Trabalho</th>
                                             <th class="min-w-100px">Quantidade</th>
                                             <th class="min-w-200px">Motivo</th>
-                                            <th class="min-w-150px">Data Solicitação</th>
-                                            <th class="min-w-250px text-end">Ações</th>
+                                            <th class="min-w-140px">Data Solicitação</th>
+                                            <th class="min-w-120px text-end">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -510,48 +525,61 @@ function decimalParaHorasMinutos($valor) {
                                                     </div>
                                                 </td>
                                                 <td><?= htmlspecialchars($solicitacao['empresa_nome'] ?? '-') ?></td>
-                                                <td><?= formatar_data($solicitacao['data_trabalho']) ?></td>
+                                                <td>
+                                                    <div class="d-flex flex-column">
+                                                        <span class="fw-bold"><?= diaDaSemana($solicitacao['data_trabalho']) ?></span>
+                                                        <span class="text-muted fs-7"><?= formatar_data($solicitacao['data_trabalho']) ?></span>
+                                                    </div>
+                                                </td>
                                                 <td>
                                                     <span class="badge badge-light-primary fs-6 quantidade-horas" data-id="<?= $solicitacao['id'] ?>">
                                                         <?= number_format($solicitacao['quantidade_horas'], 2, ',', '.') ?>h
-                                                        (<?= decimalParaHorasMinutos($solicitacao['quantidade_horas']) ?>)
                                                     </span>
+                                                    <div class="text-muted fs-7"><?= decimalParaHorasMinutos($solicitacao['quantidade_horas']) ?></div>
                                                 </td>
                                                 <td>
-                                                    <div class="text-truncate" style="max-width: 250px;" title="<?= htmlspecialchars($solicitacao['motivo']) ?>">
+                                                    <div class="text-truncate" style="max-width: 200px;" title="<?= htmlspecialchars($solicitacao['motivo']) ?>">
                                                         <?= htmlspecialchars($solicitacao['motivo']) ?>
                                                     </div>
                                                 </td>
                                                 <td><?= formatar_data($solicitacao['created_at'], 'd/m/Y H:i') ?></td>
                                                 <td class="text-end">
-                                                    <button type="button" 
-                                                            class="btn btn-sm btn-success me-1" 
-                                                            onclick="aprovarSolicitacao(<?= $solicitacao['id'] ?>, '<?= decimalParaHorasMinutos($solicitacao['quantidade_horas']) ?>', '<?= htmlspecialchars(addslashes($solicitacao['motivo'])) ?>')">
-                                                        <i class="ki-duotone ki-check fs-5">
-                                                            <span class="path1"></span>
-                                                            <span class="path2"></span>
-                                                        </i>
-                                                        Aprovar
-                                                    </button>
-                                                    <button type="button" 
-                                                            class="btn btn-sm btn-warning me-1" 
-                                                            onclick="solicitarMotivo(<?= $solicitacao['id'] ?>, '<?= htmlspecialchars(addslashes($solicitacao['motivo'])) ?>')">
-                                                        <i class="ki-duotone ki-message-text-2 fs-5">
-                                                            <span class="path1"></span>
-                                                            <span class="path2"></span>
-                                                            <span class="path3"></span>
-                                                        </i>
-                                                        Solicitar Motivo
-                                                    </button>
-                                                    <button type="button" 
-                                                            class="btn btn-sm btn-danger" 
-                                                            onclick="rejeitarSolicitacao(<?= $solicitacao['id'] ?>, '<?= htmlspecialchars(addslashes($solicitacao['motivo'])) ?>')">
-                                                        <i class="ki-duotone ki-cross fs-5">
-                                                            <span class="path1"></span>
-                                                            <span class="path2"></span>
-                                                        </i>
-                                                        Rejeitar
-                                                    </button>
+                                                    <div class="dropdown">
+                                                        <button class="btn btn-sm btn-light btn-active-light-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                            Ações
+                                                        </button>
+                                                        <ul class="dropdown-menu dropdown-menu-end">
+                                                            <li>
+                                                                <a class="dropdown-item text-success" href="#" onclick="aprovarSolicitacao(<?= $solicitacao['id'] ?>, '<?= decimalParaHorasMinutos($solicitacao['quantidade_horas']) ?>', '<?= htmlspecialchars(addslashes($solicitacao['motivo'])) ?>'); return false;">
+                                                                    <i class="ki-duotone ki-check fs-5 me-2">
+                                                                        <span class="path1"></span>
+                                                                        <span class="path2"></span>
+                                                                    </i>
+                                                                    Aprovar
+                                                                </a>
+                                                            </li>
+                                                            <li>
+                                                                <a class="dropdown-item text-warning" href="#" onclick="solicitarMotivo(<?= $solicitacao['id'] ?>, '<?= htmlspecialchars(addslashes($solicitacao['motivo'])) ?>'); return false;">
+                                                                    <i class="ki-duotone ki-message-text-2 fs-5 me-2">
+                                                                        <span class="path1"></span>
+                                                                        <span class="path2"></span>
+                                                                        <span class="path3"></span>
+                                                                    </i>
+                                                                    Solicitar Motivo
+                                                                </a>
+                                                            </li>
+                                                            <li><hr class="dropdown-divider"></li>
+                                                            <li>
+                                                                <a class="dropdown-item text-danger" href="#" onclick="rejeitarSolicitacao(<?= $solicitacao['id'] ?>, '<?= htmlspecialchars(addslashes($solicitacao['motivo'])) ?>'); return false;">
+                                                                    <i class="ki-duotone ki-cross fs-5 me-2">
+                                                                        <span class="path1"></span>
+                                                                        <span class="path2"></span>
+                                                                    </i>
+                                                                    Rejeitar
+                                                                </a>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
