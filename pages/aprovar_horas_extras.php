@@ -421,6 +421,11 @@ function diaDaSemana($data) {
     $dia = date('l', strtotime($data));
     return $dias[$dia] ?? $dia;
 }
+
+// Verifica se foi solicitado motivo
+function motivoFoiSolicitado($observacoes_rh) {
+    return !empty($observacoes_rh) && strpos($observacoes_rh, 'SOLICITAÇÃO DE MOTIVO') !== false;
+}
 ?>
 
 <div class="d-flex flex-column flex-column-fluid">
@@ -493,8 +498,10 @@ function diaDaSemana($data) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($solicitacoes as $solicitacao): ?>
-                                            <tr>
+                                        <?php foreach ($solicitacoes as $solicitacao): 
+                                            $aguardandoMotivo = motivoFoiSolicitado($solicitacao['observacoes_rh'] ?? '');
+                                        ?>
+                                            <tr <?= $aguardandoMotivo ? 'class="bg-light-warning border-warning border border-dashed"' : '' ?>>
                                                 <td>
                                                     <div class="form-check form-check-sm form-check-custom form-check-solid">
                                                         <input class="form-check-input checkbox-solicitacao" 
@@ -521,6 +528,16 @@ function diaDaSemana($data) {
                                                                     Salário: R$ <?= number_format($solicitacao['salario'], 2, ',', '.') ?>
                                                                 </span>
                                                             <?php endif; ?>
+                                                            <?php if (motivoFoiSolicitado($solicitacao['observacoes_rh'] ?? '')): ?>
+                                                                <span class="badge badge-light-warning fs-8 mt-1" title="Motivo solicitado ao colaborador">
+                                                                    <i class="ki-duotone ki-message-text-2 fs-8 me-1">
+                                                                        <span class="path1"></span>
+                                                                        <span class="path2"></span>
+                                                                        <span class="path3"></span>
+                                                                    </i>
+                                                                    Aguardando Motivo
+                                                                </span>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -545,7 +562,14 @@ function diaDaSemana($data) {
                                                 <td><?= formatar_data($solicitacao['created_at'], 'd/m/Y H:i') ?></td>
                                                 <td class="text-end">
                                                     <div class="dropdown">
-                                                        <button class="btn btn-sm btn-light btn-active-light-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                        <button class="btn btn-sm <?= $aguardandoMotivo ? 'btn-warning' : 'btn-light btn-active-light-primary' ?> dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                            <?php if ($aguardandoMotivo): ?>
+                                                                <i class="ki-duotone ki-message-text-2 fs-5 me-1">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                    <span class="path3"></span>
+                                                                </i>
+                                                            <?php endif; ?>
                                                             Ações
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end">
