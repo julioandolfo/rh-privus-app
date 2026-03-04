@@ -40,6 +40,36 @@ if ($filtro_vaga) {
     $params[] = (int)$filtro_vaga;
 }
 
+$filtro_busca = trim($_GET['busca'] ?? '');
+if ($filtro_busca) {
+    $where[] = "(cand.nome_completo LIKE ? OR cand.email LIKE ? OR v.titulo LIKE ?)";
+    $params[] = "%$filtro_busca%";
+    $params[] = "%$filtro_busca%";
+    $params[] = "%$filtro_busca%";
+}
+
+// Paginação
+$por_pagina = 25;
+$pagina_atual = max(1, (int)($_GET['pagina'] ?? 1));
+$offset = ($pagina_atual - 1) * $por_pagina;
+
+$where_str = implode(' AND ', $where);
+
+// Total de registros
+$sql_count = "
+    SELECT COUNT(*) 
+    FROM candidaturas c
+    INNER JOIN candidatos cand ON c.candidato_id = cand.id
+    INNER JOIN vagas v ON c.vaga_id = v.id
+    LEFT JOIN empresas e ON v.empresa_id = e.id
+    WHERE $where_str
+";
+$stmt = $pdo->prepare($sql_count);
+$stmt->execute($params);
+$total_registros = (int)$stmt->fetchColumn();
+$total_paginas = max(1, (int)ceil($total_registros / $por_pagina));
+if ($pagina_atual > $total_paginas) $pagina_atual = $total_paginas;
+
 $sql = "
     SELECT c.*,
            cand.nome_completo,
@@ -56,14 +86,23 @@ $sql = "
     INNER JOIN vagas v ON c.vaga_id = v.id
     LEFT JOIN empresas e ON v.empresa_id = e.id
     LEFT JOIN usuarios u ON c.recrutador_responsavel = u.id
-    WHERE " . implode(' AND ', $where) . "
+    WHERE $where_str
     ORDER BY c.created_at DESC
-    LIMIT 100
+    LIMIT $por_pagina OFFSET $offset
 ";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $candidaturas = $stmt->fetchAll();
+
+// Helper para montar URL de paginação mantendo filtros
+function url_pagina(int $pagina): string {
+    $params = $_GET;
+    $params['pagina'] = $pagina;
+    unset($params['pagina']);
+    $qs = http_build_query(array_filter(['status' => $params['status'] ?? '', 'vaga_id' => $params['vaga_id'] ?? '', 'busca' => $params['busca'] ?? '', 'pagina' => $pagina]));
+    return 'candidaturas.php?' . $qs;
+}
 
 // Busca vagas para filtro
 $stmt = $pdo->query("SELECT id, titulo FROM vagas ORDER BY titulo");
@@ -92,7 +131,20 @@ $vagas = $stmt->fetchAll();
                         <div class="mb-5">
                             <form method="GET" class="row g-3">
                                 <div class="col-md-4">
-                                    <select name="status" class="form-select">
+                                    <label class="form-label fw-semibold text-gray-600 fs-7">Buscar</label>
+                                    <div class="position-relative">
+                                        <i class="ki-duotone ki-magnifier fs-3 position-absolute top-50 translate-middle-y ms-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <input type="text" name="busca" class="form-control form-control-solid ps-10"
+                                               placeholder="Nome, e-mail ou vaga..."
+                                               value="<?= htmlspecialchars($filtro_busca) ?>">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold text-gray-600 fs-7">Status</label>
+                                    <select name="status" class="form-select form-select-solid">
                                         <option value="">Todos os status</option>
                                         <option value="nova" <?= $filtro_status === 'nova' ? 'selected' : '' ?>>Nova</option>
                                         <option value="triagem" <?= $filtro_status === 'triagem' ? 'selected' : '' ?>>Triagem</option>
@@ -102,8 +154,9 @@ $vagas = $stmt->fetchAll();
                                         <option value="reprovada" <?= $filtro_status === 'reprovada' ? 'selected' : '' ?>>Reprovada</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
-                                    <select name="vaga_id" class="form-select">
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold text-gray-600 fs-7">Vaga</label>
+                                    <select name="vaga_id" class="form-select form-select-solid">
                                         <option value="">Todas as vagas</option>
                                         <?php foreach ($vagas as $vaga): ?>
                                         <option value="<?= $vaga['id'] ?>" <?= $filtro_vaga == $vaga['id'] ? 'selected' : '' ?>>
@@ -112,15 +165,31 @@ $vagas = $stmt->fetchAll();
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
-                                    <button type="submit" class="btn btn-light-primary">Filtrar</button>
-                                    <a href="candidaturas.php" class="btn btn-light">Limpar</a>
+                                <div class="col-md-2 d-flex align-items-end gap-2">
+                                    <button type="submit" class="btn btn-primary flex-grow-1">
+                                        <i class="ki-duotone ki-magnifier fs-4"><span class="path1"></span><span class="path2"></span></i>
+                                        Filtrar
+                                    </button>
+                                    <a href="candidaturas.php" class="btn btn-light" title="Limpar filtros">
+                                        <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
+                                    </a>
                                 </div>
                             </form>
                         </div>
+
+                        <!-- Resumo dos resultados -->
+                        <div class="d-flex align-items-center justify-content-between mb-4">
+                            <span class="text-muted fs-7">
+                                Mostrando <strong class="text-gray-800"><?= count($candidaturas) ?></strong> de <strong class="text-gray-800"><?= $total_registros ?></strong> candidatura(s)
+                                <?php if ($filtro_busca || $filtro_status || $filtro_vaga): ?>
+                                <span class="badge badge-light-primary ms-2">Filtros ativos</span>
+                                <?php endif; ?>
+                            </span>
+                            <span class="text-muted fs-7">Página <?= $pagina_atual ?> de <?= $total_paginas ?></span>
+                        </div>
                         
                         <!-- Tabela -->
-                        <div class="table-responsive">
+                        <div class="table-responsive" id="tabelaCandidaturas">
                             <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
                                 <thead>
                                     <tr class="fw-bold text-muted">
@@ -195,6 +264,61 @@ $vagas = $stmt->fetchAll();
                                 </tbody>
                             </table>
                         </div>
+
+                        <!-- Paginação -->
+                        <?php if ($total_paginas > 1): ?>
+                        <div class="d-flex align-items-center justify-content-between mt-5 flex-wrap gap-3">
+                            <div class="text-muted fs-7">
+                                Total: <strong class="text-gray-800"><?= $total_registros ?></strong> candidatura(s)
+                            </div>
+                            <ul class="pagination pagination-outline mb-0">
+                                <!-- Primeira / Anterior -->
+                                <?php if ($pagina_atual > 1): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?= url_pagina(1) ?>" title="Primeira">
+                                        <i class="ki-duotone ki-double-left fs-6"><span class="path1"></span><span class="path2"></span></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?= url_pagina($pagina_atual - 1) ?>">
+                                        <i class="ki-duotone ki-left fs-6"><span class="path1"></span></i>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
+
+                                <!-- Páginas numéricas -->
+                                <?php
+                                $inicio = max(1, $pagina_atual - 2);
+                                $fim = min($total_paginas, $pagina_atual + 2);
+                                if ($inicio > 1): ?>
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                <?php endif; ?>
+                                <?php for ($p = $inicio; $p <= $fim; $p++): ?>
+                                <li class="page-item <?= $p === $pagina_atual ? 'active' : '' ?>">
+                                    <a class="page-link" href="<?= url_pagina($p) ?>"><?= $p ?></a>
+                                </li>
+                                <?php endfor; ?>
+                                <?php if ($fim < $total_paginas): ?>
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                <?php endif; ?>
+
+                                <!-- Próxima / Última -->
+                                <?php if ($pagina_atual < $total_paginas): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?= url_pagina($pagina_atual + 1) ?>">
+                                        <i class="ki-duotone ki-right fs-6"><span class="path1"></span></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?= url_pagina($total_paginas) ?>" title="Última">
+                                        <i class="ki-duotone ki-double-right fs-6"><span class="path1"></span><span class="path2"></span></i>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                        <?php endif; ?>
+
                     </div>
                 </div>
                 

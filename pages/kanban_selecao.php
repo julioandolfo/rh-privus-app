@@ -221,6 +221,37 @@ $vagas = $stmt->fetchAll();
                                                             Ver
                                                         </a>
                                                         <?php endif; ?>
+                                                        <?php if (has_role(['ADMIN', 'RH', 'GESTOR'])): ?>
+                                                        <div class="dropdown">
+                                                            <button type="button" 
+                                                                    class="btn btn-sm btn-light-warning dropdown-toggle"
+                                                                    data-bs-toggle="dropdown"
+                                                                    title="Mover para etapa">
+                                                                <i class="ki-duotone ki-arrow-right-left fs-6">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                </i>
+                                                            </button>
+                                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                                <li><h6 class="dropdown-header">Mover para</h6></li>
+                                                                <?php foreach ($colunas as $col): ?>
+                                                                <?php if ($col['codigo'] !== $coluna['codigo']): ?>
+                                                                <li>
+                                                                    <button type="button"
+                                                                            class="dropdown-item btn-mover-etapa"
+                                                                            data-id="<?= $candidatura['id'] ?>"
+                                                                            data-is-entrevista="<?= $is_entrevista_manual ? '1' : '0' ?>"
+                                                                            data-coluna="<?= htmlspecialchars($col['codigo']) ?>"
+                                                                            data-nome="<?= htmlspecialchars($candidatura['nome_completo']) ?>">
+                                                                        <span class="d-inline-block rounded-circle me-2" style="width:10px;height:10px;background:<?= htmlspecialchars($col['cor']) ?>;"></span>
+                                                                        <?= htmlspecialchars($col['nome']) ?>
+                                                                    </button>
+                                                                </li>
+                                                                <?php endif; ?>
+                                                                <?php endforeach; ?>
+                                                            </ul>
+                                                        </div>
+                                                        <?php endif; ?>
                                                         <?php if (has_role(['ADMIN', 'RH'])): ?>
                                                         <button type="button" 
                                                                 class="btn btn-sm btn-light-danger btn-remover-card" 
@@ -512,6 +543,65 @@ document.addEventListener('DOMContentLoaded', function() {
             const nome = this.dataset.nome;
             
             removerCard(id, isEntrevista, nome, this.closest('.kanban-card'));
+        });
+    });
+
+    // Botões de mover para etapa (sem arrastar)
+    document.querySelectorAll('.btn-mover-etapa').forEach(btn => {
+        btn.addEventListener('click', async function(e) {
+            e.stopPropagation();
+            const id = this.dataset.id;
+            const isEntrevista = this.dataset.isEntrevista === '1';
+            const coluna = this.dataset.coluna;
+            const nome = this.dataset.nome;
+            const card = this.closest('.kanban-card');
+            const colunaAtual = card.dataset.colunaAtual;
+
+            if (!confirm(`Mover "${nome}" para esta etapa?`)) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('candidatura_id', id);
+                formData.append('coluna_codigo', coluna);
+                if (isEntrevista) formData.append('is_entrevista', '1');
+
+                const response = await fetch('../api/recrutamento/kanban/mover.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // Move visualmente para a coluna destino
+                    const colunaDestEl = document.querySelector(`[data-coluna="${coluna}"] .kanban-column`);
+                    if (colunaDestEl) {
+                        card.dataset.colunaAtual = coluna;
+                        colunaDestEl.appendChild(card);
+
+                        // Atualiza indicador de cor do card
+                        const colunaDestHeader = document.querySelector(`[data-coluna="${coluna}"] .kanban-column-header`);
+                        if (colunaDestHeader) {
+                            const novaCor = colunaDestHeader.getAttribute('data-column-color');
+                            if (novaCor) {
+                                const indicator = card.querySelector('.kanban-card-color-indicator');
+                                if (indicator) indicator.style.backgroundColor = novaCor;
+                            }
+                        }
+                        atualizarContadores();
+
+                        if (coluna === 'contratado') {
+                            setTimeout(() => abrirModalCadastrarColaborador(id, card), 500);
+                        }
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    alert('Erro ao mover: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao mover candidatura');
+            }
         });
     });
 });
