@@ -223,9 +223,11 @@ $vagas = $stmt->fetchAll();
                                                         <?php endif; ?>
                                                         <?php if (has_role(['ADMIN', 'RH', 'GESTOR'])): ?>
                                                         <div class="dropdown">
-                                                            <button type="button" 
+                                                            <button type="button"
                                                                     class="btn btn-sm btn-light-warning dropdown-toggle"
                                                                     data-bs-toggle="dropdown"
+                                                                    data-bs-popper="static"
+                                                                    data-bs-display="static"
                                                                     title="Mover para etapa">
                                                                 <i class="ki-duotone ki-arrow-right-left fs-6">
                                                                     <span class="path1"></span>
@@ -771,8 +773,20 @@ style.textContent = `
     }
     
     /* Garante que o dropdown aberto fique por cima de todos os cards */
-    .kanban-card .dropdown-menu.show {
+    .kanban-card {
+        position: relative;
+    }
+    
+    .kanban-card.dropdown-open {
+        z-index: 1050 !important;
+        overflow: visible !important;
+    }
+    
+    .kanban-card.dropdown-open .dropdown-menu {
         z-index: 1051;
+        position: absolute !important;
+        transform: none !important;
+        inset: auto auto 0 0 !important;
     }
     
     /* Indicador de cor da etapa no card */
@@ -875,18 +889,17 @@ document.head.appendChild(style);
 
 // Fix: dropdowns dentro de containers com overflow precisam de z-index elevado ao abrir
 function inicializarDropdownsKanban() {
-    document.querySelectorAll('.kanban-card .dropdown [data-bs-toggle="dropdown"]').forEach(btn => {
-        // Evita duplicar listeners
-        if (btn._dropdownFixInit) return;
+    document.querySelectorAll('.kanban-card .dropdown').forEach(dropdown => {
+        const card = dropdown.closest('.kanban-card');
+        const btn = dropdown.querySelector('[data-bs-toggle="dropdown"]');
+        if (!btn || btn._dropdownFixInit) return;
         btn._dropdownFixInit = true;
 
-        const card = btn.closest('.kanban-card');
-
         btn.addEventListener('show.bs.dropdown', () => {
-            if (card) card.style.zIndex = '1050';
+            if (card) card.classList.add('dropdown-open');
         });
         btn.addEventListener('hide.bs.dropdown', () => {
-            if (card) card.style.zIndex = '';
+            if (card) card.classList.remove('dropdown-open');
         });
     });
 }
