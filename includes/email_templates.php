@@ -776,3 +776,143 @@ function enviar_convites_evento($evento_id, $colaboradores_ids = []) {
     ];
 }
 
+/**
+ * Envia email solicitando motivo para horas extras
+ * @param int $solicitacao_id ID da solicitação de horas extras
+ * @param string $observacao_solicitacao Observação do RH sobre o que precisa saber
+ * @return array ['success' => bool, 'message' => string]
+ */
+function enviar_email_solicitacao_motivo($solicitacao_id, $observacao_solicitacao = '') {
+    $pdo = getDB();
+    
+    // Busca dados da solicitação
+    $stmt = $pdo->prepare("
+        SELECT s.*, 
+               c.nome_completo, c.email_pessoal,
+               e.nome_fantasia as empresa_nome
+        FROM solicitacoes_horas_extras s
+        INNER JOIN colaboradores c ON s.colaborador_id = c.id
+        LEFT JOIN empresas e ON c.empresa_id = e.id
+        WHERE s.id = ?
+    ");
+    $stmt->execute([$solicitacao_id]);
+    $solicitacao = $stmt->fetch();
+    
+    if (!$solicitacao) {
+        return ['success' => false, 'message' => 'Solicitação não encontrada.'];
+    }
+    
+    // Verifica se colaborador tem email
+    if (empty($solicitacao['email_pessoal'])) {
+        return ['success' => false, 'message' => 'Colaborador sem email cadastrado.'];
+    }
+    
+    // Busca template de email ou envia email genérico
+    $template = buscar_template_email('solicitacao_motivo_horas_extras');
+    
+    // Prepara variáveis
+    $data_trabalho = date('d/m/Y', strtotime($solicitacao['data_trabalho']));
+    $quantidade_horas = number_format($solicitacao['quantidade_horas'], 2, ',', '.') . 'h';
+    $motivo_atual = $solicitacao['motivo'] ?: 'Não informado';
+    
+    // Constrói URL para o colaborador adicionar motivo
+    $basePath = get_base_url();
+    $url_adicionar_motivo = $basePath . '/pages/solicitar_horas_extras.php?acao=adicionar_motivo&id=' . $solicitacao_id;
+    
+    $variaveis = [
+        'nome_completo' => $solicitacao['nome_completo'],
+        'data_trabalho' => $data_trabalho,
+        'quantidade_horas' => $quantidade_horas,
+        'motivo_atual' => $motivo_atual,
+        'observacao_rh' => $observacao_solicitacao,
+        'empresa_nome' => $solicitacao['empresa_nome'] ?? 'RH Privus',
+        'url_adicionar_motivo' => $url_adicionar_motivo,
+        'ano_atual' => date('Y')
+    ];
+    
+    // Se template existe e está ativo, usa ele
+    if ($template && $template['ativo']) {
+        return enviar_email_template('solicitacao_motivo_horas_extras', $solicitacao['email_pessoal'], $variaveis);
+    }
+    
+    // Caso contrário, envia email com layout padrão
+    $assunto = '📝 Motivo Necessário - Horas Extras do dia ' . $data_trabalho;
+    
+    $corpo_html = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+        <div style="background-color: #ffffff; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="color: #333333; margin-top: 0; margin-bottom: 20px;">Olá ' . htmlspecialchars($solicitacao['nome_completo']) . '!</h2>
+            
+            <p style="color: #666666; line-height: 1.6; margin-bottom: 20px;">
+                O RH da <strong>' . htmlspecialchars($solicitacao['empresa_nome'] ?? 'RH Privus') . '</strong> solicitou mais informações sobre suas horas extras.
+            </p>
+            
+            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px;">
+                <h3 style="color: #856404; margin-top: 0; margin-bottom: 15px; font-size: 18px;">
+                    ⚠️ Detalhes da Solicitação
+                </h3>
+                <ul style="color: #333333; line-height: 1.8; margin: 0; padding-left: 20px;">
+                    <li><strong>Data do Trabalho:</strong> ' . $data_trabalho . '</li>
+                    <li><strong>Quantidade de Horas:</strong> ' . $quantidade_horas . '</li>
+                    <li><strong>Motivo Atual:</strong> ' . nl2br(htmlspecialchars($motivo_atual)) . '</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #f8f9fa; border: 1px dashed #ffc107; padding: 15px; margin-bottom: 20px;">
+                <h4 style="color: #856404; margin-top: 0; margin-bottom: 10px;">O que o RH precisa saber:</h4>
+                <p style="color: #333333; line-height: 1.6; margin: 0;">' . nl2br(htmlspecialchars($observacao_solicitacao)) . '</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="' . $url_adicionar_motivo . '" 
+                   style="background-color: #ffc107; color: #000; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                    📝 Adicionar Motivo
+                </a>
+            </div>
+            
+            <p style="color: #666666; line-height: 1.6; margin-bottom: 20px; font-size: 12px;">
+                Ou copie e cole este link no seu navegador:<br>
+                <span style="color: #0d6efd;">' . $url_adicionar_motivo . '</span>
+            </p>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                <p style="color: #999999; font-size: 12px; margin: 0; text-align: center;">
+                    Este é um email automático do sistema RH Privus. Por favor, não responda este email.
+                </p>
+                <p style="color: #999999; font-size: 12px; margin: 5px 0 0 0; text-align: center;">
+                    ' . date('Y') . ' RH Privus - Todos os direitos reservados
+                </p>
+            </div>
+        </div>
+    </div>';
+    
+    $corpo_texto = 'Olá ' . $solicitacao['nome_completo'] . '!
+
+O RH da ' . ($solicitacao['empresa_nome'] ?? 'RH Privus') . ' solicitou mais informações sobre suas horas extras.
+
+Detalhes da Solicitação:
+- Data do Trabalho: ' . $data_trabalho . '
+- Quantidade de Horas: ' . $quantidade_horas . '
+- Motivo Atual: ' . $motivo_atual . '
+
+O que o RH precisa saber:
+' . $observacao_solicitacao . '
+
+Para adicionar o motivo, acesse:
+' . $url_adicionar_motivo . '
+
+Este é um email automático do sistema RH Privus.
+' . date('Y') . ' RH Privus - Todos os direitos reservados';
+    
+    return enviar_email(
+        $solicitacao['email_pessoal'],
+        $assunto,
+        $corpo_html,
+        [
+            'nome_destinatario' => $solicitacao['nome_completo'],
+            'texto_alternativo' => $corpo_texto,
+            'origem' => 'solicitacao_motivo_horas_extras',
+            'colaborador_id' => $solicitacao['colaborador_id']
+        ]
+    );
+}
+

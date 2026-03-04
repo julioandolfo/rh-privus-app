@@ -96,6 +96,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('solicitar_horas_extras.php', 'Erro ao enviar solicitação: ' . $e->getMessage(), 'error');
         }
     }
+    
+    // Atualizar motivo da solicitação existente
+    if ($action === 'atualizar_motivo') {
+        $solicitacao_id = (int)($_POST['solicitacao_id'] ?? 0);
+        $novo_motivo = sanitize($_POST['novo_motivo'] ?? '');
+        
+        if (empty($solicitacao_id)) {
+            redirect('solicitar_horas_extras.php', 'Solicitação não encontrada!', 'error');
+        }
+        
+        if (empty($novo_motivo)) {
+            redirect('solicitar_horas_extras.php', 'O motivo é obrigatório!', 'error');
+        }
+        
+        try {
+            // Verifica se a solicitação pertence ao colaborador e está pendente
+            $stmt = $pdo->prepare("
+                SELECT id, colaborador_id, status FROM solicitacoes_horas_extras 
+                WHERE id = ? AND colaborador_id = ? AND status = 'pendente'
+            ");
+            $stmt->execute([$solicitacao_id, $colaborador_id]);
+            $solicitacao = $stmt->fetch();
+            
+            if (!$solicitacao) {
+                redirect('solicitar_horas_extras.php', 'Solicitação não encontrada ou já processada!', 'error');
+            }
+            
+            // Atualiza o motivo e registra no histórico
+            $stmt = $pdo->prepare("
+                UPDATE solicitacoes_horas_extras 
+                SET motivo = ?,
+                    observacoes_rh = CONCAT(IFNULL(observacoes_rh, ''), ?)
+                WHERE id = ?
+            ");
+            
+            $historico = '\n[ATUALIZAÇÃO EM ' . date('d/m/Y H:i') . '] Motivo atualizado pelo colaborador.';
+            
+            $stmt->execute([
+                $novo_motivo,
+                $historico,
+                $solicitacao_id
+            ]);
+            
+            redirect('solicitar_horas_extras.php', 'Motivo atualizado com sucesso! O RH será notificado.', 'success');
+        } catch (PDOException $e) {
+            redirect('solicitar_horas_extras.php', 'Erro ao atualizar motivo: ' . $e->getMessage(), 'error');
+        }
+    }
+}
+
+// Busca solicitação específica se houver ID na URL (para editar motivo)
+$solicitacao_editar = null;
+if (isset($_GET['acao']) && $_GET['acao'] === 'adicionar_motivo' && isset($_GET['id'])) {
+    $solicitacao_id = (int)$_GET['id'];
+    
+    $stmt = $pdo->prepare("
+        SELECT s.*, u.nome as aprovado_por_nome
+        FROM solicitacoes_horas_extras s
+        LEFT JOIN usuarios u ON s.usuario_aprovacao_id = u.id
+        WHERE s.id = ? AND s.colaborador_id = ? AND s.status = 'pendente'
+    ");
+    $stmt->execute([$solicitacao_id, $colaborador_id]);
+    $solicitacao_editar = $stmt->fetch();
 }
 
 // Busca solicitações do colaborador
@@ -112,6 +175,13 @@ $solicitacoes = $stmt->fetchAll();
 
 $page_title = 'Solicitar Horas Extras';
 include __DIR__ . '/../includes/header.php';
+
+// Função para converter decimal para HH:MM
+function decimalParaHorasMinutos($valor) {
+    $horas = floor($valor);
+    $minutos = round(($valor - $horas) * 60);
+    return sprintf('%02d:%02d', $horas, $minutos);
+}
 ?>
 
 <div class="d-flex flex-column flex-column-fluid">
@@ -137,8 +207,110 @@ include __DIR__ . '/../includes/header.php';
     <div id="kt_app_content" class="app-content flex-column-fluid">
         <div id="kt_app_content_container" class="app-container container-xxl">
             
-            <!-- Card de Solicitação -->
-            <div class="card mb-5">
+            <?php if ($solicitacao_editar): ?>
+            <!-- Card para atualizar motivo -->
+            <div class="card mb-5 border-warning">
+                <div class="card-header bg-warning">
+                    <h3 class="card-title align-items-start flex-column">
+                        <span class="card-label fw-bold fs-3 mb-1 text-white">
+                            <i class="ki-duotone ki-message-text-2 fs-1 me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Atualizar Motivo da Solicitação
+                        </span>
+                        <span class="text-white mt-1 fw-semibold fs-7">O RH solicitou mais informações sobre esta solicitação</span>
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="ki-duotone ki-information-5 fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <strong>Atenção:</strong> O RH solicitou mais detalhes sobre o motivo das suas horas extras. 
+                        Por favor, forneça uma justificativa mais completa.
+                    </div>
+                    
+                    <div class="row mb-5">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Data do Trabalho:</label>
+                            <p><?= formatar_data($solicitacao_editar['data_trabalho']) ?></p>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Quantidade:</label>
+                            <p><?= number_format($solicitacao_editar['quantidade_horas'], 2, ',', '.') ?>h 
+                               (<?= decimalParaHorasMinutos($solicitacao_editar['quantidade_horas']) ?>)</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Motivo Atual:</label>
+                            <div class="p-3 bg-light rounded">
+                                <?= htmlspecialchars($solicitacao_editar['motivo']) ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <?php if (!empty($solicitacao_editar['observacoes_rh'])): ?>
+                    <div class="row mb-5">
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-warning">
+                                <i class="ki-duotone ki-message-notif fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Observações do RH:
+                            </label>
+                            <div class="p-3 bg-light-warning rounded border border-warning border-dashed">
+                                <?= nl2br(htmlspecialchars($solicitacao_editar['observacoes_rh'])) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <form method="POST">
+                        <input type="hidden" name="action" value="atualizar_motivo">
+                        <input type="hidden" name="solicitacao_id" value="<?= $solicitacao_editar['id'] ?>">
+                        
+                        <div class="mb-5">
+                            <label class="form-label required">Novo Motivo / Justificativa Detalhada</label>
+                            <textarea name="novo_motivo" 
+                                      class="form-control" 
+                                      rows="6" 
+                                      placeholder="Descreva detalhadamente o motivo das horas extras. Inclua informações como:
+- Qual projeto ou tarefa você estava executando
+- Por que era necessário fazer horas extras
+- Qual a urgência ou importância
+- Se houve solicuação do gestor ou foi iniciativa própria"
+                                      required><?= htmlspecialchars($solicitacao_editar['motivo']) ?></textarea>
+                            <div class="form-text">Seja o mais específico possível. Isso ajuda o RH a entender a necessidade.</div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="solicitar_horas_extras.php" class="btn btn-light">
+                                <i class="ki-duotone ki-arrow-left fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Voltar
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="ki-duotone ki-check fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Atualizar Motivo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <!-- Card de Nova Solicitação -->
+            <div class="card mb-5 <?= $solicitacao_editar ? 'opacity-50' : '' ?>">
                 <div class="card-header">
                     <h3 class="card-title align-items-start flex-column">
                         <span class="card-label fw-bold fs-3 mb-1">Nova Solicitação</span>
@@ -146,7 +318,7 @@ include __DIR__ . '/../includes/header.php';
                     </h3>
                 </div>
                 <div class="card-body">
-                    <form id="form_solicitar" method="POST">
+                    <form id="form_solicitar" method="POST" <?= $solicitacao_editar ? 'onsubmit="return false;"' : '' ?>>
                         <input type="hidden" name="action" value="solicitar">
                         
                         <div class="row mb-5">
@@ -157,7 +329,7 @@ include __DIR__ . '/../includes/header.php';
                                        class="form-control" 
                                        max="<?= date('Y-m-d') ?>"
                                        value="<?= date('Y-m-d') ?>"
-                                       required>
+                                       <?= $solicitacao_editar ? 'disabled' : 'required' ?>>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label required">Quantidade de Horas</label>
@@ -168,7 +340,7 @@ include __DIR__ . '/../includes/header.php';
                                            class="form-control" 
                                            placeholder="00:00"
                                            value=""
-                                           required>
+                                           <?= $solicitacao_editar ? 'disabled' : 'required' ?>>
                                     <span class="input-group-text">HH:MM</span>
                                 </div>
                                 <div class="form-text">Digite até 4 números. Ex: 230 = 02:30 ou 0830 = 08:30. Máximo: 8 horas</div>
@@ -182,10 +354,11 @@ include __DIR__ . '/../includes/header.php';
                                           class="form-control" 
                                           rows="4" 
                                           placeholder="Descreva o motivo das horas extras trabalhadas..."
-                                          required></textarea>
+                                          <?= $solicitacao_editar ? 'disabled' : 'required' ?>></textarea>
                             </div>
                         </div>
                         
+                        <?php if (!$solicitacao_editar): ?>
                         <!-- Cronômetro -->
                         <div class="row mb-5">
                             <div class="col-12">
@@ -243,9 +416,10 @@ include __DIR__ . '/../includes/header.php';
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
                         
                         <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn btn-primary" <?= $solicitacao_editar ? 'disabled' : '' ?>>
                                 <i class="ki-duotone ki-check fs-2">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
@@ -291,7 +465,7 @@ include __DIR__ . '/../includes/header.php';
                                 </thead>
                                 <tbody>
                                     <?php foreach ($solicitacoes as $solicitacao): ?>
-                                        <tr>
+                                        <tr <?= ($solicitacao_editar && $solicitacao_editar['id'] == $solicitacao['id']) ? 'class="table-warning"' : '' ?>>
                                             <td><?= formatar_data($solicitacao['data_trabalho']) ?></td>
                                             <td><?php
                                                 $horas_decimais = floatval($solicitacao['quantidade_horas']);
@@ -303,6 +477,15 @@ include __DIR__ . '/../includes/header.php';
                                                 <div class="text-truncate" style="max-width: 200px;" title="<?= htmlspecialchars($solicitacao['motivo']) ?>">
                                                     <?= htmlspecialchars($solicitacao['motivo']) ?>
                                                 </div>
+                                                <?php if (!empty($solicitacao['observacoes_rh']) && strpos($solicitacao['observacoes_rh'], 'SOLICITAÇÃO DE MOTIVO') !== false): ?>
+                                                    <span class="badge badge-light-warning fs-8 mt-1">
+                                                        <i class="ki-duotone ki-message-text-2 fs-8 me-1">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                        Aguardando mais informações
+                                                    </span>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <?php if ($solicitacao['status'] === 'pendente'): ?>
@@ -340,7 +523,7 @@ include __DIR__ . '/../includes/header.php';
 let timerInterval = null;
 let timerSeconds = 0;
 const MAX_HOURS = 8;
-const MAX_SECONDS = MAX_HOURS * 3600; // 8 horas em segundos
+const MAX_SECONDS = MAX_HOURS * 3600;
 
 function formatTime(seconds) {
     const hrs = Math.floor(seconds / 3600);
@@ -363,10 +546,8 @@ function updateDisplay() {
     document.getElementById('timer_display').textContent = formatTime(timerSeconds);
     document.getElementById('timer_horas_display').textContent = formatHours(timerSeconds) + ' horas';
     
-    // Atualiza campo de quantidade de horas no formato HH:MM
     document.getElementById('quantidade_horas').value = formatHoursMinutes(timerSeconds);
     
-    // Verifica limite de 8 horas
     if (timerSeconds >= MAX_SECONDS) {
         stopTimer();
         Swal.fire({
@@ -418,41 +599,66 @@ function resetTimer() {
     updateDisplay();
 }
 
-// Máscara HH:MM simplificada com placeholder
+// Máscara HH:MM
 const quantidadeHorasInput = document.getElementById('quantidade_horas');
 let digitosDigitados = '';
 
-// Intercepta teclas para construir a máscara
-quantidadeHorasInput.addEventListener('keydown', function(e) {
-    // Se pressionou Delete ou Backspace, remove o último dígito
-    if (e.key === 'Backspace' || e.key === 'Delete') {
-        e.preventDefault();
-        digitosDigitados = digitosDigitados.slice(0, -1);
-        formatarCampo();
-        return;
-    }
-    
-    // Se pressionou uma tecla numérica
-    if (e.key >= '0' && e.key <= '9') {
-        e.preventDefault();
-        
-        // Se já tem 4 dígitos, não adiciona mais
-        if (digitosDigitados.length >= 4) {
+if (quantidadeHorasInput) {
+    quantidadeHorasInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            e.preventDefault();
+            digitosDigitados = digitosDigitados.slice(0, -1);
+            formatarCampo();
             return;
         }
         
-        digitosDigitados += e.key;
+        if (e.key >= '0' && e.key <= '9') {
+            e.preventDefault();
+            
+            if (digitosDigitados.length >= 4) {
+                return;
+            }
+            
+            digitosDigitados += e.key;
+            formatarCampo();
+        }
+    });
+    
+    quantidadeHorasInput.addEventListener('paste', function(e) {
+        e.preventDefault();
+        const pasteData = e.clipboardData.getData('text').replace(/\D/g, '');
+        digitosDigitados = pasteData.substring(0, 4);
         formatarCampo();
-    }
-});
-
-// Ao colar texto, processa apenas os números
-quantidadeHorasInput.addEventListener('paste', function(e) {
-    e.preventDefault();
-    const pasteData = e.clipboardData.getData('text').replace(/\D/g, '');
-    digitosDigitados = pasteData.substring(0, 4);
-    formatarCampo();
-});
+    });
+    
+    quantidadeHorasInput.addEventListener('blur', function(e) {
+        const value = e.target.value;
+        const pattern = /^([0-7]?[0-9]):([0-5][0-9])$/;
+        
+        if (!pattern.test(value)) {
+            e.target.value = '00:00';
+            Swal.fire({
+                icon: 'warning',
+                title: 'Formato Inválido',
+                text: 'Use o formato HH:MM (ex: 02:30 para 2 horas e 30 minutos)',
+                confirmButtonText: 'OK'
+            });
+        } else {
+            const [horas, minutos] = value.split(':').map(Number);
+            const totalHoras = horas + (minutos / 60);
+            
+            if (totalHoras > 8) {
+                e.target.value = '08:00';
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Limite Excedido',
+                    text: 'Máximo de 8 horas por solicitação. Valor ajustado para 08:00',
+                    confirmButtonText: 'OK'
+                });
+            }
+        }
+    });
+}
 
 function formatarCampo() {
     if (digitosDigitados.length === 0) {
@@ -463,28 +669,22 @@ function formatarCampo() {
     let horas = '00';
     let minutos = '00';
     
-    // Interpreta os dígitos conforme a quantidade
     if (digitosDigitados.length === 1) {
-        // "2" → "2_:__" (mostra apenas o que foi digitado)
         quantidadeHorasInput.value = digitosDigitados;
         return;
     } else if (digitosDigitados.length === 2) {
-        // "23" → "23:__"
         quantidadeHorasInput.value = digitosDigitados + ':';
         return;
     } else if (digitosDigitados.length === 3) {
-        // "230" → "23:0_"
         horas = digitosDigitados.substring(0, 2);
         minutos = digitosDigitados[2];
         quantidadeHorasInput.value = horas + ':' + minutos;
         return;
     } else {
-        // "2305" → "23:05"
         horas = digitosDigitados.substring(0, 2);
         minutos = digitosDigitados.substring(2, 4);
     }
     
-    // Valida limites
     if (parseInt(horas) > 8) {
         horas = '08';
         minutos = '00';
@@ -499,81 +699,55 @@ function formatarCampo() {
     quantidadeHorasInput.value = horas + ':' + minutos;
 }
 
-// Validação do formato HH:MM
-document.getElementById('quantidade_horas').addEventListener('blur', function(e) {
-    const value = e.target.value;
-    const pattern = /^([0-7]?[0-9]):([0-5][0-9])$/;
-    
-    if (!pattern.test(value)) {
-        e.target.value = '00:00';
-        Swal.fire({
-            icon: 'warning',
-            title: 'Formato Inválido',
-            text: 'Use o formato HH:MM (ex: 02:30 para 2 horas e 30 minutos)',
-            confirmButtonText: 'OK'
-        });
-    } else {
-        // Valida se não ultrapassa 8 horas
-        const [horas, minutos] = value.split(':').map(Number);
-        const totalHoras = horas + (minutos / 60);
+// Validação do formulário
+const formSolicitar = document.getElementById('form_solicitar');
+if (formSolicitar) {
+    formSolicitar.addEventListener('submit', function(e) {
+        const quantidadeInput = document.getElementById('quantidade_horas').value;
+        const pattern = /^([0-7]?[0-9]):([0-5][0-9])$/;
         
-        if (totalHoras > 8) {
-            e.target.value = '08:00';
+        if (!pattern.test(quantidadeInput)) {
+            e.preventDefault();
             Swal.fire({
-                icon: 'warning',
-                title: 'Limite Excedido',
-                text: 'Máximo de 8 horas por solicitação. Valor ajustado para 08:00',
+                icon: 'error',
+                title: 'Formato Inválido',
+                text: 'Use o formato HH:MM (ex: 02:30 para 2 horas e 30 minutos)',
                 confirmButtonText: 'OK'
             });
+            return false;
         }
-    }
-});
-
-// Validação do formulário
-document.getElementById('form_solicitar').addEventListener('submit', function(e) {
-    const quantidadeInput = document.getElementById('quantidade_horas').value;
-    const pattern = /^([0-7]?[0-9]):([0-5][0-9])$/;
-    
-    if (!pattern.test(quantidadeInput)) {
-        e.preventDefault();
-        Swal.fire({
-            icon: 'error',
-            title: 'Formato Inválido',
-            text: 'Use o formato HH:MM (ex: 02:30 para 2 horas e 30 minutos)',
-            confirmButtonText: 'OK'
-        });
-        return false;
-    }
-    
-    const [horas, minutos] = quantidadeInput.split(':').map(Number);
-    const quantidade = horas + (minutos / 60);
-    
-    if (quantidade <= 0) {
-        e.preventDefault();
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'A quantidade de horas deve ser maior que zero!',
-            confirmButtonText: 'OK'
-        });
-        return false;
-    }
-    
-    if (quantidade > 8) {
-        e.preventDefault();
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Máximo de 8 horas por solicitação!',
-            confirmButtonText: 'OK'
-        });
-        return false;
-    }
-});
+        
+        const [horas, minutos] = quantidadeInput.split(':').map(Number);
+        const quantidade = horas + (minutos / 60);
+        
+        if (quantidade <= 0) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'A quantidade de horas deve ser maior que zero!',
+                confirmButtonText: 'OK'
+            });
+            return false;
+        }
+        
+        if (quantidade > 8) {
+            e.preventDefault();
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Máximo de 8 horas por solicitação!',
+                confirmButtonText: 'OK'
+            });
+            return false;
+        }
+    });
+}
 
 // Inicializa display
-updateDisplay();
+if (document.getElementById('timer_display')) {
+    updateDisplay();
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
-
