@@ -588,6 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }
                         atualizarContadores();
+                        inicializarDropdownsKanban();
 
                         if (coluna === 'contratado') {
                             setTimeout(() => abrirModalCadastrarColaborador(id, card), 500);
@@ -845,6 +846,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializa contadores
     atualizarContadores();
+
+    // Fix dropdowns com strategy fixed (overflow container)
+    inicializarDropdownsKanban();
     
     // Observar mudanças no tema
     const observer = new MutationObserver(() => {
@@ -863,6 +867,17 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 document.head.appendChild(style);
+
+// Fix: dropdowns dentro de containers overflow precisam de strategy "fixed"
+function inicializarDropdownsKanban() {
+    document.querySelectorAll('.kanban-card .dropdown [data-bs-toggle="dropdown"]').forEach(btn => {
+        const existingInstance = bootstrap.Dropdown.getInstance(btn);
+        if (existingInstance) existingInstance.dispose();
+        new bootstrap.Dropdown(btn, {
+            popperConfig: { strategy: 'fixed' }
+        });
+    });
+}
 
 // Função para abrir modal de cadastrar colaborador
 function abrirModalCadastrarColaborador(candidaturaId, elementoCard) {
