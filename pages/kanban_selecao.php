@@ -770,6 +770,11 @@ style.textContent = `
         cursor: grabbing;
     }
     
+    /* Garante que o dropdown aberto fique por cima de todos os cards */
+    .kanban-card .dropdown-menu.show {
+        z-index: 1051;
+    }
+    
     /* Indicador de cor da etapa no card */
     .kanban-card {
         position: relative;
@@ -868,13 +873,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 document.head.appendChild(style);
 
-// Fix: dropdowns dentro de containers overflow precisam de strategy "fixed"
+// Fix: dropdowns dentro de containers com overflow precisam de z-index elevado ao abrir
 function inicializarDropdownsKanban() {
     document.querySelectorAll('.kanban-card .dropdown [data-bs-toggle="dropdown"]').forEach(btn => {
-        const existingInstance = bootstrap.Dropdown.getInstance(btn);
-        if (existingInstance) existingInstance.dispose();
-        new bootstrap.Dropdown(btn, {
-            popperConfig: { strategy: 'fixed' }
+        // Evita duplicar listeners
+        if (btn._dropdownFixInit) return;
+        btn._dropdownFixInit = true;
+
+        const card = btn.closest('.kanban-card');
+
+        btn.addEventListener('show.bs.dropdown', () => {
+            if (card) card.style.zIndex = '1050';
+        });
+        btn.addEventListener('hide.bs.dropdown', () => {
+            if (card) card.style.zIndex = '';
         });
     });
 }
