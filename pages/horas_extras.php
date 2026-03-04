@@ -368,16 +368,21 @@ $colaboradores_raw = get_colaboradores_disponiveis($pdo, $usuario);
 // Adiciona dados extras necessários (salário e empresa_id) para todos os colaboradores
 $colaboradores = [];
 foreach ($colaboradores_raw as $colab) {
-    $stmt = $pdo->prepare("SELECT salario, empresa_id FROM colaboradores WHERE id = ?");
-    $stmt->execute([$colab['id']]);
-    $colab_data = $stmt->fetch();
+    // $colab['id'] é prefixado (ex: "c_123"), deve-se usar colaborador_id (inteiro real)
+    $numeric_id = $colab['colaborador_id'] ?? null;
+    $colab_data = false;
+    if ($numeric_id) {
+        $stmt = $pdo->prepare("SELECT salario, empresa_id FROM colaboradores WHERE id = ?");
+        $stmt->execute([$numeric_id]);
+        $colab_data = $stmt->fetch();
+    }
     if ($colab_data) {
         $colaboradores[] = array_merge($colab, [
             'salario' => $colab_data['salario'] ?? null,
             'empresa_id' => $colab_data['empresa_id'] ?? null
         ]);
     } else {
-        // Se não encontrou dados, adiciona mesmo assim (pode ser colaborador sem salário)
+        // Usuário sem colaborador vinculado ou colaborador sem salário
         $colaboradores[] = array_merge($colab, [
             'salario' => null,
             'empresa_id' => null
