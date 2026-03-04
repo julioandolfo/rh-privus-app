@@ -114,6 +114,169 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao reenviar: ' . $e->getMessage(), 'error');
             }
         }
+    } elseif ($acao === 'adicionar_testemunha') {
+        // Adiciona nova testemunha ao contrato já enviado ao Autentique
+        $nome  = trim($_POST['novo_nome'] ?? '');
+        $email = trim($_POST['novo_email'] ?? '');
+
+        if (!$nome || !$email) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Nome e e-mail são obrigatórios.', 'error');
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'E-mail inválido.', 'error');
+        } elseif (!$contrato['autentique_document_id']) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Este contrato não está vinculado ao Autentique.', 'error');
+        } else {
+            try {
+                $service = new AutentiqueService();
+                $resultado = $service->adicionarSignatario($contrato['autentique_document_id'], ['email' => $email]);
+
+                if (!$resultado || empty($resultado['public_id'])) {
+                    throw new Exception('O Autentique não retornou confirmação do signatário.');
+                }
+
+                $ordem_max = 0;
+                foreach ($signatarios as $s) {
+                    if ($s['ordem_assinatura'] > $ordem_max) $ordem_max = $s['ordem_assinatura'];
+                }
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO contratos_signatarios
+                        (contrato_id, tipo, nome, email, autentique_signer_id, link_publico, assinado, ordem_assinatura)
+                    VALUES (?, 'testemunha', ?, ?, ?, ?, 0, ?)
+                ");
+                $stmt->execute([
+                    $contrato_id,
+                    $nome,
+                    $email,
+                    $resultado['public_id'],
+                    $resultado['link']['short_link'] ?? null,
+                    $ordem_max + 1
+                ]);
+
+                // Garante status correto
+                if ($contrato['status'] === 'rascunho') {
+                    $pdo->prepare("UPDATE contratos SET status = 'enviado' WHERE id = ?")->execute([$contrato_id]);
+                }
+
+                redirect('contrato_view.php?id=' . $contrato_id, 'Testemunha ' . htmlspecialchars($nome) . ' adicionada com sucesso!', 'success');
+            } catch (Exception $e) {
+                redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao adicionar testemunha: ' . $e->getMessage(), 'error');
+            }
+        }
+
+    } elseif ($acao === 'remover_testemunha') {
+        // Remove testemunha não-assinada do contrato
+        $signer_id = intval($_POST['signer_id'] ?? 0);
+
+        if ($signer_id <= 0) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Signatário inválido.', 'error');
+        } elseif (!$contrato['autentique_document_id']) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Este contrato não está vinculado ao Autentique.', 'error');
+        } else {
+            $signatario = null;
+            foreach ($signatarios as $s) {
+                if ($s['id'] == $signer_id) { $signatario = $s; break; }
+            }
+
+            if (!$signatario) {
+                redirect('contrato_view.php?id=' . $contrato_id, 'Signatário não encontrado.', 'error');
+            } elseif ($signatario['assinado']) {
+                redirect('contrato_view.php?id=' . $contrato_id, 'Não é possível remover um signatário que já assinou.', 'error');
+            } elseif ($signatario['tipo'] !== 'testemunha') {
+                redirect('contrato_view.php?id=' . $contrato_id, 'Apenas testemunhas podem ser removidas.', 'error');
+            } else {
+                try {
+                    $service = new AutentiqueService();
+
+                    if ($signatario['autentique_signer_id']) {
+                        $service->removerSignatario($contrato['autentique_document_id'], $signatario['autentique_signer_id']);
+                    }
+
+                    $pdo->prepare("DELETE FROM contratos_signatarios WHERE id = ?")->execute([$signer_id]);
+
+                    redirect('contrato_view.php?id=' . $contrato_id, 'Testemunha ' . htmlspecialchars($signatario['nome']) . ' removida com sucesso.', 'success');
+                } catch (Exception $e) {
+                    redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao remover testemunha: ' . $e->getMessage(), 'error');
+                }
+            }
+        }
+
+    } elseif ($acao === 'substituir_testemunha') {
+        // Substitui testemunha não-assinada por nova pessoa
+        $signer_id  = intval($_POST['signer_id'] ?? 0);
+        $novo_nome  = trim($_POST['novo_nome'] ?? '');
+        $novo_email = trim($_POST['novo_email'] ?? '');
+
+        if ($signer_id <= 0 || !$novo_nome || !$novo_email) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Preencha todos os campos.', 'error');
+        } elseif (!filter_var($novo_email, FILTER_VALIDATE_EMAIL)) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'E-mail inválido.', 'error');
+        } elseif (!$contrato['autentique_document_id']) {
+            redirect('contrato_view.php?id=' . $contrato_id, 'Este contrato não está vinculado ao Autentique.', 'error');
+        } else {
+            $signatario = null;
+            foreach ($signatarios as $s) {
+                if ($s['id'] == $signer_id) { $signatario = $s; break; }
+            }
+
+            if (!$signatario) {
+                redirect('contrato_view.php?id=' . $contrato_id, 'Signatário não encontrado.', 'error');
+            } elseif ($signatario['assinado']) {
+                redirect('contrato_view.php?id=' . $contrato_id, 'Não é possível substituir um signatário que já assinou.', 'error');
+            } elseif ($signatario['tipo'] !== 'testemunha') {
+                redirect('contrato_view.php?id=' . $contrato_id, 'Apenas testemunhas podem ser substituídas.', 'error');
+            } else {
+                try {
+                    $service = new AutentiqueService();
+
+                    // 1. Remove o atual do Autentique (se tiver ID)
+                    if ($signatario['autentique_signer_id']) {
+                        $service->removerSignatario($contrato['autentique_document_id'], $signatario['autentique_signer_id']);
+                    }
+
+                    // 2. Adiciona o novo no Autentique
+                    $resultado = $service->adicionarSignatario($contrato['autentique_document_id'], ['email' => $novo_email]);
+
+                    if (!$resultado || empty($resultado['public_id'])) {
+                        throw new Exception('O Autentique não retornou confirmação do novo signatário.');
+                    }
+
+                    // 3. Marca o antigo como substituído e insere o novo
+                    $pdo->prepare("
+                        UPDATE contratos_signatarios
+                        SET substituido_em = NOW(), substituido_por = NULL
+                        WHERE id = ?
+                    ")->execute([$signer_id]);
+
+                    $stmt = $pdo->prepare("
+                        INSERT INTO contratos_signatarios
+                            (contrato_id, tipo, nome, email, autentique_signer_id, link_publico, assinado, ordem_assinatura, substituido_por)
+                        VALUES (?, 'testemunha', ?, ?, ?, ?, 0, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $contrato_id,
+                        $novo_nome,
+                        $novo_email,
+                        $resultado['public_id'],
+                        $resultado['link']['short_link'] ?? null,
+                        $signatario['ordem_assinatura'],
+                        $signer_id
+                    ]);
+                    $novo_id = $pdo->lastInsertId();
+
+                    // Atualiza o antigo apontando para o novo
+                    $pdo->prepare("UPDATE contratos_signatarios SET substituido_por = ? WHERE id = ?")->execute([$novo_id, $signer_id]);
+
+                    // Remove o antigo da lista ativa (opcional: pode manter para histórico)
+                    $pdo->prepare("DELETE FROM contratos_signatarios WHERE id = ?")->execute([$signer_id]);
+
+                    redirect('contrato_view.php?id=' . $contrato_id, 'Testemunha substituída! ' . htmlspecialchars($signatario['nome']) . ' → ' . htmlspecialchars($novo_nome) . '.', 'success');
+                } catch (Exception $e) {
+                    redirect('contrato_view.php?id=' . $contrato_id, 'Erro ao substituir testemunha: ' . $e->getMessage(), 'error');
+                }
+            }
+        }
+
     } elseif ($acao === 'sincronizar') {
         // Sincroniza status consultando a API do Autentique
         log_contrato("=== SINCRONIZAÇÃO MANUAL INICIADA ===");
@@ -462,7 +625,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <p class="text-muted">Nenhum signatário cadastrado</p>
                         <?php else: ?>
                         <?php foreach ($signatarios as $signatario): ?>
-                        <div class="d-flex align-items-center justify-content-between mb-5 pb-5 border-bottom">
+                        <div class="d-flex align-items-start justify-content-between mb-5 pb-5 border-bottom">
                             <div class="flex-grow-1">
                                 <div class="fw-bold text-gray-900"><?= htmlspecialchars($signatario['nome']) ?></div>
                                 <div class="text-muted fs-7"><?= htmlspecialchars($signatario['email']) ?></div>
@@ -505,39 +668,180 @@ require_once __DIR__ . '/../includes/header.php';
                                     <?php else: ?>
                                     <span class="badge badge-light-warning ms-2">Pendente</span>
                                     <?php endif; ?>
+
+                                    <?php if (!empty($signatario['falha_envio'])): ?>
+                                    <span class="badge badge-light-danger ms-2" 
+                                          title="<?= htmlspecialchars($signatario['motivo_falha'] ?? 'Falha ao entregar e-mail') ?>">
+                                        <i class="ki-duotone ki-information fs-6">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        Falha no envio
+                                    </span>
+                                    <?php if ($signatario['motivo_falha']): ?>
+                                    <div class="alert alert-danger py-2 px-3 mt-2 fs-8">
+                                        <i class="ki-duotone ki-warning fs-6 me-1 text-danger">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <?= htmlspecialchars($signatario['motivo_falha']) ?>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php endif; ?>
                                 </div>
                             </div>
-                            <div class="ms-3">
+                            <div class="ms-3 d-flex flex-column gap-1">
                                 <?php if (!$signatario['assinado'] && $contrato['autentique_document_id']): ?>
                                 <form method="POST" style="display: inline;" class="form-reenviar-link">
                                     <input type="hidden" name="acao" value="reenviar_link">
                                     <input type="hidden" name="signer_id" value="<?= $signatario['id'] ?>">
-                                    <button type="button" class="btn btn-sm btn-light-primary btn-reenviar-link" title="Reenviar link de assinatura">
-                                        <i class="ki-duotone ki-send fs-4">
+                                    <button type="button" class="btn btn-sm btn-light-primary btn-reenviar-link w-100" title="Reenviar link de assinatura por e-mail">
+                                        <i class="ki-duotone ki-send fs-5">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
+                                        Reenviar
                                     </button>
                                 </form>
                                 <?php endif; ?>
+
                                 <?php if ($signatario['link_publico'] && in_array($signatario['tipo'], ['testemunha', 'representante'])): ?>
-                                <button type="button" class="btn btn-sm btn-light-info btn-copiar-link" 
+                                <button type="button" class="btn btn-sm btn-light-info btn-copiar-link w-100"
                                         data-link="<?= htmlspecialchars($signatario['link_publico']) ?>"
-                                        title="Copiar link público">
-                                    <i class="ki-duotone ki-copy fs-4">
+                                        title="Copiar link de assinatura">
+                                    <i class="ki-duotone ki-copy fs-5">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                         <span class="path3"></span>
                                     </i>
+                                    Copiar link
                                 </button>
+                                <?php endif; ?>
+
+                                <?php if (!$signatario['assinado'] && $signatario['tipo'] === 'testemunha' && $contrato['autentique_document_id'] && $contrato['status'] !== 'cancelado'): ?>
+                                <button type="button" class="btn btn-sm btn-light-warning btn-substituir-testemunha w-100"
+                                        data-signer-id="<?= $signatario['id'] ?>"
+                                        data-nome="<?= htmlspecialchars($signatario['nome']) ?>"
+                                        data-email="<?= htmlspecialchars($signatario['email']) ?>"
+                                        title="Substituir por outra pessoa">
+                                    <i class="ki-duotone ki-arrows-loop fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Substituir
+                                </button>
+                                <form method="POST" class="form-remover-testemunha">
+                                    <input type="hidden" name="acao" value="remover_testemunha">
+                                    <input type="hidden" name="signer_id" value="<?= $signatario['id'] ?>">
+                                    <button type="button" class="btn btn-sm btn-light-danger btn-remover-testemunha w-100"
+                                            data-nome="<?= htmlspecialchars($signatario['nome']) ?>">
+                                        <i class="ki-duotone ki-trash fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                            <span class="path4"></span>
+                                            <span class="path5"></span>
+                                        </i>
+                                        Remover
+                                    </button>
+                                </form>
                                 <?php endif; ?>
                             </div>
                         </div>
                         <?php endforeach; ?>
                         <?php endif; ?>
+
+                        <?php if ($contrato['autentique_document_id'] && $contrato['status'] !== 'cancelado' && $contrato['status'] !== 'assinado'): ?>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-sm btn-light-info w-100" id="btn-adicionar-testemunha">
+                                <i class="ki-duotone ki-plus fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Adicionar Testemunha
+                            </button>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <!--end::Card-->
+
+                <!-- Modal: Substituir Testemunha -->
+                <div class="modal fade" id="modal_substituir_testemunha" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST" id="form_substituir_testemunha">
+                                <input type="hidden" name="acao" value="substituir_testemunha">
+                                <input type="hidden" name="signer_id" id="substituir_signer_id">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Substituir Testemunha</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="alert alert-warning mb-4">
+                                        <i class="ki-duotone ki-information fs-4 me-2">
+                                            <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+                                        </i>
+                                        Substituindo: <strong id="substituir_nome_atual"></strong><br>
+                                        <small class="text-muted">O link atual será invalidado e um novo e-mail será enviado.</small>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label required">Nome da nova testemunha</label>
+                                        <input type="text" name="novo_nome" class="form-control" placeholder="Nome completo" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label required">E-mail da nova testemunha</label>
+                                        <input type="email" name="novo_email" class="form-control" placeholder="email@exemplo.com" required>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="ki-duotone ki-arrows-loop fs-4 me-1">
+                                            <span class="path1"></span><span class="path2"></span>
+                                        </i>
+                                        Confirmar Substituição
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Adicionar Testemunha -->
+                <div class="modal fade" id="modal_adicionar_testemunha" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST" id="form_adicionar_testemunha">
+                                <input type="hidden" name="acao" value="adicionar_testemunha">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Adicionar Testemunha</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-4">
+                                        <label class="form-label required">Nome</label>
+                                        <input type="text" name="novo_nome" class="form-control" placeholder="Nome completo" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label required">E-mail</label>
+                                        <input type="email" name="novo_email" class="form-control" placeholder="email@exemplo.com" required>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-info">
+                                        <i class="ki-duotone ki-plus fs-4 me-1">
+                                            <span class="path1"></span><span class="path2"></span>
+                                        </i>
+                                        Adicionar
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
             <!--end::Col-->
         </div>
@@ -627,6 +931,71 @@ document.getElementById('btn_cancelar')?.addEventListener('click', function() {
             document.getElementById('form_cancelar').submit();
         }
     }
+});
+
+// Botão Substituir Testemunha - abre modal com dados preenchidos
+document.querySelectorAll('.btn-substituir-testemunha').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const signerId = this.getAttribute('data-signer-id');
+        const nome     = this.getAttribute('data-nome');
+        document.getElementById('substituir_signer_id').value = signerId;
+        document.getElementById('substituir_nome_atual').textContent = nome;
+        // Limpa campos do form
+        const form = document.getElementById('form_substituir_testemunha');
+        form.querySelector('[name="novo_nome"]').value  = '';
+        form.querySelector('[name="novo_email"]').value = '';
+        const modal = new bootstrap.Modal(document.getElementById('modal_substituir_testemunha'));
+        modal.show();
+    });
+});
+
+// Botão Remover Testemunha - confirmação antes de submeter
+document.querySelectorAll('.btn-remover-testemunha').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const nome = this.getAttribute('data-nome');
+        const form = this.closest('form');
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Remover Testemunha?',
+                html: `<strong>${nome}</strong> será removida do contrato e não poderá mais assinar.<br><small class="text-muted">Esta ação não pode ser desfeita.</small>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sim, remover',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    btn.disabled = true;
+                    form.submit();
+                }
+            });
+        } else {
+            if (confirm('Remover testemunha ' + nome + '?')) {
+                form.submit();
+            }
+        }
+    });
+});
+
+// Botão Adicionar Testemunha - abre modal
+document.getElementById('btn-adicionar-testemunha')?.addEventListener('click', function() {
+    const form = document.getElementById('form_adicionar_testemunha');
+    form.querySelector('[name="novo_nome"]').value  = '';
+    form.querySelector('[name="novo_email"]').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('modal_adicionar_testemunha'));
+    modal.show();
+});
+
+// Loading nos forms de modal ao submeter
+['form_substituir_testemunha', 'form_adicionar_testemunha'].forEach(id => {
+    document.getElementById(id)?.addEventListener('submit', function() {
+        const btn = this.querySelector('[type="submit"]');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Processando...';
+        }
+    });
 });
 </script>
 

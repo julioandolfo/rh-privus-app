@@ -365,6 +365,62 @@ class AutentiqueService {
     }
     
     /**
+     * Adiciona um novo signatário a um documento já existente
+     */
+    public function adicionarSignatario($documentId, $signatario) {
+        $query = '
+            mutation CreateSigner($document_id: UUID!, $signer: SignerInput!) {
+                createSigner(document_id: $document_id, signer: $signer) {
+                    public_id
+                    name
+                    email
+                    delivery_method
+                    action { name }
+                    link { short_link }
+                    created_at
+                }
+            }
+        ';
+
+        $variables = [
+            'document_id' => $documentId,
+            'signer' => [
+                'email'  => $signatario['email'],
+                'action' => 'SIGN'
+            ]
+        ];
+
+        $result = $this->executeGraphQL($query, $variables);
+        log_contrato("adicionarSignatario: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+        return $result['createSigner'] ?? null;
+    }
+
+    /**
+     * Remove um signatário de um documento existente
+     */
+    public function removerSignatario($documentId, $signerPublicId) {
+        $query = '
+            mutation DeleteSigner($document_id: UUID!, $public_id: UUID!) {
+                deleteSigner(document_id: $document_id, public_id: $public_id)
+            }
+        ';
+
+        $variables = [
+            'document_id' => $documentId,
+            'public_id'   => $signerPublicId
+        ];
+
+        try {
+            $result = $this->executeGraphQL($query, $variables);
+            log_contrato("removerSignatario ($signerPublicId): " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            return $result['deleteSigner'] ?? false;
+        } catch (Exception $e) {
+            log_contrato("Erro ao remover signatário: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
      * Busca usuário atual (para teste de conexão)
      */
     public function buscarUsuarioAtual() {
