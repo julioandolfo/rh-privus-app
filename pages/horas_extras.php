@@ -1245,17 +1245,6 @@ if (quantidadeHorasRemoverInput) {
     });
 }
 
-// Máscara para quantidade de horas
-if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
-    jQuery('#quantidade_horas').mask('#0,00', {reverse: true});
-    jQuery('#quantidade_horas_remover').mask('#0,00', {reverse: true});
-    
-    // Recalcula quando a máscara é aplicada
-    jQuery('#quantidade_horas').on('input', function() {
-        calcularValorTotal();
-    });
-}
-
 // DataTables com Filtros Avançados - Aguarda jQuery estar carregado
 (function() {
     function waitForjQueryAndDataTables(callback) {
@@ -1270,6 +1259,17 @@ if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
     
     waitForjQueryAndDataTables(function() {
         window.KTHorasExtrasList = initKTHorasExtrasList();
+        
+        // Máscara para quantidade de horas (após jQuery estar disponível)
+        if (typeof window.jQuery !== 'undefined' && window.jQuery.fn.mask) {
+            window.jQuery('#quantidade_horas').mask('#0,00', {reverse: true});
+            window.jQuery('#quantidade_horas_remover').mask('#0,00', {reverse: true});
+            
+            // Recalcula quando a máscara é aplicada
+            window.jQuery('#quantidade_horas').on('input', function() {
+                calcularValorTotal();
+            });
+        }
     });
 })();
 
@@ -2336,6 +2336,26 @@ function exportarParaPDF(dados) {
 <!--end::Select2 CSS-->
 
 <script>
+// Wrapper para aguardar jQuery e dependências
+(function() {
+    function waitForDependencies(callback) {
+        if (typeof window.jQuery !== 'undefined' && 
+            typeof window.jQuery.fn.select2 !== 'undefined' &&
+            typeof bootstrap !== 'undefined') {
+            callback();
+        } else {
+            setTimeout(function() {
+                waitForDependencies(callback);
+            }, 100);
+        }
+    }
+    
+    waitForDependencies(function() {
+        initHorasExtrasScripts();
+    });
+})();
+
+function initHorasExtrasScripts() {
 // Variáveis globais para controlar se deve adicionar outra
 var adicionarOutra = false;
 var colaboradorAnterior = null;
@@ -2884,27 +2904,22 @@ function verificarCamposPreenchidos() {
     });
 }
 
-// Adiciona listeners para mudanças nos campos
-// Aguarda jQuery estar disponível antes de executar
-(function waitForjQueryFinal() {
-    if (typeof window.jQuery !== 'undefined') {
-        window.jQuery(document).ready(function() {
-            initFiltroColaboradorSelect2();
-            
-            // Listeners para inputs de data e number
-            window.jQuery('#kt_filtros_avancados_content input').on('change input', function() {
-                verificarCamposPreenchidos();
-            });
-            
-            // Listener para selects nativos
-            window.jQuery('#kt_filtros_avancados_content select:not(.select2-hidden-accessible)').on('change', function() {
-                verificarCamposPreenchidos();
-            });
-        });
-    } else {
-        setTimeout(waitForjQueryFinal, 100);
-    }
-})();
+// Adiciona listeners para mudanças nos campos - executa imediatamente já que estamos dentro do wrapper
+window.jQuery(document).ready(function() {
+    initFiltroColaboradorSelect2();
+    
+    // Listeners para inputs de data e number
+    window.jQuery('#kt_filtros_avancados_content input').on('change input', function() {
+        verificarCamposPreenchidos();
+    });
+    
+    // Listener para selects nativos
+    window.jQuery('#kt_filtros_avancados_content select:not(.select2-hidden-accessible)').on('change', function() {
+        verificarCamposPreenchidos();
+    });
+});
+
+} // Fecha função initHorasExtrasScripts
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
