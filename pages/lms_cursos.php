@@ -168,102 +168,171 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <!--end::Filtros-->
         
-        <!--begin::Card-->
-        <div class="card">
-            <div class="card-header border-0 pt-6">
-                <h3 class="card-title align-items-start flex-column">
-                    <span class="card-label fw-bold fs-3 mb-1">Cursos</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7"><?= count($cursos) ?> curso(s) encontrado(s)</span>
-                </h3>
-            </div>
-            <div class="card-body pt-0">
-                <div class="table-responsive">
-                    <table class="table align-middle table-row-dashed fs-6 gy-5">
-                        <thead>
-                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
-                                <th class="min-w-50px">ID</th>
-                                <th class="min-w-200px">Curso</th>
-                                <th class="min-w-100px">Categoria</th>
-                                <th class="min-w-100px">Status</th>
-                                <th class="min-w-100px">Aulas</th>
-                                <th class="min-w-100px">Obrigatório</th>
-                                <th class="min-w-100px text-end">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-gray-600 fw-semibold">
-                            <?php if (empty($cursos)): ?>
-                            <tr>
-                                <td colspan="7" class="text-center py-10">
-                                    <div class="text-muted">Nenhum curso encontrado</div>
-                                </td>
-                            </tr>
-                            <?php else: ?>
-                                <?php foreach ($cursos as $curso): ?>
-                                <tr>
-                                    <td><?= $curso['id'] ?></td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <?php if ($curso['imagem_capa']): ?>
-                                            <img src="<?= htmlspecialchars($curso['imagem_capa']) ?>" class="rounded me-3" style="width: 50px; height: 50px; object-fit: cover;" alt="">
-                                            <?php endif; ?>
-                                            <div>
-                                                <div class="fw-bold"><?= htmlspecialchars($curso['titulo']) ?></div>
-                                                <div class="text-muted fs-7"><?= htmlspecialchars(substr($curso['descricao'] ?? '', 0, 60)) ?>...</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <?php if ($curso['categoria_nome']): ?>
-                                        <span class="badge badge-light"><?= htmlspecialchars($curso['categoria_nome']) ?></span>
-                                        <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php
-                                        $status_classes = [
-                                            'rascunho' => 'warning',
-                                            'publicado' => 'success',
-                                            'arquivado' => 'secondary'
-                                        ];
-                                        $status_class = $status_classes[$curso['status']] ?? 'secondary';
-                                        ?>
-                                        <span class="badge badge-<?= $status_class ?>"><?= ucfirst($curso['status']) ?></span>
-                                        <?php if (!empty($curso['obrigatorio']) && $curso['obrigatorio']): ?>
-                                        <span class="badge badge-danger ms-1">Obrigatório</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?= $curso['total_aulas'] ?? 0 ?> aula(s)</td>
-                                    <td>
-                                        <?php if (!empty($curso['obrigatorio']) && $curso['obrigatorio'] && !empty($curso['total_obrigatorios'])): ?>
-                                        <span class="badge badge-info"><?= $curso['total_obrigatorios'] ?> atribuições</span>
-                                        <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-end">
-                                        <a href="lms_curso_view.php?id=<?= $curso['id'] ?>" class="btn btn-sm btn-light me-2">
-                                            <i class="ki-duotone ki-eye fs-4">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                        </a>
-                                        <a href="lms_curso_edit.php?id=<?= $curso['id'] ?>" class="btn btn-sm btn-primary">
-                                            <i class="ki-duotone ki-pencil fs-4">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
+        <!--begin::Header Resultados-->
+        <div class="d-flex align-items-center justify-content-between mb-5">
+            <div>
+                <h3 class="fw-bold fs-3 text-gray-900 mb-1">Cursos</h3>
+                <span class="text-muted fw-semibold fs-7"><?= count($cursos) ?> curso(s) encontrado(s)</span>
             </div>
         </div>
-        <!--end::Card-->
+        <!--end::Header Resultados-->
+
+        <?php if (empty($cursos)): ?>
+        <!--begin::Estado Vazio-->
+        <div class="card">
+            <div class="card-body text-center py-20">
+                <i class="ki-duotone ki-book fs-5x text-muted mb-5">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                    <span class="path4"></span>
+                </i>
+                <h3 class="text-gray-900 mb-2">Nenhum curso encontrado</h3>
+                <p class="text-muted mb-5">Crie o primeiro curso ou ajuste os filtros de busca.</p>
+                <a href="lms_curso_add.php" class="btn btn-primary">
+                    <i class="ki-duotone ki-plus fs-2"></i>
+                    Criar Novo Curso
+                </a>
+            </div>
+        </div>
+        <!--end::Estado Vazio-->
+        <?php else: ?>
+        <!--begin::Grid de Cards-->
+        <div class="row g-6">
+            <?php
+            $status_classes = [
+                'rascunho' => 'warning',
+                'publicado' => 'success',
+                'arquivado' => 'secondary'
+            ];
+            $status_labels = [
+                'rascunho' => 'Rascunho',
+                'publicado' => 'Publicado',
+                'arquivado' => 'Arquivado'
+            ];
+            foreach ($cursos as $curso):
+                $status_class = $status_classes[$curso['status']] ?? 'secondary';
+                $status_label = $status_labels[$curso['status']] ?? ucfirst($curso['status']);
+            ?>
+            <div class="col-xl-4 col-lg-6 col-md-6">
+                <div class="card h-100 card-flush hover-elevate-up transition-all" style="transition: transform 0.2s ease, box-shadow 0.2s ease;">
+                    <!--begin::Capa do Curso-->
+                    <div class="card-header p-0 border-0" style="min-height: 200px; position: relative; overflow: hidden; border-radius: 12px 12px 0 0;">
+                        <?php if (!empty($curso['imagem_capa'])): ?>
+                        <img src="../<?= htmlspecialchars($curso['imagem_capa']) ?>"
+                             alt="<?= htmlspecialchars($curso['titulo']) ?>"
+                             style="width: 100%; height: 200px; object-fit: cover; display: block;"
+                             onerror="this.parentElement.innerHTML='<div class=\'w-100 h-100 d-flex align-items-center justify-content-center bg-light-primary\' style=\'height:200px\'><i class=\'ki-duotone ki-book fs-3x text-primary\'><span class=\'path1\'></span><span class=\'path2\'></span><span class=\'path3\'></span><span class=\'path4\'></span></i></div>'">
+                        <?php else: ?>
+                        <div class="w-100 d-flex align-items-center justify-content-center bg-light-primary" style="height: 200px;">
+                            <i class="ki-duotone ki-book fs-3x text-primary">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                            </i>
+                        </div>
+                        <?php endif; ?>
+
+                        <!--begin::Badges sobrepostos-->
+                        <div style="position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
+                            <span class="badge badge-<?= $status_class ?> fs-8 fw-bold px-3 py-2"><?= $status_label ?></span>
+                            <?php if (!empty($curso['obrigatorio']) && $curso['obrigatorio']): ?>
+                            <span class="badge badge-danger fs-8 fw-bold px-3 py-2">Obrigatório</span>
+                            <?php endif; ?>
+                        </div>
+                        <!--end::Badges sobrepostos-->
+                    </div>
+                    <!--end::Capa-->
+
+                    <!--begin::Corpo do Card-->
+                    <div class="card-body p-6 d-flex flex-column">
+
+                        <!--begin::Categoria-->
+                        <?php if (!empty($curso['categoria_nome'])): ?>
+                        <span class="text-muted fs-8 fw-bold text-uppercase letter-spacing-1 mb-2">
+                            <?= htmlspecialchars($curso['categoria_nome']) ?>
+                        </span>
+                        <?php endif; ?>
+                        <!--end::Categoria-->
+
+                        <!--begin::Título-->
+                        <h4 class="fw-bold text-gray-900 fs-5 mb-2 lh-sm" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            <?= htmlspecialchars($curso['titulo']) ?>
+                        </h4>
+                        <!--end::Título-->
+
+                        <!--begin::Descrição-->
+                        <?php if (!empty($curso['descricao'])): ?>
+                        <p class="text-muted fs-7 mb-4 flex-grow-1" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            <?= htmlspecialchars($curso['descricao']) ?>
+                        </p>
+                        <?php else: ?>
+                        <div class="flex-grow-1"></div>
+                        <?php endif; ?>
+                        <!--end::Descrição-->
+
+                        <!--begin::Metadados-->
+                        <div class="d-flex align-items-center gap-4 mb-5 pt-3 border-top border-dashed">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="ki-duotone ki-teacher fs-4 text-primary">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <span class="text-muted fs-7 fw-semibold"><?= $curso['total_aulas'] ?> aula(s)</span>
+                            </div>
+                            <?php if (!empty($curso['duracao_estimada'])): ?>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="ki-duotone ki-time fs-4 text-primary">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <span class="text-muted fs-7 fw-semibold"><?= $curso['duracao_estimada'] ?> min</span>
+                            </div>
+                            <?php endif; ?>
+                            <?php if (!empty($curso['obrigatorio']) && $curso['obrigatorio'] && !empty($curso['total_obrigatorios'])): ?>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="ki-duotone ki-people fs-4 text-danger">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                    <span class="path5"></span>
+                                </i>
+                                <span class="text-muted fs-7 fw-semibold"><?= $curso['total_obrigatorios'] ?> atribuições</span>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        <!--end::Metadados-->
+
+                        <!--begin::Ações-->
+                        <div class="d-flex gap-2">
+                            <a href="lms_curso_view.php?id=<?= $curso['id'] ?>" class="btn btn-light btn-sm flex-grow-1">
+                                <i class="ki-duotone ki-eye fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Detalhes
+                            </a>
+                            <a href="lms_curso_edit.php?id=<?= $curso['id'] ?>" class="btn btn-primary btn-sm flex-grow-1">
+                                <i class="ki-duotone ki-pencil fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Editar
+                            </a>
+                        </div>
+                        <!--end::Ações-->
+
+                    </div>
+                    <!--end::Corpo do Card-->
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <!--end::Grid de Cards-->
+        <?php endif; ?>
         
     </div>
 </div>

@@ -104,6 +104,22 @@ if ($aula['tipo_conteudo'] == 'texto') {
     $campos_personalizados = $stmt->fetchAll();
 }
 
+// Extrai ID do vídeo do YouTube a partir de URL ou ID direto
+function extrairYoutubeId(string $input): string {
+    $input = trim($input);
+    // Já é um ID puro (11 chars alfanuméricos)
+    if (preg_match('/^[a-zA-Z0-9_-]{11}$/', $input)) {
+        return $input;
+    }
+    // Tenta extrair de URLs: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID
+    if (preg_match('/(?:youtube\.com\/(?:.*[?&]v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $input, $matches)) {
+        return $matches[1];
+    }
+    return $input;
+}
+
+$youtube_video_id = !empty($aula['url_youtube']) ? extrairYoutubeId($aula['url_youtube']) : '';
+
 // Atualiza título com nome da aula
 if (!empty($aula['titulo'])) {
     $page_title = $aula['titulo'];
@@ -166,12 +182,17 @@ require_once __DIR__ . '/../includes/header.php';
                             <?php if ($aula['tipo_conteudo'] == 'video_youtube'): ?>
                             <!-- Player YouTube -->
                             <div class="ratio ratio-16x9">
+                                <?php
+                                $origin = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+                                $embed_url = 'https://www.youtube.com/embed/' . htmlspecialchars($youtube_video_id) . '?enablejsapi=1&rel=0&origin=' . urlencode($origin);
+                                ?>
                                 <iframe 
                                     id="youtube-player"
-                                    src="https://www.youtube.com/embed/<?= htmlspecialchars($aula['url_youtube']) ?>?enablejsapi=1&origin=<?= urlencode(get_base_url()) ?>"
+                                    src="<?= $embed_url ?>"
                                     frameborder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen>
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowfullscreen
+                                    referrerpolicy="strict-origin-when-cross-origin">
                                 </iframe>
                             </div>
                             
