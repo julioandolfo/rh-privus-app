@@ -208,7 +208,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="card h-100 <?= $curso['status'] == 'vencido' ? 'border-danger' : ($curso['status'] == 'pendente' ? 'border-warning' : '') ?>">
                         <div class="card-header border-0 pt-9">
                             <?php if ($curso['imagem_capa']): ?>
-                            <img src="<?= htmlspecialchars($curso['imagem_capa']) ?>" class="card-img-top" alt="<?= htmlspecialchars($curso['titulo']) ?>" style="height: 150px; object-fit: cover;">
+                            <img src="../<?= htmlspecialchars($curso['imagem_capa']) ?>" class="card-img-top" alt="<?= htmlspecialchars($curso['titulo']) ?>" style="height: 150px; object-fit: cover;">
                             <?php else: ?>
                             <div class="bg-light-primary d-flex align-items-center justify-content-center" style="height: 150px;">
                                 <i class="ki-duotone ki-book fs-1 text-primary">
@@ -287,7 +287,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="card h-100">
                         <div class="card-header border-0 pt-9">
                             <?php if ($curso['imagem_capa']): ?>
-                            <img src="<?= htmlspecialchars($curso['imagem_capa']) ?>" class="card-img-top" alt="<?= htmlspecialchars($curso['titulo']) ?>" style="height: 150px; object-fit: cover;">
+                            <img src="../<?= htmlspecialchars($curso['imagem_capa']) ?>" class="card-img-top" alt="<?= htmlspecialchars($curso['titulo']) ?>" style="height: 150px; object-fit: cover;">
                             <?php else: ?>
                             <div class="bg-light-primary d-flex align-items-center justify-content-center" style="height: 150px;">
                                 <i class="ki-duotone ki-book fs-1 text-primary">

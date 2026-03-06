@@ -148,7 +148,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="row">
                     <div class="col-md-3">
                         <?php if ($curso['imagem_capa']): ?>
-                        <img src="<?= htmlspecialchars($curso['imagem_capa']) ?>" class="img-fluid rounded" alt="<?= htmlspecialchars($curso['titulo']) ?>">
+                        <img src="../<?= htmlspecialchars($curso['imagem_capa']) ?>" class="img-fluid rounded" alt="<?= htmlspecialchars($curso['titulo']) ?>">
                         <?php else: ?>
                         <div class="bg-light-primary d-flex align-items-center justify-content-center rounded" style="height: 200px;">
                             <i class="ki-duotone ki-book fs-1 text-primary">
