@@ -1,9 +1,11 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
+$page_title = 'Configurações Slack';
+
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/permissions.php';
 require_once __DIR__ . '/../includes/slack_service.php';
 
-require_login();
 require_page_permission('configuracoes_slack.php');
 
 $pdo     = getDB();
@@ -172,7 +174,6 @@ try {
     $colabs_sem_slack = $colabs_com_slack = [];
 }
 
-$page_title = 'Configurações Slack';
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/menu.php';
 ?>
