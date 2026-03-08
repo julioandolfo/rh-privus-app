@@ -1505,7 +1505,7 @@ function getIcon($name) {
                     <?php endif; ?>
                     
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('configuracoes_pontos.php') || isActive('configuracoes_openai.php') || isActive('templates_email.php') || isActive('email_logs.php') || isActive('configuracoes_autentique.php') || isActive('configuracoes_evolution.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('configuracoes_pontos.php') || isActive('configuracoes_openai.php') || isActive('templates_email.php') || isActive('email_logs.php') || isActive('configuracoes_autentique.php') || isActive('configuracoes_evolution.php') || isActive('configuracoes_slack.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -1631,6 +1631,20 @@ function getIcon($name) {
                                     </span>
                                     <span class="menu-title">
                                         WhatsApp (Evolution)
+                                    </span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('configuracoes_slack.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('configuracoes_slack.php') ?>" href="configuracoes_slack.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">
+                                        Slack
                                     </span>
                                 </a>
                             </div>

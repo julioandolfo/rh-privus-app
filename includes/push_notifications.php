@@ -6,6 +6,7 @@
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/onesignal_service.php';
 require_once __DIR__ . '/evolution_service.php';
+require_once __DIR__ . '/slack_service.php';
 
 if (!function_exists('push_log')) {
     function push_log($message)
@@ -101,6 +102,13 @@ function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = nul
             evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
         } catch (Exception $wa_e) {
             push_log("enviar_push_colaborador - WhatsApp erro (não crítico): " . $wa_e->getMessage());
+        }
+
+        // Envia também via Slack - não bloqueia em caso de erro
+        try {
+            slack_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
+        } catch (Exception $sl_e) {
+            push_log("enviar_push_colaborador - Slack erro (não crítico): " . $sl_e->getMessage());
         }
 
         return [
@@ -199,12 +207,17 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null, $tipo
             $stmt->execute([$push_id]);
         }
 
-        // Envia também via WhatsApp se o usuário tiver colaborador vinculado
+        // Envia também via WhatsApp e Slack se o usuário tiver colaborador vinculado
         if ($colaborador_id) {
             try {
                 evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
             } catch (Exception $wa_e) {
                 push_log("enviar_push_usuario - WhatsApp erro (não crítico): " . $wa_e->getMessage());
+            }
+            try {
+                slack_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
+            } catch (Exception $sl_e) {
+                push_log("enviar_push_usuario - Slack erro (não crítico): " . $sl_e->getMessage());
             }
         }
 

@@ -230,6 +230,9 @@ function get_page_permissions() {
         // Evolution API (WhatsApp) - apenas ADMIN
         'configuracoes_evolution.php'  => ['ADMIN'],
         'relatorio_humor_whatsapp.php' => ['ADMIN', 'RH'],
+
+        // Slack - apenas ADMIN
+        'configuracoes_slack.php'      => ['ADMIN'],
         
         // Manual de Conduta - todos podem visualizar
         'manual_conduta_view.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
@@ -418,7 +421,8 @@ function can_access_configuracoes() {
         'configuracoes_openai.php',
         'configuracoes_pontos.php',
         'templates_email.php',
-        'configuracoes_evolution.php'
+        'configuracoes_evolution.php',
+        'configuracoes_slack.php'
     ];
     
     return can_access_any_page($config_pages);

@@ -73,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($status === 'publicado') {
             require_once __DIR__ . '/../includes/email_templates.php';
             require_once __DIR__ . '/../includes/push_notifications.php';
+            require_once __DIR__ . '/../includes/slack_service.php';
             
             // Envia emails em background (não bloqueia a resposta)
             $resultado_email = enviar_email_novo_comunicado($comunicado_id);
@@ -103,6 +104,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
+            // Posta também no canal Slack (comunicado de broadcast)
+            try {
+                $url_comunicado = get_base_url() . '/pages/comunicado_view.php?id=' . $comunicado_id;
+                $preview_texto  = !empty($descricao) ? mb_substr(strip_tags($descricao), 0, 300) : $titulo_preview;
+                slack_comunicado_no_canal(
+                    '📢 Novo Comunicado: ' . $titulo_preview,
+                    $preview_texto,
+                    $url_comunicado
+                );
+            } catch (Exception $sl_e) {
+                error_log('[Slack] Erro ao postar comunicado no canal: ' . $sl_e->getMessage());
+            }
+
             if ($resultado_email['success']) {
                 $mensagem = 'Comunicado criado e notificações enviadas! ';
                 $mensagem .= "({$resultado_email['enviados']} emails";
