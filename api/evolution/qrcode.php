@@ -1,0 +1,163 @@
+<?php
+/**
+ * API - QR Code e Status de Conexão da Evolution API
+ * Endpoints usados pelo painel de configurações (AJAX)
+ */
+
+header('Content-Type: application/json');
+ini_set('display_errors', 0);
+
+require_once __DIR__ . '/../../includes/functions.php';
+require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/evolution_service.php';
+
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+if (!isset($_SESSION['usuario'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Não autenticado']);
+    exit;
+}
+
+// Apenas ADMIN
+if (!in_array($_SESSION['usuario']['role'] ?? '', ['ADMIN'])) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Acesso negado']);
+    exit;
+}
+
+$action = $_GET['action'] ?? $_POST['action'] ?? 'status';
+$config = evolution_get_config();
+
+if (!$config) {
+    echo json_encode(['success' => false, 'error' => 'Evolution API não configurada. Salve as configurações primeiro.']);
+    exit;
+}
+
+switch ($action) {
+
+    // ─── Status de conexão ────────────────────────────────────────────────────
+    case 'status':
+        $result = evolution_verificar_conexao($config);
+        echo json_encode([
+            'success'   => true,
+            'connected' => $result['connected'] ?? false,
+            'state'     => $result['state']     ?? 'unknown',
+            'data'      => $result['data']       ?? null,
+        ]);
+        break;
+
+    // ─── Gerar / buscar QR Code ───────────────────────────────────────────────
+    case 'qrcode':
+        $instance = $config['instance_name'];
+
+        // Primeiro verifica se já está conectado
+        $status = evolution_verificar_conexao($config);
+        if ($status['connected']) {
+            echo json_encode([
+                'success'   => true,
+                'connected' => true,
+                'state'     => 'open',
+                'message'   => 'WhatsApp já está conectado!',
+            ]);
+            break;
+        }
+
+        // Busca QR Code do endpoint /instance/connect/{instance}
+        $result = evolution_request('GET', "instance/connect/{$instance}", [], $config);
+
+        if (!$result['success']) {
+            // Tenta criar a instância se não existir e buscar novamente
+            $create = evolution_request('POST', 'instance/create', [
+                'instanceName'  => $instance,
+                'qrcode'        => true,
+                'integration'   => 'WHATSAPP-BAILEYS',
+            ], $config);
+
+            if ($create['success']) {
+                // Tenta pegar QR code após criação
+                $result = evolution_request('GET', "instance/connect/{$instance}", [], $config);
+            }
+        }
+
+        if (!$result['success']) {
+            echo json_encode([
+                'success' => false,
+                'error'   => 'Não foi possível obter o QR Code. Verifique se a instância existe na Evolution API. Detalhe: ' . ($result['raw'] ?? 'sem resposta'),
+            ]);
+            break;
+        }
+
+        $data = $result['data'] ?? [];
+
+        // A Evolution API pode retornar o base64 em diferentes campos conforme a versão
+        $base64 = $data['base64']
+            ?? $data['qrcode']['base64']
+            ?? $data['qrcode']
+            ?? null;
+
+        $code = $data['code']
+            ?? $data['qrcode']['code']
+            ?? null;
+
+        if (!$base64 && !$code) {
+            // Instância pode já estar conectada ou em estado diferente
+            $state = $data['instance']['state'] ?? $data['state'] ?? 'unknown';
+
+            if (in_array($state, ['open', 'connected'])) {
+                echo json_encode([
+                    'success'   => true,
+                    'connected' => true,
+                    'state'     => 'open',
+                    'message'   => 'WhatsApp conectado com sucesso!',
+                ]);
+            } else {
+                echo json_encode([
+                    'success' => false,
+                    'state'   => $state,
+                    'error'   => 'QR Code não disponível. Estado da instância: ' . $state . '. Verifique sua Evolution API.',
+                    'raw'     => json_encode($data),
+                ]);
+            }
+            break;
+        }
+
+        // Garante que base64 vem com prefixo data URI
+        if ($base64 && !str_starts_with($base64, 'data:')) {
+            $base64 = 'data:image/png;base64,' . $base64;
+        }
+
+        echo json_encode([
+            'success'   => true,
+            'connected' => false,
+            'state'     => 'connecting',
+            'base64'    => $base64,
+            'code'      => $code,
+        ]);
+        break;
+
+    // ─── Desconectar instância ────────────────────────────────────────────────
+    case 'logout':
+        $instance = $config['instance_name'];
+        $result   = evolution_request('DELETE', "instance/logout/{$instance}", [], $config);
+
+        echo json_encode([
+            'success' => $result['success'],
+            'message' => $result['success'] ? 'Instância desconectada com sucesso.' : 'Erro ao desconectar: ' . ($result['raw'] ?? ''),
+        ]);
+        break;
+
+    // ─── Reiniciar instância ──────────────────────────────────────────────────
+    case 'restart':
+        $instance = $config['instance_name'];
+        $result   = evolution_request('PUT', "instance/restart/{$instance}", [], $config);
+
+        echo json_encode([
+            'success' => $result['success'],
+            'message' => $result['success'] ? 'Instância reiniciada.' : 'Erro ao reiniciar.',
+        ]);
+        break;
+
+    default:
+        echo json_encode(['success' => false, 'error' => 'Ação inválida']);
+}

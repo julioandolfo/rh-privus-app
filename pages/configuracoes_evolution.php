@@ -227,7 +227,8 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card card-flush h-100">
+                    <a href="?aba=conexao" class="text-decoration-none">
+                    <div class="card card-flush h-100 <?= ($config && $config['ativo'] && !($status_conexao['connected'] ?? false)) ? 'border border-warning border-dashed' : '' ?>">
                         <div class="card-body d-flex align-items-center py-6">
                             <div class="symbol symbol-50px me-4">
                                 <span class="symbol-label bg-light-<?= ($status_conexao && $status_conexao['connected']) ? 'success' : 'warning' ?>">
@@ -242,14 +243,18 @@ include __DIR__ . '/../includes/header.php';
                                     <?php if ($status_conexao === null): ?>
                                         <span class="text-muted">Não verificado</span>
                                     <?php elseif ($status_conexao['connected']): ?>
-                                        <span class="text-success">Conectado</span>
+                                        <span class="text-success">Conectado ✅</span>
                                     <?php else: ?>
-                                        <span class="text-warning"><?= htmlspecialchars($status_conexao['state'] ?? 'Desconectado') ?></span>
+                                        <span class="text-warning">Desconectado ⚠️</span>
                                     <?php endif; ?>
                                 </div>
+                                <?php if ($config && $config['ativo'] && !($status_conexao['connected'] ?? false)): ?>
+                                <div class="fs-8 text-warning mt-1">Clique para conectar</div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
+                    </a>
                 </div>
                 <div class="col-md-3">
                     <div class="card card-flush h-100">
@@ -295,6 +300,17 @@ include __DIR__ . '/../includes/header.php';
                     <a class="nav-link <?= $aba_ativa === 'configuracoes' ? 'active' : '' ?>" href="?aba=configuracoes">
                         <i class="ki-duotone ki-setting-2 fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
                         Configurações da API
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $aba_ativa === 'conexao' ? 'active' : '' ?>" href="?aba=conexao">
+                        <i class="ki-duotone ki-phone fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                        Conexão / QR Code
+                        <?php if ($status_conexao && $status_conexao['connected']): ?>
+                        <span class="badge badge-circle badge-success ms-2 w-10px h-10px p-0"></span>
+                        <?php elseif ($config && $config['ativo']): ?>
+                        <span class="badge badge-circle badge-danger ms-2 w-10px h-10px p-0"></span>
+                        <?php endif; ?>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -417,6 +433,368 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
             </div>
+
+            <!-- ═══ ABA: Conexão / QR Code ════════════════════════════════════════════ -->
+            <?php elseif ($aba_ativa === 'conexao'): ?>
+            <?php if (!$config): ?>
+            <div class="alert alert-warning">
+                <i class="ki-duotone ki-information-5 fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                Salve as configurações da API antes de conectar ao WhatsApp.
+            </div>
+            <?php else: ?>
+            <div class="row g-5">
+
+                <!-- Painel de status e QR Code -->
+                <div class="col-md-7">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h3 class="card-title">Conexão WhatsApp</h3>
+                            <div class="card-toolbar">
+                                <span id="status_badge" class="badge badge-light-secondary fs-7">
+                                    <span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;"></span>
+                                    Verificando...
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body text-center">
+
+                            <!-- Estado: desconectado → exibe QR Code -->
+                            <div id="area_qrcode" style="display:none;">
+                                <div class="alert alert-info text-start mb-5">
+                                    <i class="ki-duotone ki-information-5 fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                    <strong>Como conectar:</strong>
+                                    Abra o WhatsApp no seu celular → <strong>Aparelhos conectados</strong> → <strong>Conectar aparelho</strong> → escaneie o QR Code abaixo.
+                                </div>
+
+                                <div class="d-flex justify-content-center mb-4">
+                                    <div class="border border-2 border-success rounded p-3 bg-white shadow-sm position-relative" style="display:inline-block;">
+                                        <img id="qrcode_img" src="" alt="QR Code WhatsApp"
+                                             style="width:260px;height:260px;display:block;" />
+                                        <!-- Overlay de expiração -->
+                                        <div id="qr_expired_overlay"
+                                             style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.7);border-radius:8px;align-items:center;justify-content:center;flex-direction:column;gap:8px;">
+                                            <span style="color:#fff;font-size:14px;font-weight:600;">QR Code expirado</span>
+                                            <button onclick="carregarQRCode()" class="btn btn-sm btn-success">
+                                                <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
+                                                Renovar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="qr_timer" class="text-muted fs-7 mb-4">
+                                    QR Code expira em <strong id="qr_countdown">60</strong>s
+                                </div>
+
+                                <button onclick="carregarQRCode()" class="btn btn-light-primary btn-sm">
+                                    <i class="ki-duotone ki-arrows-circle fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                    Gerar novo QR Code
+                                </button>
+                            </div>
+
+                            <!-- Estado: conectado -->
+                            <div id="area_conectado" style="display:none;">
+                                <div class="mb-5">
+                                    <span style="font-size:80px;">✅</span>
+                                </div>
+                                <h4 class="text-success fw-bold mb-2">WhatsApp Conectado!</h4>
+                                <p class="text-muted mb-5">A instância <strong><?= htmlspecialchars($config['instance_name']) ?></strong> está ativa e pronta para enviar mensagens.</p>
+                                <div class="d-flex justify-content-center gap-3">
+                                    <button onclick="reiniciarInstancia()" class="btn btn-light-warning btn-sm">
+                                        <i class="ki-duotone ki-arrows-circle fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                        Reiniciar
+                                    </button>
+                                    <button onclick="desconectarInstancia()" class="btn btn-light-danger btn-sm">
+                                        <i class="ki-duotone ki-cross-circle fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                        Desconectar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Estado: carregando / aguardando -->
+                            <div id="area_aguardando">
+                                <div class="spinner-border text-success mb-4" style="width:3rem;height:3rem;" role="status"></div>
+                                <p class="text-muted" id="aguardando_msg">Verificando status da conexão...</p>
+                            </div>
+
+                            <!-- Estado: erro -->
+                            <div id="area_erro" style="display:none;">
+                                <div class="mb-4" style="font-size:60px;">⚠️</div>
+                                <p class="text-danger fw-semibold" id="erro_msg">Erro ao conectar.</p>
+                                <button onclick="verificarStatus()" class="btn btn-light-primary btn-sm me-2">
+                                    Verificar novamente
+                                </button>
+                                <button onclick="carregarQRCode()" class="btn btn-success btn-sm">
+                                    Gerar QR Code
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações da instância -->
+                <div class="col-md-5">
+                    <div class="card mb-5">
+                        <div class="card-header">
+                            <h3 class="card-title">Detalhes da Instância</h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless fs-7 mb-0">
+                                <tr>
+                                    <td class="text-muted fw-semibold w-50">URL da API</td>
+                                    <td class="text-break"><code><?= htmlspecialchars($config['api_url']) ?></code></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted fw-semibold">Instância</td>
+                                    <td><span class="badge badge-light-primary"><?= htmlspecialchars($config['instance_name']) ?></span></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted fw-semibold">Estado</td>
+                                    <td><span id="estado_detalhe" class="badge badge-light-secondary">—</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted fw-semibold">Notificações WA</td>
+                                    <td>
+                                        <?php if ($config['notificacoes_whatsapp_ativas']): ?>
+                                        <span class="badge badge-light-success">Ativas</span>
+                                        <?php else: ?>
+                                        <span class="badge badge-light-danger">Inativas</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted fw-semibold">Pesquisa humor</td>
+                                    <td>
+                                        <?php if ($config['pesquisa_humor_ativa']): ?>
+                                        <span class="badge badge-light-success">Ativa às <?= substr($config['horario_pesquisa_humor'] ?? '09:00', 0, 5) ?></span>
+                                        <?php else: ?>
+                                        <span class="badge badge-light-secondary">Inativa</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Ações</h3>
+                        </div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <button onclick="verificarStatus()" class="btn btn-light-primary w-100">
+                                <i class="ki-duotone ki-wifi fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                Verificar Status
+                            </button>
+                            <button onclick="carregarQRCode()" class="btn btn-success w-100" id="btn_gerar_qr">
+                                <i class="ki-duotone ki-scan-barcode fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                Conectar via QR Code
+                            </button>
+                            <button onclick="reiniciarInstancia()" class="btn btn-light-warning w-100">
+                                <i class="ki-duotone ki-arrows-circle fs-4 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                Reiniciar Instância
+                            </button>
+                            <button onclick="desconectarInstancia()" class="btn btn-light-danger w-100">
+                                <i class="ki-duotone ki-cross-circle fs-4 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                Desconectar WhatsApp
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            const API_BASE = '../api/evolution/qrcode.php';
+            let qrInterval   = null;
+            let qrCountdown  = 60;
+            let countTimer   = null;
+            let statusPoller = null;
+
+            // ── Helpers de exibição ──────────────────────────────────────────────────
+            function mostrarArea(area) {
+                ['area_qrcode','area_conectado','area_aguardando','area_erro'].forEach(id => {
+                    document.getElementById(id).style.display = 'none';
+                });
+                document.getElementById(area).style.display = area === 'area_aguardando' ? 'block' : 'flex';
+                document.getElementById(area).style.flexDirection = 'column';
+                document.getElementById(area).style.alignItems = 'center';
+            }
+
+            function setStatusBadge(estado) {
+                const badge = document.getElementById('status_badge');
+                const detalhe = document.getElementById('estado_detalhe');
+                const map = {
+                    'open'        : ['badge-light-success', '🟢 Conectado'],
+                    'connecting'  : ['badge-light-warning', '🟡 Conectando...'],
+                    'close'       : ['badge-light-danger',  '🔴 Desconectado'],
+                    'qrcode'      : ['badge-light-warning', '🟡 Aguardando QR'],
+                    'unknown'     : ['badge-light-secondary','⚪ Desconhecido'],
+                };
+                const [cls, label] = map[estado] ?? map['unknown'];
+                badge.className   = 'badge fs-7 ' + cls;
+                badge.innerHTML   = label;
+                if (detalhe) {
+                    detalhe.className = 'badge ' + cls;
+                    detalhe.textContent = label;
+                }
+            }
+
+            // ── Verifica status ──────────────────────────────────────────────────────
+            function verificarStatus() {
+                mostrarArea('area_aguardando');
+                document.getElementById('aguardando_msg').textContent = 'Verificando status...';
+
+                fetch(API_BASE + '?action=status')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.connected) {
+                            setStatusBadge('open');
+                            mostrarArea('area_conectado');
+                            pararPolling();
+                        } else {
+                            const estado = data.state ?? 'close';
+                            setStatusBadge(estado === 'connecting' ? 'connecting' : 'close');
+                            mostrarArea('area_erro');
+                            document.getElementById('erro_msg').textContent =
+                                'WhatsApp desconectado. Estado: ' + estado + '. Clique em "Conectar via QR Code" para reconectar.';
+                        }
+                    })
+                    .catch(() => {
+                        setStatusBadge('unknown');
+                        mostrarArea('area_erro');
+                        document.getElementById('erro_msg').textContent = 'Não foi possível comunicar com a Evolution API. Verifique a URL e a API Key.';
+                    });
+            }
+
+            // ── Carrega QR Code ──────────────────────────────────────────────────────
+            function carregarQRCode() {
+                pararPolling();
+                mostrarArea('area_aguardando');
+                document.getElementById('aguardando_msg').textContent = 'Gerando QR Code...';
+                setStatusBadge('qrcode');
+
+                fetch(API_BASE + '?action=qrcode')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.connected) {
+                            setStatusBadge('open');
+                            mostrarArea('area_conectado');
+                            return;
+                        }
+
+                        if (!data.success || !data.base64) {
+                            mostrarArea('area_erro');
+                            document.getElementById('erro_msg').textContent = data.error ?? 'Não foi possível gerar o QR Code.';
+                            return;
+                        }
+
+                        // Exibe QR Code
+                        document.getElementById('qrcode_img').src = data.base64;
+                        document.getElementById('qr_expired_overlay').style.display = 'none';
+                        mostrarArea('area_qrcode');
+                        setStatusBadge('qrcode');
+
+                        // Inicia countdown de 60s
+                        iniciarCountdown(60);
+
+                        // Polling: verifica a cada 4s se conectou
+                        iniciarPollingConexao();
+                    })
+                    .catch(() => {
+                        mostrarArea('area_erro');
+                        document.getElementById('erro_msg').textContent = 'Erro de comunicação ao buscar QR Code.';
+                    });
+            }
+
+            // ── Countdown de expiração do QR ─────────────────────────────────────────
+            function iniciarCountdown(segundos) {
+                clearInterval(countTimer);
+                qrCountdown = segundos;
+                document.getElementById('qr_countdown').textContent = qrCountdown;
+                document.getElementById('qr_timer').style.display = 'block';
+
+                countTimer = setInterval(() => {
+                    qrCountdown--;
+                    document.getElementById('qr_countdown').textContent = qrCountdown;
+                    if (qrCountdown <= 0) {
+                        clearInterval(countTimer);
+                        clearInterval(qrInterval);
+                        // Mostra overlay de expirado
+                        const overlay = document.getElementById('qr_expired_overlay');
+                        overlay.style.display = 'flex';
+                        document.getElementById('qr_timer').style.display = 'none';
+                        document.getElementById('qr_countdown').textContent = '60';
+                    }
+                }, 1000);
+            }
+
+            // ── Polling de conexão após exibir QR ────────────────────────────────────
+            function iniciarPollingConexao() {
+                clearInterval(qrInterval);
+                qrInterval = setInterval(() => {
+                    fetch(API_BASE + '?action=status')
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.connected) {
+                                pararPolling();
+                                setStatusBadge('open');
+                                mostrarArea('area_conectado');
+
+                                // Toast de sucesso
+                                if (typeof Swal !== 'undefined') {
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: 'WhatsApp Conectado! 🎉',
+                                        text: 'A instância foi conectada com sucesso.',
+                                        timer: 3000,
+                                        showConfirmButton: false,
+                                    });
+                                }
+                            }
+                        })
+                        .catch(() => {});
+                }, 4000);
+            }
+
+            function pararPolling() {
+                clearInterval(qrInterval);
+                clearInterval(countTimer);
+            }
+
+            // ── Desconectar ──────────────────────────────────────────────────────────
+            function desconectarInstancia() {
+                if (!confirm('Tem certeza que deseja desconectar o WhatsApp? Será necessário escanear o QR Code novamente para reconectar.')) return;
+
+                mostrarArea('area_aguardando');
+                document.getElementById('aguardando_msg').textContent = 'Desconectando...';
+
+                fetch(API_BASE + '?action=logout')
+                    .then(r => r.json())
+                    .then(data => {
+                        setStatusBadge('close');
+                        mostrarArea('area_erro');
+                        document.getElementById('erro_msg').textContent = data.message ?? 'Desconectado.';
+                    })
+                    .catch(() => {
+                        mostrarArea('area_erro');
+                        document.getElementById('erro_msg').textContent = 'Erro ao desconectar.';
+                    });
+            }
+
+            // ── Reiniciar ────────────────────────────────────────────────────────────
+            function reiniciarInstancia() {
+                mostrarArea('area_aguardando');
+                document.getElementById('aguardando_msg').textContent = 'Reiniciando instância...';
+
+                fetch(API_BASE + '?action=restart')
+                    .then(r => r.json())
+                    .then(() => setTimeout(verificarStatus, 3000))
+                    .catch(() => setTimeout(verificarStatus, 3000));
+            }
+
+            // ── Auto-inicialização ───────────────────────────────────────────────────
+            document.addEventListener('DOMContentLoaded', verificarStatus);
+            </script>
+            <?php endif; ?>
 
             <!-- ═══ ABA: Pesquisa de Humor ════════════════════════════════════════════ -->
             <?php elseif ($aba_ativa === 'pesquisa_humor'): ?>

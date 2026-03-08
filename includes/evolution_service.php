@@ -64,6 +64,11 @@ function evolution_request(string $method, string $endpoint, array $body = [], ?
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
     } elseif ($method === 'GET') {
         curl_setopt($ch, CURLOPT_HTTPGET, true);
+    } elseif ($method === 'DELETE') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+    } elseif ($method === 'PUT') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
     }
 
     $response     = curl_exec($ch);
