@@ -186,31 +186,52 @@ function processar_mensagem(array $msg, PDO $pdo, ?int $webhook_log_id): void {
 }
 
 /**
- * Extrai o texto de uma mensagem (suporta diferentes formatos da Evolution API)
+ * Extrai o texto/valor de uma mensagem recebida
+ * Suporta: lista de opções, botões, botões interativos e texto simples
  */
 function extrair_texto_mensagem(array $msg): string {
-    // Resposta de botão
-    $button_reply = $msg['message']['buttonsResponseMessage']['selectedButtonId']
-        ?? $msg['message']['interactiveResponseMessage']['nativeFlowResponseMessage']['paramsJson']
-        ?? null;
+    $message = $msg['message'] ?? [];
 
-    if ($button_reply) {
-        // Pode vir como JSON: {"id":"5","title":"Ótimo 😄"}
-        $decoded = json_decode($button_reply, true);
-        return $decoded['id'] ?? $button_reply;
+    // 1. Resposta de lista de opções (sendList) — rowId é o valor que enviamos ('1'-'5')
+    $list_reply = $message['listResponseMessage']['singleSelectReply']['selectedRowId']
+               ?? $message['listResponseMessage']['selectedRowId']
+               ?? null;
+    if ($list_reply !== null) {
+        return trim((string)$list_reply);
     }
 
-    // Lista de resposta (list message)
-    $list_reply = $msg['message']['listResponseMessage']['singleSelectReply']['selectedRowId'] ?? null;
-    if ($list_reply) {
-        return $list_reply;
+    // 2. Resposta de botão simples (sendButtons)
+    $button_id = $message['buttonsResponseMessage']['selectedButtonId']
+              ?? $message['buttonsResponseMessage']['buttonId']
+              ?? null;
+    if ($button_id !== null) {
+        return trim((string)$button_id);
     }
 
-    // Texto simples
-    $texto = $msg['message']['conversation']
-        ?? $msg['message']['extendedTextMessage']['text']
-        ?? $msg['message']['ephemeralMessage']['message']['extendedTextMessage']['text']
-        ?? '';
+    // 3. Botão interativo / template (nativeFlowResponseMessage)
+    $native = $message['interactiveResponseMessage']['nativeFlowResponseMessage']['paramsJson']
+           ?? $message['interactiveResponseMessage']['body']['text']
+           ?? null;
+    if ($native !== null) {
+        $decoded = json_decode($native, true);
+        return trim((string)($decoded['id'] ?? $decoded['selectedId'] ?? $native));
+    }
+
+    // 4. Resposta de template button (templateButtonReplyMessage)
+    $template_reply = $message['templateButtonReplyMessage']['selectedId']
+                   ?? $message['templateButtonReplyMessage']['selectedDisplayText']
+                   ?? null;
+    if ($template_reply !== null) {
+        return trim((string)$template_reply);
+    }
+
+    // 5. Texto simples (conversa normal ou extendedText)
+    $texto = $message['conversation']
+          ?? $message['extendedTextMessage']['text']
+          ?? $message['ephemeralMessage']['message']['conversation']
+          ?? $message['ephemeralMessage']['message']['extendedTextMessage']['text']
+          ?? $message['viewOnceMessage']['message']['conversation']
+          ?? '';
 
     return trim($texto);
 }

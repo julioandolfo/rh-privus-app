@@ -97,7 +97,7 @@ $total    = count($colaboradores);
 $enviados = 0;
 $erros    = 0;
 
-echo "📋 Colaboradores a notificar: {$total}\n\n";
+echo "📋 Colaboradores a enfileirar: {$total} (envio real controlado pelo processar_fila_whatsapp.php)\n\n";
 
 if ($total === 0) {
     echo "ℹ️  Nenhum colaborador pendente. Todos já receberam a pesquisa hoje ou não têm WA configurado.\n";
@@ -114,15 +114,15 @@ foreach ($colaboradores as $colaborador) {
     $result = evolution_enviar_pesquisa_humor($id, $config['mensagem_pesquisa_humor'] ?? '');
 
     if ($result['success']) {
-        echo "✅ Enviado\n";
+        echo "✅ Enfileirado\n";
         $enviados++;
     } else {
         echo "❌ Erro: " . ($result['error'] ?? 'desconhecido') . "\n";
         $erros++;
     }
 
-    // Pausa entre envios para não sobrecarregar a API
-    usleep(500000); // 0.5s
+    // Pequena pausa entre enfileiramentos (muito menor que o envio real, que acontece no processador de fila)
+    usleep(100000); // 0.1s — apenas para não sobrecarregar o banco
 }
 
 // ─── Resumo ───────────────────────────────────────────────────────────────────

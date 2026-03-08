@@ -173,7 +173,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $senha_para_email = !empty($senha) ? $senha : null;
             enviar_email_novo_colaborador($colaborador_id, $senha_para_email);
         }
-        
+
+        // WhatsApp boas-vindas — usa o telefone cadastrado como número WA (se preenchido)
+        if (!empty($telefone)) {
+            try {
+                require_once __DIR__ . '/../includes/evolution_service.php';
+                $config_wa = evolution_get_config();
+                if ($config_wa && $config_wa['notificacoes_whatsapp_ativas']) {
+                    $primeiro_nome = explode(' ', $nome_completo)[0];
+                    $base_url = get_base_url();
+                    $texto_wa  = "🎉 Bem-vindo(a), *{$primeiro_nome}*!\n\n";
+                    $texto_wa .= "Você foi cadastrado(a) no sistema *RH Privus*.\n\n";
+                    $texto_wa .= "Acesse: {$base_url}\n";
+                    if (!empty($senha)) {
+                        $texto_wa .= "Usuário: seu CPF\nSenha: {$senha}\n\n";
+                    }
+                    $texto_wa .= "_Qualquer dúvida, fale com o RH._ 💙";
+                    evolution_enviar_texto($telefone, $texto_wa, (int)$colaborador_id, 'boas_vindas');
+                }
+            } catch (Exception $wa_e) { error_log('[WA] colaborador_add boas-vindas: ' . $wa_e->getMessage()); }
+        }
+
         redirect('colaboradores.php', 'Colaborador cadastrado com sucesso!');
     } catch (PDOException $e) {
         redirect('colaborador_add.php', 'Erro ao cadastrar: ' . $e->getMessage(), 'error');

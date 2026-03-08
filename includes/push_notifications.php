@@ -198,7 +198,16 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null, $tipo
             $stmt = $pdo->prepare("UPDATE notificacoes_push SET enviado = 1, enviado_em = NOW() WHERE id = ?");
             $stmt->execute([$push_id]);
         }
-        
+
+        // Envia também via WhatsApp se o usuário tiver colaborador vinculado
+        if ($colaborador_id) {
+            try {
+                evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
+            } catch (Exception $wa_e) {
+                push_log("enviar_push_usuario - WhatsApp erro (não crítico): " . $wa_e->getMessage());
+            }
+        }
+
         return [
             'success' => true,
             'enviadas' => $result['enviadas'],

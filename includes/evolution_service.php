@@ -242,6 +242,60 @@ function evolution_enviar_botoes(string $numero, string $titulo, string $descric
 }
 
 /**
+ * Envia pesquisa de humor usando Lista de Opções (sendList) com fallback em texto
+ * Mais compatível com WhatsApp via Baileys do que botões interativos
+ */
+function evolution_enviar_pesquisa_lista(string $numero, string $texto_intro, ?int $colaborador_id = null): array {
+    $config = evolution_get_config();
+    if (!$config) {
+        return ['success' => false, 'error' => 'Evolution API não configurada'];
+    }
+
+    $numero_formatado = evolution_normalizar_numero($numero);
+    $instance         = $config['instance_name'];
+
+    // Tenta sendList (lista de opções — melhor suporte no Baileys)
+    $body_list = [
+        'number'      => $numero_formatado,
+        'title'       => '🌡️ Como você está hoje?',
+        'description' => $texto_intro,
+        'buttonText'  => 'Ver opções',
+        'footerText'  => 'RH Privus',
+        'sections'    => [[
+            'title' => 'Selecione seu humor',
+            'rows'  => [
+                ['rowId' => '5', 'title' => '😄 Muito feliz',   'description' => 'Estou ótimo hoje!'],
+                ['rowId' => '4', 'title' => '🙂 Feliz',         'description' => 'Estou bem'],
+                ['rowId' => '3', 'title' => '😐 Neutro',        'description' => 'Mais ou menos'],
+                ['rowId' => '2', 'title' => '😔 Triste',        'description' => 'Não estou bem'],
+                ['rowId' => '1', 'title' => '😢 Muito triste',  'description' => 'Estou muito mal'],
+            ],
+        ]],
+    ];
+
+    $result = evolution_request('POST', "message/sendList/{$instance}", $body_list, $config);
+
+    if ($result['success']) {
+        evolution_log_mensagem($colaborador_id, $numero_formatado, 'pesquisa_humor',
+            '🌡️ Pesquisa de humor (lista)', 'enviado',
+            $result['data'] ?? null, $result['data']['key']['id'] ?? null, null);
+        return $result;
+    }
+
+    // Fallback: texto simples com instruções numéricas
+    $texto_fallback  = $texto_intro . "\n\n";
+    $texto_fallback .= "Responda com o *número* que representa como você está:\n\n";
+    $texto_fallback .= "5️⃣ *5* - 😄 Muito feliz\n";
+    $texto_fallback .= "4️⃣ *4* - 🙂 Feliz\n";
+    $texto_fallback .= "3️⃣ *3* - 😐 Neutro\n";
+    $texto_fallback .= "2️⃣ *2* - 😔 Triste\n";
+    $texto_fallback .= "1️⃣ *1* - 😢 Muito triste\n\n";
+    $texto_fallback .= "_Basta digitar o número correspondente._";
+
+    return evolution_enviar_texto($numero, $texto_fallback, $colaborador_id, 'pesquisa_humor');
+}
+
+/**
  * Verifica o status da conexão de uma instância
  */
 function evolution_verificar_conexao(?array $config = null): array {
@@ -294,8 +348,70 @@ function evolution_verificar_conexao(?array $config = null): array {
 }
 
 /**
- * Envia notificação do sistema para um colaborador via WhatsApp
- * Respeita o opt-in do colaborador (whatsapp_ativo)
+ * Enfileira uma notificação WhatsApp para processamento controlado pelo cron.
+ * Usa a tabela `evolution_fila_mensagens` como buffer de rate-limiting.
+ *
+ * @param int    $colaborador_id
+ * @param string $numero          Número já normalizado (com DDI)
+ * @param string $titulo
+ * @param string $mensagem        Texto completo já formatado
+ * @param string $url
+ * @param string $tipo            notificacao | pesquisa_humor | boas_vindas | manual
+ * @param \DateTime|null $agendado_para  Null = enviar o quanto antes
+ */
+function evolution_enfileirar_mensagem(
+    ?int $colaborador_id,
+    string $numero,
+    string $titulo,
+    string $mensagem,
+    string $url = '',
+    string $tipo = 'notificacao',
+    ?\DateTime $agendado_para = null
+): bool {
+    try {
+        $pdo = getDB();
+
+        // Evita duplicata para o mesmo colaborador/tipo/dia (ex: pesquisa humor)
+        if ($tipo === 'pesquisa_humor' && $colaborador_id) {
+            $stmt = $pdo->prepare("
+                SELECT id FROM evolution_fila_mensagens
+                WHERE colaborador_id = ? AND tipo = 'pesquisa_humor'
+                  AND DATE(created_at) = CURDATE() AND status IN ('pendente','enviando','enviado')
+                LIMIT 1
+            ");
+            $stmt->execute([$colaborador_id]);
+            if ($stmt->fetch()) {
+                return false; // já na fila ou enviado hoje
+            }
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO evolution_fila_mensagens
+                (colaborador_id, numero, titulo, mensagem, url, tipo, status, agendado_para)
+            VALUES (?, ?, ?, ?, ?, ?, 'pendente', ?)
+        ");
+        $stmt->execute([
+            $colaborador_id,
+            $numero,
+            $titulo,
+            $mensagem,
+            $url,
+            $tipo,
+            $agendado_para ? $agendado_para->format('Y-m-d H:i:s') : null,
+        ]);
+
+        return true;
+    } catch (Exception $e) {
+        error_log('[EvolutionAPI] Erro ao enfileirar mensagem: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Envia notificação do sistema para um colaborador via WhatsApp.
+ * A mensagem é enfileirada na tabela evolution_fila_mensagens para
+ * ser processada pelo cron processar_fila_whatsapp.php com rate limiting.
+ * Respeita o opt-in do colaborador (whatsapp_ativo).
  *
  * @param int    $colaborador_id
  * @param string $titulo
@@ -326,18 +442,26 @@ function evolution_notificar_colaborador(int $colaborador_id, string $titulo, st
         }
 
         // Monta mensagem formatada
-        $nome = $colaborador['nome_completo'];
-        $texto = "👋 Olá, *{$nome}*!\n\n";
-        $texto .= "*{$titulo}*\n\n";
-        $texto .= $mensagem;
-
+        $nome  = $colaborador['nome_completo'];
+        $texto = "👋 Olá, *{$nome}*!\n\n*{$titulo}*\n\n{$mensagem}";
         if (!empty($url)) {
             $texto .= "\n\n🔗 Acesse: {$url}";
         }
-
         $texto .= "\n\n_RH Privus_";
 
-        return evolution_enviar_texto($colaborador['whatsapp_numero'], $texto, $colaborador_id, 'notificacao');
+        $numero = evolution_normalizar_numero($colaborador['whatsapp_numero']);
+
+        // Enfileira para envio controlado (rate limiting via cron)
+        $enfileirado = evolution_enfileirar_mensagem(
+            $colaborador_id,
+            $numero,
+            $titulo,
+            $texto,
+            $url,
+            'notificacao'
+        );
+
+        return ['success' => true, 'queued' => $enfileirado, 'message' => 'Mensagem enfileirada para envio'];
 
     } catch (Exception $e) {
         error_log('[EvolutionAPI] Erro ao notificar colaborador: ' . $e->getMessage());
@@ -399,40 +523,27 @@ function evolution_enviar_pesquisa_humor(int $colaborador_id, string $mensagem_c
             $texto_intro = "Bom dia, *{$nome}*! 😊\n\nComo você está se sentindo hoje?\nSua resposta nos ajuda a cuidar melhor do time!";
         }
 
-        $botoes = [
-            ['id' => '5', 'text' => '😄 Ótimo'],
-            ['id' => '4', 'text' => '🙂 Bem'],
-            ['id' => '3', 'text' => '😐 Regular'],
-            ['id' => '2', 'text' => '😕 Mal'],
-            ['id' => '1', 'text' => '😞 Muito mal'],
-        ];
+        $numero_formatado = evolution_normalizar_numero($colaborador['whatsapp_numero']);
 
-        $result = evolution_enviar_botoes(
-            $colaborador['whatsapp_numero'],
-            '🌡️ Pesquisa de Humor Diário',
-            $texto_intro,
-            $botoes,
+        // Enfileira pesquisa (o cron processar_fila_whatsapp.php enviará via sendList com rate limiting)
+        $enfileirado = evolution_enfileirar_mensagem(
             $colaborador_id,
+            $numero_formatado,
+            '🌡️ Como você está hoje?',
+            $texto_intro,
+            '',
             'pesquisa_humor'
         );
 
-        // Registra o envio na tabela de controle
-        $log_id = null;
-        if ($result['success']) {
-            $stmt_log = $pdo->prepare("SELECT id FROM evolution_mensagens_log WHERE colaborador_id = ? ORDER BY id DESC LIMIT 1");
-            $stmt_log->execute([$colaborador_id]);
-            $log_row  = $stmt_log->fetch();
-            $log_id   = $log_row['id'] ?? null;
-        }
-
+        // Registra na tabela de controle de envios (mesmo que ainda não enviado — evita re-enfileirar)
         $stmt = $pdo->prepare("
             INSERT INTO humor_pesquisa_envios (colaborador_id, data_envio, enviado, mensagem_log_id)
-            VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE enviado = VALUES(enviado), mensagem_log_id = VALUES(mensagem_log_id)
+            VALUES (?, ?, 0, NULL)
+            ON DUPLICATE KEY UPDATE enviado = enviado
         ");
-        $stmt->execute([$colaborador_id, $hoje, $result['success'] ? 1 : 0, $log_id]);
+        $stmt->execute([$colaborador_id, $hoje]);
 
-        return $result;
+        return ['success' => $enfileirado, 'queued' => $enfileirado, 'message' => 'Pesquisa enfileirada para envio'];
 
     } catch (Exception $e) {
         error_log('[EvolutionAPI] Erro ao enviar pesquisa humor: ' . $e->getMessage());

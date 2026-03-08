@@ -37,8 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $api_url      = rtrim(trim($_POST['api_url'] ?? ''), '/');
         $api_key      = trim($_POST['api_key'] ?? '');
         $instance     = trim($_POST['instance_name'] ?? '');
-        $notif_ativas = isset($_POST['notificacoes_whatsapp_ativas']) ? 1 : 0;
-        $ativo        = isset($_POST['ativo']) ? 1 : 0;
+        $notif_ativas       = isset($_POST['notificacoes_whatsapp_ativas']) ? 1 : 0;
+        $ativo              = isset($_POST['ativo']) ? 1 : 0;
+        $intervalo_msgs     = max(3, (int)($_POST['intervalo_entre_mensagens'] ?? 7));
+        $max_msgs_hora      = max(0, (int)($_POST['max_mensagens_por_hora'] ?? 80));
 
         if (empty($api_url) || empty($api_key) || empty($instance)) {
             $error = 'URL da API, API Key e Nome da Instância são obrigatórios!';
@@ -50,16 +52,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("
                         UPDATE evolution_config
                         SET api_url = ?, api_key = ?, instance_name = ?,
-                            notificacoes_whatsapp_ativas = ?, ativo = ?, updated_by = ?, updated_at = NOW()
+                            notificacoes_whatsapp_ativas = ?, ativo = ?,
+                            intervalo_entre_mensagens = ?, max_mensagens_por_hora = ?,
+                            updated_by = ?, updated_at = NOW()
                         WHERE id = ?
                     ");
-                    $stmt->execute([$api_url, $api_key, $instance, $notif_ativas, $ativo, $usuario['id'], $existing['id']]);
+                    $stmt->execute([$api_url, $api_key, $instance, $notif_ativas, $ativo, $intervalo_msgs, $max_msgs_hora, $usuario['id'], $existing['id']]);
                 } else {
                     $stmt = $pdo->prepare("
-                        INSERT INTO evolution_config (api_url, api_key, instance_name, notificacoes_whatsapp_ativas, ativo, updated_by)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        INSERT INTO evolution_config (api_url, api_key, instance_name, notificacoes_whatsapp_ativas, ativo, intervalo_entre_mensagens, max_mensagens_por_hora, updated_by)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ");
-                    $stmt->execute([$api_url, $api_key, $instance, $notif_ativas, $ativo, $usuario['id']]);
+                    $stmt->execute([$api_url, $api_key, $instance, $notif_ativas, $ativo, $intervalo_msgs, $max_msgs_hora, $usuario['id']]);
                 }
 
                 // Tenta criar a instância na Evolution API automaticamente (silencioso se já existir)
@@ -451,6 +455,40 @@ include __DIR__ . '/../includes/header.php';
                                         Integração ativa
                                     </label>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="separator my-5"></div>
+                        <h5 class="fw-bold mb-1">⏱️ Rate Limiting — Proteção Anti-Bloqueio</h5>
+                        <p class="text-muted fs-7 mb-5">Controla o ritmo de disparos para evitar que o número seja bloqueado pelo WhatsApp. As mensagens são enfileiradas e processadas pelo cron <code>processar_fila_whatsapp.php</code> com os intervalos abaixo.</p>
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Intervalo entre mensagens (segundos)</label>
+                                <input type="number" name="intervalo_entre_mensagens" class="form-control"
+                                       min="3" max="60" step="1"
+                                       value="<?= (int)($config['intervalo_entre_mensagens'] ?? 7) ?>">
+                                <div class="form-text">Mínimo recomendado: <strong>5s</strong>. Pausa + jitter aleatório de ±40%.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Limite máximo por hora</label>
+                                <input type="number" name="max_mensagens_por_hora" class="form-control"
+                                       min="0" max="500" step="5"
+                                       value="<?= (int)($config['max_mensagens_por_hora'] ?? 80) ?>">
+                                <div class="form-text">0 = sem limite. Recomendado: <strong>80</strong> mensagens/hora.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Situação atual da fila</label>
+                                <?php
+                                    try {
+                                        $fila_pendente = $pdo->query("SELECT COUNT(*) FROM evolution_fila_mensagens WHERE status = 'pendente'")->fetchColumn();
+                                        $fila_hora = $pdo->query("SELECT COUNT(*) FROM evolution_fila_mensagens WHERE status = 'enviado' AND enviado_em >= DATE_SUB(NOW(), INTERVAL 1 HOUR)")->fetchColumn();
+                                    } catch (Exception $e) { $fila_pendente = '?'; $fila_hora = '?'; }
+                                ?>
+                                <div class="d-flex gap-3 mt-2">
+                                    <span class="badge badge-light-warning fs-7 px-3 py-2">⏳ <?= $fila_pendente ?> pendentes</span>
+                                    <span class="badge badge-light-success fs-7 px-3 py-2">✅ <?= $fila_hora ?> enviadas/hora</span>
+                                </div>
+                                <div class="form-text mt-1">Atualize a página para ver o estado atual.</div>
                             </div>
                         </div>
 

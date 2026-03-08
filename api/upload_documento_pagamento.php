@@ -135,6 +135,9 @@ try {
         $stmt_notif->execute([$item['empresa_id']]);
         $admins = $stmt_notif->fetchAll(PDO::FETCH_COLUMN);
         
+        require_once __DIR__ . '/../includes/evolution_service.php';
+        $url_doc = get_base_url() . '/pages/fechamento_pagamentos.php?view=' . $fechamento_id;
+
         foreach ($admins as $admin_id) {
             try {
                 // Verifica preferência antes de enviar
@@ -143,8 +146,20 @@ try {
                         'usuario_id' => $admin_id,
                         'titulo' => 'Novo Documento de Pagamento',
                         'mensagem' => 'Colaborador enviou documento para fechamento de pagamento',
-                        'url' => get_base_url() . '/pages/fechamento_pagamentos.php?view=' . $fechamento_id
+                        'url' => $url_doc
                     ]);
+                }
+                // WhatsApp para admin/RH com colaborador vinculado
+                $stmt_colab = $pdo->prepare("SELECT colaborador_id FROM usuarios WHERE id = ? LIMIT 1");
+                $stmt_colab->execute([$admin_id]);
+                $admin_colab_id = $stmt_colab->fetchColumn();
+                if ($admin_colab_id) {
+                    evolution_notificar_colaborador(
+                        (int)$admin_colab_id,
+                        '📄 Novo Documento de Pagamento',
+                        'Um colaborador enviou documento para fechamento de pagamento.',
+                        $url_doc
+                    );
                 }
             } catch (Exception $e) {
                 // Ignora erros de notificação

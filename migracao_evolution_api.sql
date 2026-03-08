@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS `evolution_config` (
     `dias_pesquisa_humor` VARCHAR(20) DEFAULT '1,2,3,4,5' COMMENT 'Dias da semana (0=Dom, 1=Seg...6=Sáb)',
     `mensagem_pesquisa_humor` TEXT COMMENT 'Mensagem personalizada da pesquisa de humor',
     `notificacoes_whatsapp_ativas` TINYINT(1) DEFAULT 1 COMMENT 'Enviar notificações do sistema via WA',
+    `intervalo_entre_mensagens` INT DEFAULT 7 COMMENT 'Segundos de pausa entre disparos em lote (mínimo 3)',
+    `max_mensagens_por_hora` INT DEFAULT 80 COMMENT 'Limite de mensagens por hora (0 = sem limite)',
     `updated_by` INT NULL,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -62,6 +64,27 @@ CREATE TABLE IF NOT EXISTS `humor_pesquisa_envios` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY `uk_colaborador_data` (`colaborador_id`, `data_envio`),
     INDEX `idx_data_envio` (`data_envio`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Fila de mensagens WhatsApp (rate limiting e envio controlado)
+-- Notificações são enfileiradas aqui e processadas pelo cron processar_fila_whatsapp.php
+CREATE TABLE IF NOT EXISTS `evolution_fila_mensagens` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `colaborador_id` INT NULL COMMENT 'Colaborador destinatário',
+    `numero` VARCHAR(20) NOT NULL COMMENT 'Número formatado com DDI',
+    `titulo` VARCHAR(255) NOT NULL,
+    `mensagem` TEXT NOT NULL,
+    `url` VARCHAR(500) NULL,
+    `tipo` ENUM('notificacao','pesquisa_humor','boas_vindas','manual') DEFAULT 'notificacao',
+    `status` ENUM('pendente','enviando','enviado','erro') DEFAULT 'pendente',
+    `tentativas` TINYINT DEFAULT 0,
+    `erro_detalhe` TEXT NULL,
+    `agendado_para` DATETIME NULL COMMENT 'NULL = enviar ASAP',
+    `enviado_em` DATETIME NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_status_agendado` (`status`, `agendado_para`),
+    INDEX `idx_colaborador` (`colaborador_id`),
+    INDEX `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Webhooks recebidos da Evolution API (log bruto)
