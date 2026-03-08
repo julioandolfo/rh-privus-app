@@ -62,7 +62,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->execute([$api_url, $api_key, $instance, $notif_ativas, $ativo, $usuario['id']]);
                 }
 
-                $success = 'Configurações salvas com sucesso!';
+                // Tenta criar a instância na Evolution API automaticamente (silencioso se já existir)
+                $config_temp = [
+                    'api_url'       => $api_url,
+                    'api_key'       => $api_key,
+                    'instance_name' => $instance,
+                ];
+                evolution_request('POST', 'instance/create', [
+                    'instanceName' => $instance,
+                    'qrcode'       => true,
+                    'integration'  => 'WHATSAPP-BAILEYS',
+                ], $config_temp);
+
+                // Redireciona para aba de conexão com instrução clara
+                redirect('configuracoes_evolution.php?aba=conexao', '✅ Configurações salvas! Agora escaneie o QR Code abaixo para conectar o WhatsApp.', 'success');
+
             } catch (PDOException $e) {
                 $error = 'Erro ao salvar: ' . $e->getMessage();
             }
@@ -130,10 +144,14 @@ try {
     $config = $pdo->query("SELECT * FROM evolution_config ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {}
 
-// ─── Status da conexão ───────────────────────────────────────────────────────
+// ─── Status da conexão (silencioso — apenas para exibir badge no topo) ────────
 $status_conexao = null;
 if ($config && $config['ativo']) {
-    $status_conexao = evolution_verificar_conexao($config);
+    try {
+        $status_conexao = evolution_verificar_conexao($config);
+    } catch (Exception $e) {
+        $status_conexao = ['connected' => false, 'state' => 'unknown'];
+    }
 }
 
 // ─── Colaboradores com/sem WhatsApp ─────────────────────────────────────────
@@ -340,10 +358,42 @@ include __DIR__ . '/../includes/header.php';
                     <h3 class="card-title">Conexão com a Evolution API</h3>
                 </div>
                 <div class="card-body">
+
+                    <!-- Guia de passos -->
+                    <div class="row g-4 mb-8">
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-start gap-3 p-4 rounded bg-light-primary border border-primary border-dashed h-100">
+                                <span class="badge badge-circle badge-primary fs-5 flex-shrink-0 mt-1">1</span>
+                                <div>
+                                    <div class="fw-bold text-primary mb-1">Preencha e salve</div>
+                                    <div class="text-muted fs-7">Informe a URL da sua Evolution API, a API Key e escolha um nome para a instância (ex: <code>rh-privus</code>). Clique em <strong>Salvar</strong>.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-start gap-3 p-4 rounded bg-light-success border border-success border-dashed h-100">
+                                <span class="badge badge-circle badge-success fs-5 flex-shrink-0 mt-1">2</span>
+                                <div>
+                                    <div class="fw-bold text-success mb-1">Escaneie o QR Code</div>
+                                    <div class="text-muted fs-7">Após salvar, você será redirecionado para a aba <strong>Conexão / QR Code</strong>. Escaneie com o WhatsApp do número que enviará as mensagens.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-start gap-3 p-4 rounded bg-light-warning border border-warning border-dashed h-100">
+                                <span class="badge badge-circle badge-warning fs-5 flex-shrink-0 mt-1">3</span>
+                                <div>
+                                    <div class="fw-bold text-warning mb-1">Pronto para usar</div>
+                                    <div class="text-muted fs-7">Com o WhatsApp conectado, as notificações e a pesquisa de humor passarão a funcionar automaticamente.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="alert alert-info mb-6">
                         <i class="ki-duotone ki-information-5 fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                        A <strong>Evolution API</strong> é um servidor auto-hospedado que conecta ao WhatsApp Web.
-                        Você precisa ter uma instância rodando e um número de WhatsApp conectado (via QR Code) antes de configurar aqui.
+                        A <strong>Evolution API</strong> é um servidor auto-hospedado que conecta ao WhatsApp Web/Business.
+                        A instância será criada automaticamente ao salvar — você <strong>não precisa criá-la</strong> manualmente na Evolution API.
                     </div>
 
                     <form method="POST">
@@ -404,17 +454,14 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
 
-                        <div class="d-flex justify-content-between">
-                            <form method="POST" class="m-0">
-                                <input type="hidden" name="action" value="testar_conexao">
-                                <button type="submit" class="btn btn-light-primary">
-                                    <i class="ki-duotone ki-wifi fs-2 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                                    Verificar Conexão
-                                </button>
-                            </form>
-                            <button type="submit" form="" onclick="this.closest('form').submit()" class="btn btn-primary">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="?aba=conexao" class="btn btn-light-success">
+                                <i class="ki-duotone ki-scan-barcode fs-2 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                Ir para QR Code
+                            </a>
+                            <button type="submit" class="btn btn-primary">
                                 <i class="ki-duotone ki-check fs-2 me-1"><span class="path1"></span><span class="path2"></span></i>
-                                Salvar Configurações
+                                Salvar e Conectar →
                             </button>
                         </div>
                     </form>
@@ -791,8 +838,16 @@ include __DIR__ . '/../includes/header.php';
                     .catch(() => setTimeout(verificarStatus, 3000));
             }
 
-            // ── Auto-inicialização ───────────────────────────────────────────────────
-            document.addEventListener('DOMContentLoaded', verificarStatus);
+                            // ── Auto-inicialização ───────────────────────────────────────────────────
+                            // Se vier de um redirect após salvar, vai direto para o QR Code
+                            document.addEventListener('DOMContentLoaded', function() {
+                                const params = new URLSearchParams(window.location.search);
+                                if (params.get('aba') === 'conexao') {
+                                    verificarStatus();
+                                } else {
+                                    verificarStatus();
+                                }
+                            });
             </script>
             <?php endif; ?>
 

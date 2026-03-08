@@ -63,28 +63,31 @@ switch ($action) {
             break;
         }
 
+        // Tenta criar a instância (ignorado silenciosamente se já existir)
+        evolution_request('POST', 'instance/create', [
+            'instanceName' => $instance,
+            'qrcode'       => true,
+            'integration'  => 'WHATSAPP-BAILEYS',
+        ], $config);
+
         // Busca QR Code do endpoint /instance/connect/{instance}
         $result = evolution_request('GET', "instance/connect/{$instance}", [], $config);
 
         if (!$result['success']) {
-            // Tenta criar a instância se não existir e buscar novamente
-            $create = evolution_request('POST', 'instance/create', [
-                'instanceName'  => $instance,
-                'qrcode'        => true,
-                'integration'   => 'WHATSAPP-BAILEYS',
-            ], $config);
+            $detalhe = $result['error'] ?? $result['raw'] ?? 'sem resposta';
 
-            if ($create['success']) {
-                // Tenta pegar QR code após criação
-                $result = evolution_request('GET', "instance/connect/{$instance}", [], $config);
+            // Diagnóstico amigável
+            if (str_contains($detalhe, 'cURL error')) {
+                $msg = 'Não foi possível alcançar a Evolution API. Verifique se o servidor está online e se a URL está correta.';
+            } elseif ($result['http_code'] === 401 || $result['http_code'] === 403) {
+                $msg = 'API Key inválida ou sem permissão. Verifique a API Key nas configurações.';
+            } elseif ($result['http_code'] === 404) {
+                $msg = 'Instância "' . htmlspecialchars($instance) . '" não encontrada na Evolution API.';
+            } else {
+                $msg = 'Erro ao obter QR Code (HTTP ' . ($result['http_code'] ?? '?') . '): ' . $detalhe;
             }
-        }
 
-        if (!$result['success']) {
-            echo json_encode([
-                'success' => false,
-                'error'   => 'Não foi possível obter o QR Code. Verifique se a instância existe na Evolution API. Detalhe: ' . ($result['raw'] ?? 'sem resposta'),
-            ]);
+            echo json_encode(['success' => false, 'error' => $msg]);
             break;
         }
 
