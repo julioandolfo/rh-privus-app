@@ -93,11 +93,6 @@ function get_page_permissions() {
         'eventos_api.php' => ['ADMIN', 'RH', 'GESTOR'],
         'meus_eventos.php' => ['COLABORADOR'],
         
-        // Chat - ADMIN e RH para gestão, COLABORADOR para visualização
-        'chat_gestao.php' => ['ADMIN', 'RH'],
-        'chat_colaborador.php' => ['COLABORADOR'],
-        'chat_configuracoes.php' => ['ADMIN', 'RH'],
-        
         // Perfil/Conta - todos podem acessar
         'minha_conta.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
         
@@ -231,6 +226,10 @@ function get_page_permissions() {
         
         // Configurações Autentique - apenas ADMIN
         'configuracoes_autentique.php' => ['ADMIN'],
+
+        // Evolution API (WhatsApp) - apenas ADMIN
+        'configuracoes_evolution.php'  => ['ADMIN'],
+        'relatorio_humor_whatsapp.php' => ['ADMIN', 'RH'],
         
         // Manual de Conduta - todos podem visualizar
         'manual_conduta_view.php' => ['ADMIN', 'RH', 'GESTOR', 'COLABORADOR'],
@@ -419,7 +418,7 @@ function can_access_configuracoes() {
         'configuracoes_openai.php',
         'configuracoes_pontos.php',
         'templates_email.php',
-        'chat_configuracoes.php'
+        'configuracoes_evolution.php'
     ];
     
     return can_access_any_page($config_pages);

@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/onesignal_service.php';
+require_once __DIR__ . '/evolution_service.php';
 
 if (!function_exists('push_log')) {
     function push_log($message)
@@ -95,6 +96,13 @@ function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = nul
             $stmt->execute([$push_id]);
         }
         
+        // Envia também via WhatsApp (Evolution API) - não bloqueia em caso de erro
+        try {
+            evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
+        } catch (Exception $wa_e) {
+            push_log("enviar_push_colaborador - WhatsApp erro (não crítico): " . $wa_e->getMessage());
+        }
+
         return [
             'success' => true,
             'enviadas' => $result['enviadas'],

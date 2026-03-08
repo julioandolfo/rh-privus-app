@@ -8,63 +8,9 @@ if (!isset($_SESSION['usuario'])) {
 }
 
 require_once __DIR__ . '/permissions.php';
-require_once __DIR__ . '/chat_functions.php';
 
 $usuario = $_SESSION['usuario'];
 $current_page = get_current_page();
-
-// Busca total de mensagens não lidas para o badge do menu
-$total_nao_lidas_chat = 0;
-try {
-    $pdo = getDB();
-    if (is_colaborador() && !empty($usuario['colaborador_id'])) {
-        $stmt = $pdo->prepare("
-            SELECT COUNT(DISTINCT m.id) as total
-            FROM chat_mensagens m
-            INNER JOIN chat_conversas c ON m.conversa_id = c.id
-            WHERE c.colaborador_id = ?
-            AND m.enviado_por_usuario_id IS NOT NULL
-            AND m.lida_por_colaborador = FALSE
-            AND m.deletada = FALSE
-        ");
-        $stmt->execute([$usuario['colaborador_id']]);
-        $result = $stmt->fetch();
-        $total_nao_lidas_chat = (int)($result['total'] ?? 0);
-    } elseif (can_show_menu(['ADMIN', 'RH'])) {
-        // ADMIN: conta todas as mensagens não lidas
-        // RH: conta apenas mensagens de conversas atribuídas a ele + não atribuídas
-        if ($usuario['role'] === 'ADMIN') {
-            $stmt = $pdo->query("
-                SELECT COUNT(DISTINCT m.id) as total
-                FROM chat_mensagens m
-                INNER JOIN chat_conversas c ON m.conversa_id = c.id
-                WHERE m.enviado_por_colaborador_id IS NOT NULL
-                AND m.lida_por_rh = FALSE
-                AND m.deletada = FALSE
-                AND c.status NOT IN ('fechada', 'arquivada', 'resolvida')
-            ");
-        } else {
-            // RH: apenas conversas atribuídas a ele + não atribuídas
-            $usuario_id = (int)($usuario['id'] ?? 0);
-            $stmt = $pdo->prepare("
-                SELECT COUNT(DISTINCT m.id) as total
-                FROM chat_mensagens m
-                INNER JOIN chat_conversas c ON m.conversa_id = c.id
-                WHERE m.enviado_por_colaborador_id IS NOT NULL
-                AND m.lida_por_rh = FALSE
-                AND m.deletada = FALSE
-                AND c.status NOT IN ('fechada', 'arquivada', 'resolvida')
-                AND (c.atribuido_para_usuario_id = ? OR c.atribuido_para_usuario_id IS NULL)
-            ");
-            $stmt->execute([$usuario_id]);
-        }
-        $result = $stmt->fetch();
-        $total_nao_lidas_chat = (int)($result['total'] ?? 0);
-    }
-} catch (Exception $e) {
-    // Ignora erros para não quebrar o menu
-    $total_nao_lidas_chat = 0;
-}
 
 function isActive($page) {
     global $current_page;
@@ -192,26 +138,6 @@ function getIcon($name) {
                 <?php endif; ?>
                 <!--end:Menu item-->
                 
-                <!--begin:Menu item - Chat-->
-                <?php if (can_show_menu(['ADMIN', 'RH']) || is_colaborador()): ?>
-                <div class="menu-item">
-                    <a class="menu-link <?= isActive('chat_gestao.php') || isActive('chat_colaborador.php') ?>" href="<?= is_colaborador() ? 'chat_colaborador.php' : 'chat_gestao.php' ?>">
-                        <span class="menu-icon">
-                            <i class="ki-duotone ki-message-text-2 fs-2">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                                <span class="path3"></span>
-                                <span class="path4"></span>
-                            </i>
-                        </span>
-                        <span class="menu-title">Chat</span>
-                        <?php if ($total_nao_lidas_chat > 0): ?>
-                        <span class="badge badge-circle badge-danger ms-auto"><?= $total_nao_lidas_chat > 99 ? '99+' : $total_nao_lidas_chat ?></span>
-                        <?php endif; ?>
-                    </a>
-                </div>
-                <!--end:Menu item-->
-                <?php endif; ?>
                 
                 <!--begin:Menu item-->
                 <?php if (can_access_feed_menu()): ?>
@@ -1140,6 +1066,18 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('relatorio_humor_whatsapp.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('relatorio_humor_whatsapp.php') ?>" href="relatorio_humor_whatsapp.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Humor WhatsApp</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
                             <?php if (can_access_page('promocoes.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
@@ -1567,7 +1505,7 @@ function getIcon($name) {
                     <?php endif; ?>
                     
                     <!--begin:Menu item-->
-                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('chat_configuracoes.php') || isActive('configuracoes_pontos.php') || isActive('configuracoes_openai.php') || isActive('templates_email.php') || isActive('email_logs.php') || isActive('configuracoes_autentique.php')) ? 'here show' : '' ?>">
+                    <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('configuracoes_email.php') || isActive('configuracoes_onesignal.php') || isActive('permissoes.php') || isActive('configuracoes_pontos.php') || isActive('configuracoes_openai.php') || isActive('templates_email.php') || isActive('email_logs.php') || isActive('configuracoes_autentique.php') || isActive('configuracoes_evolution.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
                         <span class="menu-link">
                             <span class="menu-icon">
@@ -1642,18 +1580,6 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
-                            <?php if (can_access_page('chat_configuracoes.php')): ?>
-                            <!--begin:Menu item-->
-                            <div class="menu-item">
-                                <a class="menu-link <?= isActive('chat_configuracoes.php') ?>" href="chat_configuracoes.php">
-                                    <span class="menu-bullet">
-                                        <span class="bullet bullet-dot"></span>
-                                    </span>
-                                    <span class="menu-title">Chat</span>
-                                </a>
-                            </div>
-                            <!--end:Menu item-->
-                            <?php endif; ?>
                             <?php if (can_access_page('configuracoes_pontos.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
@@ -1692,6 +1618,20 @@ function getIcon($name) {
                                         <span class="bullet bullet-dot"></span>
                                     </span>
                                     <span class="menu-title">Autentique</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
+                            <?php if (can_access_page('configuracoes_evolution.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('configuracoes_evolution.php') ?>" href="configuracoes_evolution.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">
+                                        WhatsApp (Evolution)
+                                    </span>
                                 </a>
                             </div>
                             <!--end:Menu item-->

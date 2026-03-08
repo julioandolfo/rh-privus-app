@@ -358,65 +358,6 @@ function decimalParaHorasMinutos($valor) {
                             </div>
                         </div>
                         
-                        <?php if (!$solicitacao_editar): ?>
-                        <!-- Cronômetro -->
-                        <div class="row mb-5">
-                            <div class="col-12">
-                                <div class="card bg-light-primary">
-                                    <div class="card-body">
-                                        <h4 class="mb-4">Cronômetro</h4>
-                                        <div class="text-center mb-4">
-                                            <div class="display-1 fw-bold text-primary" id="timer_display">00:00:00</div>
-                                            <div class="text-muted fs-6 mt-2">
-                                                <span id="timer_horas_display">0.00 horas</span>
-                                            </div>
-                                        </div>
-                                        <div class="d-flex justify-content-center gap-3">
-                                            <button type="button" 
-                                                    class="btn btn-success btn-lg" 
-                                                    id="btn_start"
-                                                    onclick="startTimer()">
-                                                <i class="ki-duotone ki-play fs-2">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                Iniciar
-                                            </button>
-                                            <button type="button" 
-                                                    class="btn btn-danger btn-lg" 
-                                                    id="btn_stop"
-                                                    onclick="stopTimer()"
-                                                    disabled>
-                                                <i class="ki-duotone ki-pause fs-2">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                Parar
-                                            </button>
-                                            <button type="button" 
-                                                    class="btn btn-warning btn-lg" 
-                                                    id="btn_reset"
-                                                    onclick="resetTimer()">
-                                                <i class="ki-duotone ki-arrows-circle fs-2">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                </i>
-                                                Resetar
-                                            </button>
-                                        </div>
-                                        <div class="alert alert-info mt-4 mb-0">
-                                            <i class="ki-duotone ki-information-5 fs-2 me-2">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                                <span class="path3"></span>
-                                            </i>
-                                            O cronômetro tem limite máximo de 8 horas. Ao parar, o tempo será automaticamente preenchido no campo de quantidade de horas.
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
                         
                         <div class="d-flex justify-content-end">
                             <button type="submit" class="btn btn-primary" <?= $solicitacao_editar ? 'disabled' : '' ?>>
@@ -520,85 +461,6 @@ function decimalParaHorasMinutos($valor) {
 </div>
 
 <script>
-let timerInterval = null;
-let timerSeconds = 0;
-const MAX_HOURS = 8;
-const MAX_SECONDS = MAX_HOURS * 3600;
-
-function formatTime(seconds) {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-function formatHours(seconds) {
-    return (seconds / 3600).toFixed(2);
-}
-
-function formatHoursMinutes(seconds) {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-}
-
-function updateDisplay() {
-    document.getElementById('timer_display').textContent = formatTime(timerSeconds);
-    document.getElementById('timer_horas_display').textContent = formatHours(timerSeconds) + ' horas';
-    
-    document.getElementById('quantidade_horas').value = formatHoursMinutes(timerSeconds);
-    
-    if (timerSeconds >= MAX_SECONDS) {
-        stopTimer();
-        Swal.fire({
-            icon: 'warning',
-            title: 'Limite Atingido',
-            text: 'Você atingiu o limite máximo de 8 horas. O cronômetro foi pausado automaticamente.',
-            confirmButtonText: 'OK'
-        });
-    }
-}
-
-function startTimer() {
-    if (timerSeconds >= MAX_SECONDS) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Limite Atingido',
-            text: 'Você já atingiu o limite máximo de 8 horas.',
-            confirmButtonText: 'OK'
-        });
-        return;
-    }
-    
-    document.getElementById('btn_start').disabled = true;
-    document.getElementById('btn_stop').disabled = false;
-    
-    timerInterval = setInterval(() => {
-        timerSeconds++;
-        updateDisplay();
-        
-        if (timerSeconds >= MAX_SECONDS) {
-            stopTimer();
-        }
-    }, 1000);
-}
-
-function stopTimer() {
-    if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-    }
-    
-    document.getElementById('btn_start').disabled = false;
-    document.getElementById('btn_stop').disabled = true;
-}
-
-function resetTimer() {
-    stopTimer();
-    timerSeconds = 0;
-    updateDisplay();
-}
-
 // Máscara HH:MM
 const quantidadeHorasInput = document.getElementById('quantidade_horas');
 let digitosDigitados = '';
@@ -744,10 +606,6 @@ if (formSolicitar) {
     });
 }
 
-// Inicializa display
-if (document.getElementById('timer_display')) {
-    updateDisplay();
-}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

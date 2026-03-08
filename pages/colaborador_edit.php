@@ -80,7 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rg = sanitize($_POST['rg'] ?? '');
     $data_nascimento = $_POST['data_nascimento'] ?? null;
     $estado_civil = $_POST['estado_civil'] ?? null;
-    $telefone = sanitize($_POST['telefone'] ?? '');
+    $telefone           = sanitize($_POST['telefone'] ?? '');
+    $whatsapp_numero    = preg_replace('/\D/', '', $_POST['whatsapp_numero'] ?? '');
+    $whatsapp_ativo     = isset($_POST['whatsapp_ativo']) ? 1 : 0;
     $email_pessoal = sanitize($_POST['email_pessoal'] ?? '');
     $data_inicio = $_POST['data_inicio'] ?? null;
     $status = $_POST['status'] ?? 'ativo';
@@ -155,7 +157,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 nome_completo = ?, cpf = ?, cnpj = ?, rg = ?, data_nascimento = ?, estado_civil = ?, telefone = ?, email_pessoal = ?, 
                 data_inicio = ?, status = ?, tipo_contrato = ?, salario = ?, pix = ?, banco = ?, agencia = ?, conta = ?, tipo_conta = ?, 
                 cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade_endereco = ?, estado_endereco = ?, regiao = ?,
-                descricao_funcao = ?, observacoes = ?, foto = ?, senha_hash = ?
+                descricao_funcao = ?, observacoes = ?, foto = ?, senha_hash = ?,
+                whatsapp_numero = ?, whatsapp_ativo = ?
             WHERE id = ?
         ");
         $stmt->execute([
@@ -163,7 +166,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $estado_civil ?: null, $telefone, $email_pessoal, $data_inicio, 
             $status, $tipo_contrato, $salario, $pix, $banco, $agencia, $conta, $tipo_conta, 
             !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco,
-            !empty($estado_endereco) ? $estado_endereco : null, $regiao, $descricao_funcao, $observacoes, $foto_path, $senha_hash, $id
+            !empty($estado_endereco) ? $estado_endereco : null, $regiao, $descricao_funcao, $observacoes, $foto_path, $senha_hash,
+            !empty($whatsapp_numero) ? $whatsapp_numero : null, $whatsapp_ativo, $id
         ]);
         
         // Processa filhos (remove todos e adiciona novamente)
@@ -451,6 +455,23 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Email Pessoal</label>
                                 <input type="email" name="email_pessoal" class="form-control" value="<?= htmlspecialchars($colaborador['email_pessoal']) ?>">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">WhatsApp</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">🟢</span>
+                                    <input type="text" name="whatsapp_numero" class="form-control"
+                                           placeholder="11999999999"
+                                           value="<?= htmlspecialchars($colaborador['whatsapp_numero'] ?? '') ?>">
+                                </div>
+                                <div class="form-text">Somente dígitos com DDD. Deixe vazio para não usar WA.</div>
+                            </div>
+                            <div class="col-md-3 mb-3 d-flex align-items-end pb-2">
+                                <div class="form-check form-switch form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" name="whatsapp_ativo" id="whatsapp_ativo"
+                                           <?= ($colaborador['whatsapp_ativo'] ?? 1) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="whatsapp_ativo">Receber notificações WA</label>
+                                </div>
                             </div>
                         </div>
                         

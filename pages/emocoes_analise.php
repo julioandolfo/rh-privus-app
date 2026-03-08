@@ -536,6 +536,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     <th class="min-w-100px">Cargo</th>
                                     <th class="min-w-80px text-center">Emoção</th>
                                     <th class="min-w-100px text-center">Nível</th>
+                                    <th class="min-w-80px text-center">Canal</th>
                                     <th>Descrição</th>
                                 </tr>
                             </thead>
@@ -567,6 +568,17 @@ require_once __DIR__ . '/../includes/header.php';
                                         <span class="badge badge-<?= getCorBadge($nivel) ?> fs-7">
                                             <?= $nome_nivel ?>
                                         </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <?php if (($emocao['canal'] ?? 'web') === 'whatsapp'): ?>
+                                        <span class="badge badge-light-success" title="Respondido via WhatsApp">
+                                            🟢 WhatsApp
+                                        </span>
+                                        <?php else: ?>
+                                        <span class="badge badge-light-primary" title="Respondido via portal web">
+                                            🌐 Web
+                                        </span>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php if (!empty($emocao['descricao'])): ?>
