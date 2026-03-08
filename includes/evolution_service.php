@@ -74,10 +74,31 @@ function evolution_request(string $method, string $endpoint, array $body = [], ?
     $response     = curl_exec($ch);
     $http_code    = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curl_error   = curl_error($ch);
+    $total_time   = curl_getinfo($ch, CURLINFO_TOTAL_TIME);
     curl_close($ch);
 
+    // Log detalhado sempre (para diagnóstico)
+    $log_line = sprintf(
+        '[EvolutionAPI] %s %s | HTTP %d | %.2fs | cURL: %s | Body: %s | Response: %s',
+        $method,
+        $url,
+        $http_code,
+        $total_time,
+        $curl_error ?: 'OK',
+        $body ? substr(json_encode($body), 0, 200) : '-',
+        substr($response ?: '', 0, 500)
+    );
+    error_log($log_line);
+
     if ($curl_error) {
-        return ['success' => false, 'error' => 'cURL error: ' . $curl_error];
+        return [
+            'success'   => false,
+            'http_code' => 0,
+            'error'     => 'cURL error: ' . $curl_error,
+            'raw'       => '',
+            'data'      => null,
+            'url'       => $url,
+        ];
     }
 
     $data = json_decode($response, true);
@@ -87,6 +108,7 @@ function evolution_request(string $method, string $endpoint, array $body = [], ?
         'http_code' => $http_code,
         'data'      => $data,
         'raw'       => $response,
+        'url'       => $url,
     ];
 }
 
@@ -234,16 +256,40 @@ function evolution_verificar_conexao(?array $config = null): array {
     $result = evolution_request('GET', "instance/connectionState/{$config['instance_name']}", [], $config);
 
     if (!$result['success']) {
-        return ['success' => false, 'connected' => false, 'error' => $result['error'] ?? 'Erro de conexão'];
+        return [
+            'success'   => false,
+            'connected' => false,
+            'error'     => $result['error'] ?? 'Erro de conexão (HTTP ' . ($result['http_code'] ?? '?') . ')',
+            'http_code' => $result['http_code'] ?? 0,
+            'raw'       => $result['raw'] ?? '',
+            'url'       => $result['url'] ?? '',
+        ];
     }
 
-    $state = $result['data']['instance']['state'] ?? $result['data']['state'] ?? 'unknown';
+    $data = $result['data'] ?? [];
+
+    // A Evolution API retorna o estado em diferentes lugares dependendo da versão
+    // v1/v2: data.instance.state
+    // v2+:   data.state
+    // outros: data.instanceName + data.connectionStatus
+    $state = $data['instance']['state']
+          ?? $data['state']
+          ?? $data['connectionStatus']
+          ?? $data['status']
+          ?? 'unknown';
+
+    // Normaliza valores equivalentes
+    if (in_array(strtolower($state), ['open', 'connected', 'online'])) {
+        $state = 'open';
+    }
 
     return [
         'success'   => true,
         'connected' => $state === 'open',
         'state'     => $state,
-        'data'      => $result['data'],
+        'data'      => $data,
+        'raw'       => $result['raw'],
+        'url'       => $result['url'],
     ];
 }
 

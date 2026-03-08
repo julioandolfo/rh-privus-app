@@ -566,14 +566,28 @@ include __DIR__ . '/../includes/header.php';
 
                             <!-- Estado: erro -->
                             <div id="area_erro" style="display:none;">
-                                <div class="mb-4" style="font-size:60px;">⚠️</div>
-                                <p class="text-danger fw-semibold" id="erro_msg">Erro ao conectar.</p>
-                                <button onclick="verificarStatus()" class="btn btn-light-primary btn-sm me-2">
-                                    Verificar novamente
-                                </button>
-                                <button onclick="carregarQRCode()" class="btn btn-success btn-sm">
-                                    Gerar QR Code
-                                </button>
+                                <div class="mb-3" style="font-size:50px;">⚠️</div>
+                                <p class="text-danger fw-semibold mb-4" id="erro_msg">Erro ao conectar.</p>
+                                <div class="d-flex gap-2 flex-wrap justify-content-center mb-4">
+                                    <button onclick="verificarStatus()" class="btn btn-light-primary btn-sm">
+                                        🔄 Verificar novamente
+                                    </button>
+                                    <button onclick="carregarQRCode()" class="btn btn-success btn-sm">
+                                        📱 Gerar QR Code
+                                    </button>
+                                    <button onclick="rodarDiagnostico()" class="btn btn-light-warning btn-sm">
+                                        🔍 Diagnóstico
+                                    </button>
+                                </div>
+                                <!-- Resultado do diagnóstico -->
+                                <div id="area_diagnostico" style="display:none; width:100%; text-align:left;">
+                                    <div class="separator my-3"></div>
+                                    <h6 class="fw-bold mb-3 text-center">🔍 Resultado do Diagnóstico</h6>
+                                    <div id="diag_loading" class="text-center text-muted fs-7">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>Rodando testes...
+                                    </div>
+                                    <div id="diag_resultado"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -689,6 +703,9 @@ include __DIR__ . '/../includes/header.php';
             function verificarStatus() {
                 mostrarArea('area_aguardando');
                 document.getElementById('aguardando_msg').textContent = 'Verificando status...';
+                // Oculta diagnóstico anterior
+                const areaDiag = document.getElementById('area_diagnostico');
+                if (areaDiag) areaDiag.style.display = 'none';
 
                 fetch(API_BASE + '?action=status')
                     .then(r => r.json())
@@ -697,20 +714,45 @@ include __DIR__ . '/../includes/header.php';
                             setStatusBadge('open');
                             mostrarArea('area_conectado');
                             pararPolling();
+                            return;
+                        }
+
+                        const estado = data.state ?? 'unknown';
+                        setStatusBadge(in_array(estado, ['connecting','qrcode']) ? 'connecting' : 'close');
+                        mostrarArea('area_erro');
+
+                        // Monta mensagem de erro com detalhes úteis
+                        let msg = '';
+                        if (data.error) {
+                            msg = data.error;
+                        } else if (estado === 'unknown') {
+                            msg = 'A Evolution API respondeu mas o estado da instância não foi reconhecido.';
+                            if (data.raw) {
+                                msg += ' Resposta bruta: ' + data.raw.substring(0, 200);
+                            }
                         } else {
-                            const estado = data.state ?? 'close';
-                            setStatusBadge(estado === 'connecting' ? 'connecting' : 'close');
-                            mostrarArea('area_erro');
-                            document.getElementById('erro_msg').textContent =
-                                'WhatsApp desconectado. Estado: ' + estado + '. Clique em "Conectar via QR Code" para reconectar.';
+                            msg = 'WhatsApp desconectado (estado: ' + estado + '). Clique em "Gerar QR Code" para conectar.';
+                        }
+
+                        document.getElementById('erro_msg').textContent = msg;
+
+                        // Se estado unknown, sugere diagnóstico automaticamente
+                        if (estado === 'unknown') {
+                            setTimeout(() => {
+                                const btn = document.querySelector('button[onclick="rodarDiagnostico()"]');
+                                if (btn) btn.classList.add('btn-warning');
+                            }, 500);
                         }
                     })
-                    .catch(() => {
+                    .catch(err => {
                         setStatusBadge('unknown');
                         mostrarArea('area_erro');
-                        document.getElementById('erro_msg').textContent = 'Não foi possível comunicar com a Evolution API. Verifique a URL e a API Key.';
+                        document.getElementById('erro_msg').textContent =
+                            'Não foi possível comunicar com a Evolution API. Verifique se o servidor está online. Detalhe: ' + err.message;
                     });
             }
+
+            function in_array(val, arr) { return arr.includes(val); }
 
             // ── Carrega QR Code ──────────────────────────────────────────────────────
             function carregarQRCode() {
@@ -838,7 +880,115 @@ include __DIR__ . '/../includes/header.php';
                     .catch(() => setTimeout(verificarStatus, 3000));
             }
 
-                            // ── Auto-inicialização ───────────────────────────────────────────────────
+                            // ── Diagnóstico ──────────────────────────────────────────────────────────
+            function rodarDiagnostico() {
+                const areaDiag  = document.getElementById('area_diagnostico');
+                const diagLoad  = document.getElementById('diag_loading');
+                const diagRes   = document.getElementById('diag_resultado');
+
+                areaDiag.style.display = 'block';
+                diagLoad.style.display = 'block';
+                diagRes.innerHTML = '';
+
+                fetch(API_BASE + '?action=diagnostico')
+                    .then(r => r.json())
+                    .then(data => {
+                        diagLoad.style.display = 'none';
+
+                        if (!data.success) {
+                            diagRes.innerHTML = `<div class="alert alert-danger">${data.error ?? 'Erro desconhecido'}</div>`;
+                            return;
+                        }
+
+                        const d = data.diagnostico;
+                        let html = '';
+
+                        // Mapa de ícone/cor por resultado
+                        function badge(ok) {
+                            return ok
+                                ? '<span class="badge badge-light-success">✅ OK</span>'
+                                : '<span class="badge badge-light-danger">❌ Falha</span>';
+                        }
+
+                        function httpBadge(code) {
+                            const cls = code >= 200 && code < 300 ? 'success' : (code === 0 ? 'danger' : 'warning');
+                            return `<span class="badge badge-light-${cls}">HTTP ${code || 'sem resposta'}</span>`;
+                        }
+
+                        // Config
+                        const cfg = d['05_config_salva'] ?? {};
+                        html += `
+                        <div class="card mb-3">
+                            <div class="card-header py-3"><h6 class="mb-0">⚙️ Configuração Salva</h6></div>
+                            <div class="card-body p-3 fs-7">
+                                <div><strong>URL:</strong> <code>${cfg.api_url ?? '—'}</code></div>
+                                <div><strong>Instância:</strong> <code>${cfg.instance_name ?? '—'}</code></div>
+                                <div><strong>API Key:</strong> <code>${cfg.api_key_len ?? '—'}</code></div>
+                            </div>
+                        </div>`;
+
+                        // Cada teste
+                        const testes = [
+                            { key: '01_api_raiz',          label: '1. Acesso à Evolution API (raiz)' },
+                            { key: '02_listar_instancias', label: '2. Listar instâncias' },
+                            { key: '03_connection_state',  label: '3. Estado da instância' },
+                            { key: '04_qrcode',            label: '4. Buscar QR Code' },
+                        ];
+
+                        testes.forEach(t => {
+                            const r = d[t.key] ?? {};
+                            const rawStr = r.raw ? `<details class="mt-2"><summary class="text-muted fs-8 cursor-pointer">Ver resposta bruta</summary><pre class="bg-light p-2 rounded fs-8 mt-1" style="max-height:120px;overflow:auto;word-break:break-all">${escapeHtml(r.raw)}</pre></details>` : '';
+                            const dataStr = r.data ? `<details class="mt-1"><summary class="text-muted fs-8 cursor-pointer">Ver data</summary><pre class="bg-light p-2 rounded fs-8 mt-1" style="max-height:120px;overflow:auto">${escapeHtml(JSON.stringify(r.data, null, 2))}</pre></details>` : '';
+                            const erroStr = r.error ? `<div class="text-danger fs-8 mt-1">Erro: ${escapeHtml(r.error)}</div>` : '';
+
+                            html += `
+                            <div class="card mb-2">
+                                <div class="card-body p-3 fs-7">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <strong>${t.label}</strong>
+                                        <div class="d-flex gap-2">${httpBadge(r.http_code)} ${badge(r.success)}</div>
+                                    </div>
+                                    <div class="text-muted">URL: <code>${r.url ?? '—'}</code></div>
+                                    ${erroStr}${rawStr}${dataStr}
+                                </div>
+                            </div>`;
+                        });
+
+                        // Diagnóstico automático de causas comuns
+                        const raiz  = d['01_api_raiz']  ?? {};
+                        const lista = d['02_listar_instancias'] ?? {};
+                        const state = d['03_connection_state']  ?? {};
+
+                        html += '<div class="card mb-2 border-warning"><div class="card-header py-2 bg-light-warning"><h6 class="mb-0">💡 Possíveis Causas</h6></div><div class="card-body p-3 fs-7"><ul class="mb-0 ps-3">';
+
+                        if (!raiz.success && raiz.http_code === 0) {
+                            html += '<li class="text-danger">❌ <strong>Servidor inacessível</strong> — Verifique se a Evolution API está online e se a URL está correta (incluindo porta, se necessário). Ex: <code>https://api.seudominio.com.br</code></li>';
+                        } else if (!raiz.success && raiz.http_code === 401) {
+                            html += '<li class="text-danger">❌ <strong>API Key inválida</strong> — A chave de autenticação foi recusada. Verifique a variável <code>AUTHENTICATION_API_KEY</code> no servidor da Evolution API.</li>';
+                        } else if (raiz.success && !lista.success) {
+                            html += '<li class="text-warning">⚠️ A API responde mas não lista instâncias — pode ser problema de permissão ou versão diferente da Evolution API.</li>';
+                        } else if (lista.success && !state.success) {
+                            html += `<li class="text-warning">⚠️ A instância "<strong><?= htmlspecialchars($config['instance_name'] ?? '') ?></strong>" não foi encontrada ou não existe ainda. Clique em "Gerar QR Code" para criá-la automaticamente.</li>`;
+                        } else if (state.success) {
+                            const estadoRaw = JSON.stringify(state.data ?? {});
+                            html += `<li class="text-info">ℹ️ A instância existe. Estado retornado: <code>${escapeHtml(estadoRaw)}</code>. O sistema pode estar interpretando um campo diferente do esperado.</li>`;
+                        }
+
+                        html += '</ul></div></div>';
+                        diagRes.innerHTML = html;
+                    })
+                    .catch(e => {
+                        diagLoad.style.display = 'none';
+                        diagRes.innerHTML = `<div class="alert alert-danger">Erro ao executar diagnóstico: ${e.message}</div>`;
+                    });
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            }
+
+            // ── Auto-inicialização ───────────────────────────────────────────────────
                             // Se vier de um redirect após salvar, vai direto para o QR Code
                             document.addEventListener('DOMContentLoaded', function() {
                                 const params = new URLSearchParams(window.location.search);

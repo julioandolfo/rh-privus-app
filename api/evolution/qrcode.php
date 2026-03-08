@@ -44,6 +44,10 @@ switch ($action) {
             'connected' => $result['connected'] ?? false,
             'state'     => $result['state']     ?? 'unknown',
             'data'      => $result['data']       ?? null,
+            'raw'       => $result['raw']        ?? null,
+            'url'       => $result['url']        ?? null,
+            'http_code' => $result['http_code']  ?? null,
+            'error'     => $result['error']      ?? null,
         ]);
         break;
 
@@ -159,6 +163,62 @@ switch ($action) {
             'success' => $result['success'],
             'message' => $result['success'] ? 'Instância reiniciada.' : 'Erro ao reiniciar.',
         ]);
+        break;
+
+    // ─── Diagnóstico completo ─────────────────────────────────────────────────
+    case 'diagnostico':
+        $instance = $config['instance_name'];
+        $diag     = [];
+
+        // 1. Testa acesso à API raiz
+        $r = evolution_request('GET', '', [], $config);
+        $diag['01_api_raiz'] = [
+            'url'       => $r['url'] ?? ($config['api_url'] . '/'),
+            'http_code' => $r['http_code'] ?? 0,
+            'success'   => $r['success'],
+            'raw'       => substr($r['raw'] ?? '', 0, 300),
+        ];
+
+        // 2. Lista instâncias existentes
+        $r = evolution_request('GET', 'instance/fetchInstances', [], $config);
+        $diag['02_listar_instancias'] = [
+            'url'       => $r['url'] ?? '',
+            'http_code' => $r['http_code'] ?? 0,
+            'success'   => $r['success'],
+            'data'      => $r['data'] ?? null,
+            'raw'       => substr($r['raw'] ?? '', 0, 500),
+        ];
+
+        // 3. Estado da conexão da instância específica
+        $r = evolution_request('GET', "instance/connectionState/{$instance}", [], $config);
+        $diag['03_connection_state'] = [
+            'url'       => $r['url'] ?? '',
+            'http_code' => $r['http_code'] ?? 0,
+            'success'   => $r['success'],
+            'data'      => $r['data'] ?? null,
+            'raw'       => substr($r['raw'] ?? '', 0, 500),
+            'error'     => $r['error'] ?? null,
+        ];
+
+        // 4. Tenta buscar QR Code diretamente
+        $r = evolution_request('GET', "instance/connect/{$instance}", [], $config);
+        $diag['04_qrcode'] = [
+            'url'       => $r['url'] ?? '',
+            'http_code' => $r['http_code'] ?? 0,
+            'success'   => $r['success'],
+            'tem_base64'=> isset($r['data']['base64']),
+            'raw'       => substr($r['raw'] ?? '', 0, 300),
+        ];
+
+        // 5. Configuração salva (sem expor api_key completa)
+        $diag['05_config_salva'] = [
+            'api_url'       => $config['api_url'],
+            'instance_name' => $config['instance_name'],
+            'api_key_len'   => strlen($config['api_key']) . ' chars, começa com: ' . substr($config['api_key'], 0, 6) . '...',
+            'ativo'         => $config['ativo'],
+        ];
+
+        echo json_encode(['success' => true, 'diagnostico' => $diag], JSON_PRETTY_PRINT);
         break;
 
     default:
