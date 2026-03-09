@@ -1178,7 +1178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $item['colaborador_id'],
                     'Pagamento Processado 💰',
                     'Seu pagamento de ' . $fechamento['mes_referencia'] . ' foi processado. Valor: R$ ' . number_format($item['valor_total'], 2, ',', '.'),
-                    'pages/meus_pagamentos.php',
+                    get_base_url() . '/pages/meus_pagamentos.php',
                     'fechamento_pagamento',
                     $fechamento_id,
                     'pagamento'
@@ -2373,7 +2373,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'fechamento_pagamento_extra',
                         'Novo Pagamento Extra',
                         "Você recebeu um {$subtipo_label} no valor de R$ " . number_format($total_pagamento / count($colaboradores_ids), 2, ',', '.'),
-                        '../pages/meus_pagamentos.php',
+                        get_base_url() . '/pages/meus_pagamentos.php',
                         $fechamento_id,
                         'pagamento'
                     );

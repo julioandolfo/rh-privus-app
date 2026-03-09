@@ -4,6 +4,8 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/evolution_service.php';
+require_once __DIR__ . '/slack_service.php';
 
 /**
  * Faz upload de anexo de ocorrência
@@ -436,14 +438,14 @@ function enviar_notificacoes_ocorrencia($ocorrencia_id) {
         }
         
         // Push notification para colaborador
+        // enviar_push_colaborador já enfileira WA e Slack internamente
         if ($ocorrencia['notificar_colaborador_push']) {
             try {
-                // Envia push com novo sistema (login automático e detalhes)
                 enviar_push_colaborador(
                     $ocorrencia['colaborador_id'],
                     $titulo_colaborador . ' ⚠️',
                     $mensagem_colaborador . ' Clique para ver os detalhes.',
-                    $link_ocorrencia_relativo,
+                    $link_ocorrencia,   // URL absoluta para WA/Slack ficarem com link funcional
                     'ocorrencia',
                     $ocorrencia_id,
                     'ocorrencia'
@@ -451,12 +453,34 @@ function enviar_notificacoes_ocorrencia($ocorrencia_id) {
             } catch (Exception $e) {
                 error_log("Erro ao enviar push para colaborador: " . $e->getMessage());
             }
+        } else {
+            // Push desabilitado para este tipo de ocorrência — WA e Slack disparam diretamente
+            // (evita duplicação quando push está ativo, pois push já enfileira ambos)
+            try {
+                evolution_notificar_colaborador(
+                    $ocorrencia['colaborador_id'],
+                    $titulo_colaborador . ' ⚠️',
+                    $mensagem_colaborador,
+                    $link_ocorrencia
+                );
+            } catch (Exception $e) {
+                error_log('[WA] Ocorrência colaborador (sem push): ' . $e->getMessage());
+            }
+            try {
+                slack_notificar_colaborador(
+                    $ocorrencia['colaborador_id'],
+                    $titulo_colaborador . ' ⚠️',
+                    $mensagem_colaborador,
+                    $link_ocorrencia
+                );
+            } catch (Exception $e) {
+                error_log('[Slack] Ocorrência colaborador (sem push): ' . $e->getMessage());
+            }
         }
-        
+
         // Email (verifica se está habilitado)
         if ($ocorrencia['notificar_colaborador_email']) {
             // Email já é enviado pela função enviar_email_ocorrencia quando chamada
-            // A função enviar_email_ocorrencia precisa verificar essa configuração também
         }
     }
     

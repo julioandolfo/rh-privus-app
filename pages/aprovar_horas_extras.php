@@ -118,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $solicitacao['colaborador_id'],
                     'Horas Extras Aprovadas! ⏰',
                     'Suas ' . number_format($solicitacao['quantidade_horas'], 2, ',', '.') . ' horas extras foram aprovadas e serão pagas.',
-                    'pages/meus_pagamentos.php',
+                    get_base_url() . '/pages/meus_pagamentos.php',
                     'horas_extras',
                     $hora_extra_id,
                     'hora_extra'
@@ -265,7 +265,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $solicitacao['colaborador_id'],
                     'Horas Extras Aprovadas! ⏰',
                     'Suas ' . number_format($quantidade_final, 2, ',', '.') . ' horas extras foram aprovadas e serão pagas.',
-                    'pages/meus_pagamentos.php',
+                    get_base_url() . '/pages/meus_pagamentos.php',
                     'horas_extras',
                     $hora_extra_id,
                     'hora_extra'
@@ -345,7 +345,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $solicitacao['colaborador_id'],
                 '📝 Motivo Necessário - Horas Extras',
                 'O RH solicitou mais informações sobre suas horas extras do dia ' . formatar_data($solicitacao['data_trabalho']) . '. Clique para adicionar o motivo.',
-                'pages/solicitar_horas_extras.php?acao=adicionar_motivo&id=' . $solicitacao_id,
+                get_base_url() . '/pages/solicitar_horas_extras.php?acao=adicionar_motivo&id=' . $solicitacao_id,
                 'horas_extras_motivo',
                 $solicitacao_id,
                 'solicitacao_horas_extras'

@@ -121,12 +121,10 @@ try {
         'Documento enviado pelo colaborador'
     ]);
     
-    // Envia notificação para admin/rh (se OneSignal configurado)
+    // Envia notificação para admin/rh via push (cobre OneSignal + WA + Slack + DB)
     try {
-        require_once __DIR__ . '/../includes/push_preferences.php';
-        require_once __DIR__ . '/../includes/onesignal_service.php';
-        
-        // Busca usuários admin/rh da empresa
+        require_once __DIR__ . '/../includes/push_notifications.php';
+
         $stmt_notif = $pdo->prepare("
             SELECT DISTINCT u.id
             FROM usuarios u
@@ -134,35 +132,20 @@ try {
         ");
         $stmt_notif->execute([$item['empresa_id']]);
         $admins = $stmt_notif->fetchAll(PDO::FETCH_COLUMN);
-        
-        require_once __DIR__ . '/../includes/evolution_service.php';
+
         $url_doc = get_base_url() . '/pages/fechamento_pagamentos.php?view=' . $fechamento_id;
 
         foreach ($admins as $admin_id) {
             try {
-                // Verifica preferência antes de enviar
-                if (verificar_preferencia_push($admin_id, null, 'documento_pagamento_enviado')) {
-                    onesignal_send_notification([
-                        'usuario_id' => $admin_id,
-                        'titulo' => 'Novo Documento de Pagamento',
-                        'mensagem' => 'Colaborador enviou documento para fechamento de pagamento',
-                        'url' => $url_doc
-                    ]);
-                }
-                // WhatsApp para admin/RH com colaborador vinculado
-                $stmt_colab = $pdo->prepare("SELECT colaborador_id FROM usuarios WHERE id = ? LIMIT 1");
-                $stmt_colab->execute([$admin_id]);
-                $admin_colab_id = $stmt_colab->fetchColumn();
-                if ($admin_colab_id) {
-                    evolution_notificar_colaborador(
-                        (int)$admin_colab_id,
-                        '📄 Novo Documento de Pagamento',
-                        'Um colaborador enviou documento para fechamento de pagamento.',
-                        $url_doc
-                    );
-                }
+                enviar_push_usuario(
+                    $admin_id,
+                    '📄 Novo Documento de Pagamento',
+                    'Um colaborador enviou documento para o fechamento de pagamento.',
+                    $url_doc,
+                    'documento_pagamento_enviado'
+                );
             } catch (Exception $e) {
-                // Ignora erros de notificação
+                // Ignora erros de notificação individuais
             }
         }
     } catch (Exception $e) {

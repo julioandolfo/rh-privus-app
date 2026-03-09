@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $colab['id'],
                         'Novo Comunicado 📢',
                         $titulo_preview,
-                        'pages/comunicado_view.php?id=' . $comunicado_id,
+                        get_base_url() . '/pages/comunicado_view.php?id=' . $comunicado_id,
                         'comunicado',
                         $comunicado_id,
                         'comunicado'

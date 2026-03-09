@@ -218,7 +218,7 @@ function enviar_push_feedback_recebido($feedback_id, $destinatario_usuario_id, $
         
         $titulo = 'Novo Feedback Recebido 💬';
         $mensagem = $anonimo ? 'Você recebeu um feedback anônimo' : "$remetente_nome enviou um feedback para você";
-        $url = 'pages/feedback_meus.php?tipo=recebidos';
+        $url = get_base_url() . '/pages/feedback_meus.php?tipo=recebidos';
         
         if ($destinatario_usuario_id) {
             require_once __DIR__ . '/push_notifications.php';
@@ -503,7 +503,7 @@ function enviar_push_solicitacao_feedback($solicitacao_id) {
         
         $titulo = 'Nova Solicitação de Feedback 💭';
         $mensagem = $solicitacao['solicitante_nome'] . ' está pedindo que você envie um feedback';
-        $url = 'pages/feedback_solicitacoes.php?tipo=recebidas';
+        $url = get_base_url() . '/pages/feedback_solicitacoes.php?tipo=recebidas';
         
         if ($solicitacao['solicitado_usuario_id']) {
             require_once __DIR__ . '/push_notifications.php';
@@ -585,7 +585,7 @@ function notificar_resposta_solicitacao($solicitacao_id, $acao) {
         $emoji = $acao === 'aceitar' ? '✅' : '❌';
         $titulo_push = $acao === 'aceitar' ? 'Solicitação Aceita! ' . $emoji : 'Solicitação Recusada ' . $emoji;
         $mensagem_push = $mensagem;
-        $link_push = 'pages/feedback_solicitacoes.php?tipo=enviadas';
+        $link_push = get_base_url() . '/pages/feedback_solicitacoes.php?tipo=enviadas';
         
         if ($solicitacao['solicitante_usuario_id']) {
             require_once __DIR__ . '/push_notifications.php';

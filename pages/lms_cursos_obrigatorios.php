@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $colab_id,
                                 'Novo Curso Atribuído 📚',
                                 'O curso "' . $titulo_curso . '" foi atribuído para você.' . $prazo_texto,
-                                'pages/lms_meus_cursos.php',
+                                get_base_url() . '/pages/lms_meus_cursos.php',
                                 'curso',
                                 $atribuicao_id,
                                 'lms_atribuicao'

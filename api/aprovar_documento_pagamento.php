@@ -120,47 +120,23 @@ try {
         $observacoes ?: ($acao === 'aprovar' ? 'Documento aprovado' : 'Documento rejeitado')
     ]);
     
-    // Envia notificação para o colaborador
+    // Envia notificação para o colaborador via push (cobre OneSignal + WA + Slack + DB)
     try {
-        require_once __DIR__ . '/../includes/push_preferences.php';
-        require_once __DIR__ . '/../includes/onesignal_service.php';
-        require_once __DIR__ . '/../includes/evolution_service.php';
+        require_once __DIR__ . '/../includes/push_notifications.php';
 
-        // Busca usuario_id do colaborador se existir
-        $usuario_id_colab = null;
-        $stmt_user = $pdo->prepare("SELECT id FROM usuarios WHERE colaborador_id = ? LIMIT 1");
-        $stmt_user->execute([$item['colaborador_id']]);
-        $user_colab = $stmt_user->fetch();
-        if ($user_colab) {
-            $usuario_id_colab = $user_colab['id'];
-        }
-
-        $tipo_notificacao = $acao === 'aprovar'
-            ? 'documento_pagamento_aprovado'
-            : 'documento_pagamento_rejeitado';
-
-        $titulo_notif  = $acao === 'aprovar' ? 'Documento Aprovado ✅' : 'Documento Rejeitado ❌';
+        $titulo_notif   = $acao === 'aprovar' ? 'Documento Aprovado ✅' : 'Documento Rejeitado ❌';
         $mensagem_notif = $acao === 'aprovar'
             ? 'Seu documento de pagamento foi aprovado!'
             : 'Seu documento de pagamento foi rejeitado. Motivo: ' . $observacoes;
-        $url_pagamentos = get_base_url() . '/pages/meus_pagamentos.php';
+        $tipo_notificacao = $acao === 'aprovar' ? 'documento_pagamento_aprovado' : 'documento_pagamento_rejeitado';
+        $url_pagamentos   = get_base_url() . '/pages/meus_pagamentos.php';
 
-        // Verifica preferência antes de enviar push
-        if (verificar_preferencia_push($usuario_id_colab, $item['colaborador_id'], $tipo_notificacao)) {
-            onesignal_send_notification([
-                'colaborador_id' => $item['colaborador_id'],
-                'titulo' => $titulo_notif,
-                'mensagem' => $mensagem_notif,
-                'url' => $url_pagamentos
-            ]);
-        }
-
-        // WhatsApp
-        evolution_notificar_colaborador(
+        enviar_push_colaborador(
             (int)$item['colaborador_id'],
             $titulo_notif,
             $mensagem_notif,
-            $url_pagamentos
+            $url_pagamentos,
+            $tipo_notificacao
         );
     } catch (Exception $e) {
         // Ignora erros de notificação

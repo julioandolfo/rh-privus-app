@@ -86,18 +86,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     require_once __DIR__ . '/../includes/email_templates.php';
                     enviar_email_horas_extras($hora_extra_id);
 
-                    // WhatsApp
+                    // Notifica via push (cobre Push + WA + Slack + DB)
                     try {
-                        require_once __DIR__ . '/../includes/evolution_service.php';
+                        require_once __DIR__ . '/../includes/push_notifications.php';
                         $h_fmt = number_format($quantidade_horas, 1, ',', '.');
                         $d_fmt = date('d/m/Y', strtotime($data_trabalho));
-                        evolution_notificar_colaborador(
+                        enviar_push_colaborador(
                             (int)$colaborador_id,
                             '⏰ Horas Extras Registradas',
                             "{$h_fmt}h extras do dia {$d_fmt} foram adicionadas ao seu banco de horas.",
-                            get_base_url() . '/pages/banco_horas.php'
+                            get_base_url() . '/pages/banco_horas.php',
+                            'horas_extras'
                         );
-                    } catch (Exception $wa_e) { error_log('[WA] horas_extras banco: ' . $wa_e->getMessage()); }
+                    } catch (Exception $e) { error_log('[Push] horas_extras banco: ' . $e->getMessage()); }
 
                     redirect('horas_extras.php', 'Hora extra adicionada ao banco de horas com sucesso!');
                     
@@ -158,19 +159,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 require_once __DIR__ . '/../includes/email_templates.php';
                 enviar_email_horas_extras($hora_extra_id);
 
-                // WhatsApp
+                // Notifica via push (cobre Push + WA + Slack + DB)
                 try {
-                    require_once __DIR__ . '/../includes/evolution_service.php';
+                    require_once __DIR__ . '/../includes/push_notifications.php';
                     $h_fmt = number_format($quantidade_horas, 1, ',', '.');
                     $d_fmt = date('d/m/Y', strtotime($data_trabalho));
                     $v_fmt = 'R$ ' . number_format($valor_total, 2, ',', '.');
-                    evolution_notificar_colaborador(
+                    enviar_push_colaborador(
                         (int)$colaborador_id,
                         '⏰ Horas Extras Registradas',
                         "{$h_fmt}h extras do dia {$d_fmt} foram registradas. Valor a receber: {$v_fmt}.",
-                        get_base_url() . '/pages/minhas_horas_extras.php'
+                        get_base_url() . '/pages/minhas_horas_extras.php',
+                        'horas_extras'
                     );
-                } catch (Exception $wa_e) { error_log('[WA] horas_extras dinheiro: ' . $wa_e->getMessage()); }
+                } catch (Exception $e) { error_log('[Push] horas_extras dinheiro: ' . $e->getMessage()); }
 
                 redirect('horas_extras.php', 'Hora extra cadastrada com sucesso!');
             }

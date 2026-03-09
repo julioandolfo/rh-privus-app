@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $colaborador_id,
                 'Parabéns pela Promoção! 🎉',
                 'Você recebeu uma promoção. Seu novo salário é R$ ' . number_format($salario_novo, 2, ',', '.') . '. Confira os detalhes agora!',
-                'pages/promocoes.php', // URL original para referência
+                get_base_url() . '/pages/promocoes.php',
                 'promocao', // Tipo da notificação
                 $promocao_id, // ID da promoção
                 'promocao' // Tipo da referência
