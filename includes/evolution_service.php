@@ -431,14 +431,28 @@ function evolution_notificar_colaborador(int $colaborador_id, string $titulo, st
         $stmt->execute([$colaborador_id]);
         $colaborador = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$colaborador || !$colaborador['whatsapp_ativo'] || empty($colaborador['whatsapp_numero'])) {
-            return ['success' => false, 'error' => 'Colaborador sem WhatsApp configurado ou opt-out'];
+        if (!$colaborador) {
+            error_log("[EvolutionAPI] evolution_notificar_colaborador: colaborador_id={$colaborador_id} não encontrado ou inativo.");
+            return ['success' => false, 'error' => 'Colaborador não encontrado ou inativo'];
+        }
+        if (!$colaborador['whatsapp_ativo']) {
+            error_log("[EvolutionAPI] evolution_notificar_colaborador: colaborador_id={$colaborador_id} ({$colaborador['nome_completo']}) tem whatsapp_ativo=0.");
+            return ['success' => false, 'error' => 'Colaborador com WhatsApp desativado (opt-out)'];
+        }
+        if (empty($colaborador['whatsapp_numero'])) {
+            error_log("[EvolutionAPI] evolution_notificar_colaborador: colaborador_id={$colaborador_id} ({$colaborador['nome_completo']}) sem whatsapp_numero cadastrado.");
+            return ['success' => false, 'error' => 'Colaborador sem número WhatsApp cadastrado'];
         }
 
         // Verifica se notificações WA estão ativas na config
         $config = evolution_get_config();
-        if (!$config || !$config['notificacoes_whatsapp_ativas']) {
-            return ['success' => false, 'error' => 'Notificações WhatsApp desativadas'];
+        if (!$config) {
+            error_log("[EvolutionAPI] evolution_notificar_colaborador: evolution_config não encontrada, inativa ou vazia.");
+            return ['success' => false, 'error' => 'Evolution API não configurada ou inativa'];
+        }
+        if (empty($config['notificacoes_whatsapp_ativas'])) {
+            error_log("[EvolutionAPI] evolution_notificar_colaborador: notificacoes_whatsapp_ativas=0 na evolution_config.");
+            return ['success' => false, 'error' => 'Notificações WhatsApp desativadas na configuração'];
         }
 
         // Monta mensagem formatada

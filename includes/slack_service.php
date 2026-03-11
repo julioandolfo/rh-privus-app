@@ -291,12 +291,18 @@ function slack_enfileirar_mensagem(
 function slack_notificar_colaborador(int $colaborador_id, string $titulo, string $mensagem, string $url = ''): array {
     try {
         $config = slack_get_config();
-        if (!$config || !$config['notificacoes_slack_ativas']) {
+        if (!$config) {
+            error_log("[Slack] slack_notificar_colaborador: slack_config não encontrada ou inativa (colaborador_id={$colaborador_id}).");
+            return ['ok' => false, 'error' => 'Slack não configurado ou inativo'];
+        }
+        if (empty($config['notificacoes_slack_ativas'])) {
+            error_log("[Slack] slack_notificar_colaborador: notificacoes_slack_ativas=0 na slack_config (colaborador_id={$colaborador_id}).");
             return ['ok' => false, 'error' => 'Notificações Slack desativadas'];
         }
 
         $slack_user_id = slack_get_user_id($colaborador_id, $config);
         if (!$slack_user_id) {
+            error_log("[Slack] slack_notificar_colaborador: colaborador_id={$colaborador_id} sem slack_user_id cadastrado.");
             return ['ok' => false, 'error' => 'Colaborador sem Slack User ID configurado'];
         }
 

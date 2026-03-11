@@ -436,45 +436,45 @@ function enviar_notificacoes_ocorrencia($ocorrencia_id) {
                 'ocorrencia'
             );
         }
-        
-        // Push notification para colaborador
-        // enviar_push_colaborador já enfileira WA e Slack internamente
+
+        // WhatsApp e Slack são sempre disparados diretamente, independente do push.
+        // Assim funcionam mesmo quando push está desabilitado ou falha internamente.
+        try {
+            evolution_notificar_colaborador(
+                $ocorrencia['colaborador_id'],
+                $titulo_colaborador . ' ⚠️',
+                $mensagem_colaborador . ' Clique para ver os detalhes.',
+                $link_ocorrencia
+            );
+        } catch (Exception $e) {
+            error_log('[WA] Ocorrência colaborador: ' . $e->getMessage());
+        }
+        try {
+            slack_notificar_colaborador(
+                $ocorrencia['colaborador_id'],
+                $titulo_colaborador . ' ⚠️',
+                $mensagem_colaborador . ' Clique para ver os detalhes.',
+                $link_ocorrencia
+            );
+        } catch (Exception $e) {
+            error_log('[Slack] Ocorrência colaborador: ' . $e->getMessage());
+        }
+
+        // Push notification — passa false para não duplicar WA/Slack (já disparados acima)
         if ($ocorrencia['notificar_colaborador_push']) {
             try {
                 enviar_push_colaborador(
                     $ocorrencia['colaborador_id'],
                     $titulo_colaborador . ' ⚠️',
                     $mensagem_colaborador . ' Clique para ver os detalhes.',
-                    $link_ocorrencia,   // URL absoluta para WA/Slack ficarem com link funcional
+                    $link_ocorrencia,
                     'ocorrencia',
                     $ocorrencia_id,
-                    'ocorrencia'
+                    'ocorrencia',
+                    false  // WA/Slack já foram disparados acima
                 );
             } catch (Exception $e) {
-                error_log("Erro ao enviar push para colaborador: " . $e->getMessage());
-            }
-        } else {
-            // Push desabilitado para este tipo de ocorrência — WA e Slack disparam diretamente
-            // (evita duplicação quando push está ativo, pois push já enfileira ambos)
-            try {
-                evolution_notificar_colaborador(
-                    $ocorrencia['colaborador_id'],
-                    $titulo_colaborador . ' ⚠️',
-                    $mensagem_colaborador,
-                    $link_ocorrencia
-                );
-            } catch (Exception $e) {
-                error_log('[WA] Ocorrência colaborador (sem push): ' . $e->getMessage());
-            }
-            try {
-                slack_notificar_colaborador(
-                    $ocorrencia['colaborador_id'],
-                    $titulo_colaborador . ' ⚠️',
-                    $mensagem_colaborador,
-                    $link_ocorrencia
-                );
-            } catch (Exception $e) {
-                error_log('[Slack] Ocorrência colaborador (sem push): ' . $e->getMessage());
+                error_log('Erro ao enviar push para colaborador: ' . $e->getMessage());
             }
         }
 

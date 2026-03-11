@@ -31,7 +31,7 @@ if (!function_exists('push_log')) {
  * @param string $referencia_tipo Tipo da referência (opcional)
  * @return array ['success' => bool, 'enviadas' => int, 'message' => string, 'notificacao_id' => int]
  */
-function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = null, $tipo = 'geral', $referencia_id = null, $referencia_tipo = null) {
+function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = null, $tipo = 'geral', $referencia_id = null, $referencia_tipo = null, bool $incluir_wa_slack = true) {
     try {
         $pdo = getDB();
         
@@ -97,18 +97,18 @@ function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = nul
             $stmt->execute([$push_id]);
         }
         
-        // Envia também via WhatsApp (Evolution API) - não bloqueia em caso de erro
-        try {
-            evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
-        } catch (Exception $wa_e) {
-            push_log("enviar_push_colaborador - WhatsApp erro (não crítico): " . $wa_e->getMessage());
-        }
-
-        // Envia também via Slack - não bloqueia em caso de erro
-        try {
-            slack_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
-        } catch (Exception $sl_e) {
-            push_log("enviar_push_colaborador - Slack erro (não crítico): " . $sl_e->getMessage());
+        // Envia também via WhatsApp e Slack (só se o chamador não tratar isso diretamente)
+        if ($incluir_wa_slack) {
+            try {
+                evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
+            } catch (Exception $wa_e) {
+                push_log("enviar_push_colaborador - WhatsApp erro (não crítico): " . $wa_e->getMessage());
+            }
+            try {
+                slack_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
+            } catch (Exception $sl_e) {
+                push_log("enviar_push_colaborador - Slack erro (não crítico): " . $sl_e->getMessage());
+            }
         }
 
         return [
@@ -141,7 +141,7 @@ function enviar_push_colaborador($colaborador_id, $titulo, $mensagem, $url = nul
  * @param string $referencia_tipo Tipo da referência (opcional)
  * @return array ['success' => bool, 'enviadas' => int, 'message' => string, 'notificacao_id' => int]
  */
-function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null, $tipo = 'geral', $referencia_id = null, $referencia_tipo = null) {
+function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null, $tipo = 'geral', $referencia_id = null, $referencia_tipo = null, bool $incluir_wa_slack = true) {
     try {
         $pdo = getDB();
         
@@ -207,8 +207,8 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null, $tipo
             $stmt->execute([$push_id]);
         }
 
-        // Envia também via WhatsApp e Slack se o usuário tiver colaborador vinculado
-        if ($colaborador_id) {
+        // Envia também via WhatsApp e Slack (só se o chamador não tratar isso diretamente)
+        if ($incluir_wa_slack && $colaborador_id) {
             try {
                 evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
             } catch (Exception $wa_e) {
