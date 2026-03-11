@@ -30,8 +30,23 @@ try {
     $usuario = $_SESSION['usuario'];
     
     $request_id = $_POST['request_id'] ?? null;
-    $lider_id = (int)($_POST['lider_id'] ?? 0);
-    $liderado_id = (int)($_POST['liderado_id'] ?? 0);
+    
+    // Suporta IDs prefixados (c_X = colaborador, u_X = usuário) ou numérico puro
+    function extrair_colaborador_id($raw, $pdo) {
+        if (preg_match('/^c_(\d+)$/', $raw, $m)) {
+            return (int)$m[1];
+        }
+        if (preg_match('/^u_(\d+)$/', $raw, $m)) {
+            $stmt = $pdo->prepare("SELECT colaborador_id FROM usuarios WHERE id = ?");
+            $stmt->execute([(int)$m[1]]);
+            $row = $stmt->fetch();
+            return ($row && $row['colaborador_id']) ? (int)$row['colaborador_id'] : 0;
+        }
+        return (int)$raw;
+    }
+    
+    $lider_id = extrair_colaborador_id($_POST['lider_id'] ?? '', $pdo);
+    $liderado_id = extrair_colaborador_id($_POST['liderado_id'] ?? '', $pdo);
     $data_reuniao = $_POST['data_reuniao'] ?? date('Y-m-d');
     $hora_inicio = $_POST['hora_inicio'] ?? null;
     $hora_fim = $_POST['hora_fim'] ?? null;
