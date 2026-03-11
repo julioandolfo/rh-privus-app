@@ -50,13 +50,46 @@ try {
         
         if (preg_match('/^u_(\d+)$/', $raw, $m)) {
             $user_id = (int)$m[1];
-            $stmt = $pdo->prepare("SELECT colaborador_id FROM usuarios WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT id, colaborador_id, nome, foto, empresa_id, setor_id FROM usuarios WHERE id = ?");
             $stmt->execute([$user_id]);
-            $row = $stmt->fetch();
-            if ($row && $row['colaborador_id']) {
-                return (int)$row['colaborador_id'];
+            $usr = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$usr) return 0;
+            
+            if (!empty($usr['colaborador_id'])) {
+                return (int)$usr['colaborador_id'];
             }
-            throw new Exception("Este usuário não possui cadastro de colaborador vinculado. Vincule-o primeiro em Colaboradores.");
+            
+            // Auto-cria colaborador para o usuário
+            $empresa_id = $usr['empresa_id'];
+            $setor_id = $usr['setor_id'];
+            
+            if (!$empresa_id) {
+                $stmt_emp = $pdo->prepare("SELECT empresa_id FROM usuarios_empresas WHERE usuario_id = ? LIMIT 1");
+                $stmt_emp->execute([$user_id]);
+                $empresa_id = $stmt_emp->fetchColumn() ?: null;
+            }
+            if (!$empresa_id) {
+                $empresa_id = $pdo->query("SELECT id FROM empresas WHERE status = 'ativo' ORDER BY id LIMIT 1")->fetchColumn();
+            }
+            if (!$setor_id) {
+                $setor_id = $pdo->query("SELECT id FROM setores WHERE status = 'ativo' ORDER BY id LIMIT 1")->fetchColumn();
+            }
+            $cargo_id = $pdo->query("SELECT id FROM cargos WHERE status = 'ativo' ORDER BY id LIMIT 1")->fetchColumn();
+            
+            if (!$empresa_id || !$setor_id || !$cargo_id) {
+                throw new Exception("Não foi possível criar colaborador automaticamente. Verifique se há empresa, setor e cargo cadastrados.");
+            }
+            
+            $stmt_ins = $pdo->prepare("
+                INSERT INTO colaboradores (empresa_id, setor_id, cargo_id, nome_completo, foto, data_inicio, status)
+                VALUES (?, ?, ?, ?, ?, CURDATE(), 'ativo')
+            ");
+            $stmt_ins->execute([$empresa_id, $setor_id, $cargo_id, $usr['nome'], $usr['foto']]);
+            $novo_colab_id = (int)$pdo->lastInsertId();
+            
+            $pdo->prepare("UPDATE usuarios SET colaborador_id = ? WHERE id = ?")->execute([$novo_colab_id, $user_id]);
+            
+            return $novo_colab_id;
         }
         
         return (int)$raw;
