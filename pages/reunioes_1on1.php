@@ -615,6 +615,12 @@ document.getElementById('btn-salvar-reuniao')?.addEventListener('click', functio
     const formData = new FormData(form);
     const btnSalvar = document.getElementById('btn-salvar-reuniao');
     
+    // DEBUG: mostra todos os valores do FormData antes do envio
+    console.log('DEBUG SUBMIT - liderId:', liderId, 'lideradoId:', lideradoId);
+    for (let [key, value] of formData.entries()) {
+        console.log('DEBUG SUBMIT - FormData:', key, '=', value);
+    }
+    
     // Adiciona timestamp único para evitar duplicação
     const requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     formData.append('request_id', requestId);

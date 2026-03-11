@@ -31,8 +31,13 @@ try {
     
     $request_id = $_POST['request_id'] ?? null;
     
-    // Suporta IDs prefixados (c_X = colaborador, u_X = usuário) ou numérico puro
+    $raw_lider = $_POST['lider_id'] ?? '';
+    $raw_liderado = $_POST['liderado_id'] ?? '';
+    
+    // Extrai ID numérico do colaborador a partir de c_X, u_X ou valor puro
     function extrair_colaborador_id($raw, $pdo) {
+        $raw = trim((string)$raw);
+        if ($raw === '') return 0;
         if (preg_match('/^c_(\d+)$/', $raw, $m)) {
             return (int)$m[1];
         }
@@ -45,8 +50,8 @@ try {
         return (int)$raw;
     }
     
-    $lider_id = extrair_colaborador_id($_POST['lider_id'] ?? '', $pdo);
-    $liderado_id = extrair_colaborador_id($_POST['liderado_id'] ?? '', $pdo);
+    $lider_id = extrair_colaborador_id($raw_lider, $pdo);
+    $liderado_id = extrair_colaborador_id($raw_liderado, $pdo);
     $data_reuniao = $_POST['data_reuniao'] ?? date('Y-m-d');
     $hora_inicio = $_POST['hora_inicio'] ?? null;
     $hora_fim = $_POST['hora_fim'] ?? null;
@@ -54,8 +59,11 @@ try {
     $proximos_passos = trim($_POST['proximos_passos'] ?? '');
     $status = $_POST['status'] ?? 'agendada'; // 'agendada' ou 'solicitada'
     
+    error_log("REUNIAO_1ON1_DEBUG: raw_lider={$raw_lider}, raw_liderado={$raw_liderado}, lider_id={$lider_id}, liderado_id={$liderado_id}");
+    error_log("REUNIAO_1ON1_DEBUG: POST=" . json_encode($_POST, JSON_UNESCAPED_UNICODE));
+    
     if ($lider_id <= 0 || $liderado_id <= 0) {
-        throw new Exception('Líder e liderado são obrigatórios');
+        throw new Exception("Líder e liderado são obrigatórios (recebido: lider_raw={$raw_lider}, liderado_raw={$raw_liderado}, lider_id={$lider_id}, liderado_id={$liderado_id})");
     }
     
     // Proteção ATÔMICA contra requisições duplicadas usando GET_LOCK do MySQL
