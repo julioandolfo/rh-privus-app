@@ -56,7 +56,18 @@ $reunioes = $stmt->fetchAll();
 
 // Busca colaboradores disponíveis
 require_once __DIR__ . '/../includes/select_colaborador.php';
-$colaboradores = get_colaboradores_disponiveis($pdo, $usuario);
+$colaboradores_raw = get_colaboradores_disponiveis($pdo, $usuario);
+
+// Normaliza IDs: converte c_X → X numérico, descarta u_X (usuários sem colaborador
+// não podem ser líder/liderado em reuniões 1:1 pois a tabela exige colaboradores.id)
+$colaboradores = [];
+foreach ($colaboradores_raw as $c) {
+    if (preg_match('/^c_(\d+)$/', $c['id'], $m)) {
+        $c['id'] = (int)$m[1];
+        $colaboradores[] = $c;
+    }
+    // u_X descartado: usuário sem colaborador não pode participar de reunião 1:1
+}
 
 // Busca líderes (colaboradores que têm liderados OU todos se for ADMIN/RH)
 $lideres = [];
@@ -64,56 +75,35 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     // Para ADMIN/RH, pode selecionar qualquer colaborador como líder
     $lideres = $colaboradores;
     
-    // Adiciona também usuários ADMIN, RH e GESTOR diretamente da tabela usuarios
+    // Adiciona usuários ADMIN/RH/GESTOR que possuem colaborador vinculado
     $usuarios_lideres = [];
     if ($usuario['role'] === 'ADMIN') {
-        // ADMIN pode ver todos os usuários ADMIN/RH/GESTOR
-        // DEBUG: Query completa para ver todos os usuários
-        $stmt_debug = $pdo->query("
-            SELECT id, nome, role, status, colaborador_id, empresa_id, setor_id
-            FROM usuarios
-            WHERE role IN ('ADMIN', 'RH', 'GESTOR')
-            ORDER BY nome
-        ");
-        $todos_usuarios = $stmt_debug->fetchAll(PDO::FETCH_ASSOC);
-        echo "<script>console.log('DEBUG - Todos os usuários ADMIN/RH/GESTOR no banco:', " . json_encode($todos_usuarios, JSON_UNESCAPED_UNICODE) . ");</script>";
-        
         $stmt_usuarios_lideres = $pdo->query("
             SELECT 
-                COALESCE(colaborador_id, id) as id,
+                colaborador_id as id,
                 nome as nome_completo,
-                foto,
-                id as usuario_id,
-                colaborador_id,
-                role
+                foto
             FROM usuarios
             WHERE role IN ('ADMIN', 'RH', 'GESTOR')
             AND status = 'ativo'
-            AND COALESCE(colaborador_id, id) IS NOT NULL
+            AND colaborador_id IS NOT NULL
             ORDER BY nome
         ");
         $usuarios_lideres = $stmt_usuarios_lideres->fetchAll(PDO::FETCH_ASSOC);
-        
-        // DEBUG: Log detalhado de cada usuário retornado
-        echo "<script>console.log('DEBUG - Query retornou ' + " . count($usuarios_lideres) . " + ' usuários');";
-        foreach ($usuarios_lideres as $idx => $user) {
-            echo "console.log('DEBUG - Usuário " . ($idx + 1) . ":', " . json_encode($user, JSON_UNESCAPED_UNICODE) . ");";
-        }
-        echo "</script>";
     } else {
         // RH só pode ver usuários das empresas dele
         if (isset($usuario['empresas_ids']) && is_array($usuario['empresas_ids']) && !empty($usuario['empresas_ids'])) {
             $placeholders = implode(',', array_fill(0, count($usuario['empresas_ids']), '?'));
             $stmt_usuarios_lideres = $pdo->prepare("
                 SELECT DISTINCT
-                    COALESCE(u.colaborador_id, u.id) as id,
+                    u.colaborador_id as id,
                     u.nome as nome_completo,
                     u.foto
                 FROM usuarios u
                 LEFT JOIN usuarios_empresas ue ON u.id = ue.usuario_id
                 WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
                 AND u.status = 'ativo'
-                AND COALESCE(u.colaborador_id, u.id) IS NOT NULL
+                AND u.colaborador_id IS NOT NULL
                 AND (u.empresa_id IN ($placeholders) OR ue.empresa_id IN ($placeholders))
                 ORDER BY u.nome
             ");
@@ -122,14 +112,14 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
         } elseif (!empty($usuario['empresa_id'])) {
             $stmt_usuarios_lideres = $pdo->prepare("
                 SELECT DISTINCT
-                    COALESCE(u.colaborador_id, u.id) as id,
+                    u.colaborador_id as id,
                     u.nome as nome_completo,
                     u.foto
                 FROM usuarios u
                 LEFT JOIN usuarios_empresas ue ON u.id = ue.usuario_id
                 WHERE u.role IN ('ADMIN', 'RH', 'GESTOR')
                 AND u.status = 'ativo'
-                AND COALESCE(u.colaborador_id, u.id) IS NOT NULL
+                AND u.colaborador_id IS NOT NULL
                 AND (u.empresa_id = ? OR ue.empresa_id = ?)
                 ORDER BY u.nome
             ");
@@ -138,119 +128,25 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
         }
     }
     
-    // Combina os arrays, evitando duplicatas
+    // Combina evitando duplicatas (agora todos os IDs são numéricos)
     if (!empty($usuarios_lideres)) {
-        $lideres_ids = array_column($lideres, 'id');
-        echo "<script>console.log('DEBUG - IDs de líderes já existentes (colaboradores):', " . json_encode($lideres_ids, JSON_UNESCAPED_UNICODE) . ");</script>";
-        echo "<script>console.log('DEBUG - Lista completa de colaboradores:', " . json_encode($colaboradores, JSON_UNESCAPED_UNICODE) . ");</script>";
-        
-        foreach ($usuarios_lideres as $idx => $user_lider) {
-            $nome_usuario = htmlspecialchars($user_lider['nome_completo'] ?? 'Sem nome', ENT_QUOTES);
-            // DEBUG: Log de cada usuário sendo processado
-            echo "<script>console.log('DEBUG - Processando usuário " . ($idx + 1) . " (" . $nome_usuario . "):', " . json_encode($user_lider, JSON_UNESCAPED_UNICODE) . ");</script>";
-            
-            // Garante que tem id e nome_completo válidos
-            if (empty($user_lider['id'])) {
-                echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: id vazio');</script>";
-                continue;
+        $lideres_ids = array_map('intval', array_column($lideres, 'id'));
+        foreach ($usuarios_lideres as $user_lider) {
+            $uid = (int)$user_lider['id'];
+            if ($uid > 0 && !in_array($uid, $lideres_ids)) {
+                $user_lider['id'] = $uid;
+                $user_lider['foto'] = !empty($user_lider['foto']) ? $user_lider['foto'] : null;
+                $lideres[] = $user_lider;
+                $lideres_ids[] = $uid;
             }
-            if (empty($user_lider['nome_completo'])) {
-                echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: nome_completo vazio');</script>";
-                continue;
-            }
-            
-            // Converte id para inteiro para comparação correta
-            $user_id = (int)$user_lider['id'];
-            echo "<script>console.log('DEBUG - " . $nome_usuario . " - ID original:', " . json_encode($user_lider['id']) . ", ID convertido:', " . $user_id . ");</script>";
-            echo "<script>console.log('DEBUG - " . $nome_usuario . " - Verificando se ID ' . " . $user_id . " . ' está em:', " . json_encode($lideres_ids, JSON_UNESCAPED_UNICODE) . ");</script>";
-            
-            // Verifica se o ID já existe na lista
-            $id_existe = in_array($user_id, $lideres_ids);
-            echo "<script>console.log('DEBUG - " . $nome_usuario . " - ID existe na lista?', " . ($id_existe ? 'true' : 'false') . ");</script>";
-            
-            if ($id_existe) {
-                // Verifica qual colaborador tem esse ID
-                $colab_com_mesmo_id = null;
-                foreach ($colaboradores as $colab) {
-                    if ((int)$colab['id'] === $user_id) {
-                        $colab_com_mesmo_id = $colab;
-                        break;
-                    }
-                }
-                if ($colab_com_mesmo_id) {
-                    // Verifica se o colaborador está vinculado a este usuário
-                    $stmt_check_user = $pdo->prepare("SELECT id FROM usuarios WHERE id = ? AND colaborador_id = ?");
-                    $stmt_check_user->execute([$user_lider['usuario_id'], $user_id]);
-                    $is_same_user = $stmt_check_user->fetch();
-                    
-                    if ($is_same_user) {
-                        // É o mesmo usuário, não adiciona duplicata
-                        echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: Colaborador ID " . $user_id . " já está vinculado a este usuário');</script>";
-                        continue;
-                    } else {
-                        // ID conflita mas não é o mesmo usuário
-                        // Como o usuário não tem colaborador_id próprio, vamos incluir mesmo assim
-                        // mas vamos substituir o nome do colaborador existente pelo nome do usuário
-                        // para que apareça na lista com o nome correto
-                        echo "<script>console.log('DEBUG - " . $nome_usuario . " - ID colaborador " . $user_id . " conflita, mas incluindo usuário substituindo nome do colaborador existente');</script>";
-                        
-                        // Encontra o colaborador na lista e substitui o nome
-                        foreach ($lideres as $key => $lider) {
-                            if ((int)$lider['id'] === $user_id) {
-                                // Substitui o nome do colaborador pelo nome do usuário
-                                $lideres[$key]['nome_completo'] = $user_lider['nome_completo'];
-                                $lideres[$key]['foto'] = !empty($user_lider['foto']) ? $user_lider['foto'] : $lider['foto'];
-                                echo "<script>console.log('DEBUG - " . $nome_usuario . " - Nome do colaborador ID " . $user_id . " substituído pelo nome do usuário');</script>";
-                                break;
-                            }
-                        }
-                        // Não adiciona novamente, apenas substituiu o nome
-                        continue;
-                    }
-                } else {
-                    echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: ID " . $user_id . " já existe na lista de líderes (duplicata)');</script>";
-                    continue;
-                }
-            } else {
-                // Se não tem colaborador_id, usa o ID do usuário ao invés do colaborador_id
-                if (empty($user_lider['colaborador_id'])) {
-                    $user_id = (int)$user_lider['usuario_id'];
-                    echo "<script>console.log('DEBUG - " . $nome_usuario . " - Sem colaborador_id, usando ID do usuário: " . $user_id . "');</script>";
-                    
-                    // Verifica se esse ID de usuário já existe na lista
-                    if (in_array($user_id, $lideres_ids)) {
-                        echo "<script>console.log('DEBUG - " . $nome_usuario . " REJEITADO: ID do usuário " . $user_id . " já existe na lista');</script>";
-                        continue;
-                    }
-                }
-            }
-            
-            // Garante que foto seja null se vazio
-            $user_lider['foto'] = !empty($user_lider['foto']) ? $user_lider['foto'] : null;
-            $user_lider['id'] = $user_id; // Garante que id seja inteiro
-            $lideres[] = $user_lider;
-            $lideres_ids[] = $user_id;
-            echo "<script>console.log('DEBUG - " . $nome_usuario . " ADICIONADO à lista de líderes com ID: " . $user_id . "');</script>";
         }
-    } else {
-        echo "<script>console.log('DEBUG - Nenhum usuário líder retornado da query');</script>";
     }
     
-    // Ordena novamente por nome
     usort($lideres, function($a, $b) {
         return strcmp($a['nome_completo'], $b['nome_completo']);
     });
-    
-    // DEBUG: Log dos dados para console
-    echo "<script>console.log('DEBUG - Role do usuário:', '" . htmlspecialchars($usuario['role'], ENT_QUOTES) . "');";
-    echo "console.log('DEBUG - Total de líderes:', " . count($lideres) . ");";
-    echo "console.log('DEBUG - Total de colaboradores:', " . count($colaboradores) . ");";
-    echo "console.log('DEBUG - Total de usuários líderes retornados:', " . count($usuarios_lideres) . ");";
-    echo "console.log('DEBUG - Usuários líderes retornados:', " . json_encode($usuarios_lideres, JSON_UNESCAPED_UNICODE) . ");";
-    echo "console.log('DEBUG - Líderes finais combinados:', " . json_encode($lideres, JSON_UNESCAPED_UNICODE) . ");";
-    echo "</script>";
 } else {
-    // Para GESTOR, mostra líderes que têm liderados + usuários ADMIN/RH/GESTOR
+    // Para GESTOR, mostra líderes que têm liderados
     $stmt_lideres = $pdo->query("
         SELECT DISTINCT c.id, c.nome_completo, c.foto
         FROM colaboradores c
@@ -262,8 +158,7 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     ");
     $lideres = $stmt_lideres->fetchAll();
     
-    // Adiciona também usuários ADMIN, RH e GESTOR diretamente da tabela usuarios
-    // GESTOR só pode ver usuários do seu setor
+    // Adiciona usuários ADMIN/RH/GESTOR com colaborador vinculado no mesmo setor
     $stmt_setor = $pdo->prepare("SELECT setor_id FROM usuarios WHERE id = ?");
     $stmt_setor->execute([$usuario['id']]);
     $user_data = $stmt_setor->fetch();
@@ -272,38 +167,32 @@ if ($usuario['role'] === 'ADMIN' || $usuario['role'] === 'RH') {
     if ($setor_id) {
         $stmt_usuarios_lideres = $pdo->prepare("
             SELECT 
-                COALESCE(colaborador_id, id) as id,
+                colaborador_id as id,
                 nome as nome_completo,
                 foto
             FROM usuarios
             WHERE role IN ('ADMIN', 'RH', 'GESTOR')
             AND status = 'ativo'
-            AND COALESCE(colaborador_id, id) IS NOT NULL
+            AND colaborador_id IS NOT NULL
             AND setor_id = ?
             ORDER BY nome
         ");
         $stmt_usuarios_lideres->execute([$setor_id]);
         $usuarios_lideres = $stmt_usuarios_lideres->fetchAll(PDO::FETCH_ASSOC);
         
-        // Combina os arrays, evitando duplicatas
-        $lideres_ids = array_column($lideres, 'id');
+        $lideres_ids = array_map('intval', array_column($lideres, 'id'));
         foreach ($usuarios_lideres as $user_lider) {
-            if (!in_array($user_lider['id'], $lideres_ids)) {
+            $uid = (int)$user_lider['id'];
+            if ($uid > 0 && !in_array($uid, $lideres_ids)) {
+                $user_lider['id'] = $uid;
                 $lideres[] = $user_lider;
-                $lideres_ids[] = $user_lider['id'];
+                $lideres_ids[] = $uid;
             }
         }
         
-        // Ordena novamente por nome
         usort($lideres, function($a, $b) {
             return strcmp($a['nome_completo'], $b['nome_completo']);
         });
-        
-        // DEBUG: Log dos dados para console (GESTOR)
-        echo "<script>console.log('DEBUG GESTOR - Total de líderes:', " . count($lideres) . ");";
-        echo "console.log('DEBUG GESTOR - Usuários líderes retornados:', " . json_encode($usuarios_lideres, JSON_UNESCAPED_UNICODE) . ");";
-        echo "console.log('DEBUG GESTOR - Líderes finais combinados:', " . json_encode($lideres, JSON_UNESCAPED_UNICODE) . ");";
-        echo "</script>";
     }
 }
 
