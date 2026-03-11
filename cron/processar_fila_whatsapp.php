@@ -21,8 +21,39 @@ require_once __DIR__ . '/../includes/evolution_service.php';
 
 date_default_timezone_set('America/Sao_Paulo');
 
-$agora = date('Y-m-d H:i:s');
+$agora  = date('Y-m-d H:i:s');
 $inicio = microtime(true);
+
+// Arquivo de status persistente lido pelo painel admin
+define('STATUS_FILE', __DIR__ . '/../storage/cron/fila_whatsapp_status.json');
+
+/**
+ * Grava o status atual da execução no arquivo JSON.
+ * O painel de configurações lê este arquivo para exibir o histórico do cron.
+ */
+function salvar_status_cron(array $dados): void {
+    $existente = [];
+    if (file_exists(STATUS_FILE)) {
+        $json = @file_get_contents(STATUS_FILE);
+        if ($json) $existente = json_decode($json, true) ?? [];
+    }
+
+    // Mantém as últimas 20 execuções
+    $historico = $existente['historico'] ?? [];
+    array_unshift($historico, $dados);
+    $historico = array_slice($historico, 0, 20);
+
+    $payload = [
+        'ultima_execucao'    => $dados['iniciado_em'],
+        'ultimo_status'      => $dados['status'],
+        'ultimo_enviados'    => $dados['enviados'] ?? 0,
+        'ultimo_erros'       => $dados['erros']    ?? 0,
+        'total_execucoes'    => ($existente['total_execucoes'] ?? 0) + 1,
+        'historico'          => $historico,
+    ];
+
+    @file_put_contents(STATUS_FILE, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+}
 
 echo "[{$agora}] Iniciando processador da fila WhatsApp\n";
 
@@ -31,12 +62,15 @@ $config = evolution_get_config();
 
 if (!$config) {
     echo "⚠️  Evolution API não configurada. Encerrando.\n";
+    salvar_status_cron(['iniciado_em' => $agora, 'status' => 'sem_config', 'enviados' => 0, 'erros' => 0, 'duracao_s' => 0, 'pendentes' => 0, 'detalhe' => 'Evolution API não configurada']);
     exit(0);
 }
 
 $conexao = evolution_verificar_conexao($config);
 if (!$conexao['connected']) {
-    echo "⚠️  WhatsApp desconectado (estado: " . ($conexao['state'] ?? 'desconhecido') . "). Fila pausada.\n";
+    $estado = $conexao['state'] ?? 'desconhecido';
+    echo "⚠️  WhatsApp desconectado (estado: {$estado}). Fila pausada.\n";
+    salvar_status_cron(['iniciado_em' => $agora, 'status' => 'desconectado', 'enviados' => 0, 'erros' => 0, 'duracao_s' => 0, 'pendentes' => 0, 'detalhe' => "WA desconectado: {$estado}"]);
     exit(0);
 }
 
@@ -64,6 +98,7 @@ try {
 
         if ($enviadas_ultima_hora >= $max_por_hora) {
             echo "🛑 Limite de {$max_por_hora} mensagens/hora atingido ({$enviadas_ultima_hora} enviadas). Aguardando próxima hora.\n";
+            salvar_status_cron(['iniciado_em' => $agora, 'status' => 'limite_hora', 'enviados' => 0, 'erros' => 0, 'duracao_s' => 0, 'pendentes' => 0, 'detalhe' => "Limite horário: {$enviadas_ultima_hora}/{$max_por_hora}"]);
             exit(0);
         }
 
@@ -110,6 +145,7 @@ echo "📋 Mensagens pendentes nesta execução: {$total} (máx: {$max_esta_exec
 
 if ($total === 0) {
     echo "✅ Fila vazia. Nada a enviar.\n";
+    salvar_status_cron(['iniciado_em' => $agora, 'status' => 'fila_vazia', 'enviados' => 0, 'erros' => 0, 'duracao_s' => round(microtime(true) - $inicio, 1), 'pendentes' => 0, 'detalhe' => 'Fila sem mensagens pendentes']);
     exit(0);
 }
 
@@ -202,3 +238,23 @@ echo "Enviados:     {$enviados}\n";
 echo "Erros:        {$erros}\n";
 echo "Duração:      {$duracao}s\n";
 echo "Finalizado:   " . date('Y-m-d H:i:s') . "\n";
+
+// Conta pendentes restantes para o status
+try {
+    $pendentes_restantes = (int)$pdo->query("SELECT COUNT(*) FROM evolution_fila_mensagens WHERE status = 'pendente' AND tentativas < 3")->fetchColumn();
+} catch (Exception $e) {
+    $pendentes_restantes = 0;
+}
+
+salvar_status_cron([
+    'iniciado_em'  => $agora,
+    'finalizado_em'=> date('Y-m-d H:i:s'),
+    'status'       => $erros === 0 ? 'ok' : ($enviados > 0 ? 'parcial' : 'erro'),
+    'enviados'     => $enviados,
+    'erros'        => $erros,
+    'processados'  => $enviados + $erros,
+    'total_fila'   => $total,
+    'pendentes'    => $pendentes_restantes,
+    'duracao_s'    => $duracao,
+    'detalhe'      => "Enviados: {$enviados} | Erros: {$erros} | Duração: {$duracao}s",
+]);

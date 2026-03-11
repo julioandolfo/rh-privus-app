@@ -503,6 +503,139 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
 
+                        <?php
+                        // ─── Status do Cron ─────────────────────────────────────────────
+                        $status_file = __DIR__ . '/../storage/cron/fila_whatsapp_status.json';
+                        $cron_status = file_exists($status_file)
+                            ? (json_decode(file_get_contents($status_file), true) ?? [])
+                            : [];
+                        $historico   = $cron_status['historico'] ?? [];
+                        $ultima      = $historico[0] ?? null;
+
+                        $status_badge = [
+                            'ok'         => ['class' => 'badge-light-success', 'label' => '✅ OK'],
+                            'parcial'    => ['class' => 'badge-light-warning', 'label' => '⚠️ Parcial'],
+                            'erro'       => ['class' => 'badge-light-danger',  'label' => '❌ Erro'],
+                            'fila_vazia' => ['class' => 'badge-light-info',    'label' => '📭 Fila vazia'],
+                            'desconectado' => ['class' => 'badge-light-danger','label' => '🔴 WA desconectado'],
+                            'sem_config' => ['class' => 'badge-light-danger',  'label' => '⚙️ Sem config'],
+                            'limite_hora'=> ['class' => 'badge-light-warning', 'label' => '🛑 Limite/hora'],
+                        ];
+                        ?>
+
+                        <div class="separator my-5"></div>
+                        <h5 class="fw-bold mb-1">🕐 Status do Cron <code>processar_fila_whatsapp.php</code></h5>
+                        <p class="text-muted fs-7 mb-4">
+                            Histórico das últimas execuções do processador de fila.
+                            Configure no sistema operacional: <code>* * * * * php <?= realpath(__DIR__ . '/../cron/processar_fila_whatsapp.php') ?></code>
+                        </p>
+
+                        <?php if (empty($ultima)): ?>
+                        <div class="alert alert-warning d-flex align-items-center">
+                            <i class="ki-duotone ki-information-5 fs-2 text-warning me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            <div>
+                                <strong>Cron nunca executou</strong> ou arquivo de status não encontrado.<br>
+                                <small>O arquivo é criado em <code>storage/cron/fila_whatsapp_status.json</code> após a primeira execução.</small>
+                            </div>
+                        </div>
+                        <?php else:
+                            $st = $ultima['status'] ?? 'ok';
+                            $badge = $status_badge[$st] ?? ['class' => 'badge-light-secondary', 'label' => $st];
+
+                            // Calcula há quantos minutos foi a última execução
+                            $diff_min = '?';
+                            if (!empty($ultima['iniciado_em'])) {
+                                $ts = strtotime($ultima['iniciado_em']);
+                                $diff_sec = time() - $ts;
+                                if ($diff_sec < 60)       $diff_min = "há {$diff_sec}s";
+                                elseif ($diff_sec < 3600) $diff_min = 'há ' . floor($diff_sec/60) . 'min';
+                                else                       $diff_min = 'há ' . floor($diff_sec/3600) . 'h';
+                            }
+                        ?>
+
+                        <!-- Resumo da última execução -->
+                        <div class="d-flex flex-wrap gap-3 mb-4">
+                            <div class="border rounded p-3 text-center" style="min-width:110px">
+                                <div class="fs-7 text-muted mb-1">Última execução</div>
+                                <div class="fw-bold fs-7"><?= htmlspecialchars($ultima['iniciado_em'] ?? '—') ?></div>
+                                <small class="text-muted"><?= $diff_min ?></small>
+                            </div>
+                            <div class="border rounded p-3 text-center" style="min-width:100px">
+                                <div class="fs-7 text-muted mb-1">Status</div>
+                                <span class="badge <?= $badge['class'] ?> px-3 py-2"><?= $badge['label'] ?></span>
+                            </div>
+                            <div class="border rounded p-3 text-center" style="min-width:90px">
+                                <div class="fs-7 text-muted mb-1">Enviados</div>
+                                <div class="fw-bold fs-4 text-success"><?= (int)($ultima['enviados'] ?? 0) ?></div>
+                            </div>
+                            <div class="border rounded p-3 text-center" style="min-width:90px">
+                                <div class="fs-7 text-muted mb-1">Erros</div>
+                                <div class="fw-bold fs-4 <?= ($ultima['erros'] ?? 0) > 0 ? 'text-danger' : 'text-muted' ?>"><?= (int)($ultima['erros'] ?? 0) ?></div>
+                            </div>
+                            <div class="border rounded p-3 text-center" style="min-width:90px">
+                                <div class="fs-7 text-muted mb-1">Na fila</div>
+                                <div class="fw-bold fs-4 <?= ($ultima['pendentes'] ?? 0) > 0 ? 'text-warning' : 'text-muted' ?>"><?= (int)($ultima['pendentes'] ?? 0) ?></div>
+                            </div>
+                            <div class="border rounded p-3 text-center" style="min-width:90px">
+                                <div class="fs-7 text-muted mb-1">Duração</div>
+                                <div class="fw-bold fs-7"><?= htmlspecialchars($ultima['duracao_s'] ?? '—') ?>s</div>
+                            </div>
+                            <div class="border rounded p-3 text-center" style="min-width:90px">
+                                <div class="fs-7 text-muted mb-1">Total exec.</div>
+                                <div class="fw-bold fs-7"><?= (int)($cron_status['total_execucoes'] ?? 0) ?></div>
+                            </div>
+                        </div>
+
+                        <!-- Histórico das últimas execuções -->
+                        <?php if (count($historico) > 1): ?>
+                        <div class="mb-3">
+                            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#historico_cron">
+                                📋 Ver histórico (<?= count($historico) ?> execuções)
+                            </button>
+                            <div class="collapse mt-3" id="historico_cron">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered table-striped fs-7">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Data/Hora</th>
+                                                <th>Status</th>
+                                                <th class="text-center">Enviados</th>
+                                                <th class="text-center">Erros</th>
+                                                <th class="text-center">Pendentes</th>
+                                                <th>Duração</th>
+                                                <th>Detalhe</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($historico as $exec): ?>
+                                            <?php
+                                                $st_h  = $exec['status'] ?? 'ok';
+                                                $bg_h  = $status_badge[$st_h] ?? ['class' => 'badge-light-secondary', 'label' => $st_h];
+                                            ?>
+                                            <tr>
+                                                <td class="text-nowrap"><?= htmlspecialchars($exec['iniciado_em'] ?? '—') ?></td>
+                                                <td><span class="badge <?= $bg_h['class'] ?>"><?= $bg_h['label'] ?></span></td>
+                                                <td class="text-center text-success fw-bold"><?= (int)($exec['enviados'] ?? 0) ?></td>
+                                                <td class="text-center <?= ($exec['erros'] ?? 0) > 0 ? 'text-danger fw-bold' : 'text-muted' ?>"><?= (int)($exec['erros'] ?? 0) ?></td>
+                                                <td class="text-center <?= ($exec['pendentes'] ?? 0) > 0 ? 'text-warning' : '' ?>"><?= (int)($exec['pendentes'] ?? 0) ?></td>
+                                                <td><?= htmlspecialchars($exec['duracao_s'] ?? '—') ?>s</td>
+                                                <td class="text-muted"><?= htmlspecialchars($exec['detalhe'] ?? '') ?></td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="alert alert-light-info fs-7 mb-0">
+                            <strong>Nota:</strong> Notificações individuais (ocorrências, documentos, aprovações) são enviadas <strong>diretamente</strong>, sem passar pela fila.
+                            A fila é usada para <strong>comunicados em massa</strong> e <strong>pesquisa de humor</strong>.
+                        </div>
+
+                        <?php endif; ?>
+
                         <div class="d-flex justify-content-between align-items-center">
                             <a href="?aba=conexao" class="btn btn-light-success">
                                 <i class="ki-duotone ki-scan-barcode fs-2 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
