@@ -15,10 +15,14 @@ $usuario = $_SESSION['usuario'];
 
 // Carrega colaboradores ativos para o seletor de destinatários
 $stmt_todos_colabs = $pdo->query("
-    SELECT id, nome_completo, cargo, departamento
-    FROM colaboradores
-    WHERE status = 'ativo'
-    ORDER BY nome_completo
+    SELECT c.id, c.nome_completo,
+           s.nome_setor  AS departamento,
+           ca.nome_cargo AS cargo
+    FROM colaboradores c
+    LEFT JOIN setores s  ON s.id  = c.setor_id
+    LEFT JOIN cargos  ca ON ca.id = c.cargo_id
+    WHERE c.status = 'ativo'
+    ORDER BY c.nome_completo
 ");
 $todos_colaboradores = $stmt_todos_colabs->fetchAll();
 
