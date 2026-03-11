@@ -31,22 +31,34 @@ try {
     
     $request_id = $_POST['request_id'] ?? null;
     
-    $raw_lider = $_POST['lider_id'] ?? '';
-    $raw_liderado = $_POST['liderado_id'] ?? '';
+    $raw_lider = trim((string)($_POST['lider_id'] ?? ''));
+    $raw_liderado = trim((string)($_POST['liderado_id'] ?? ''));
     
-    // Extrai ID numérico do colaborador a partir de c_X, u_X ou valor puro
+    /**
+     * Converte ID prefixado (c_X, u_X) ou numérico puro para colaborador_id.
+     * - c_X → retorna X (ID do colaborador)
+     * - u_X → busca colaborador_id do usuário X; se não tiver, retorna 0
+     * - numérico → retorna como inteiro
+     */
     function extrair_colaborador_id($raw, $pdo) {
         $raw = trim((string)$raw);
         if ($raw === '') return 0;
+        
         if (preg_match('/^c_(\d+)$/', $raw, $m)) {
             return (int)$m[1];
         }
+        
         if (preg_match('/^u_(\d+)$/', $raw, $m)) {
+            $user_id = (int)$m[1];
             $stmt = $pdo->prepare("SELECT colaborador_id FROM usuarios WHERE id = ?");
-            $stmt->execute([(int)$m[1]]);
+            $stmt->execute([$user_id]);
             $row = $stmt->fetch();
-            return ($row && $row['colaborador_id']) ? (int)$row['colaborador_id'] : 0;
+            if ($row && $row['colaborador_id']) {
+                return (int)$row['colaborador_id'];
+            }
+            throw new Exception("Este usuário não possui cadastro de colaborador vinculado. Vincule-o primeiro em Colaboradores.");
         }
+        
         return (int)$raw;
     }
     
@@ -57,13 +69,10 @@ try {
     $hora_fim = $_POST['hora_fim'] ?? null;
     $assuntos_tratados = trim($_POST['assuntos_tratados'] ?? '');
     $proximos_passos = trim($_POST['proximos_passos'] ?? '');
-    $status = $_POST['status'] ?? 'agendada'; // 'agendada' ou 'solicitada'
-    
-    error_log("REUNIAO_1ON1_DEBUG: raw_lider={$raw_lider}, raw_liderado={$raw_liderado}, lider_id={$lider_id}, liderado_id={$liderado_id}");
-    error_log("REUNIAO_1ON1_DEBUG: POST=" . json_encode($_POST, JSON_UNESCAPED_UNICODE));
+    $status = $_POST['status'] ?? 'agendada';
     
     if ($lider_id <= 0 || $liderado_id <= 0) {
-        throw new Exception("Líder e liderado são obrigatórios (recebido: lider_raw={$raw_lider}, liderado_raw={$raw_liderado}, lider_id={$lider_id}, liderado_id={$liderado_id})");
+        throw new Exception('Líder e liderado são obrigatórios');
     }
     
     // Proteção ATÔMICA contra requisições duplicadas usando GET_LOCK do MySQL
