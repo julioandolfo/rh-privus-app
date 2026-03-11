@@ -350,7 +350,7 @@ function enviar_email_ocorrencia($ocorrencia_id) {
 /**
  * Envia email de novo comunicado para todos colaboradores
  */
-function enviar_email_novo_comunicado($comunicado_id) {
+function enviar_email_novo_comunicado($comunicado_id, ?array $colaboradores_ids = null) {
     $pdo = getDB();
     
     // Busca dados do comunicado
@@ -383,7 +383,15 @@ function enviar_email_novo_comunicado($comunicado_id) {
         }
     }
     
-    // Busca todos os colaboradores ativos com email
+    // Busca colaboradores ativos com email (filtrado por IDs quando especificados)
+    $filtro_ids_sql = '';
+    $params_colab   = [];
+    if (!empty($colaboradores_ids)) {
+        $placeholders   = implode(',', array_fill(0, count($colaboradores_ids), '?'));
+        $filtro_ids_sql = "AND c.id IN ($placeholders)";
+        $params_colab   = $colaboradores_ids;
+    }
+
     $stmt_colab = $pdo->prepare("
         SELECT DISTINCT
             c.id as colaborador_id,
@@ -394,13 +402,14 @@ function enviar_email_novo_comunicado($comunicado_id) {
         FROM colaboradores c
         LEFT JOIN usuarios u ON c.id = u.colaborador_id
         WHERE c.status = 'ativo'
+        $filtro_ids_sql
         AND (
             c.email_pessoal IS NOT NULL AND c.email_pessoal != ''
             OR u.email IS NOT NULL
         )
         ORDER BY c.nome_completo
     ");
-    $stmt_colab->execute();
+    $stmt_colab->execute($params_colab);
     $colaboradores = $stmt_colab->fetchAll();
     
     if (empty($colaboradores)) {

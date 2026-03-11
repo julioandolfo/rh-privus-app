@@ -13,18 +13,41 @@ require_page_permission('comunicado_add.php');
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
+// Carrega colaboradores ativos para o seletor de destinatários
+$stmt_todos_colabs = $pdo->query("
+    SELECT id, nome_completo, cargo, departamento
+    FROM colaboradores
+    WHERE status = 'ativo'
+    ORDER BY nome_completo
+");
+$todos_colaboradores = $stmt_todos_colabs->fetchAll();
+
 // Processa POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $titulo = trim($_POST['titulo'] ?? '');
-    $conteudo = $_POST['conteudo'] ?? '';
-    $status = $_POST['status'] ?? 'rascunho';
+    $titulo          = trim($_POST['titulo'] ?? '');
+    $conteudo        = $_POST['conteudo'] ?? '';
+    $status          = $_POST['status'] ?? 'rascunho';
     $data_publicacao = !empty($_POST['data_publicacao']) ? $_POST['data_publicacao'] : null;
-    $data_expiracao = !empty($_POST['data_expiracao']) ? $_POST['data_expiracao'] : null;
-    
+    $data_expiracao  = !empty($_POST['data_expiracao'])  ? $_POST['data_expiracao']  : null;
+
+    // Destinatários: 'todos' ou array de IDs específicos
+    $destinatarios_raw = $_POST['destinatarios'] ?? [];
+    $enviar_para_todos = empty($destinatarios_raw)
+        || in_array('todos', $destinatarios_raw, true)
+        || (count($destinatarios_raw) === 1 && $destinatarios_raw[0] === '');
+
+    $ids_selecionados = [];
+    if (!$enviar_para_todos) {
+        $ids_selecionados = array_values(array_filter(array_map('intval', $destinatarios_raw), fn($v) => $v > 0));
+        if (empty($ids_selecionados)) {
+            redirect('comunicado_add.php', 'Selecione ao menos um destinatário!', 'error');
+        }
+    }
+
     if (empty($titulo) || empty($conteudo)) {
         redirect('comunicado_add.php', 'Preencha todos os campos obrigatórios!', 'error');
     }
-    
+
     // Processa upload de imagem
     $imagem = null;
     if (isset($_FILES['imagem']) && $_FILES['imagem']['error'] === UPLOAD_ERR_OK) {
@@ -32,104 +55,121 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0755, true);
         }
-        
+
         $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $finfo     = finfo_open(FILEINFO_MIME_TYPE);
         $mime_type = finfo_file($finfo, $_FILES['imagem']['tmp_name']);
         finfo_close($finfo);
-        
+
         if (in_array($mime_type, $allowed_types)) {
-            $max_size = 5 * 1024 * 1024; // 5MB
+            $max_size = 5 * 1024 * 1024;
             if ($_FILES['imagem']['size'] <= $max_size) {
-                $ext = strtolower(pathinfo($_FILES['imagem']['name'], PATHINFO_EXTENSION));
+                $ext      = strtolower(pathinfo($_FILES['imagem']['name'], PATHINFO_EXTENSION));
                 $filename = 'comunicado_' . time() . '_' . uniqid() . '.' . $ext;
-                $filepath = $upload_dir . $filename;
-                
-                if (move_uploaded_file($_FILES['imagem']['tmp_name'], $filepath)) {
+                if (move_uploaded_file($_FILES['imagem']['tmp_name'], $upload_dir . $filename)) {
                     $imagem = 'uploads/comunicados/' . $filename;
                 }
             }
         }
     }
-    
+
     try {
         $stmt = $pdo->prepare("
             INSERT INTO comunicados (titulo, conteudo, imagem, criado_por_usuario_id, status, data_publicacao, data_expiracao)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([
-            $titulo,
-            $conteudo,
-            $imagem,
-            $usuario['id'],
-            $status,
-            $data_publicacao,
-            $data_expiracao
-        ]);
-        
+        $stmt->execute([$titulo, $conteudo, $imagem, $usuario['id'], $status, $data_publicacao, $data_expiracao]);
         $comunicado_id = $pdo->lastInsertId();
-        
-        // Se o comunicado foi publicado, envia emails e push para todos os colaboradores
+
         if ($status === 'publicado') {
             require_once __DIR__ . '/../includes/email_templates.php';
             require_once __DIR__ . '/../includes/push_notifications.php';
+            require_once __DIR__ . '/../includes/evolution_service.php';
             require_once __DIR__ . '/../includes/slack_service.php';
-            
-            // Envia emails em background (não bloqueia a resposta)
-            $resultado_email = enviar_email_novo_comunicado($comunicado_id);
-            
-            // Envia push notifications para todos colaboradores ativos
-            $stmt_colabs = $pdo->query("SELECT id, nome_completo FROM colaboradores WHERE status = 'ativo'");
-            $colaboradores = $stmt_colabs->fetchAll();
-            
+
+            $url_comunicado = get_base_url() . '/pages/comunicado_view.php?id=' . $comunicado_id;
+            $titulo_preview = mb_strlen($titulo) > 50 ? mb_substr($titulo, 0, 50) . '...' : $titulo;
+
+            // ─── Monta lista de colaboradores para notificar ──────────────────
+            if ($enviar_para_todos) {
+                $stmt_colabs = $pdo->query("SELECT id, nome_completo FROM colaboradores WHERE status = 'ativo'");
+            } else {
+                $ph          = implode(',', array_fill(0, count($ids_selecionados), '?'));
+                $stmt_colabs = $pdo->prepare("SELECT id, nome_completo FROM colaboradores WHERE status = 'ativo' AND id IN ($ph)");
+                $stmt_colabs->execute($ids_selecionados);
+            }
+            $colaboradores_notif = $enviar_para_todos ? $stmt_colabs->fetchAll() : $stmt_colabs->fetchAll();
+
+            // ─── Email ────────────────────────────────────────────────────────
+            $ids_email       = $enviar_para_todos ? null : $ids_selecionados;
+            $resultado_email = enviar_email_novo_comunicado($comunicado_id, $ids_email);
+
+            // ─── Push + WhatsApp (individual) + Slack DM ─────────────────────
             $push_enviados = 0;
-            $titulo_preview = strlen($titulo) > 50 ? substr($titulo, 0, 50) . '...' : $titulo;
-            
-            foreach ($colaboradores as $colab) {
+            $wa_enfileirados = 0;
+
+            foreach ($colaboradores_notif as $colab) {
+                // WhatsApp direto (independente do push)
+                try {
+                    $r = evolution_notificar_colaborador(
+                        $colab['id'],
+                        '📢 Novo Comunicado',
+                        $titulo_preview,
+                        $url_comunicado
+                    );
+                    if (!empty($r['success'])) $wa_enfileirados++;
+                } catch (Exception $wa_e) {
+                    error_log("[WA] Comunicado colaborador {$colab['id']}: " . $wa_e->getMessage());
+                }
+
+                // Push + Slack DM (passa false para WA não duplicar)
                 try {
                     $resultado_push = enviar_push_colaborador(
                         $colab['id'],
                         'Novo Comunicado 📢',
                         $titulo_preview,
-                        get_base_url() . '/pages/comunicado_view.php?id=' . $comunicado_id,
+                        $url_comunicado,
                         'comunicado',
                         $comunicado_id,
-                        'comunicado'
+                        'comunicado',
+                        false  // WA já disparado acima; Slack DM via push_notifications
                     );
-                    if ($resultado_push['success']) {
-                        $push_enviados++;
-                    }
+                    if (!empty($resultado_push['success'])) $push_enviados++;
                 } catch (Exception $e) {
-                    error_log("Erro ao enviar push para colaborador {$colab['id']}: " . $e->getMessage());
+                    error_log("Erro push comunicado colaborador {$colab['id']}: " . $e->getMessage());
                 }
-            }
-            
-            // Posta também no canal Slack (comunicado de broadcast)
-            try {
-                $url_comunicado = get_base_url() . '/pages/comunicado_view.php?id=' . $comunicado_id;
-                $preview_texto  = !empty($descricao) ? mb_substr(strip_tags($descricao), 0, 300) : $titulo_preview;
-                slack_comunicado_no_canal(
-                    '📢 Novo Comunicado: ' . $titulo_preview,
-                    $preview_texto,
-                    $url_comunicado
-                );
-            } catch (Exception $sl_e) {
-                error_log('[Slack] Erro ao postar comunicado no canal: ' . $sl_e->getMessage());
             }
 
-            if ($resultado_email['success']) {
-                $mensagem = 'Comunicado criado e notificações enviadas! ';
-                $mensagem .= "({$resultado_email['enviados']} emails";
-                if ($resultado_email['erros'] > 0) {
-                    $mensagem .= ", {$resultado_email['erros']} erros";
+            // ─── Slack canal (broadcast — só quando for para todos) ───────────
+            if ($enviar_para_todos) {
+                try {
+                    $preview_texto = mb_substr(strip_tags($conteudo), 0, 300);
+                    slack_comunicado_no_canal(
+                        '📢 Novo Comunicado: ' . $titulo_preview,
+                        $preview_texto,
+                        $url_comunicado
+                    );
+                } catch (Exception $sl_e) {
+                    error_log('[Slack] Erro ao postar comunicado no canal: ' . $sl_e->getMessage());
                 }
-                $mensagem .= ", {$push_enviados} push)";
-                redirect('comunicados.php', $mensagem, 'success');
+            }
+
+            // ─── Mensagem de retorno ──────────────────────────────────────────
+            $total_dest = count($colaboradores_notif);
+            if ($resultado_email['success']) {
+                $msg  = "Comunicado publicado! {$total_dest} destinatário(s): ";
+                $msg .= "{$resultado_email['enviados']} e-mail(s)";
+                $msg .= ", {$push_enviados} push";
+                $msg .= ", {$wa_enfileirados} WA enfileirado(s)";
+                if ($resultado_email['erros'] > 0) {
+                    $msg .= " ({$resultado_email['erros']} erros de e-mail)";
+                }
+                redirect('comunicados.php', $msg, 'success');
             } else {
-                redirect('comunicados.php', 'Comunicado criado mas houve erro ao enviar emails: ' . $resultado_email['message'], 'warning');
+                redirect('comunicados.php', 'Comunicado criado mas houve erro ao enviar e-mails: ' . $resultado_email['message'], 'warning');
             }
         } else {
-            redirect('comunicados.php', 'Comunicado criado com sucesso!', 'success');
+            redirect('comunicados.php', 'Comunicado salvo como rascunho!', 'success');
         }
     } catch (PDOException $e) {
         redirect('comunicado_add.php', 'Erro ao criar comunicado: ' . $e->getMessage(), 'error');
@@ -212,7 +252,74 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
             </div>
             <!--end::Card-->
-            
+
+            <!--begin::Card Destinatários-->
+            <div class="card mb-5">
+                <div class="card-header border-0 pt-5">
+                    <h3 class="card-title align-items-start flex-column">
+                        <span class="card-label fw-bold fs-3 mb-1">Destinatários</span>
+                        <span class="text-muted fw-semibold fs-7">Defina quem receberá este comunicado (push, e-mail e WhatsApp)</span>
+                    </h3>
+                </div>
+                <div class="card-body pt-4">
+
+                    <!--begin::Tipo-->
+                    <div class="d-flex gap-4 mb-6">
+                        <label class="d-flex align-items-center gap-2 cursor-pointer">
+                            <input type="radio" name="tipo_destinatario" id="radio_todos" value="todos" class="form-check-input" checked>
+                            <span class="fw-semibold fs-6">Todos os colaboradores ativos</span>
+                        </label>
+                        <label class="d-flex align-items-center gap-2 cursor-pointer">
+                            <input type="radio" name="tipo_destinatario" id="radio_especificos" value="especificos" class="form-check-input">
+                            <span class="fw-semibold fs-6">Colaboradores específicos</span>
+                        </label>
+                    </div>
+                    <!--end::Tipo-->
+
+                    <!--begin::Seletor específico (oculto por padrão)-->
+                    <div id="bloco_especificos" class="d-none">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <label class="form-label mb-0 fw-semibold">Selecione os colaboradores</label>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-light-primary" id="btn_selecionar_todos">Marcar todos</button>
+                                <button type="button" class="btn btn-sm btn-light-danger" id="btn_limpar_todos">Limpar</button>
+                            </div>
+                        </div>
+                        <select id="select_destinatarios" name="destinatarios[]" multiple class="form-select" data-placeholder="Buscar colaborador...">
+                            <?php foreach ($todos_colaboradores as $colab): ?>
+                                <option value="<?= $colab['id'] ?>"
+                                    data-dept="<?= htmlspecialchars($colab['departamento'] ?? '') ?>"
+                                    data-cargo="<?= htmlspecialchars($colab['cargo'] ?? '') ?>">
+                                    <?= htmlspecialchars($colab['nome_completo']) ?>
+                                    <?php if (!empty($colab['departamento'])): ?>
+                                        — <?= htmlspecialchars($colab['departamento']) ?>
+                                    <?php endif; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text mt-2">
+                            <span id="label_qtd_selecionados" class="badge badge-light-primary me-2">0 selecionado(s)</span>
+                            de <?= count($todos_colaboradores) ?> colaboradores ativos
+                        </div>
+                    </div>
+                    <!--end::Seletor específico-->
+
+                    <!--begin::Info todos-->
+                    <div id="bloco_todos_info" class="alert alert-light-primary d-flex align-items-center">
+                        <i class="ki-duotone ki-people fs-2 text-primary me-3">
+                            <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+                            <span class="path4"></span><span class="path5"></span>
+                        </i>
+                        <div>
+                            <strong><?= count($todos_colaboradores) ?> colaboradores</strong> receberão este comunicado via push, e-mail e WhatsApp.
+                        </div>
+                    </div>
+                    <!--end::Info todos-->
+
+                </div>
+            </div>
+            <!--end::Card Destinatários-->
+
             <!--begin::Actions-->
             <div class="card">
                 <div class="card-footer d-flex justify-content-end py-6 px-9">
@@ -267,6 +374,105 @@ require_once __DIR__ . '/../includes/header.php';
 })();
 </script>
 <!--end::Script para preencher data/hora-->
+
+<!--begin::Select2 Destinatários-->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const radioTodos      = document.getElementById('radio_todos');
+    const radioEspecificos = document.getElementById('radio_especificos');
+    const blocoEspecificos = document.getElementById('bloco_especificos');
+    const blocoTodosInfo   = document.getElementById('bloco_todos_info');
+    const selectDest       = document.getElementById('select_destinatarios');
+    const labelQtd         = document.getElementById('label_qtd_selecionados');
+    const btnMarcarTodos   = document.getElementById('btn_selecionar_todos');
+    const btnLimpar        = document.getElementById('btn_limpar_todos');
+
+    // Inicializa Select2 se disponível
+    let select2Ativo = false;
+    if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
+        $(selectDest).select2({
+            placeholder: 'Buscar colaborador pelo nome ou departamento...',
+            allowClear: true,
+            width: '100%',
+            language: {
+                noResults: function() { return 'Nenhum colaborador encontrado'; },
+                searching: function() { return 'Buscando...'; }
+            }
+        });
+        $(selectDest).on('change', atualizarContador);
+        select2Ativo = true;
+    } else {
+        selectDest.addEventListener('change', atualizarContador);
+    }
+
+    function atualizarContador() {
+        const qtd = Array.from(selectDest.selectedOptions).length;
+        labelQtd.textContent = qtd + ' selecionado(s)';
+    }
+
+    function alternarModo() {
+        if (radioEspecificos.checked) {
+            blocoEspecificos.classList.remove('d-none');
+            blocoTodosInfo.classList.add('d-none');
+        } else {
+            blocoEspecificos.classList.add('d-none');
+            blocoTodosInfo.classList.remove('d-none');
+            // Limpa seleção ao voltar para "todos"
+            if (select2Ativo) {
+                $(selectDest).val(null).trigger('change');
+            } else {
+                Array.from(selectDest.options).forEach(o => o.selected = false);
+            }
+            atualizarContador();
+        }
+    }
+
+    radioTodos.addEventListener('change', alternarModo);
+    radioEspecificos.addEventListener('change', alternarModo);
+
+    btnMarcarTodos.addEventListener('click', function () {
+        const allIds = Array.from(selectDest.options).map(o => o.value);
+        if (select2Ativo) {
+            $(selectDest).val(allIds).trigger('change');
+        } else {
+            Array.from(selectDest.options).forEach(o => o.selected = true);
+        }
+        atualizarContador();
+    });
+
+    btnLimpar.addEventListener('click', function () {
+        if (select2Ativo) {
+            $(selectDest).val(null).trigger('change');
+        } else {
+            Array.from(selectDest.options).forEach(o => o.selected = false);
+        }
+        atualizarContador();
+    });
+
+    // Ao submeter: se "todos", adiciona um input hidden para garantir o valor correto
+    document.getElementById('form_comunicado').addEventListener('submit', function (e) {
+        if (radioTodos.checked) {
+            // Garante que nenhum destinatário específico seja enviado (modo todos)
+            if (select2Ativo) {
+                $(selectDest).val(null);
+            } else {
+                Array.from(selectDest.options).forEach(o => o.selected = false);
+            }
+            // Sinaliza "todos" via campo hidden
+            let hidden = document.getElementById('hidden_todos');
+            if (!hidden) {
+                hidden = document.createElement('input');
+                hidden.type  = 'hidden';
+                hidden.name  = 'destinatarios[]';
+                hidden.id    = 'hidden_todos';
+                hidden.value = 'todos';
+                this.appendChild(hidden);
+            }
+        }
+    }, true); // captura antes do handler do TinyMCE
+});
+</script>
+<!--end::Select2 Destinatários-->
 
 <!--begin::TinyMCE-->
 <script src="../assets/plugins/custom/tinymce/tinymce.min.js"></script>

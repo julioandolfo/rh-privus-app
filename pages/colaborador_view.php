@@ -663,6 +663,44 @@ require_once __DIR__ . '/../includes/header.php';
                                                                     <th class="text-gray-600 fw-semibold">Email Pessoal</th>
                                                                     <td class="text-gray-800"><?= $colaborador['email_pessoal'] ? htmlspecialchars($colaborador['email_pessoal']) : '-' ?></td>
                                                                 </tr>
+                                                                <tr>
+                                                                    <th class="text-gray-600 fw-semibold">CEP</th>
+                                                                    <td class="text-gray-800"><?= !empty($colaborador['cep']) ? preg_replace('/^(\d{5})(\d{3})$/', '$1-$2', $colaborador['cep']) : '-' ?></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th class="text-gray-600 fw-semibold">Logradouro</th>
+                                                                    <td class="text-gray-800">
+                                                                        <?php
+                                                                        $end_partes = array_filter([
+                                                                            $colaborador['logradouro'] ?? '',
+                                                                            $colaborador['numero'] ?? '',
+                                                                        ]);
+                                                                        echo $end_partes ? htmlspecialchars(implode(', ', $end_partes)) : '-';
+                                                                        ?>
+                                                                    </td>
+                                                                </tr>
+                                                                <?php if (!empty($colaborador['complemento'])): ?>
+                                                                <tr>
+                                                                    <th class="text-gray-600 fw-semibold">Complemento</th>
+                                                                    <td class="text-gray-800"><?= htmlspecialchars($colaborador['complemento']) ?></td>
+                                                                </tr>
+                                                                <?php endif; ?>
+                                                                <tr>
+                                                                    <th class="text-gray-600 fw-semibold">Bairro</th>
+                                                                    <td class="text-gray-800"><?= !empty($colaborador['bairro']) ? htmlspecialchars($colaborador['bairro']) : '-' ?></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th class="text-gray-600 fw-semibold">Cidade / UF</th>
+                                                                    <td class="text-gray-800">
+                                                                        <?php
+                                                                        $cidade_uf = array_filter([
+                                                                            $colaborador['cidade_endereco'] ?? '',
+                                                                            $colaborador['estado_endereco'] ?? '',
+                                                                        ]);
+                                                                        echo $cidade_uf ? htmlspecialchars(implode(' / ', $cidade_uf)) : '-';
+                                                                        ?>
+                                                                    </td>
+                                                                </tr>
                                                                 <?php if ($colaborador['status'] === 'desligado' && $data_desligamento): ?>
                                                                 <tr>
                                                                     <th class="text-gray-600 fw-semibold">Data de Desligamento</th>
