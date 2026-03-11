@@ -108,25 +108,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ids_email       = $enviar_para_todos ? null : $ids_selecionados;
             $resultado_email = enviar_email_novo_comunicado($comunicado_id, $ids_email);
 
-            // ─── Push + WhatsApp (individual) + Slack DM ─────────────────────
-            $push_enviados = 0;
+            // ─── Push + WhatsApp (fila em massa) + Slack DM ─────────────────
+            $push_enviados   = 0;
             $wa_enfileirados = 0;
 
             foreach ($colaboradores_notif as $colab) {
-                // WhatsApp direto (independente do push)
+                // WhatsApp via fila — comunicado é envio em massa; cron ou botão
+                // "Processar Fila" no painel Evolution dispara as mensagens com rate limiting.
                 try {
-                    $r = evolution_notificar_colaborador(
-                        $colab['id'],
-                        '📢 Novo Comunicado',
-                        $titulo_preview,
-                        $url_comunicado
-                    );
-                    if (!empty($r['success'])) $wa_enfileirados++;
+                    $stmt_wa = $pdo->prepare("
+                        SELECT whatsapp_numero, whatsapp_ativo, nome_completo
+                        FROM colaboradores WHERE id = ? AND status = 'ativo'
+                    ");
+                    $stmt_wa->execute([$colab['id']]);
+                    $colab_wa = $stmt_wa->fetch();
+                    if ($colab_wa && $colab_wa['whatsapp_ativo'] && !empty($colab_wa['whatsapp_numero'])) {
+                        $nome_wa  = $colab_wa['nome_completo'];
+                        $texto_wa = "👋 Olá, *{$nome_wa}*!\n\n*📢 Novo Comunicado*\n\n{$titulo_preview}\n\n🔗 Acesse: {$url_comunicado}\n\n_RH Privus_";
+                        $enfileirou = evolution_enfileirar_mensagem(
+                            $colab['id'],
+                            evolution_normalizar_numero($colab_wa['whatsapp_numero']),
+                            '📢 Novo Comunicado',
+                            $texto_wa,
+                            $url_comunicado,
+                            'notificacao'
+                        );
+                        if ($enfileirou) $wa_enfileirados++;
+                    }
                 } catch (Exception $wa_e) {
-                    error_log("[WA] Comunicado colaborador {$colab['id']}: " . $wa_e->getMessage());
+                    error_log("[WA] Comunicado enfileirar colaborador {$colab['id']}: " . $wa_e->getMessage());
                 }
 
-                // Push + Slack DM (passa false para WA não duplicar)
+                // Push + Slack DM
                 try {
                     $resultado_push = enviar_push_colaborador(
                         $colab['id'],
@@ -135,8 +148,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $url_comunicado,
                         'comunicado',
                         $comunicado_id,
-                        'comunicado',
-                        false  // WA já disparado acima; Slack DM via push_notifications
+                        'comunicado'
+                        // WA não duplica pois enviar_push_colaborador chama evolution_notificar_colaborador
+                        // que envia direto — mas aqui já enfileiramos acima, então passamos false
+                        , false
                     );
                     if (!empty($resultado_push['success'])) $push_enviados++;
                 } catch (Exception $e) {
@@ -164,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msg  = "Comunicado publicado! {$total_dest} destinatário(s): ";
                 $msg .= "{$resultado_email['enviados']} e-mail(s)";
                 $msg .= ", {$push_enviados} push";
-                $msg .= ", {$wa_enfileirados} WA enfileirado(s)";
+                $msg .= ", {$wa_enfileirados} WA na fila (processar em Configurações → WhatsApp)";
                 if ($resultado_email['erros'] > 0) {
                     $msg .= " ({$resultado_email['erros']} erros de e-mail)";
                 }

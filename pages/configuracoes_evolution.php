@@ -484,11 +484,22 @@ include __DIR__ . '/../includes/header.php';
                                         $fila_hora = $pdo->query("SELECT COUNT(*) FROM evolution_fila_mensagens WHERE status = 'enviado' AND enviado_em >= DATE_SUB(NOW(), INTERVAL 1 HOUR)")->fetchColumn();
                                     } catch (Exception $e) { $fila_pendente = '?'; $fila_hora = '?'; }
                                 ?>
-                                <div class="d-flex gap-3 mt-2">
-                                    <span class="badge badge-light-warning fs-7 px-3 py-2">⏳ <?= $fila_pendente ?> pendentes</span>
-                                    <span class="badge badge-light-success fs-7 px-3 py-2">✅ <?= $fila_hora ?> enviadas/hora</span>
+                                <div class="d-flex flex-wrap gap-2 mt-2">
+                                    <span class="badge badge-light-warning fs-7 px-3 py-2" id="badge_pendentes">⏳ <?= $fila_pendente ?> pendentes</span>
+                                    <span class="badge badge-light-success fs-7 px-3 py-2" id="badge_hora">✅ <?= $fila_hora ?> enviadas/hora</span>
                                 </div>
-                                <div class="form-text mt-1">Atualize a página para ver o estado atual.</div>
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-sm btn-warning" id="btn_processar_fila" title="Processa até 20 mensagens da fila agora, com o intervalo configurado entre cada envio">
+                                        <span class="indicator-label">
+                                            <i class="ki-duotone ki-send fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                            Processar Fila Agora
+                                        </span>
+                                        <span class="indicator-progress">Enviando...
+                                            <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                                        </span>
+                                    </button>
+                                </div>
+                                <div class="form-text mt-1" id="resultado_fila"></div>
                             </div>
                         </div>
 
@@ -1258,6 +1269,49 @@ function toggleApiKey() {
         icon.className = 'ki-duotone ki-eye fs-2';
     }
 }
+
+// ─── Processar Fila Agora ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    const btn = document.getElementById('btn_processar_fila');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+        btn.setAttribute('data-kt-indicator', 'on');
+        btn.disabled = true;
+
+        const resultado = document.getElementById('resultado_fila');
+        resultado.innerHTML = '';
+
+        fetch('../api/evolution/processar_fila.php', {
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.removeAttribute('data-kt-indicator');
+            btn.disabled = false;
+
+            if (data.success) {
+                resultado.innerHTML = '<span class="text-success fw-semibold">'
+                    + '✅ ' + data.message
+                    + (data.ainda_pendente > 0 ? ' | <strong>' + data.ainda_pendente + '</strong> ainda na fila.' : '')
+                    + '</span>';
+
+                // Atualiza badges
+                if (document.getElementById('badge_pendentes')) {
+                    document.getElementById('badge_pendentes').textContent = '⏳ ' + (data.ainda_pendente ?? '?') + ' pendentes';
+                }
+            } else {
+                resultado.innerHTML = '<span class="text-danger fw-semibold">⚠️ ' + (data.error || 'Erro desconhecido') + '</span>';
+            }
+        })
+        .catch(err => {
+            btn.removeAttribute('data-kt-indicator');
+            btn.disabled = false;
+            resultado.innerHTML = '<span class="text-danger fw-semibold">⚠️ Falha na requisição: ' + err + '</span>';
+        });
+    });
+});
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

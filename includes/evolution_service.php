@@ -465,17 +465,16 @@ function evolution_notificar_colaborador(int $colaborador_id, string $titulo, st
 
         $numero = evolution_normalizar_numero($colaborador['whatsapp_numero']);
 
-        // Enfileira para envio controlado (rate limiting via cron)
-        $enfileirado = evolution_enfileirar_mensagem(
-            $colaborador_id,
-            $numero,
-            $titulo,
-            $texto,
-            $url,
-            'notificacao'
-        );
+        // Envio direto — notificações individuais têm volume baixo, não há risco de
+        // bloqueio por disparo em massa. A fila (processar_fila_whatsapp.php) é usada
+        // apenas para envios em lote (pesquisa de humor, comunicados).
+        $resultado = evolution_enviar_texto($numero, $texto, $colaborador_id, 'notificacao');
 
-        return ['success' => true, 'queued' => $enfileirado, 'message' => 'Mensagem enfileirada para envio'];
+        return [
+            'success' => $resultado['success'] ?? false,
+            'sent'    => true,
+            'message' => $resultado['success'] ? 'Mensagem enviada' : ($resultado['error'] ?? 'Falha ao enviar'),
+        ];
 
     } catch (Exception $e) {
         error_log('[EvolutionAPI] Erro ao notificar colaborador: ' . $e->getMessage());
