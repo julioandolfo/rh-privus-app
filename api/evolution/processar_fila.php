@@ -8,11 +8,28 @@
  * Requer autenticação de admin (sessão ativa).
  */
 
+header('Content-Type: application/json; charset=utf-8');
+
+// Garante que erros fatais retornem JSON em vez de HTML/vazio
+set_error_handler(function ($severity, $message, $file, $line) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode([
+            'success' => false,
+            'error'   => $error['message'] . ' em ' . basename($error['file']) . ':' . $error['line'],
+        ]);
+    }
+});
+
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/evolution_service.php';
-
-header('Content-Type: application/json; charset=utf-8');
 
 // ─── Autenticação ────────────────────────────────────────────────────────────
 if (!isset($_SESSION['usuario']) || !in_array($_SESSION['usuario']['role'] ?? '', ['ADMIN', 'RH'])) {
@@ -38,9 +55,13 @@ if (!$conexao['connected']) {
 }
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
-$max_por_execucao = max(1, (int)($_GET['limite'] ?? 20)); // até 20 por acionamento manual
-$intervalo_ms     = max(1000, (int)($config['intervalo_entre_mensagens'] ?? 7) * 1000); // em ms
-$max_por_hora     = max(0, (int)($config['max_mensagens_por_hora'] ?? 80));
+$max_por_execucao    = max(1, (int)($_GET['limite'] ?? 20));
+$intervalo_segundos  = max(2, (int)($config['intervalo_entre_mensagens'] ?? 7));
+$max_por_hora        = max(0, (int)($config['max_mensagens_por_hora'] ?? 80));
+
+// Limita para não estourar timeout HTTP (~60s). Se intervalo é 30s, max 1 por vez.
+$max_no_timeout = max(1, (int)floor(55 / $intervalo_segundos));
+$max_por_execucao = min($max_por_execucao, $max_no_timeout);
 
 // ─── Verifica limite por hora ─────────────────────────────────────────────────
 try {
@@ -108,11 +129,10 @@ try {
 
         try {
             if ($msg['tipo'] === 'pesquisa_humor') {
-                // Pesquisa: usa sendList para compatibilidade
                 $resultado = evolution_enviar_pesquisa_lista(
                     $msg['numero'],
-                    $msg['colaborador_id'] ?? null,
-                    $config
+                    $msg['mensagem'],
+                    $msg['colaborador_id'] ? (int)$msg['colaborador_id'] : null
                 );
             } else {
                 $resultado = evolution_enviar_texto(
@@ -151,7 +171,7 @@ try {
 
         // Intervalo entre mensagens (somente se houver mais para enviar)
         if ($enviados + $erros < count($mensagens)) {
-            usleep($intervalo_ms * 1000); // converte ms para microssegundos
+            sleep($intervalo_segundos);
         }
     }
 
