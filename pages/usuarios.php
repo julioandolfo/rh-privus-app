@@ -57,6 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $setor_id = $_POST['setor_id'] ?? null;
         $colaborador_id = $_POST['colaborador_id'] ?? null;
         $status = $_POST['status'] ?? 'ativo';
+        $telefone = sanitize($_POST['telefone'] ?? '');
+        $whatsapp_ativo = isset($_POST['whatsapp_ativo']) ? 1 : 0;
         
         if (empty($nome) || empty($email) || empty($role)) {
             redirect('usuarios.php', 'Preencha os campos obrigatórios!', 'error');
@@ -101,10 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
                 $stmt = $pdo->prepare("
-                    INSERT INTO usuarios (nome, email, senha_hash, role, empresa_id, setor_id, colaborador_id, status, foto)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO usuarios (nome, email, senha_hash, role, empresa_id, setor_id, colaborador_id, status, foto, telefone, whatsapp_ativo)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$nome, $email, $senha_hash, $role, $empresa_id ?: null, $setor_id ?: null, $colaborador_id ?: null, $status, $foto_path]);
+                $stmt->execute([$nome, $email, $senha_hash, $role, $empresa_id ?: null, $setor_id ?: null, $colaborador_id ?: null, $status, $foto_path, $telefone ?: null, $whatsapp_ativo]);
                 
                 $usuario_id = $pdo->lastInsertId();
                 
@@ -151,18 +153,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($senha)) {
                     $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
                     $stmt = $pdo->prepare("
-                        UPDATE usuarios 
-                        SET nome = ?, email = ?, senha_hash = ?, role = ?, empresa_id = ?, setor_id = ?, colaborador_id = ?, status = ?, foto = ?
+                        UPDATE usuarios
+                        SET nome = ?, email = ?, senha_hash = ?, role = ?, empresa_id = ?, setor_id = ?, colaborador_id = ?, status = ?, foto = ?, telefone = ?, whatsapp_ativo = ?
                         WHERE id = ?
                     ");
-                    $stmt->execute([$nome, $email, $senha_hash, $role, $empresa_id ?: null, $setor_id ?: null, $colaborador_id ?: null, $status, $foto_path, $id]);
+                    $stmt->execute([$nome, $email, $senha_hash, $role, $empresa_id ?: null, $setor_id ?: null, $colaborador_id ?: null, $status, $foto_path, $telefone ?: null, $whatsapp_ativo, $id]);
                 } else {
                     $stmt = $pdo->prepare("
-                        UPDATE usuarios 
-                        SET nome = ?, email = ?, role = ?, empresa_id = ?, setor_id = ?, colaborador_id = ?, status = ?, foto = ?
+                        UPDATE usuarios
+                        SET nome = ?, email = ?, role = ?, empresa_id = ?, setor_id = ?, colaborador_id = ?, status = ?, foto = ?, telefone = ?, whatsapp_ativo = ?
                         WHERE id = ?
                     ");
-                    $stmt->execute([$nome, $email, $role, $empresa_id ?: null, $setor_id ?: null, $colaborador_id ?: null, $status, $foto_path, $id]);
+                    $stmt->execute([$nome, $email, $role, $empresa_id ?: null, $setor_id ?: null, $colaborador_id ?: null, $status, $foto_path, $telefone ?: null, $whatsapp_ativo, $id]);
                 }
                 
                 // Atualiza relacionamento com empresas
@@ -553,12 +555,25 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     
                     <div class="row mb-7">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="fw-semibold fs-6 mb-2">Status</label>
                             <select name="status" id="status" class="form-select form-select-solid">
                                 <option value="ativo">Ativo</option>
                                 <option value="inativo">Inativo</option>
                             </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-semibold fs-6 mb-2">Telefone / WhatsApp</label>
+                            <div class="input-group">
+                                <span class="input-group-text">📱</span>
+                                <input type="text" name="telefone" id="telefone" class="form-control form-control-solid" placeholder="(11) 99999-9999" />
+                            </div>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end pb-2">
+                            <div class="form-check form-switch form-check-custom form-check-solid">
+                                <input class="form-check-input" type="checkbox" name="whatsapp_ativo" id="whatsapp_ativo" checked />
+                                <label class="form-check-label" for="whatsapp_ativo">Receber notificações WA</label>
+                            </div>
                         </div>
                     </div>
                     
@@ -753,6 +768,8 @@ function editarUsuario(usuario) {
     document.getElementById('role').value = usuario.role || '';
     document.getElementById('colaborador_id').value = usuario.colaborador_id || '';
     document.getElementById('status').value = usuario.status || 'ativo';
+    document.getElementById('telefone').value = usuario.telefone || '';
+    document.getElementById('whatsapp_ativo').checked = usuario.whatsapp_ativo !== 0 && usuario.whatsapp_ativo !== '0';
     document.getElementById('senha').value = '';
     document.getElementById('senha_required').textContent = '';
     

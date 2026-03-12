@@ -63,13 +63,12 @@ if ($minutos_agora < $minutos_config) {
 
 echo "✅ Horário OK (a partir de {$horario_config}, agora: " . $now->format('H:i') . ")\n\n";
 
-// ─── Busca colaboradores ativos com WhatsApp ──────────────────────────────────
+// ─── Busca colaboradores ativos com telefone ─────────────────────────────────
 try {
     $pdo = getDB();
 
-    // Exclui quem já recebeu o envio hoje OU já registrou emoção hoje (qualquer canal)
     $colaboradores = $pdo->query("
-        SELECT c.id, c.nome_completo, c.telefone
+        SELECT c.id, c.nome_completo, c.telefone, 'colaborador' AS tipo
         FROM colaboradores c
         WHERE c.status = 'ativo'
           AND c.whatsapp_ativo = 1
@@ -89,31 +88,49 @@ try {
         ORDER BY c.nome_completo
     ")->fetchAll(PDO::FETCH_ASSOC);
 
+    // Busca também usuários sem colaborador vinculado que tenham telefone
+    $usuarios_sem_colab = $pdo->query("
+        SELECT u.id, u.nome AS nome_completo, u.telefone, 'usuario' AS tipo
+        FROM usuarios u
+        WHERE u.status = 'ativo'
+          AND u.whatsapp_ativo = 1
+          AND u.telefone IS NOT NULL
+          AND u.telefone != ''
+          AND (u.colaborador_id IS NULL OR u.colaborador_id = 0)
+          AND u.id NOT IN (
+              SELECT e.usuario_id FROM emocoes e WHERE e.data_registro = CURDATE() AND e.usuario_id IS NOT NULL
+          )
+        ORDER BY u.nome
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (Exception $e) {
-    echo "❌ Erro ao buscar colaboradores: " . $e->getMessage() . "\n";
+    echo "❌ Erro ao buscar destinatários: " . $e->getMessage() . "\n";
     exit(1);
 }
 
-$total    = count($colaboradores);
+$destinatarios = array_merge($colaboradores, $usuarios_sem_colab);
+$total    = count($destinatarios);
 $enviados = 0;
 $erros    = 0;
 
-echo "📋 Colaboradores a enfileirar: {$total} (envio real controlado pelo processar_fila_whatsapp.php)\n\n";
+echo "📋 Destinatários: " . count($colaboradores) . " colaboradores + " . count($usuarios_sem_colab) . " usuários = {$total} total\n\n";
 
 if ($total === 0) {
-    echo "ℹ️  Nenhum colaborador pendente. Diagnóstico:\n";
+    echo "ℹ️  Nenhum destinatário pendente. Diagnóstico:\n";
     try {
-        $diag_total   = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo'")->fetchColumn();
-        $diag_sem_wa  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND (telefone IS NULL OR telefone = '')")->fetchColumn();
-        $diag_optout  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 0")->fetchColumn();
-        $diag_com_wa  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 1 AND telefone IS NOT NULL AND telefone != ''")->fetchColumn();
-        $diag_ja_env  = (int)$pdo->query("SELECT COUNT(*) FROM humor_pesquisa_envios WHERE data_envio = CURDATE()")->fetchColumn();
-        $diag_ja_emoc = (int)$pdo->query("SELECT COUNT(DISTINCT COALESCE(e.colaborador_id, u.colaborador_id)) FROM emocoes e LEFT JOIN usuarios u ON u.id = e.usuario_id WHERE e.data_registro = CURDATE()")->fetchColumn();
+        $diag_total_c  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo'")->fetchColumn();
+        $diag_sem_tel  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND (telefone IS NULL OR telefone = '')")->fetchColumn();
+        $diag_optout   = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 0")->fetchColumn();
+        $diag_com_wa   = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 1 AND telefone IS NOT NULL AND telefone != ''")->fetchColumn();
+        $diag_total_u  = (int)$pdo->query("SELECT COUNT(*) FROM usuarios WHERE status = 'ativo' AND (colaborador_id IS NULL OR colaborador_id = 0) AND telefone IS NOT NULL AND telefone != '' AND whatsapp_ativo = 1")->fetchColumn();
+        $diag_ja_env   = (int)$pdo->query("SELECT COUNT(*) FROM humor_pesquisa_envios WHERE data_envio = CURDATE()")->fetchColumn();
+        $diag_ja_emoc  = (int)$pdo->query("SELECT COUNT(DISTINCT COALESCE(e.colaborador_id, u.colaborador_id)) FROM emocoes e LEFT JOIN usuarios u ON u.id = e.usuario_id WHERE e.data_registro = CURDATE()")->fetchColumn();
 
-        echo "   - Colaboradores ativos total:  {$diag_total}\n";
-        echo "   - Sem telefone cadastrado:     {$diag_sem_wa}\n";
+        echo "   - Colaboradores ativos total:  {$diag_total_c}\n";
+        echo "   - Sem telefone cadastrado:     {$diag_sem_tel}\n";
         echo "   - Com whatsapp_ativo=0:        {$diag_optout}\n";
         echo "   - Com WA configurado e ativo:  {$diag_com_wa}\n";
+        echo "   - Usuários (sem colab) com WA: {$diag_total_u}\n";
         echo "   - Já receberam pesquisa hoje:  {$diag_ja_env}\n";
         echo "   - Já registraram emoção hoje:  {$diag_ja_emoc}\n";
     } catch (Exception $de) {
@@ -122,16 +139,32 @@ if ($total === 0) {
     exit(0);
 }
 
-// ─── Envia pesquisa para cada colaborador ─────────────────────────────────────
-foreach ($colaboradores as $colaborador) {
-    $nome = $colaborador['nome_completo'];
-    $id   = (int)$colaborador['id'];
+// ─── Envia pesquisa para cada destinatário ────────────────────────────────────
+foreach ($destinatarios as $dest) {
+    $nome = $dest['nome_completo'];
+    $id   = (int)$dest['id'];
+    $tipo = $dest['tipo'];
 
-    echo "  Enviando para {$nome} ({$colaborador['telefone']})... ";
+    echo "  [{$tipo}] Enviando para {$nome} ({$dest['telefone']})... ";
 
-    $result = evolution_enviar_pesquisa_humor($id, $config['mensagem_pesquisa_humor'] ?? '');
+    if ($tipo === 'colaborador') {
+        $result = evolution_enviar_pesquisa_humor($id, $config['mensagem_pesquisa_humor'] ?? '');
+    } else {
+        // Usuário sem colaborador: enfileira manualmente como texto simples
+        $primeiro_nome = explode(' ', $nome)[0];
+        $msg_custom = $config['mensagem_pesquisa_humor'] ?? '';
+        if (empty($msg_custom)) {
+            $msg_custom = "Bom dia, *{$primeiro_nome}*! 😊\n\nComo você está se sentindo hoje?\nResponda com um número:\n\n5 - 😄 Muito feliz\n4 - 🙂 Feliz\n3 - 😐 Neutro\n2 - 😕 Triste\n1 - 😞 Muito triste\n\n_Sua resposta nos ajuda a cuidar melhor do time!_";
+        } else {
+            $msg_custom = str_replace('{nome}', $primeiro_nome, $msg_custom);
+        }
 
-    if ($result['success']) {
+        $numero = evolution_normalizar_numero($dest['telefone']);
+        $enfileirado = evolution_enfileirar_mensagem(null, $numero, '🌡️ Como você está hoje?', $msg_custom, '', 'pesquisa_humor');
+        $result = ['success' => $enfileirado];
+    }
+
+    if (!empty($result['success'])) {
         echo "✅ Enfileirado\n";
         $enviados++;
     } else {
@@ -139,8 +172,7 @@ foreach ($colaboradores as $colaborador) {
         $erros++;
     }
 
-    // Pequena pausa entre enfileiramentos (muito menor que o envio real, que acontece no processador de fila)
-    usleep(100000); // 0.1s — apenas para não sobrecarregar o banco
+    usleep(100000);
 }
 
 // ─── Resumo ───────────────────────────────────────────────────────────────────

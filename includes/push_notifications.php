@@ -208,16 +208,25 @@ function enviar_push_usuario($usuario_id, $titulo, $mensagem, $url = null, $tipo
         }
 
         // Envia também via WhatsApp e Slack (só se o chamador não tratar isso diretamente)
-        if ($incluir_wa_slack && $colaborador_id) {
-            try {
-                evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
-            } catch (Exception $wa_e) {
-                push_log("enviar_push_usuario - WhatsApp erro (não crítico): " . $wa_e->getMessage());
-            }
-            try {
-                slack_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
-            } catch (Exception $sl_e) {
-                push_log("enviar_push_usuario - Slack erro (não crítico): " . $sl_e->getMessage());
+        if ($incluir_wa_slack) {
+            if ($colaborador_id) {
+                try {
+                    evolution_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
+                } catch (Exception $wa_e) {
+                    push_log("enviar_push_usuario - WhatsApp erro (não crítico): " . $wa_e->getMessage());
+                }
+                try {
+                    slack_notificar_colaborador($colaborador_id, $titulo, $mensagem, $url ?? '');
+                } catch (Exception $sl_e) {
+                    push_log("enviar_push_usuario - Slack erro (não crítico): " . $sl_e->getMessage());
+                }
+            } else {
+                // Usuário sem colaborador vinculado — envia WA usando dados do próprio usuário
+                try {
+                    evolution_notificar_usuario($usuario_id, $titulo, $mensagem, $url ?? '');
+                } catch (Exception $wa_e) {
+                    push_log("enviar_push_usuario - WhatsApp (sem colab) erro: " . $wa_e->getMessage());
+                }
             }
         }
 

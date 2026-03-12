@@ -87,6 +87,11 @@ CREATE TABLE IF NOT EXISTS `evolution_fila_mensagens` (
     INDEX `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Campo de WhatsApp nos usuarios (para receber notificações WA mesmo sem ser colaborador)
+ALTER TABLE `usuarios`
+    ADD COLUMN IF NOT EXISTS `telefone` VARCHAR(20) NULL COMMENT 'Telefone/WhatsApp do usuário',
+    ADD COLUMN IF NOT EXISTS `whatsapp_ativo` TINYINT(1) DEFAULT 1 COMMENT 'Se deve receber notificações no WhatsApp';
+
 -- Webhooks recebidos da Evolution API (log bruto)
 CREATE TABLE IF NOT EXISTS `evolution_webhooks_log` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,

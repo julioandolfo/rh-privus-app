@@ -483,6 +483,64 @@ function evolution_notificar_colaborador(int $colaborador_id, string $titulo, st
 }
 
 /**
+ * Envia notificação via WhatsApp para um usuário do sistema.
+ * Primeiro tenta via colaborador vinculado. Se não existir, usa o telefone do próprio usuário.
+ */
+function evolution_notificar_usuario(int $usuario_id, string $titulo, string $mensagem, string $url = ''): array {
+    try {
+        $pdo = getDB();
+
+        // Verifica se o usuário tem colaborador vinculado — se sim, usa o fluxo de colaborador
+        $stmt = $pdo->prepare("SELECT colaborador_id, nome, telefone, whatsapp_ativo FROM usuarios WHERE id = ? AND status = 'ativo'");
+        $stmt->execute([$usuario_id]);
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$usuario) {
+            return ['success' => false, 'error' => 'Usuário não encontrado ou inativo'];
+        }
+
+        // Se tem colaborador vinculado, delega para evolution_notificar_colaborador
+        if (!empty($usuario['colaborador_id'])) {
+            return evolution_notificar_colaborador((int)$usuario['colaborador_id'], $titulo, $mensagem, $url);
+        }
+
+        // Sem colaborador — usa dados do próprio usuário
+        if (empty($usuario['whatsapp_ativo'])) {
+            return ['success' => false, 'error' => 'Usuário com WhatsApp desativado'];
+        }
+        if (empty($usuario['telefone'])) {
+            error_log("[EvolutionAPI] evolution_notificar_usuario: usuario_id={$usuario_id} ({$usuario['nome']}) sem telefone.");
+            return ['success' => false, 'error' => 'Usuário sem telefone cadastrado'];
+        }
+
+        $config = evolution_get_config();
+        if (!$config || empty($config['notificacoes_whatsapp_ativas'])) {
+            return ['success' => false, 'error' => 'Notificações WhatsApp desativadas'];
+        }
+
+        $nome  = $usuario['nome'];
+        $texto = "👋 Olá, *{$nome}*!\n\n*{$titulo}*\n\n{$mensagem}";
+        if (!empty($url)) {
+            $texto .= "\n\n🔗 Acesse: {$url}";
+        }
+        $texto .= "\n\n_RH Privus_";
+
+        $numero = evolution_normalizar_numero($usuario['telefone']);
+        $resultado = evolution_enviar_texto($numero, $texto, null, 'notificacao');
+
+        return [
+            'success' => $resultado['success'] ?? false,
+            'sent'    => true,
+            'message' => $resultado['success'] ? 'Mensagem enviada' : ($resultado['error'] ?? 'Falha ao enviar'),
+        ];
+
+    } catch (Exception $e) {
+        error_log('[EvolutionAPI] Erro ao notificar usuario: ' . $e->getMessage());
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+/**
  * Envia pesquisa de humor para um colaborador
  *
  * @param int    $colaborador_id
