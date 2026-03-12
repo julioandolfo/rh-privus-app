@@ -47,20 +47,21 @@ if (!in_array($dia_semana, $dias_ativos)) {
     exit(0);
 }
 
-// ─── Verifica janela de horário (±30 min do horário configurado) ──────────────
+// ─── Verifica se já passou do horário mínimo configurado ─────────────────────
+// Envia a partir do horário configurado em diante (sem janela rígida).
+// A proteção contra duplicatas é feita pela query que exclui quem já recebeu hoje.
 $horario_config = substr($config['horario_pesquisa_humor'] ?? '09:00:00', 0, 5);
 [$hora_conf, $min_conf] = array_map('intval', explode(':', $horario_config));
 
 $minutos_agora  = $hora_atual * 60 + $min_atual;
 $minutos_config = $hora_conf * 60 + $min_conf;
-$diferenca      = abs($minutos_agora - $minutos_config);
 
-if ($diferenca > 30) {
-    echo "ℹ️  Fora da janela de envio. Configurado: {$horario_config}, Agora: " . $now->format('H:i') . " (diferença: {$diferenca} min). Encerrando.\n";
+if ($minutos_agora < $minutos_config) {
+    echo "ℹ️  Ainda não chegou o horário de envio. Configurado: {$horario_config}, Agora: " . $now->format('H:i') . ". Encerrando.\n";
     exit(0);
 }
 
-echo "✅ Dentro da janela de envio ({$horario_config} ±30min)\n\n";
+echo "✅ Horário OK (a partir de {$horario_config}, agora: " . $now->format('H:i') . ")\n\n";
 
 // ─── Busca colaboradores ativos com WhatsApp ──────────────────────────────────
 try {
