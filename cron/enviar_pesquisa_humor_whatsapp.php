@@ -101,7 +101,24 @@ $erros    = 0;
 echo "📋 Colaboradores a enfileirar: {$total} (envio real controlado pelo processar_fila_whatsapp.php)\n\n";
 
 if ($total === 0) {
-    echo "ℹ️  Nenhum colaborador pendente. Todos já receberam a pesquisa hoje ou não têm WA configurado.\n";
+    echo "ℹ️  Nenhum colaborador pendente. Diagnóstico:\n";
+    try {
+        $diag_total   = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo'")->fetchColumn();
+        $diag_sem_wa  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND (whatsapp_numero IS NULL OR whatsapp_numero = '')")->fetchColumn();
+        $diag_optout  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 0")->fetchColumn();
+        $diag_com_wa  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 1 AND whatsapp_numero IS NOT NULL AND whatsapp_numero != ''")->fetchColumn();
+        $diag_ja_env  = (int)$pdo->query("SELECT COUNT(*) FROM humor_pesquisa_envios WHERE data_envio = CURDATE()")->fetchColumn();
+        $diag_ja_emoc = (int)$pdo->query("SELECT COUNT(DISTINCT COALESCE(e.colaborador_id, u.colaborador_id)) FROM emocoes e LEFT JOIN usuarios u ON u.id = e.usuario_id WHERE e.data_registro = CURDATE()")->fetchColumn();
+
+        echo "   - Colaboradores ativos total:  {$diag_total}\n";
+        echo "   - Sem whatsapp_numero:         {$diag_sem_wa}\n";
+        echo "   - Com whatsapp_ativo=0:        {$diag_optout}\n";
+        echo "   - Com WA configurado e ativo:  {$diag_com_wa}\n";
+        echo "   - Já receberam pesquisa hoje:  {$diag_ja_env}\n";
+        echo "   - Já registraram emoção hoje:  {$diag_ja_emoc}\n";
+    } catch (Exception $de) {
+        echo "   ❌ Erro no diagnóstico: " . $de->getMessage() . "\n";
+    }
     exit(0);
 }
 
