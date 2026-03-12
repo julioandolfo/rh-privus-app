@@ -69,12 +69,12 @@ try {
 
     // Exclui quem já recebeu o envio hoje OU já registrou emoção hoje (qualquer canal)
     $colaboradores = $pdo->query("
-        SELECT c.id, c.nome_completo, c.whatsapp_numero
+        SELECT c.id, c.nome_completo, c.telefone
         FROM colaboradores c
         WHERE c.status = 'ativo'
           AND c.whatsapp_ativo = 1
-          AND c.whatsapp_numero IS NOT NULL
-          AND c.whatsapp_numero != ''
+          AND c.telefone IS NOT NULL
+          AND c.telefone != ''
           AND c.id NOT IN (
               SELECT colaborador_id FROM humor_pesquisa_envios WHERE data_envio = CURDATE()
           )
@@ -104,14 +104,14 @@ if ($total === 0) {
     echo "ℹ️  Nenhum colaborador pendente. Diagnóstico:\n";
     try {
         $diag_total   = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo'")->fetchColumn();
-        $diag_sem_wa  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND (whatsapp_numero IS NULL OR whatsapp_numero = '')")->fetchColumn();
+        $diag_sem_wa  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND (telefone IS NULL OR telefone = '')")->fetchColumn();
         $diag_optout  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 0")->fetchColumn();
-        $diag_com_wa  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 1 AND whatsapp_numero IS NOT NULL AND whatsapp_numero != ''")->fetchColumn();
+        $diag_com_wa  = (int)$pdo->query("SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_ativo = 1 AND telefone IS NOT NULL AND telefone != ''")->fetchColumn();
         $diag_ja_env  = (int)$pdo->query("SELECT COUNT(*) FROM humor_pesquisa_envios WHERE data_envio = CURDATE()")->fetchColumn();
         $diag_ja_emoc = (int)$pdo->query("SELECT COUNT(DISTINCT COALESCE(e.colaborador_id, u.colaborador_id)) FROM emocoes e LEFT JOIN usuarios u ON u.id = e.usuario_id WHERE e.data_registro = CURDATE()")->fetchColumn();
 
         echo "   - Colaboradores ativos total:  {$diag_total}\n";
-        echo "   - Sem whatsapp_numero:         {$diag_sem_wa}\n";
+        echo "   - Sem telefone cadastrado:     {$diag_sem_wa}\n";
         echo "   - Com whatsapp_ativo=0:        {$diag_optout}\n";
         echo "   - Com WA configurado e ativo:  {$diag_com_wa}\n";
         echo "   - Já receberam pesquisa hoje:  {$diag_ja_env}\n";
@@ -127,7 +127,7 @@ foreach ($colaboradores as $colaborador) {
     $nome = $colaborador['nome_completo'];
     $id   = (int)$colaborador['id'];
 
-    echo "  Enviando para {$nome} ({$colaborador['whatsapp_numero']})... ";
+    echo "  Enviando para {$nome} ({$colaborador['telefone']})... ";
 
     $result = evolution_enviar_pesquisa_humor($id, $config['mensagem_pesquisa_humor'] ?? '');
 

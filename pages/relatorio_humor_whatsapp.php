@@ -95,10 +95,10 @@ $por_colaborador = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ─── Colaboradores com WA mas sem resposta hoje ───────────────────────────────
 $sem_resposta_hoje = $pdo->query("
-    SELECT c.nome_completo, c.whatsapp_numero, c.whatsapp_ativo
+    SELECT c.nome_completo, c.telefone, c.whatsapp_ativo
     FROM colaboradores c
     WHERE c.status = 'ativo'
-      AND c.whatsapp_numero IS NOT NULL AND c.whatsapp_numero != ''
+      AND c.telefone IS NOT NULL AND c.telefone != ''
       AND c.id NOT IN (
           SELECT COALESCE(e.colaborador_id, u.colaborador_id)
           FROM emocoes e
@@ -112,7 +112,7 @@ $sem_resposta_hoje = $pdo->query("
 // ─── Taxa de resposta do dia ──────────────────────────────────────────────────
 $taxa = $pdo->query("
     SELECT
-        (SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND whatsapp_numero IS NOT NULL AND whatsapp_numero != '' AND whatsapp_ativo = 1) as com_wa,
+        (SELECT COUNT(*) FROM colaboradores WHERE status = 'ativo' AND telefone IS NOT NULL AND telefone != '' AND whatsapp_ativo = 1) as com_wa,
         (SELECT COUNT(*) FROM humor_pesquisa_envios WHERE data_envio = CURDATE() AND enviado = 1) as enviados_hoje,
         (SELECT COUNT(*) FROM humor_pesquisa_envios WHERE data_envio = CURDATE() AND respondido = 1) as respondidos_hoje,
         (SELECT COUNT(*) FROM emocoes WHERE data_registro = CURDATE() AND canal = 'whatsapp') as respostas_hoje

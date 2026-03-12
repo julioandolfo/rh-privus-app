@@ -424,7 +424,7 @@ function evolution_notificar_colaborador(int $colaborador_id, string $titulo, st
 
         // Verifica opt-in e número do colaborador
         $stmt = $pdo->prepare("
-            SELECT nome_completo, whatsapp_numero, whatsapp_ativo
+            SELECT nome_completo, telefone, whatsapp_ativo
             FROM colaboradores
             WHERE id = ? AND status = 'ativo'
         ");
@@ -439,9 +439,9 @@ function evolution_notificar_colaborador(int $colaborador_id, string $titulo, st
             error_log("[EvolutionAPI] evolution_notificar_colaborador: colaborador_id={$colaborador_id} ({$colaborador['nome_completo']}) tem whatsapp_ativo=0.");
             return ['success' => false, 'error' => 'Colaborador com WhatsApp desativado (opt-out)'];
         }
-        if (empty($colaborador['whatsapp_numero'])) {
-            error_log("[EvolutionAPI] evolution_notificar_colaborador: colaborador_id={$colaborador_id} ({$colaborador['nome_completo']}) sem whatsapp_numero cadastrado.");
-            return ['success' => false, 'error' => 'Colaborador sem número WhatsApp cadastrado'];
+        if (empty($colaborador['telefone'])) {
+            error_log("[EvolutionAPI] evolution_notificar_colaborador: colaborador_id={$colaborador_id} ({$colaborador['nome_completo']}) sem telefone cadastrado.");
+            return ['success' => false, 'error' => 'Colaborador sem telefone cadastrado'];
         }
 
         // Verifica se notificações WA estão ativas na config
@@ -463,7 +463,7 @@ function evolution_notificar_colaborador(int $colaborador_id, string $titulo, st
         }
         $texto .= "\n\n_RH Privus_";
 
-        $numero = evolution_normalizar_numero($colaborador['whatsapp_numero']);
+        $numero = evolution_normalizar_numero($colaborador['telefone']);
 
         // Envio direto — notificações individuais têm volume baixo, não há risco de
         // bloqueio por disparo em massa. A fila (processar_fila_whatsapp.php) é usada
@@ -493,15 +493,15 @@ function evolution_enviar_pesquisa_humor(int $colaborador_id, string $mensagem_c
         $pdo = getDB();
 
         $stmt = $pdo->prepare("
-            SELECT nome_completo, whatsapp_numero, whatsapp_ativo
+            SELECT nome_completo, telefone, whatsapp_ativo
             FROM colaboradores
             WHERE id = ? AND status = 'ativo'
         ");
         $stmt->execute([$colaborador_id]);
         $colaborador = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$colaborador || !$colaborador['whatsapp_ativo'] || empty($colaborador['whatsapp_numero'])) {
-            return ['success' => false, 'error' => 'Colaborador sem WhatsApp configurado'];
+        if (!$colaborador || !$colaborador['whatsapp_ativo'] || empty($colaborador['telefone'])) {
+            return ['success' => false, 'error' => 'Colaborador sem telefone ou WhatsApp desativado'];
         }
 
         $nome      = explode(' ', $colaborador['nome_completo'])[0]; // Primeiro nome
@@ -536,7 +536,7 @@ function evolution_enviar_pesquisa_humor(int $colaborador_id, string $mensagem_c
             $texto_intro = "Bom dia, *{$nome}*! 😊\n\nComo você está se sentindo hoje?\nSua resposta nos ajuda a cuidar melhor do time!";
         }
 
-        $numero_formatado = evolution_normalizar_numero($colaborador['whatsapp_numero']);
+        $numero_formatado = evolution_normalizar_numero($colaborador['telefone']);
 
         // Enfileira pesquisa (o cron processar_fila_whatsapp.php enviará via sendList com rate limiting)
         $enfileirado = evolution_enfileirar_mensagem(
@@ -600,7 +600,7 @@ function evolution_processar_resposta_humor(int $colaborador_id, string $respost
 
         // Busca usuario_id vinculado ao colaborador
         $stmt = $pdo->prepare("
-            SELECT c.whatsapp_numero, c.nome_completo, u.id as usuario_id
+            SELECT c.telefone, c.nome_completo, u.id as usuario_id
             FROM colaboradores c
             LEFT JOIN usuarios u ON u.colaborador_id = c.id
             WHERE c.id = ?
@@ -627,9 +627,9 @@ function evolution_processar_resposta_humor(int $colaborador_id, string $respost
         if ($stmt->fetch()) {
             // Já registrou hoje — envia mensagem amigável
             $nome = explode(' ', $colaborador['nome_completo'])[0];
-            if (!empty($colaborador['whatsapp_numero'])) {
+            if (!empty($colaborador['telefone'])) {
                 $msg = "ℹ️ *{$nome}*, você já registrou sua emoção hoje!\n\nObrigado pela participação. 💙";
-                evolution_enviar_texto($colaborador['whatsapp_numero'], $msg, $colaborador_id, 'resposta');
+                evolution_enviar_texto($colaborador['telefone'], $msg, $colaborador_id, 'resposta');
             }
             return false;
         }
@@ -655,9 +655,9 @@ function evolution_processar_resposta_humor(int $colaborador_id, string $respost
         $emoji_conf  = $emojis_conf[$nivel_emocao] ?? '';
         $label_conf  = $labels_conf[$nivel_emocao] ?? '';
 
-        if (!empty($colaborador['whatsapp_numero'])) {
+        if (!empty($colaborador['telefone'])) {
             $confirmacao = "✅ Obrigado, *{$nome}*! Registramos que você está *{$label_conf}* {$emoji_conf} hoje.\n\n_Sua resposta é importante para o time!_ 💙";
-            evolution_enviar_texto($colaborador['whatsapp_numero'], $confirmacao, $colaborador_id, 'resposta');
+            evolution_enviar_texto($colaborador['telefone'], $confirmacao, $colaborador_id, 'resposta');
         }
 
         return true;
@@ -721,9 +721,9 @@ function evolution_buscar_colaborador_por_numero(string $numero): ?array {
         $placeholders = implode(',', array_fill(0, count($variantes), '?'));
 
         $stmt = $pdo->prepare("
-            SELECT id, nome_completo, whatsapp_numero, whatsapp_ativo
+            SELECT id, nome_completo, telefone, whatsapp_ativo
             FROM colaboradores
-            WHERE REGEXP_REPLACE(whatsapp_numero, '[^0-9]', '') IN ({$placeholders})
+            WHERE REGEXP_REPLACE(telefone, '[^0-9]', '') IN ({$placeholders})
             AND status = 'ativo'
             LIMIT 1
         ");

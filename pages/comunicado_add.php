@@ -117,17 +117,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // "Processar Fila" no painel Evolution dispara as mensagens com rate limiting.
                 try {
                     $stmt_wa = $pdo->prepare("
-                        SELECT whatsapp_numero, whatsapp_ativo, nome_completo
+                        SELECT telefone, whatsapp_ativo, nome_completo
                         FROM colaboradores WHERE id = ? AND status = 'ativo'
                     ");
                     $stmt_wa->execute([$colab['id']]);
                     $colab_wa = $stmt_wa->fetch();
-                    if ($colab_wa && $colab_wa['whatsapp_ativo'] && !empty($colab_wa['whatsapp_numero'])) {
+                    if ($colab_wa && $colab_wa['whatsapp_ativo'] && !empty($colab_wa['telefone'])) {
                         $nome_wa  = $colab_wa['nome_completo'];
                         $texto_wa = "👋 Olá, *{$nome_wa}*!\n\n*📢 Novo Comunicado*\n\n{$titulo_preview}\n\n🔗 Acesse: {$url_comunicado}\n\n_RH Privus_";
                         $enfileirou = evolution_enfileirar_mensagem(
                             $colab['id'],
-                            evolution_normalizar_numero($colab_wa['whatsapp_numero']),
+                            evolution_normalizar_numero($colab_wa['telefone']),
                             '📢 Novo Comunicado',
                             $texto_wa,
                             $url_comunicado,

@@ -164,8 +164,8 @@ try {
     $row = $pdo->query("
         SELECT
             COUNT(*) as total,
-            SUM(CASE WHEN whatsapp_numero IS NOT NULL AND whatsapp_numero != '' THEN 1 ELSE 0 END) as com_numero,
-            SUM(CASE WHEN whatsapp_ativo = 1 AND whatsapp_numero IS NOT NULL AND whatsapp_numero != '' THEN 1 ELSE 0 END) as ativos
+            SUM(CASE WHEN telefone IS NOT NULL AND telefone != '' THEN 1 ELSE 0 END) as com_numero,
+            SUM(CASE WHEN whatsapp_ativo = 1 AND telefone IS NOT NULL AND telefone != '' THEN 1 ELSE 0 END) as ativos
         FROM colaboradores WHERE status = 'ativo'
     ")->fetch(PDO::FETCH_ASSOC);
     $stats_whatsapp = $row;
