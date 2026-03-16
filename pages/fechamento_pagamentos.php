@@ -292,13 +292,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         try {
-            // Verifica se já existe fechamento REGULAR para este mês (permite múltiplos extras)
-            $stmt = $pdo->prepare("SELECT id FROM fechamentos_pagamento WHERE empresa_id = ? AND mes_referencia = ? AND tipo_fechamento = 'regular'");
-            $stmt->execute([$empresa_id, $mes_referencia]);
-            if ($stmt->fetch()) {
-                redirect('fechamento_pagamentos.php', 'Já existe um fechamento regular para este mês!', 'error');
-            }
-            
             // Cria fechamento regular
             $stmt = $pdo->prepare("
                 INSERT INTO fechamentos_pagamento (empresa_id, tipo_fechamento, mes_referencia, data_fechamento, total_colaboradores, usuario_id, status)
