@@ -5057,7 +5057,11 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
     container.innerHTML = '<p class="text-muted">Carregando...</p>';
     fetch('../api/get_colaboradores.php?empresa_id=' + empresaId + '&status=ativo&com_salario=1')
         .then(function(r) { return r.json(); })
-        .then(function(data) {
+        .then(function(response) {
+            // Suporta dois formatos: array direto ou { colaboradores, excluidos }
+            var data = Array.isArray(response) ? response : (response.colaboradores || []);
+            var excluidos = Array.isArray(response) ? [] : (response.excluidos || []);
+
             var html = '';
             if (data.length > 0) {
                 html += '<div class="form-check mb-3 pb-3 border-bottom"><input class="form-check-input" type="checkbox" id="selecionar_todos_colaboradores"><label class="form-check-label fw-bold" for="selecionar_todos_colaboradores">Selecionar Todos (' + data.length + ' colaborador' + (data.length > 1 ? 'es' : '') + ')</label></div>';
@@ -5065,6 +5069,28 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
             data.forEach(function(colab) {
                 html += '<div class="form-check mb-3"><input class="form-check-input colaborador-checkbox" type="checkbox" name="colaboradores[]" value="' + colab.id + '" id="colab_' + colab.id + '"><label class="form-check-label" for="colab_' + colab.id + '">' + colab.nome_completo + ' - Salario: R$ ' + parseFloat(colab.salario || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2}) + '</label></div>';
             });
+
+            // Mostra colaboradores excluídos com o motivo
+            if (excluidos.length > 0) {
+                html += '<div class="mt-4 pt-3 border-top">';
+                html += '<div class="d-flex align-items-center mb-2 cursor-pointer" onclick="document.getElementById(\'excluidos_lista\').classList.toggle(\'d-none\')">';
+                html += '<span class="badge badge-light-warning me-2">' + excluidos.length + '</span>';
+                html += '<span class="fw-semibold text-warning fs-7">Colaborador(es) não listado(s) — clique para ver motivo</span>';
+                html += '</div>';
+                html += '<div id="excluidos_lista" class="d-none">';
+                html += '<div class="table-responsive"><table class="table table-sm table-bordered fs-7 mb-0">';
+                html += '<thead class="table-light"><tr><th>Colaborador</th><th>Tipo</th><th>Motivo</th><th></th></tr></thead><tbody>';
+                excluidos.forEach(function(exc) {
+                    html += '<tr>';
+                    html += '<td>' + exc.nome_completo + '</td>';
+                    html += '<td><span class="badge badge-light-info">' + (exc.tipo_contrato || '—') + '</span></td>';
+                    html += '<td><span class="text-danger fw-semibold">' + exc.motivo + '</span></td>';
+                    html += '<td><a href="colaborador_edit.php?id=' + exc.id + '" target="_blank" class="btn btn-sm btn-light-primary py-1 px-2">Editar</a></td>';
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div></div></div>';
+            }
+
             container.innerHTML = html || '<p class="text-muted">Nenhum colaborador encontrado</p>';
             var selecionarTodos = document.getElementById('selecionar_todos_colaboradores');
             if (selecionarTodos) {

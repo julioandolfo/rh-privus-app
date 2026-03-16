@@ -113,8 +113,10 @@ if ($status) {
 }
 
 // Filtro de salário
+$incluir_excluidos_salario = false;
 if ($com_salario === '1') {
     $where[] = "salario IS NOT NULL AND salario > 0";
+    $incluir_excluidos_salario = true;
 }
 
 // Busca por nome ou CPF
@@ -145,6 +147,56 @@ if ($status === 'desligado') {
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $colaboradores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Quando filtro de salário está ativo, busca também os que foram excluídos e o motivo
+if ($incluir_excluidos_salario && $empresa_id > 0) {
+    $where_excluidos = [];
+    $params_excluidos = [];
+
+    $where_excluidos[] = "empresa_id = ?";
+    $params_excluidos[] = $empresa_id;
+
+    if ($status) {
+        $where_excluidos[] = "status = ?";
+        $params_excluidos[] = $status;
+    } else {
+        $where_excluidos[] = "status = 'ativo'";
+    }
+
+    $where_excluidos[] = "(salario IS NULL OR salario = 0)";
+
+    if ($q) {
+        $where_excluidos[] = "(nome_completo LIKE ? OR cpf LIKE ?)";
+        $search_term_exc = "%{$q}%";
+        $params_excluidos[] = $search_term_exc;
+        $params_excluidos[] = $search_term_exc;
+    }
+
+    $sql_exc = "SELECT id, nome_completo, cpf, salario, tipo_contrato FROM colaboradores WHERE " . implode(' AND ', $where_excluidos) . " ORDER BY nome_completo LIMIT 100";
+    $stmt_exc = $pdo->prepare($sql_exc);
+    $stmt_exc->execute($params_excluidos);
+    $excluidos = $stmt_exc->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!empty($excluidos)) {
+        echo json_encode([
+            'colaboradores' => $colaboradores,
+            'excluidos'     => array_map(function($e) {
+                $motivo = 'Salário não cadastrado';
+                if ($e['salario'] !== null && (float)$e['salario'] == 0) {
+                    $motivo = 'Salário cadastrado como R$ 0,00';
+                }
+                return [
+                    'id'             => $e['id'],
+                    'nome_completo'  => $e['nome_completo'],
+                    'cpf'            => $e['cpf'],
+                    'tipo_contrato'  => $e['tipo_contrato'],
+                    'motivo'         => $motivo,
+                ];
+            }, $excluidos),
+        ]);
+        exit;
+    }
+}
 
 echo json_encode($colaboradores);
 
