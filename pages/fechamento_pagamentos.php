@@ -808,18 +808,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirect('fechamento_pagamentos.php', 'Você não tem permissão para atualizar este item!', 'error');
             }
             
-            // Processa bônus editados
+            // Remove todos os bônus antigos e re-insere apenas os que vieram no POST
             $total_bonus = 0;
+            $stmt = $pdo->prepare("DELETE FROM fechamentos_pagamento_bonus WHERE fechamento_pagamento_id = ? AND colaborador_id = ?");
+            $stmt->execute([$item['fechamento_id'], $item['colaborador_id']]);
+
             if (!empty($bonus_editados) && is_array($bonus_editados)) {
-                // Remove bônus antigos do fechamento para este colaborador
-                $stmt = $pdo->prepare("DELETE FROM fechamentos_pagamento_bonus WHERE fechamento_pagamento_id = ? AND colaborador_id = ?");
-                $stmt->execute([$item['fechamento_id'], $item['colaborador_id']]);
-                
-                // Insere bônus editados
                 foreach ($bonus_editados as $bonus_data) {
                     if (!empty($bonus_data['tipo_bonus_id']) && !empty($bonus_data['valor'])) {
-                        // O valor já vem formatado do JavaScript (ex: "290.00")
-                        // Apenas converte para float
                         $valor_bonus = (float)$bonus_data['valor'];
                         $total_bonus += $valor_bonus;
                         
