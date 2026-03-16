@@ -325,24 +325,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$colab_id]);
                 $colab = $stmt->fetch();
                 
-                if (!$colab || !$colab['salario']) continue;
+                if (!$colab) continue;
                 
-                // Calcula salário proporcional baseado na data de início
-                $salario_base = $colab['salario'];
+                // Salário pode ser null/0 — será editável no fechamento depois
+                $salario_base = (float)($colab['salario'] ?? 0);
                 
-                // Se o colaborador foi admitido durante o mês de referência, calcular proporcional
-                if (!empty($colab['data_inicio'])) {
+                // Se tem salário e o colaborador foi admitido durante o mês, calcula proporcional
+                if ($salario_base > 0 && !empty($colab['data_inicio'])) {
                     $data_admissao = strtotime($colab['data_inicio']);
                     $inicio_mes = strtotime($data_inicio);
                     $fim_mes = strtotime($data_fim);
                     
-                    // Se a admissão foi dentro do período do fechamento
                     if ($data_admissao >= $inicio_mes && $data_admissao <= $fim_mes) {
-                        // Calcula dias trabalhados no mês
-                        $total_dias_mes = (int)date('t', $inicio_mes); // Total de dias do mês
+                        $total_dias_mes = (int)date('t', $inicio_mes);
                         $dias_trabalhados = (int)date('d', $fim_mes) - (int)date('d', $data_admissao) + 1;
-                        
-                        // Calcula salário proporcional
                         $salario_base = ($colab['salario'] / $total_dias_mes) * $dias_trabalhados;
                     }
                 }
@@ -792,6 +788,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'atualizar_item') {
         $item_id = (int)($_POST['item_id'] ?? 0);
+        $salario_base = str_replace(['.', ','], ['', '.'], $_POST['salario_base'] ?? '0');
+        $salario_base = (float)$salario_base;
         $horas_extras = str_replace(',', '.', $_POST['horas_extras'] ?? '0');
         $valor_horas_extras = str_replace(['.', ','], ['', '.'], $_POST['valor_horas_extras'] ?? '0');
         $descontos = str_replace(['.', ','], ['', '.'], $_POST['descontos'] ?? '0');
@@ -848,15 +846,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
-            $valor_total = $item['salario_base'] + $valor_horas_extras + $total_bonus - $descontos + $adicionais;
+            $valor_total = $salario_base + $valor_horas_extras + $total_bonus - $descontos + $adicionais;
             
-            // Atualiza item
+            // Atualiza item (incluindo salário base editável)
             $stmt = $pdo->prepare("
                 UPDATE fechamentos_pagamento_itens 
-                SET horas_extras = ?, valor_horas_extras = ?, descontos = ?, adicionais = ?, valor_total = ?
+                SET salario_base = ?, horas_extras = ?, valor_horas_extras = ?, descontos = ?, adicionais = ?, valor_total = ?
                 WHERE id = ?
             ");
-            $stmt->execute([$horas_extras, $valor_horas_extras, $descontos, $adicionais, $valor_total, $item_id]);
+            $stmt->execute([$salario_base, $horas_extras, $valor_horas_extras, $descontos, $adicionais, $valor_total, $item_id]);
             
             // Recalcula totais do fechamento
             $stmt = $pdo->prepare("
@@ -4200,7 +4198,8 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="row mb-7">
                         <div class="col-md-6">
                             <label class="fw-semibold fs-6 mb-2">Salário Base</label>
-                            <input type="text" id="item_salario_base" class="form-control form-control-solid" readonly />
+                            <input type="text" name="salario_base" id="item_salario_base" class="form-control form-control-solid" />
+                            <div class="form-text">Editável — será recalculado no valor total.</div>
                         </div>
                         <div class="col-md-6">
                             <label class="fw-semibold fs-6 mb-2">Horas Extras</label>
@@ -5055,42 +5054,20 @@ document.getElementById('empresa_id')?.addEventListener('change', function() {
         return;
     }
     container.innerHTML = '<p class="text-muted">Carregando...</p>';
-    fetch('../api/get_colaboradores.php?empresa_id=' + empresaId + '&status=ativo&com_salario=1')
+    fetch('../api/get_colaboradores.php?empresa_id=' + empresaId + '&status=ativo')
         .then(function(r) { return r.json(); })
-        .then(function(response) {
-            // Suporta dois formatos: array direto ou { colaboradores, excluidos }
-            var data = Array.isArray(response) ? response : (response.colaboradores || []);
-            var excluidos = Array.isArray(response) ? [] : (response.excluidos || []);
-
+        .then(function(data) {
             var html = '';
             if (data.length > 0) {
                 html += '<div class="form-check mb-3 pb-3 border-bottom"><input class="form-check-input" type="checkbox" id="selecionar_todos_colaboradores"><label class="form-check-label fw-bold" for="selecionar_todos_colaboradores">Selecionar Todos (' + data.length + ' colaborador' + (data.length > 1 ? 'es' : '') + ')</label></div>';
             }
             data.forEach(function(colab) {
-                html += '<div class="form-check mb-3"><input class="form-check-input colaborador-checkbox" type="checkbox" name="colaboradores[]" value="' + colab.id + '" id="colab_' + colab.id + '"><label class="form-check-label" for="colab_' + colab.id + '">' + colab.nome_completo + ' - Salario: R$ ' + parseFloat(colab.salario || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2}) + '</label></div>';
+                var salarioVal = parseFloat(colab.salario || 0);
+                var salarioLabel = salarioVal > 0
+                    ? 'R$ ' + salarioVal.toLocaleString('pt-BR', {minimumFractionDigits: 2})
+                    : '<span class="text-warning fw-semibold">sem salário</span>';
+                html += '<div class="form-check mb-3"><input class="form-check-input colaborador-checkbox" type="checkbox" name="colaboradores[]" value="' + colab.id + '" id="colab_' + colab.id + '"><label class="form-check-label" for="colab_' + colab.id + '">' + colab.nome_completo + ' - Salário: ' + salarioLabel + '</label></div>';
             });
-
-            // Mostra colaboradores excluídos com o motivo
-            if (excluidos.length > 0) {
-                html += '<div class="mt-4 pt-3 border-top">';
-                html += '<div class="d-flex align-items-center mb-2 cursor-pointer" onclick="document.getElementById(\'excluidos_lista\').classList.toggle(\'d-none\')">';
-                html += '<span class="badge badge-light-warning me-2">' + excluidos.length + '</span>';
-                html += '<span class="fw-semibold text-warning fs-7">Colaborador(es) não listado(s) — clique para ver motivo</span>';
-                html += '</div>';
-                html += '<div id="excluidos_lista" class="d-none">';
-                html += '<div class="table-responsive"><table class="table table-sm table-bordered fs-7 mb-0">';
-                html += '<thead class="table-light"><tr><th>Colaborador</th><th>Tipo</th><th>Motivo</th><th></th></tr></thead><tbody>';
-                excluidos.forEach(function(exc) {
-                    html += '<tr>';
-                    html += '<td>' + exc.nome_completo + '</td>';
-                    html += '<td><span class="badge badge-light-info">' + (exc.tipo_contrato || '—') + '</span></td>';
-                    html += '<td><span class="text-danger fw-semibold">' + exc.motivo + '</span></td>';
-                    html += '<td><a href="colaborador_edit.php?id=' + exc.id + '" target="_blank" class="btn btn-sm btn-light-primary py-1 px-2">Editar</a></td>';
-                    html += '</tr>';
-                });
-                html += '</tbody></table></div></div></div>';
-            }
-
             container.innerHTML = html || '<p class="text-muted">Nenhum colaborador encontrado</p>';
             var selecionarTodos = document.getElementById('selecionar_todos_colaboradores');
             if (selecionarTodos) {
@@ -5121,7 +5098,7 @@ let bonusItemAtual = [];
 function editarItem(item) {
     document.getElementById('item_id').value = item.id;
     document.getElementById('item_colaborador').value = item.colaborador_nome;
-    document.getElementById('item_salario_base').value = 'R$ ' + parseFloat(item.salario_base || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('item_salario_base').value = parseFloat(item.salario_base || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('item_horas_extras').value = parseFloat(item.horas_extras || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('item_valor_horas_extras').value = parseFloat(item.valor_horas_extras || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('item_descontos').value = parseFloat(item.descontos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
