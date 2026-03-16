@@ -108,3 +108,7 @@ CREATE TABLE IF NOT EXISTS `evolution_webhooks_log` (
     INDEX `idx_processado` (`processado`),
     INDEX `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Flag para indicar que bônus de um item de fechamento já foram editados manualmente
+ALTER TABLE `fechamentos_pagamento_itens`
+    ADD COLUMN IF NOT EXISTS `bonus_editado` TINYINT(1) DEFAULT 0 COMMENT 'Se 1, não rebusca bônus automáticos do cadastro';

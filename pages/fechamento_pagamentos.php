@@ -837,10 +837,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $valor_total = $salario_base + $valor_horas_extras + $total_bonus - $descontos + $adicionais;
             
-            // Atualiza item (incluindo salário base editável)
+            // Atualiza item (incluindo salário base editável e marca bônus como editado)
             $stmt = $pdo->prepare("
                 UPDATE fechamentos_pagamento_itens 
-                SET salario_base = ?, horas_extras = ?, valor_horas_extras = ?, descontos = ?, adicionais = ?, valor_total = ?
+                SET salario_base = ?, horas_extras = ?, valor_horas_extras = ?, descontos = ?, adicionais = ?, valor_total = ?, bonus_editado = 1
                 WHERE id = ?
             ");
             $stmt->execute([$salario_base, $horas_extras, $valor_horas_extras, $descontos, $adicionais, $valor_total, $item_id]);
@@ -2755,7 +2755,9 @@ if (isset($_GET['view'])) {
             
             // Para fechamentos extras, não busca bônus automáticos (já devem estar salvos)
             // Para fechamentos regulares, busca bônus automáticos se não encontrou salvos
-            if (empty($bonus_salvos) && $inclui_bonus_automaticos_item && !$is_fechamento_extra) {
+            // e se o item NUNCA teve bônus editados manualmente (bonus_editado = 0)
+            $bonus_ja_editado = !empty($item['bonus_editado']);
+            if (empty($bonus_salvos) && $inclui_bonus_automaticos_item && !$is_fechamento_extra && !$bonus_ja_editado) {
                 $stmt = $pdo->prepare("
                     SELECT cb.*, tb.nome as tipo_bonus_nome, tb.tipo_valor, tb.valor_fixo
                     FROM colaboradores_bonus cb
