@@ -4189,7 +4189,10 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="row mb-7">
                         <div class="col-md-6">
                             <label class="fw-semibold fs-6 mb-2">Salário Base</label>
-                            <input type="text" name="salario_base" id="item_salario_base" class="form-control form-control-solid" />
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" name="salario_base" id="item_salario_base" class="form-control form-control-solid" placeholder="0,00" />
+                            </div>
                             <div class="form-text">Editável — será recalculado no valor total.</div>
                         </div>
                         <div class="col-md-6">
@@ -5131,6 +5134,7 @@ function editarItem(item) {
 // Aplicar máscaras nos campos do modal de editar item
 function aplicarMascarasItem() {
     if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
+        jQuery('#item_salario_base').mask('#.##0,00', {reverse: true});
         jQuery('#item_valor_horas_extras').mask('#.##0,00', {reverse: true});
         jQuery('#item_descontos').mask('#.##0,00', {reverse: true});
         jQuery('#item_adicionais').mask('#.##0,00', {reverse: true});
