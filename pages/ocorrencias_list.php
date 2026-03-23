@@ -258,7 +258,14 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="toolbar d-flex flex-stack mb-3 mb-lg-5" id="kt_toolbar">
     <div id="kt_toolbar_container" class="container-fluid d-flex flex-stack flex-wrap">
         <div class="page-title d-flex flex-column me-5 py-2">
-            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0"><?= htmlspecialchars($page_title) ?></h1>
+            <h1 class="d-flex flex-row flex-wrap align-items-center gap-3 text-gray-900 fw-bold fs-3 mb-0">
+                <span><?= htmlspecialchars($page_title) ?></span>
+                <?php if ($sem_detalhe && !empty($ocorrencias_avisos)): ?>
+                <span class="badge badge-danger fs-5 fw-bold px-4 py-2 rounded-pill aviso-pendente-badge" title="Requer conversa com seu gestor">
+                    <?= count($ocorrencias_avisos) ?> <?= count($ocorrencias_avisos) === 1 ? 'pendente' : 'pendentes' ?>
+                </span>
+                <?php endif; ?>
+            </h1>
             <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 pt-1">
                 <li class="breadcrumb-item text-muted">
                     <a href="dashboard.php" class="text-muted text-hover-primary">Home</a>
@@ -286,16 +293,10 @@ require_once __DIR__ . '/../includes/header.php';
     <div id="kt_content_container" class="container-xxl">
 
         <?php if ($sem_detalhe): ?>
-        <div class="alert alert-primary d-flex align-items-center p-5 mb-8">
-            <i class="ki-duotone ki-notification-bing fs-2hx text-primary me-4">
-                <span class="path1"></span><span class="path2"></span><span class="path3"></span>
-            </i>
-            <div class="d-flex flex-column">
-                <h4 class="mb-1 text-gray-900">Aviso do RH</h4>
-                <span class="text-gray-700">Existem registros administrativos associados ao seu cadastro. O conteúdo não é exibido aqui por política da empresa. <strong>Procure seu gestor direto</strong> para entender do que se trata.</span>
-            </div>
-        </div>
-        <?php if (empty($ocorrencias_avisos)): ?>
+        <?php
+        $n_avisos = count($ocorrencias_avisos);
+        ?>
+        <?php if ($n_avisos === 0): ?>
         <div class="card card-flush">
             <div class="card-body text-center py-15">
                 <i class="ki-duotone ki-check-circle fs-3x text-success mb-5"><span class="path1"></span><span class="path2"></span></i>
@@ -303,25 +304,83 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <?php else: ?>
-        <div class="d-flex flex-column gap-4">
-            <?php foreach ($ocorrencias_avisos as $av): ?>
-            <div class="card card-flush shadow-sm border border-gray-300 border-dashed">
-                <div class="card-body d-flex align-items-center py-6 px-6">
-                    <div class="symbol symbol-50px me-5">
-                        <div class="symbol-label bg-light-primary">
-                            <i class="ki-duotone ki-notification-on fs-2x text-primary"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+        <div class="card mb-8 border border-warning border-3 shadow-sm aviso-colaborador-destaque" role="alert" aria-live="polite">
+            <div class="card-body p-6 p-lg-8">
+                <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-5 gap-lg-8">
+                    <div class="symbol symbol-80px symbol-circle flex-shrink-0 mx-auto mx-lg-0">
+                        <div class="symbol-label bg-warning">
+                            <i class="ki-duotone ki-information-2 fs-3x text-gray-900">
+                                <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+                            </i>
                         </div>
                     </div>
-                    <div class="flex-grow-1">
-                        <div class="fw-bold text-gray-900 fs-5 mb-1">Registro administrativo</div>
-                        <div class="text-gray-700 fs-6 mb-1">Para saber os detalhes, converse com <strong>seu gestor</strong>.</div>
-                        <div class="text-muted fs-7">Referência: <?= htmlspecialchars(formatar_data($av['data_ocorrencia'])) ?></div>
+                    <div class="flex-grow-1 text-center text-lg-start">
+                        <div class="mb-2">
+                            <span class="badge badge-light-danger fs-6 fw-bold px-3 py-2">Ação necessária</span>
+                        </div>
+                        <h2 class="fs-2 fw-bolder text-gray-900 mb-3">
+                            <?php if ($n_avisos === 1): ?>
+                            Você tem <span class="text-danger">1 aviso</span> no seu cadastro
+                            <?php else: ?>
+                            Você tem <span class="text-danger"><?= $n_avisos ?> avisos</span> no seu cadastro
+                            <?php endif; ?>
+                        </h2>
+                        <p class="fs-5 fw-semibold text-gray-800 mb-2">
+                            Isso significa que há algo registrado pela gestão/RH que <strong>não aparece aqui em detalhes</strong>.
+                        </p>
+                        <p class="fs-5 text-gray-700 mb-0">
+                            <strong class="text-gray-900">O que fazer:</strong> procure <strong>seu gestor direto</strong> para entender o assunto e alinhar os próximos passos.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="text-gray-700 fw-semibold fs-5 mb-4">
+            <i class="ki-duotone ki-down fs-3 text-primary align-middle me-1"><span class="path1"></span><span class="path2"></span></i>
+            Resumo dos avisos (sem detalhes):
+        </p>
+        <div class="d-flex flex-column gap-4">
+            <?php
+            $idx_av = 0;
+            foreach ($ocorrencias_avisos as $av):
+                $idx_av++;
+            ?>
+            <div class="card card-flush shadow-sm border-start border-danger border-4 aviso-item-card">
+                <div class="card-body d-flex align-items-center py-6 px-6">
+                    <div class="symbol symbol-55px me-5 flex-shrink-0">
+                        <div class="symbol-label bg-light-danger">
+                            <span class="fw-bolder fs-2 text-danger"><?= $idx_av ?></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <span class="badge badge-danger">Pendente de alinhamento</span>
+                            <span class="text-muted fs-7">Aviso <?= $idx_av ?> de <?= $n_avisos ?></span>
+                        </div>
+                        <div class="fw-bold text-gray-900 fs-4 mb-1">Registro na sua ficha</div>
+                        <div class="text-gray-700 fs-6">Fale com <strong>seu gestor</strong> — ele(a) explica o que é e o que fazer.</div>
+                        <div class="text-muted fs-7 mt-2">Referência interna: <?= htmlspecialchars(formatar_data($av['data_ocorrencia'])) ?></div>
                     </div>
                 </div>
             </div>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
+        <style>
+        .aviso-pendente-badge {
+            animation: aviso-pulse 2.2s ease-in-out infinite;
+        }
+        @keyframes aviso-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(241, 65, 108, 0.45); }
+            50% { box-shadow: 0 0 0 10px rgba(241, 65, 108, 0); }
+        }
+        [data-theme="dark"] .aviso-colaborador-destaque {
+            background-color: rgba(255, 193, 7, 0.12);
+        }
+        [data-theme="dark"] .aviso-item-card {
+            background-color: rgba(241, 65, 108, 0.06);
+        }
+        </style>
 
         <?php else: ?>
 
