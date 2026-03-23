@@ -13,6 +13,9 @@ require_page_permission('contrato_template_edit.php');
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
+
+require_once __DIR__ . '/../includes/distrato_contrato_auto.php';
+garantir_schema_contratos_distrato($pdo);
 $template_id = intval($_GET['id'] ?? 0);
 
 if ($template_id <= 0) {
@@ -39,6 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $descricao = trim($_POST['descricao'] ?? '');
     $conteudo_html = $_POST['conteudo_html'] ?? '';
     $ativo = isset($_POST['ativo']) ? 1 : 0;
+    $padrao_distrato = isset($_POST['padrao_distrato']) ? 1 : 0;
+    if ($padrao_distrato) {
+        $pdo->exec('UPDATE contratos_templates SET padrao_distrato = 0');
+    }
     
     if (empty($nome) || empty($conteudo_html)) {
         redirect('contrato_template_edit.php?id=' . $template_id, 'Preencha todos os campos obrigatórios!', 'error');
@@ -51,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $stmt = $pdo->prepare("
             UPDATE contratos_templates 
-            SET nome = ?, descricao = ?, conteudo_html = ?, variaveis_disponiveis = ?, ativo = ?
+            SET nome = ?, descricao = ?, conteudo_html = ?, variaveis_disponiveis = ?, ativo = ?, padrao_distrato = ?
             WHERE id = ?
         ");
         $stmt->execute([
@@ -60,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $conteudo_html,
             $variaveis_json,
             $ativo,
+            $padrao_distrato,
             $template_id
         ]);
         
@@ -89,6 +97,17 @@ $variaveis_disponiveis = [
         '{{colaborador.cargo_nome}}' => 'Cargo',
         '{{colaborador.salario}}' => 'Salário',
         '{{colaborador.data_admissao}}' => 'Data de Admissão',
+        '{{empresa.razao_social}}' => 'Razão social',
+        '{{empresa.cnpj}}' => 'CNPJ da empresa',
+        '{{empresa.endereco_completo}}' => 'Endereço completo (logradouro, bairro, cidade/UF, CEP)',
+        '{{empresa.cidade}}' => 'Cidade da empresa',
+        '{{empresa.estado}}' => 'UF da empresa',
+    ],
+    'Distrato / colaborador extra' => [
+        '{{colaborador.estado_civil_label}}' => 'Estado civil (texto)',
+        '{{colaborador.qualificacao_contratual}}' => 'Qualificação (CLT ou prestador)',
+        '{{colaborador.categoria_contrato_titulo}}' => 'Título: TRABALHO ou PRESTAÇÃO DE SERVIÇOS',
+        '{{colaborador.data_nascimento}}' => 'Data de nascimento',
     ],
     'Dados do Contrato' => [
         '{{contrato.titulo}}' => 'Título do Contrato',
@@ -101,6 +120,12 @@ $variaveis_disponiveis = [
         '{{data_atual}}' => 'Data Atual (dd/mm/yyyy)',
         '{{hora_atual}}' => 'Hora Atual (HH:mm)',
         '{{data_formatada}}' => 'Data Formatada (dd de mês de yyyy)',
+    ],
+    'Desligamento (distrato automático)' => [
+        '{{demissao.data}}' => 'Data do desligamento',
+        '{{demissao.tipo_label}}' => 'Tipo de demissão (texto)',
+        '{{demissao.tipo}}' => 'Tipo de demissão (código interno)',
+        '{{demissao.motivo}}' => 'Motivo informado no desligamento',
     ],
 ];
 
@@ -171,12 +196,20 @@ require_once __DIR__ . '/../includes/header.php';
                                 <textarea id="conteudo_html" name="conteudo_html" class="form-control" rows="20" required><?= htmlspecialchars($template['conteudo_html']) ?></textarea>
                             </div>
                             
-                            <div class="form-check form-check-custom form-check-solid">
+                            <div class="form-check form-check-custom form-check-solid mb-3">
                                 <input class="form-check-input" type="checkbox" name="ativo" id="ativo" value="1" 
                                        <?= $template['ativo'] ? 'checked' : '' ?> />
                                 <label class="form-check-label" for="ativo">
                                     Template ativo
                                 </label>
+                            </div>
+                            <div class="form-check form-check-custom form-check-solid mb-3">
+                                <input class="form-check-input" type="checkbox" name="padrao_distrato" id="padrao_distrato" value="1"
+                                       <?= !empty($template['padrao_distrato']) ? 'checked' : '' ?> />
+                                <label class="form-check-label" for="padrao_distrato">
+                                    Usar como <strong>padrão de distrato</strong> ao desligar colaborador
+                                </label>
+                                <div class="form-text">Apenas um template pode ser o padrão. Ao marcar este, os demais são desmarcados.</div>
                             </div>
                         </div>
                     </div>

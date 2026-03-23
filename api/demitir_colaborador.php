@@ -84,16 +84,25 @@ try {
             $observacoes,
             $usuario['id']
         ]);
+        $demissao_novo_id = (int)$pdo->lastInsertId();
         
         // Atualiza status do colaborador
         $stmt = $pdo->prepare("UPDATE colaboradores SET status = 'desligado' WHERE id = ?");
         $stmt->execute([$colaborador_id]);
         
         $pdo->commit();
+
+        require_once __DIR__ . '/../includes/distrato_contrato_auto.php';
+        $res_distrato = criar_contrato_distrato_automatico($pdo, (int)$colaborador_id, $demissao_novo_id, $usuario);
+        $msg_ok = 'Demissão registrada com sucesso!';
+        if (!empty($res_distrato['message'])) {
+            $msg_ok .= ' ' . $res_distrato['message'];
+        }
         
         echo json_encode([
             'success' => true,
-            'message' => 'Demissão registrada com sucesso!'
+            'message' => $msg_ok,
+            'contrato_distrato_id' => $res_distrato['contrato_id'],
         ]);
         
     } catch (Exception $e) {

@@ -54,17 +54,29 @@ if (!$colaborador) {
 $flags_ativas = get_flags_ativas($colaborador_id);
 $total_flags_ativas = count($flags_ativas);
 
-// Busca ocorrências do colaborador
-$stmt = $pdo->prepare("
-    SELECT o.*, u.nome as usuario_nome, tp.nome as tipo_nome
-    FROM ocorrencias o
-    LEFT JOIN usuarios u ON o.usuario_id = u.id
-    LEFT JOIN tipos_ocorrencias tp ON o.tipo_ocorrencia_id = tp.id
-    WHERE o.colaborador_id = ?
-    ORDER BY o.data_ocorrencia DESC, o.created_at DESC
-");
-$stmt->execute([$colaborador_id]);
-$ocorrencias = $stmt->fetchAll();
+// Busca ocorrências do colaborador (colaborador role: só metadados mínimos para avisos)
+$ocorrencias_modo_aviso = colaborador_ocorrencias_flags_sem_detalhe();
+if ($ocorrencias_modo_aviso) {
+    $stmt = $pdo->prepare("
+        SELECT o.id, o.data_ocorrencia
+        FROM ocorrencias o
+        WHERE o.colaborador_id = ?
+        ORDER BY o.data_ocorrencia DESC, o.id DESC
+    ");
+    $stmt->execute([$colaborador_id]);
+    $ocorrencias = $stmt->fetchAll();
+} else {
+    $stmt = $pdo->prepare("
+        SELECT o.*, u.nome as usuario_nome, tp.nome as tipo_nome
+        FROM ocorrencias o
+        LEFT JOIN usuarios u ON o.usuario_id = u.id
+        LEFT JOIN tipos_ocorrencias tp ON o.tipo_ocorrencia_id = tp.id
+        WHERE o.colaborador_id = ?
+        ORDER BY o.data_ocorrencia DESC, o.created_at DESC
+    ");
+    $stmt->execute([$colaborador_id]);
+    $ocorrencias = $stmt->fetchAll();
+}
 
 // Busca horas extras do colaborador
 $stmt = $pdo->prepare("
@@ -431,7 +443,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Ocorrências
+                            <?= !empty($ocorrencias_modo_aviso) ? 'Avisos' : 'Ocorrências' ?>
                         </a>
                     </li>
                     <li class="nav-item">

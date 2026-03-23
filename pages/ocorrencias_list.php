@@ -7,14 +7,22 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
 
-$page_title = is_colaborador() ? 'Minhas Ocorrências' : 'Ocorrências';
-require_once __DIR__ . '/../includes/ocorrencias_functions.php';
-require_once __DIR__ . '/../includes/header.php';
-
 require_page_permission('ocorrencias_list.php');
+
+require_once __DIR__ . '/../includes/ocorrencias_functions.php';
 
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
+$sem_detalhe = colaborador_ocorrencias_flags_sem_detalhe();
+
+$page_title = $sem_detalhe ? 'Avisos' : (is_colaborador() ? 'Minhas Ocorrências' : 'Ocorrências');
+
+$ocorrencias_avisos = [];
+$ocorrencias = [];
+$ocorrencias_agrupadas = [];
+$colaboradores = [];
+$tipos_ocorrencias_db = [];
+$tags_disponiveis = [];
 
 // Filtros
 $filtro_colaborador = $_GET['colaborador'] ?? '';
@@ -26,6 +34,32 @@ $filtro_data_inicio = $_GET['data_inicio'] ?? '';
 $filtro_data_fim = $_GET['data_fim'] ?? '';
 $filtro_tag = $_GET['tag'] ?? '';
 $filtro_apenas_informativa = $_GET['apenas_informativa'] ?? '';
+
+$tipos_ocorrencias = [
+    'atraso' => 'Atraso',
+    'falta' => 'Falta',
+    'ausência injustificada' => 'Ausência Injustificada',
+    'falha operacional' => 'Falha Operacional',
+    'desempenho baixo' => 'Desempenho Baixo',
+    'comportamento inadequado' => 'Comportamento Inadequado',
+    'advertência' => 'Advertência',
+    'elogio' => 'Elogio'
+];
+
+if ($sem_detalhe) {
+    $where_av = [];
+    $params_av = [];
+    if (!empty($usuario['colaborador_id'])) {
+        $where_av[] = 'o.colaborador_id = ?';
+        $params_av[] = $usuario['colaborador_id'];
+    } else {
+        $where_av[] = '1 = 0';
+    }
+    $where_sql_av = 'WHERE ' . implode(' AND ', $where_av);
+    $stmt = $pdo->prepare("SELECT o.id, o.data_ocorrencia FROM ocorrencias o $where_sql_av ORDER BY o.data_ocorrencia DESC, o.id DESC");
+    $stmt->execute($params_av);
+    $ocorrencias_avisos = $stmt->fetchAll();
+} else {
 
 // Monta query com filtros
 $where = [];
@@ -215,23 +249,16 @@ try {
 // Busca tags para filtro
 $tags_disponiveis = get_tags_ocorrencias();
 
-$tipos_ocorrencias = [
-    'atraso' => 'Atraso',
-    'falta' => 'Falta',
-    'ausência injustificada' => 'Ausência Injustificada',
-    'falha operacional' => 'Falha Operacional',
-    'desempenho baixo' => 'Desempenho Baixo',
-    'comportamento inadequado' => 'Comportamento Inadequado',
-    'advertência' => 'Advertência',
-    'elogio' => 'Elogio'
-];
+} // fim !$sem_detalhe
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <!--begin::Toolbar-->
 <div class="toolbar d-flex flex-stack mb-3 mb-lg-5" id="kt_toolbar">
     <div id="kt_toolbar_container" class="container-fluid d-flex flex-stack flex-wrap">
         <div class="page-title d-flex flex-column me-5 py-2">
-            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0"><?= is_colaborador() ? 'Minhas Ocorrências' : 'Ocorrências' ?></h1>
+            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0"><?= htmlspecialchars($page_title) ?></h1>
             <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 pt-1">
                 <li class="breadcrumb-item text-muted">
                     <a href="dashboard.php" class="text-muted text-hover-primary">Home</a>
@@ -239,10 +266,10 @@ $tipos_ocorrencias = [
                 <li class="breadcrumb-item">
                     <span class="bullet bg-gray-200 w-5px h-2px"></span>
                 </li>
-                <li class="breadcrumb-item text-gray-900"><?= is_colaborador() ? 'Minhas Ocorrências' : 'Ocorrências' ?></li>
+                <li class="breadcrumb-item text-gray-900"><?= htmlspecialchars($page_title) ?></li>
             </ul>
         </div>
-        <?php if ($usuario['role'] !== 'COLABORADOR' && can_access_page('ocorrencias_add.php')): ?>
+        <?php if (!$sem_detalhe && $usuario['role'] !== 'COLABORADOR' && can_access_page('ocorrencias_add.php')): ?>
         <div class="d-flex align-items-center py-2">
             <a href="ocorrencias_add.php" class="btn btn-primary">
                 <i class="ki-duotone ki-plus fs-2"></i>
@@ -257,7 +284,47 @@ $tipos_ocorrencias = [
 <!--begin::Post-->
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
-        
+
+        <?php if ($sem_detalhe): ?>
+        <div class="alert alert-primary d-flex align-items-center p-5 mb-8">
+            <i class="ki-duotone ki-notification-bing fs-2hx text-primary me-4">
+                <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+            </i>
+            <div class="d-flex flex-column">
+                <h4 class="mb-1 text-gray-900">Aviso do RH</h4>
+                <span class="text-gray-700">Existem registros administrativos associados ao seu cadastro. O conteúdo não é exibido aqui por política da empresa. <strong>Procure seu gestor direto</strong> para entender do que se trata.</span>
+            </div>
+        </div>
+        <?php if (empty($ocorrencias_avisos)): ?>
+        <div class="card card-flush">
+            <div class="card-body text-center py-15">
+                <i class="ki-duotone ki-check-circle fs-3x text-success mb-5"><span class="path1"></span><span class="path2"></span></i>
+                <p class="fs-5 text-gray-600 mb-0">No momento não há avisos pendentes de esclarecimento com seu gestor.</p>
+            </div>
+        </div>
+        <?php else: ?>
+        <div class="d-flex flex-column gap-4">
+            <?php foreach ($ocorrencias_avisos as $av): ?>
+            <div class="card card-flush shadow-sm border border-gray-300 border-dashed">
+                <div class="card-body d-flex align-items-center py-6 px-6">
+                    <div class="symbol symbol-50px me-5">
+                        <div class="symbol-label bg-light-primary">
+                            <i class="ki-duotone ki-notification-on fs-2x text-primary"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold text-gray-900 fs-5 mb-1">Registro administrativo</div>
+                        <div class="text-gray-700 fs-6 mb-1">Para saber os detalhes, converse com <strong>seu gestor</strong>.</div>
+                        <div class="text-muted fs-7">Referência: <?= htmlspecialchars(formatar_data($av['data_ocorrencia'])) ?></div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php else: ?>
+
         <!-- Cards de Estatísticas -->
         <div class="row g-5 g-xl-8 mb-5">
             <div class="col-xl-3">
@@ -724,10 +791,13 @@ $tipos_ocorrencias = [
             </div>
         </div>
         
+        <?php endif; ?>
+
     </div>
 </div>
 <!--end::Post-->
 
+<?php if (!$sem_detalhe): ?>
 <script>
 "use strict";
 
@@ -938,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 </style>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

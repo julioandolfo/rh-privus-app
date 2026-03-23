@@ -3,11 +3,6 @@
  * Visualizar Flags de Colaboradores
  */
 
-// Ativa exibição de erros temporariamente para debug
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
@@ -15,28 +10,47 @@ require_once __DIR__ . '/../includes/ocorrencias_functions.php';
 
 require_page_permission('flags_view.php');
 
-try {
-    $pdo = getDB();
-    $usuario = $_SESSION['usuario'];
-    
-    if (empty($usuario)) {
-        throw new Exception("Usuário não autenticado");
+$pdo = getDB();
+$usuario = $_SESSION['usuario'];
+
+$sem_detalhe = colaborador_ocorrencias_flags_sem_detalhe();
+$flags_avisos = [];
+$flags = [];
+$colaboradores = [];
+$stats = [
+    'total_ativas' => 0,
+    'total_expiradas' => 0,
+    'faltas_nao_justificadas' => 0,
+    'ma_conduta' => 0,
+    'colaboradores_com_flags' => 0
+];
+
+verificar_expiracao_flags();
+
+if ($sem_detalhe) {
+    $cid = $usuario['colaborador_id'] ?? null;
+    if ($cid) {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT f.id, f.data_flag, f.data_validade, f.status
+                FROM ocorrencias_flags f
+                WHERE f.colaborador_id = ?
+                ORDER BY f.data_flag DESC, f.id DESC
+            ");
+            $stmt->execute([$cid]);
+            $flags_avisos = $stmt->fetchAll();
+        } catch (Exception $e) {
+            error_log("Erro ao buscar flags (avisos): " . $e->getMessage());
+        }
     }
-} catch (Exception $e) {
-    die("Erro ao inicializar: " . $e->getMessage() . "<br>Arquivo: " . $e->getFile() . "<br>Linha: " . $e->getLine());
-}
+} else {
 
 // Filtros
 $colaborador_id = $_GET['colaborador_id'] ?? null;
 $status = $_GET['status'] ?? 'ativa';
 $tipo_flag = $_GET['tipo_flag'] ?? null;
 
-// Verifica e expira flags vencidas antes de buscar
-// Nota: Para melhor performance, recomenda-se executar o cron diariamente
-// A verificação aqui garante dados atualizados mesmo sem cron configurado
-verificar_expiracao_flags();
-
-// Se for colaborador, força filtro para ver apenas suas próprias flags
+// Se for colaborador (gestão), força filtro para ver apenas suas próprias flags
 if (is_colaborador() && !empty($usuario['colaborador_id'])) {
     $colaborador_id = $usuario['colaborador_id'];
 }
@@ -63,7 +77,6 @@ if ($colaborador_id) {
         $where[] = "c.setor_id = ?";
         $params[] = $setor_id;
     } elseif (is_colaborador() && !empty($usuario['colaborador_id'])) {
-        // Colaborador só vê suas próprias flags
         $where[] = "f.colaborador_id = ?";
         $params[] = $usuario['colaborador_id'];
     }
@@ -160,7 +173,6 @@ try {
     $stmt_stats->execute($params);
     $stats = $stmt_stats->fetch();
     
-    // Garante que todas as chaves existem
     $stats = array_merge([
         'total_ativas' => 0,
         'total_expiradas' => 0,
@@ -170,16 +182,11 @@ try {
     ], $stats ?: []);
 } catch (Exception $e) {
     error_log("Erro ao buscar estatísticas de flags: " . $e->getMessage());
-    $stats = [
-        'total_ativas' => 0,
-        'total_expiradas' => 0,
-        'faltas_nao_justificadas' => 0,
-        'ma_conduta' => 0,
-        'colaboradores_com_flags' => 0
-    ];
 }
 
-$page_title = is_colaborador() ? 'Minhas Flags' : 'Flags de Colaboradores';
+} // fim !$sem_detalhe
+
+$page_title = $sem_detalhe ? 'Avisos' : (is_colaborador() ? 'Minhas Flags' : 'Flags de Colaboradores');
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -187,7 +194,7 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="toolbar d-flex flex-stack mb-3 mb-lg-5" id="kt_toolbar">
     <div id="kt_toolbar_container" class="container-fluid d-flex flex-stack flex-wrap">
         <div class="page-title d-flex flex-column me-5 py-2">
-            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0"><?= is_colaborador() ? 'Minhas Flags' : 'Flags de Colaboradores' ?></h1>
+            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0"><?= htmlspecialchars($page_title) ?></h1>
             <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 pt-1">
                 <li class="breadcrumb-item text-muted">
                     <a href="dashboard.php" class="text-muted text-hover-primary">Home</a>
@@ -195,7 +202,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <li class="breadcrumb-item">
                     <span class="bullet bg-gray-200 w-5px h-2px"></span>
                 </li>
-                <li class="breadcrumb-item text-gray-900">Flags</li>
+                <li class="breadcrumb-item text-gray-900"><?= htmlspecialchars($page_title) ?></li>
             </ul>
         </div>
     </div>
@@ -206,6 +213,49 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="post d-flex flex-column-fluid" id="kt_post">
     <div id="kt_content_container" class="container-xxl">
         
+        <?php if ($sem_detalhe): ?>
+        <div class="alert alert-primary d-flex align-items-center p-5 mb-8">
+            <i class="ki-duotone ki-flag fs-2hx text-primary me-4">
+                <span class="path1"></span><span class="path2"></span>
+            </i>
+            <div class="d-flex flex-column">
+                <h4 class="mb-1 text-gray-900">Acompanhamento</h4>
+                <span class="text-gray-700">Há indicações de acompanhamento registradas no RH. O tipo e o contexto <strong>não são exibidos aqui</strong>. <strong>Procure seu gestor direto</strong> para entender do que se trata.</span>
+            </div>
+        </div>
+        <?php if (empty($flags_avisos)): ?>
+        <div class="card card-flush">
+            <div class="card-body text-center py-15">
+                <i class="ki-duotone ki-check-circle fs-3x text-success mb-5"><span class="path1"></span><span class="path2"></span></i>
+                <p class="fs-5 text-gray-600 mb-0">Não há indicações registradas para o seu cadastro.</p>
+            </div>
+        </div>
+        <?php else: ?>
+        <div class="d-flex flex-column gap-4">
+            <?php foreach ($flags_avisos as $fa): ?>
+            <div class="card card-flush shadow-sm border border-gray-300 border-dashed">
+                <div class="card-body d-flex align-items-center py-6 px-6">
+                    <div class="symbol symbol-50px me-5">
+                        <div class="symbol-label bg-light-warning">
+                            <i class="ki-duotone ki-notification-on fs-2x text-warning"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold text-gray-900 fs-5 mb-1">Indicação de acompanhamento</div>
+                        <div class="text-gray-700 fs-6 mb-1">Para saber os detalhes, converse com <strong>seu gestor</strong>.</div>
+                        <div class="text-muted fs-7">
+                            Situação: <?= $fa['status'] === 'ativa' ? 'Em vigor' : 'Encerrada' ?>
+                            · Referência: <?= htmlspecialchars(formatar_data($fa['data_flag'])) ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php else: ?>
+
         <!-- Estatísticas -->
         <div class="row g-5 g-xl-8 mb-5">
             <div class="col-xl-3">
@@ -451,6 +501,8 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php endif; ?>
 
     </div>
 </div>

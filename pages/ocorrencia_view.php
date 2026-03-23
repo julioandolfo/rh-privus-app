@@ -18,6 +18,10 @@ if (!$ocorrencia_id) {
     redirect('ocorrencias_list.php', 'Ocorrência não encontrada!', 'error');
 }
 
+if (colaborador_ocorrencias_flags_sem_detalhe()) {
+    redirect('ocorrencias_list.php', 'Os detalhes deste registro são tratados apenas com o seu gestor.', 'info');
+}
+
 // Processa ações
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';

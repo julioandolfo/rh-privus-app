@@ -1708,7 +1708,7 @@ function getIcon($name) {
                                 <span class="path3"></span>
                             </i>
                         </span>
-                        <span class="menu-title">Minhas Ocorrências</span>
+                        <span class="menu-title"><?= colaborador_ocorrencias_flags_sem_detalhe() ? 'Avisos' : 'Minhas Ocorrências' ?></span>
                     </a>
                 </div>
                 <!--end:Menu item-->
@@ -1724,7 +1724,7 @@ function getIcon($name) {
                                 <span class="path2"></span>
                             </i>
                         </span>
-                        <span class="menu-title">Minhas Flags</span>
+                        <span class="menu-title"><?= colaborador_ocorrencias_flags_sem_detalhe() ? 'Indicações' : 'Minhas Flags' ?></span>
                     </a>
                 </div>
                 <!--end:Menu item-->

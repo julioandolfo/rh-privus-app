@@ -13,6 +13,9 @@ require_page_permission('contrato_templates.php');
 $pdo = getDB();
 $usuario = $_SESSION['usuario'];
 
+require_once __DIR__ . '/../includes/distrato_contrato_auto.php';
+garantir_schema_contratos_distrato($pdo);
+
 // Processa exclusão
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'excluir') {
     $id = intval($_POST['id'] ?? 0);
@@ -128,8 +131,11 @@ require_once __DIR__ . '/../includes/header.php';
                             <tr>
                                 <td>
                                     <span class="text-gray-900 fw-bold d-block fs-6"><?= htmlspecialchars($template['nome']) ?></span>
+                                    <?php if (!empty($template['padrao_distrato'])): ?>
+                                    <span class="badge badge-light-warning fs-8 mt-1">Padrão distrato (desligamento)</span>
+                                    <?php endif; ?>
                                     <?php if ($template['descricao']): ?>
-                                    <span class="text-muted fs-7"><?= htmlspecialchars($template['descricao']) ?></span>
+                                    <span class="text-muted fs-7 d-block"><?= htmlspecialchars($template['descricao']) ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td>

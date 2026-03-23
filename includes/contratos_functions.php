@@ -6,6 +6,43 @@
 require_once __DIR__ . '/functions.php';
 
 /**
+ * Endereço da empresa em uma linha (logradouro, bairro, cidade/UF, CEP).
+ */
+function montar_endereco_completo_empresa(array $empresa) {
+    $partes = [];
+    if (!empty($empresa['endereco'])) {
+        $partes[] = trim($empresa['endereco']);
+    }
+    if (!empty($empresa['bairro'])) {
+        $partes[] = trim($empresa['bairro']);
+    }
+    $loc = array_filter([trim($empresa['cidade'] ?? ''), trim($empresa['estado'] ?? '')]);
+    if ($loc) {
+        $partes[] = implode('/', $loc);
+    }
+    if (!empty($empresa['cep'])) {
+        $partes[] = formatar_cep($empresa['cep']);
+    }
+    return implode(', ', array_filter($partes));
+}
+
+/**
+ * Estado civil para texto de contrato (ex.: distrato).
+ */
+function label_estado_civil_contrato($valor) {
+    $map = [
+        'solteiro' => 'solteiro(a)',
+        'casado' => 'casado(a)',
+        'divorciado' => 'divorciado(a)',
+        'viuvo' => 'viúvo(a)',
+        'uniao_estavel' => 'em união estável',
+        'outro' => 'outro',
+    ];
+    $v = strtolower(trim((string)$valor));
+    return $map[$v] ?? ($valor !== '' && $valor !== null ? (string)$valor : 'estado civil não informado');
+}
+
+/**
  * Substitui variáveis no template com dados do colaborador
  */
 function substituir_variaveis_contrato($template, $colaborador, $contrato_data = []) {
@@ -43,6 +80,11 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
         $endereco_partes[] = implode('/', $cidade_estado);
     }
     $endereco_completo = implode(', ', $endereco_partes);
+
+    $tipo_contr = strtoupper(trim($colaborador['tipo_contrato'] ?? 'PJ'));
+    $eh_clt = ($tipo_contr === 'CLT');
+    $categoria_titulo = $eh_clt ? 'TRABALHO' : 'PRESTAÇÃO DE SERVIÇOS';
+    $qualificacao = $eh_clt ? 'com vínculo empregatício' : 'na qualidade de prestador(a) de serviços';
     
     // Dados do colaborador
     $variaveis = [
@@ -68,18 +110,23 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
         '{{colaborador.salario_extenso}}' => numero_por_extenso($colaborador['salario'] ?? 0),
         '{{colaborador.data_admissao}}' => formatar_data($colaborador['data_admissao'] ?? ''),
         '{{colaborador.regiao}}' => $colaborador['regiao'] ?? '',
+        '{{colaborador.estado_civil_label}}' => label_estado_civil_contrato($colaborador['estado_civil'] ?? ''),
+        '{{colaborador.qualificacao_contratual}}' => $qualificacao,
+        '{{colaborador.categoria_contrato_titulo}}' => $categoria_titulo,
     ];
     
     // Dados da empresa (contratante)
     $variaveis['{{empresa.nome_fantasia}}'] = $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '';
-    $variaveis['{{empresa.razao_social}}'] = $empresa['razao_social'] ?? '';
+    $variaveis['{{empresa.razao_social}}'] = $empresa['razao_social'] ?? $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '';
     $variaveis['{{empresa.cnpj}}'] = formatar_cnpj($empresa['cnpj'] ?? '');
     $variaveis['{{empresa.telefone}}'] = formatar_telefone($empresa['telefone'] ?? '');
     $variaveis['{{empresa.email}}'] = $empresa['email'] ?? '';
     $variaveis['{{empresa.cidade}}'] = $empresa['cidade'] ?? '';
     $variaveis['{{empresa.estado}}'] = $empresa['estado'] ?? '';
     $variaveis['{{empresa.endereco}}'] = $empresa['endereco'] ?? '';
+    $variaveis['{{empresa.bairro}}'] = $empresa['bairro'] ?? '';
     $variaveis['{{empresa.cep}}'] = formatar_cep($empresa['cep'] ?? '');
+    $variaveis['{{empresa.endereco_completo}}'] = montar_endereco_completo_empresa($empresa) ?: ($empresa['endereco'] ?? '');
     
     // Dados do contrato
     $variaveis['{{contrato.titulo}}'] = $contrato_data['titulo'] ?? '';
@@ -92,6 +139,12 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';
+
+    // Demissão / distrato (preenchidos em contrato_data ao gerar distrato automático)
+    $variaveis['{{demissao.data}}'] = formatar_data($contrato_data['demissao_data'] ?? '');
+    $variaveis['{{demissao.tipo}}'] = $contrato_data['demissao_tipo'] ?? '';
+    $variaveis['{{demissao.tipo_label}}'] = $contrato_data['demissao_tipo_label'] ?? '';
+    $variaveis['{{demissao.motivo}}'] = $contrato_data['demissao_motivo'] ?? '';
     
     // Dados de data/hora
     $variaveis['{{data_atual}}'] = date('d/m/Y');
@@ -226,7 +279,7 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
         
         // Empresa
         'empresa.nome_fantasia' => ['valor' => $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '', 'label' => 'Nome Fantasia da Empresa', 'tipo' => 'text'],
-        'empresa.razao_social' => ['valor' => $empresa['razao_social'] ?? '', 'label' => 'Razão Social da Empresa', 'tipo' => 'text'],
+        'empresa.razao_social' => ['valor' => $empresa['razao_social'] ?? $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '', 'label' => 'Razão Social da Empresa', 'tipo' => 'text'],
         'empresa.cnpj' => ['valor' => $empresa['cnpj'] ?? '', 'label' => 'CNPJ da Empresa', 'tipo' => 'text'],
         'empresa.telefone' => ['valor' => $empresa['telefone'] ?? '', 'label' => 'Telefone da Empresa', 'tipo' => 'text'],
         'empresa.email' => ['valor' => $empresa['email'] ?? '', 'label' => 'Email da Empresa', 'tipo' => 'email'],
@@ -235,6 +288,7 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
         'empresa.endereco' => ['valor' => $empresa['endereco'] ?? '', 'label' => 'Endereço da Empresa', 'tipo' => 'text'],
         'empresa.cep' => ['valor' => $empresa['cep'] ?? '', 'label' => 'CEP da Empresa', 'tipo' => 'text'],
         'empresa.bairro' => ['valor' => $empresa['bairro'] ?? '', 'label' => 'Bairro da Empresa', 'tipo' => 'text'],
+        'empresa.endereco_completo' => ['valor' => montar_endereco_completo_empresa($empresa), 'label' => 'Endereço completo da Empresa', 'tipo' => 'text'],
         
         // Contrato (descrição da função pode vir do contrato ou do cadastro do colaborador)
         'contrato.descricao_funcao' => [
@@ -259,6 +313,12 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
         'contrato.bonificacao_extenso' => ['valor' => $contrato_data['bonificacao_extenso'] ?? '', 'label' => 'Bonificação (por extenso)', 'tipo' => 'text'],
         'contrato.valor_kit' => ['valor' => $contrato_data['valor_kit'] ?? '', 'label' => 'Valor do Kit de Produtos (R$)', 'tipo' => 'number'],
         'contrato.valor_kit_extenso' => ['valor' => $contrato_data['valor_kit_extenso'] ?? '', 'label' => 'Valor do Kit (por extenso)', 'tipo' => 'text'],
+
+        // Demissão / distrato
+        'demissao.data' => ['valor' => !empty($contrato_data['demissao_data']) ? formatar_data($contrato_data['demissao_data']) : '', 'label' => 'Data do desligamento', 'tipo' => 'text'],
+        'demissao.tipo' => ['valor' => $contrato_data['demissao_tipo'] ?? '', 'label' => 'Tipo de demissão (código)', 'tipo' => 'text'],
+        'demissao.tipo_label' => ['valor' => $contrato_data['demissao_tipo_label'] ?? '', 'label' => 'Tipo de demissão', 'tipo' => 'text'],
+        'demissao.motivo' => ['valor' => $contrato_data['demissao_motivo'] ?? '', 'label' => 'Motivo do desligamento', 'tipo' => 'textarea'],
     ];
     
     // Extrai variáveis usadas no template
@@ -268,12 +328,12 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
     $faltantes = [];
     foreach ($variaveis_template as $variavel) {
         // Ignora variáveis de data (sempre preenchidas automaticamente)
-        if (in_array($variavel, ['data_atual', 'hora_atual', 'data_formatada', 'contrato.titulo', 'contrato.data_criacao', 'contrato.data_vencimento', 'contrato.observacoes'])) {
+        if (in_array($variavel, ['data_atual', 'hora_atual', 'data_formatada', 'contrato.titulo', 'contrato.data_criacao', 'contrato.data_vencimento', 'contrato.observacoes', 'demissao.tipo', 'colaborador.estado_civil_label', 'colaborador.qualificacao_contratual', 'colaborador.categoria_contrato_titulo'])) {
             continue;
         }
         
         // Ignora variáveis que não são obrigatórias (complemento, observacoes, etc)
-        if (in_array($variavel, ['colaborador.complemento', 'colaborador.rg'])) {
+        if (in_array($variavel, ['colaborador.complemento', 'colaborador.rg', 'demissao.motivo'])) {
             continue;
         }
         
@@ -345,6 +405,11 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
         $endereco_partes[] = implode('/', $cidade_estado);
     }
     $endereco_completo = implode(', ', $endereco_partes);
+
+    $tipo_contr = strtoupper(trim($colaborador['tipo_contrato'] ?? 'PJ'));
+    $eh_clt = ($tipo_contr === 'CLT');
+    $categoria_titulo = $eh_clt ? 'TRABALHO' : 'PRESTAÇÃO DE SERVIÇOS';
+    $qualificacao = $eh_clt ? 'com vínculo empregatício' : 'na qualidade de prestador(a) de serviços';
     
     // Dados do colaborador
     $variaveis = [
@@ -370,11 +435,14 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
         '{{colaborador.salario_extenso}}' => numero_por_extenso($colaborador['salario'] ?? 0),
         '{{colaborador.data_admissao}}' => formatar_data($colaborador['data_admissao'] ?? ''),
         '{{colaborador.regiao}}' => $colaborador['regiao'] ?? '',
+        '{{colaborador.estado_civil_label}}' => label_estado_civil_contrato($colaborador['estado_civil'] ?? ''),
+        '{{colaborador.qualificacao_contratual}}' => $qualificacao,
+        '{{colaborador.categoria_contrato_titulo}}' => $categoria_titulo,
     ];
     
     // Dados da empresa (contratante)
     $variaveis['{{empresa.nome_fantasia}}'] = $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '';
-    $variaveis['{{empresa.razao_social}}'] = $empresa['razao_social'] ?? '';
+    $variaveis['{{empresa.razao_social}}'] = $empresa['razao_social'] ?? $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '';
     $variaveis['{{empresa.cnpj}}'] = formatar_cnpj($empresa['cnpj'] ?? '');
     $variaveis['{{empresa.telefone}}'] = formatar_telefone($empresa['telefone'] ?? '');
     $variaveis['{{empresa.email}}'] = $empresa['email'] ?? '';
@@ -383,6 +451,7 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
     $variaveis['{{empresa.endereco}}'] = $empresa['endereco'] ?? '';
     $variaveis['{{empresa.bairro}}'] = $empresa['bairro'] ?? '';
     $variaveis['{{empresa.cep}}'] = formatar_cep($empresa['cep'] ?? '');
+    $variaveis['{{empresa.endereco_completo}}'] = montar_endereco_completo_empresa($empresa) ?: ($empresa['endereco'] ?? '');
     
     // Dados do contrato
     $variaveis['{{contrato.titulo}}'] = $contrato_data['titulo'] ?? '';
@@ -395,6 +464,12 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';
+
+    // Demissão / distrato
+    $variaveis['{{demissao.data}}'] = formatar_data($contrato_data['demissao_data'] ?? '');
+    $variaveis['{{demissao.tipo}}'] = $contrato_data['demissao_tipo'] ?? '';
+    $variaveis['{{demissao.tipo_label}}'] = $contrato_data['demissao_tipo_label'] ?? '';
+    $variaveis['{{demissao.motivo}}'] = $contrato_data['demissao_motivo'] ?? '';
 
     // Valores financeiros do contrato (para templates de representação comercial)
     $variaveis['{{contrato.valor_pedido}}'] = $contrato_data['valor_pedido'] ?? '';
@@ -537,5 +612,20 @@ function buscar_dados_colaborador_completos($colaborador_id) {
     $stmt->execute([$colaborador_id]);
     
     return $stmt->fetch();
+}
+
+/**
+ * Rótulo amigável do tipo de demissão (cadastro demissoes.tipo_demissao)
+ */
+function label_tipo_demissao($tipo) {
+    $map = [
+        'sem_justa_causa' => 'Dispensa sem justa causa',
+        'justa_causa' => 'Dispensa por justa causa',
+        'pedido_demissao' => 'Pedido de demissão',
+        'aposentadoria' => 'Aposentadoria',
+        'falecimento' => 'Falecimento',
+        'outro' => 'Outro',
+    ];
+    return $map[$tipo] ?? ($tipo ?: '—');
 }
 

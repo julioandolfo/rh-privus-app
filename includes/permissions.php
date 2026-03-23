@@ -365,6 +365,13 @@ function is_colaborador_sem_usuario() {
 }
 
 /**
+ * Colaborador (role COLABORADOR) vê ocorrências/flags apenas como aviso genérico, sem detalhes no sistema.
+ */
+function colaborador_ocorrencias_flags_sem_detalhe() {
+    return isset($_SESSION['usuario']['role']) && $_SESSION['usuario']['role'] === 'COLABORADOR';
+}
+
+/**
  * Verifica se o menu item deve ser exibido para o usuário atual
  * 
  * @param string|array $roles Role único ou array de roles permitidos

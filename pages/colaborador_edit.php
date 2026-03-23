@@ -62,6 +62,7 @@ if (!can_access_colaborador($id)) {
 
 // Processa POST ANTES de incluir o header (para evitar erro de headers already sent)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $msg_distrato = '';
     // Para RH, valida se a empresa selecionada está nas empresas permitidas
     $empresa_id = $_POST['empresa_id'] ?? $colaborador['empresa_id'];
     if ($usuario['role'] === 'RH' && $empresa_id) {
@@ -224,6 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Processa demissão se o status for desligado
+        $demissao_id_vinculo = null;
         if ($status === 'desligado' && $data_demissao) {
             // Verifica se já existe um registro de demissão
             $stmt_check_demissao = $pdo->prepare("SELECT id FROM demissoes WHERE colaborador_id = ? ORDER BY data_demissao DESC LIMIT 1");
@@ -243,6 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $motivo_demissao,
                     $demissao_existente['id']
                 ]);
+                $demissao_id_vinculo = (int)$demissao_existente['id'];
             } else {
                 // Cria novo registro de demissão
                 $stmt_insert_demissao = $pdo->prepare("
@@ -256,14 +259,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $motivo_demissao,
                     $usuario['id']
                 ]);
+                $demissao_id_vinculo = (int)$pdo->lastInsertId();
             }
         } elseif ($status !== 'desligado') {
             // Se o status não for mais desligado, remove o registro de demissão
             $stmt_delete_demissao = $pdo->prepare("DELETE FROM demissoes WHERE colaborador_id = ?");
             $stmt_delete_demissao->execute([$id]);
         }
+
+        if ($status === 'desligado' && $colaborador['status'] !== 'desligado' && $demissao_id_vinculo) {
+            require_once __DIR__ . '/../includes/distrato_contrato_auto.php';
+            $res_distrato = criar_contrato_distrato_automatico($pdo, (int)$id, $demissao_id_vinculo, $usuario);
+            if (!empty($res_distrato['message'])) {
+                $msg_distrato = ' ' . $res_distrato['message'];
+            }
+        }
         
-        redirect('colaborador_view.php?id=' . $id, 'Colaborador atualizado com sucesso!');
+        redirect('colaborador_view.php?id=' . $id, 'Colaborador atualizado com sucesso!' . $msg_distrato, 'success');
     } catch (PDOException $e) {
         redirect('colaborador_edit.php?id=' . $id, 'Erro ao atualizar: ' . $e->getMessage(), 'error');
     }

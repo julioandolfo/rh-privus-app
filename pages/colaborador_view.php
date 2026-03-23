@@ -49,17 +49,31 @@ if (!can_access_colaborador($id)) {
 $flags_ativas = get_flags_ativas($id);
 $total_flags_ativas = count($flags_ativas);
 
+$colab_sem_detalhe_occ = colaborador_ocorrencias_flags_sem_detalhe()
+    && (int) $id === (int) ($usuario['colaborador_id'] ?? 0);
+
 // Busca ocorrências do colaborador
-$stmt = $pdo->prepare("
-    SELECT o.*, u.nome as usuario_nome, tp.nome as tipo_nome
-    FROM ocorrencias o
-    LEFT JOIN usuarios u ON o.usuario_id = u.id
-    LEFT JOIN tipos_ocorrencias tp ON o.tipo_ocorrencia_id = tp.id
-    WHERE o.colaborador_id = ?
-    ORDER BY o.data_ocorrencia DESC, o.created_at DESC
-");
-$stmt->execute([$id]);
-$ocorrencias = $stmt->fetchAll();
+if ($colab_sem_detalhe_occ) {
+    $stmt = $pdo->prepare("
+        SELECT o.id, o.data_ocorrencia
+        FROM ocorrencias o
+        WHERE o.colaborador_id = ?
+        ORDER BY o.data_ocorrencia DESC, o.created_at DESC
+    ");
+    $stmt->execute([$id]);
+    $ocorrencias = $stmt->fetchAll();
+} else {
+    $stmt = $pdo->prepare("
+        SELECT o.*, u.nome as usuario_nome, tp.nome as tipo_nome
+        FROM ocorrencias o
+        LEFT JOIN usuarios u ON o.usuario_id = u.id
+        LEFT JOIN tipos_ocorrencias tp ON o.tipo_ocorrencia_id = tp.id
+        WHERE o.colaborador_id = ?
+        ORDER BY o.data_ocorrencia DESC, o.created_at DESC
+    ");
+    $stmt->execute([$id]);
+    $ocorrencias = $stmt->fetchAll();
+}
 
 // Busca horas extras do colaborador
 $stmt = $pdo->prepare("
@@ -448,8 +462,8 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                <span class="d-none d-md-inline">Ocorrências</span>
-                                <span class="d-md-none">Ocorrências</span>
+                                <span class="d-none d-md-inline"><?= !empty($colab_sem_detalhe_occ) ? 'Avisos' : 'Ocorrências' ?></span>
+                                <span class="d-md-none"><?= !empty($colab_sem_detalhe_occ) ? 'Avisos' : 'Ocorr.' ?></span>
                                 <?php if (count($ocorrencias) > 0): ?>
                                 <span class="badge badge-circle badge-danger ms-2"><?= count($ocorrencias) ?></span>
                                 <?php endif; ?>
@@ -550,12 +564,18 @@ require_once __DIR__ . '/../includes/header.php';
                                                 <?= ucfirst($colaborador['status']) ?>
                                             </span>
                                             <?php if ($total_flags_ativas > 0): ?>
+                                                <?php if (!empty($colab_sem_detalhe_occ)): ?>
+                                                <span class="badge badge-light-primary">
+                                                    Aviso de acompanhamento — fale com seu gestor
+                                                </span>
+                                                <?php else: ?>
                                             <a href="flags_view.php?colaborador_id=<?= $id ?>&status=ativa" class="badge badge-<?= $total_flags_ativas >= 3 ? 'danger' : ($total_flags_ativas >= 2 ? 'warning' : 'info') ?>">
                                                 🚩 <?= $total_flags_ativas ?> Flag<?= $total_flags_ativas > 1 ? 's' : '' ?> Ativa<?= $total_flags_ativas > 1 ? 's' : '' ?>
                                                 <?php if ($total_flags_ativas >= 3): ?>
                                                 <span class="ms-1">⚠️</span>
                                                 <?php endif; ?>
                                             </a>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
                                         
@@ -1333,7 +1353,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <!--begin::Tab Pane - Ocorrências-->
                     <div class="tab-pane fade" id="kt_tab_pane_ocorrencias" role="tabpanel">
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-7 gap-3">
-                            <h3 class="fw-bold text-gray-800 mb-0">Ocorrências do Colaborador</h3>
+                            <h3 class="fw-bold text-gray-800 mb-0"><?= !empty($colab_sem_detalhe_occ) ? 'Avisos' : 'Ocorrências do Colaborador' ?></h3>
                             <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
                                 <a href="ocorrencias_add.php?colaborador_id=<?= $id ?>" class="btn btn-primary w-100 w-md-auto">
                                     <i class="ki-duotone ki-plus fs-2">
@@ -1345,7 +1365,38 @@ require_once __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                         </div>
                         
-                        <?php if (empty($ocorrencias)): ?>
+                        <?php if (!empty($colab_sem_detalhe_occ)): ?>
+                            <div class="alert alert-primary d-flex align-items-center p-5 mb-5">
+                                <i class="ki-duotone ki-notification-bing fs-2hx text-primary me-4">
+                                    <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+                                </i>
+                                <div class="d-flex flex-column">
+                                    <h4 class="mb-1 text-gray-900">Aviso do RH</h4>
+                                    <span class="text-gray-700">Os detalhes não são exibidos aqui. <strong>Procure seu gestor direto</strong> para entender o contexto.</span>
+                                </div>
+                            </div>
+                            <?php if (empty($ocorrencias)): ?>
+                            <div class="text-center py-10 text-muted">Nenhum aviso no momento.</div>
+                            <?php else: ?>
+                            <div class="d-flex flex-column gap-4">
+                                <?php foreach ($ocorrencias as $ocorrencia): ?>
+                                <div class="card card-flush border border-dashed border-gray-300">
+                                    <div class="card-body d-flex align-items-center py-5 px-5">
+                                        <div class="symbol symbol-45px me-4">
+                                            <div class="symbol-label bg-light-primary">
+                                                <i class="ki-duotone ki-notification-on fs-2 text-primary"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-gray-900">Registro administrativo</div>
+                                            <div class="text-muted fs-7">Referência: <?= htmlspecialchars(formatar_data($ocorrencia['data_ocorrencia'])) ?></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        <?php elseif (empty($ocorrencias)): ?>
                             <div class="alert alert-info d-flex align-items-center p-5">
                                 <i class="ki-duotone ki-information fs-2hx text-info me-4">
                                     <span class="path1"></span>

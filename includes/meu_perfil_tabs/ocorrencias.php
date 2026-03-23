@@ -1,18 +1,55 @@
 <?php
 /**
- * Tab: Ocorrências - Meu Perfil
+ * Tab: Ocorrências / Avisos - Meu Perfil
  */
+$modo_aviso = !empty($ocorrencias_modo_aviso);
 ?>
 
 <div class="card">
     <div class="card-header border-0 pt-6">
         <h3 class="card-title align-items-start flex-column">
-            <span class="card-label fw-bold fs-3 mb-1">Minhas Ocorrências</span>
-            <span class="text-muted fw-semibold fs-7">Histórico de ocorrências registradas</span>
+            <span class="card-label fw-bold fs-3 mb-1"><?= $modo_aviso ? 'Avisos' : 'Minhas Ocorrências' ?></span>
+            <span class="text-muted fw-semibold fs-7"><?= $modo_aviso ? 'Informações administrativas — fale com seu gestor' : 'Histórico de ocorrências registradas' ?></span>
         </h3>
     </div>
     <div class="card-body pt-0">
-        <?php if (empty($ocorrencias)): ?>
+        <?php if ($modo_aviso): ?>
+            <div class="alert alert-primary d-flex align-items-center p-5 mb-5">
+                <i class="ki-duotone ki-notification-bing fs-2hx text-primary me-4">
+                    <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+                </i>
+                <div class="d-flex flex-column">
+                    <h4 class="mb-1 text-gray-900">Política de comunicação</h4>
+                    <span class="text-gray-700">Os detalhes dos registros não são exibidos aqui. <strong>Procure seu gestor direto</strong> para entender o contexto.</span>
+                </div>
+            </div>
+            <?php if (empty($ocorrencias)): ?>
+            <div class="text-center py-10">
+                <i class="ki-duotone ki-check-circle fs-5x text-success mb-5">
+                    <span class="path1"></span><span class="path2"></span>
+                </i>
+                <div class="fw-bold fs-4 text-gray-700">Nenhum aviso no momento</div>
+            </div>
+            <?php else: ?>
+            <div class="d-flex flex-column gap-4">
+                <?php foreach ($ocorrencias as $oc): ?>
+                <div class="card card-flush border border-dashed border-gray-300">
+                    <div class="card-body d-flex align-items-center py-5 px-5">
+                        <div class="symbol symbol-45px me-4">
+                            <div class="symbol-label bg-light-primary">
+                                <i class="ki-duotone ki-notification-on fs-2 text-primary"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-gray-900">Registro administrativo</div>
+                            <div class="text-muted fs-7">Referência: <?= htmlspecialchars(formatar_data($oc['data_ocorrencia'])) ?></div>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+        <?php elseif (empty($ocorrencias)): ?>
             <div class="text-center py-10">
                 <i class="ki-duotone ki-shield-tick fs-5x text-success mb-5">
                     <span class="path1"></span>
@@ -88,8 +125,8 @@
                                 </span>
                             </td>
                             <td>
-                                <div title="<?= htmlspecialchars($oc['descricao']) ?>">
-                                    <?= htmlspecialchars(mb_substr($oc['descricao'], 0, 60)) ?><?= mb_strlen($oc['descricao']) > 60 ? '...' : '' ?>
+                                <div title="<?= htmlspecialchars($oc['descricao'] ?? '') ?>">
+                                    <?= htmlspecialchars(mb_substr($oc['descricao'] ?? '', 0, 60)) ?><?= mb_strlen($oc['descricao'] ?? '') > 60 ? '...' : '' ?>
                                 </div>
                                 
                                 <?php if (!empty($oc['tempo_atraso_minutos'])): ?>

@@ -60,33 +60,41 @@ if (is_colaborador() && !empty($colaborador_id)) {
         $stmt->execute([$colaborador_id]);
         $total_ocorrencias = $stmt->fetch()['total'];
         
-        // Ocorrências recentes (últimas 5)
-        $stmt = $pdo->prepare("
-            SELECT o.*, tp.nome as tipo_nome, u.nome as usuario_nome
-            FROM ocorrencias o
-            LEFT JOIN tipos_ocorrencias tp ON o.tipo_ocorrencia_id = tp.id
-            LEFT JOIN usuarios u ON o.usuario_id = u.id
-            WHERE o.colaborador_id = ?
-            ORDER BY o.data_ocorrencia DESC, o.created_at DESC
-            LIMIT 5
-        ");
-        $stmt->execute([$colaborador_id]);
-        $ocorrencias_recentes = $stmt->fetchAll();
+        $colaborador_dashboard_aviso_occ = colaborador_ocorrencias_flags_sem_detalhe();
         
-        // Gráfico de ocorrências por mês (últimos 6 meses)
-        $meses_grafico = [];
-        $ocorrencias_grafico = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $mes = date('Y-m', strtotime("-$i months"));
-            $meses_grafico[] = date('M/Y', strtotime("-$i months"));
-            
+        if ($colaborador_dashboard_aviso_occ) {
+            $ocorrencias_recentes = [];
+            $meses_grafico = [];
+            $ocorrencias_grafico = [];
+        } else {
+            // Ocorrências recentes (últimas 5)
             $stmt = $pdo->prepare("
-                SELECT COUNT(*) as total 
-                FROM ocorrencias 
-                WHERE colaborador_id = ? AND DATE_FORMAT(data_ocorrencia, '%Y-%m') = ?
+                SELECT o.*, tp.nome as tipo_nome, u.nome as usuario_nome
+                FROM ocorrencias o
+                LEFT JOIN tipos_ocorrencias tp ON o.tipo_ocorrencia_id = tp.id
+                LEFT JOIN usuarios u ON o.usuario_id = u.id
+                WHERE o.colaborador_id = ?
+                ORDER BY o.data_ocorrencia DESC, o.created_at DESC
+                LIMIT 5
             ");
-            $stmt->execute([$colaborador_id, $mes]);
-            $ocorrencias_grafico[] = $stmt->fetch()['total'];
+            $stmt->execute([$colaborador_id]);
+            $ocorrencias_recentes = $stmt->fetchAll();
+            
+            // Gráfico de ocorrências por mês (últimos 6 meses)
+            $meses_grafico = [];
+            $ocorrencias_grafico = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $mes = date('Y-m', strtotime("-$i months"));
+                $meses_grafico[] = date('M/Y', strtotime("-$i months"));
+                
+                $stmt = $pdo->prepare("
+                    SELECT COUNT(*) as total 
+                    FROM ocorrencias 
+                    WHERE colaborador_id = ? AND DATE_FORMAT(data_ocorrencia, '%Y-%m') = ?
+                ");
+                $stmt->execute([$colaborador_id, $mes]);
+                $ocorrencias_grafico[] = $stmt->fetch()['total'];
+            }
         }
         
         // Pagamentos/Fechamentos do colaborador
@@ -153,6 +161,7 @@ if (is_colaborador() && !empty($colaborador_id)) {
         $colaborador = null;
         $ocorrencias_mes = 0;
         $total_ocorrencias = 0;
+        $colaborador_dashboard_aviso_occ = colaborador_ocorrencias_flags_sem_detalhe();
         $ocorrencias_recentes = [];
         $ocorrencias_grafico = [];
         $meses_grafico = [];
@@ -1097,12 +1106,24 @@ if (is_colaborador() && !empty($colaborador_id)) {
                 <div class="card card-xl-stretch mb-xl-8">
                     <div class="card-header border-0 pt-5">
                         <h3 class="card-title align-items-start flex-column">
+                            <?php if (!empty($colaborador_dashboard_aviso_occ)): ?>
+                            <span class="card-label fw-bold fs-3 mb-1">Avisos</span>
+                            <span class="text-muted fw-semibold fs-7">Informações administrativas</span>
+                            <?php else: ?>
                             <span class="card-label fw-bold fs-3 mb-1">Minhas Ocorrências</span>
                             <span class="text-muted fw-semibold fs-7">Últimos 6 meses</span>
+                            <?php endif; ?>
                         </h3>
                     </div>
                     <div class="card-body pt-5">
+                        <?php if (!empty($colaborador_dashboard_aviso_occ)): ?>
+                        <div class="alert alert-primary mb-0">
+                            <p class="mb-3">Detalhes de registros administrativos não são exibidos no sistema. Para saber do que se trata, <strong>procure seu gestor direto</strong>.</p>
+                            <a href="ocorrencias_list.php" class="btn btn-sm btn-primary">Ver avisos</a>
+                        </div>
+                        <?php else: ?>
                         <canvas id="kt_chart_ocorrencias_mes" style="height: 350px;"></canvas>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -1132,8 +1153,19 @@ if (is_colaborador() && !empty($colaborador_id)) {
                                 <span class="text-gray-800 fw-bold fs-6"><?= htmlspecialchars($colaborador['nome_cargo'] ?? '-') ?></span>
                             </div>
                             <div>
+                                <?php if (!empty($colaborador_dashboard_aviso_occ)): ?>
+                                <span class="text-muted fw-semibold fs-7 d-block mb-1">Avisos administrativos</span>
+                                <span class="text-gray-800 fw-bold fs-6">
+                                    <?php if ($total_ocorrencias > 0): ?>
+                                    Há avisos — fale com seu gestor
+                                    <?php else: ?>
+                                    Nenhum aviso no momento
+                                    <?php endif; ?>
+                                </span>
+                                <?php else: ?>
                                 <span class="text-muted fw-semibold fs-7 d-block mb-1">Total de Ocorrências</span>
                                 <span class="text-gray-800 fw-bold fs-6"><?= $total_ocorrencias ?></span>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <?php endif; ?>
