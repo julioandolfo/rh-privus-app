@@ -271,6 +271,32 @@ class AutentiqueService {
         
         return $doc;
     }
+
+    /**
+     * URLs dos arquivos do documento na Autentique (original, assinado, PAdES).
+     * Documentação: query document { files { original signed pades } }
+     *
+     * @return array|null ['original' => ?string, 'signed' => ?string, 'pades' => ?string]
+     */
+    public function obterArquivosDocumento($documentId) {
+        $query = '
+            query GetDocumentFiles($id: UUID!) {
+                document(id: $id) {
+                    id
+                    files { original signed pades }
+                }
+            }
+        ';
+
+        $result = $this->executeGraphQL($query, ['id' => $documentId]);
+        $doc = $result['document'] ?? null;
+
+        if (!$doc) {
+            return null;
+        }
+
+        return $doc['files'] ?? ['original' => null, 'signed' => null, 'pades' => null];
+    }
     
     /**
      * Cria link público de assinatura

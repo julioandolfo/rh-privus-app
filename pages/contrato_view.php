@@ -615,16 +615,32 @@ require_once __DIR__ . '/../includes/header.php';
                             <?= $contrato['conteudo_final_html'] ?>
                         </div>
                         
-                        <?php if ($contrato['pdf_path']): ?>
-                        <div class="mt-10">
-                            <a href="../<?= htmlspecialchars($contrato['pdf_path']) ?>" target="_blank" class="btn btn-light-primary">
+                        <?php if ($contrato['pdf_path'] || $contrato['autentique_document_id']): ?>
+                        <div class="mt-10 d-flex flex-wrap gap-3 align-items-center">
+                            <?php if ($contrato['pdf_path']): ?>
+                            <a href="../<?= htmlspecialchars($contrato['pdf_path']) ?>" target="_blank" rel="noopener" class="btn btn-light-primary">
                                 <i class="ki-duotone ki-file-down fs-2">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                Baixar PDF
+                                Baixar PDF gerado
                             </a>
+                            <?php endif; ?>
+                            <?php if ($contrato['autentique_document_id']): ?>
+                            <a href="contrato_baixar_assinado.php?id=<?= (int)$contrato_id ?>" target="_blank" rel="noopener" class="btn btn-light-success">
+                                <i class="ki-duotone ki-shield-tick fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Baixar PDF assinado (Autentique)
+                            </a>
+                            <?php endif; ?>
                         </div>
+                        <?php if ($contrato['autentique_document_id'] && $contrato['status'] !== 'assinado'): ?>
+                        <p class="text-muted fs-7 mt-3 mb-0">
+                            O PDF assinado só fica disponível na Autentique após todas as assinaturas. Se o status já estiver correto, use <strong>Sincronizar com Autentique</strong>.
+                        </p>
+                        <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
