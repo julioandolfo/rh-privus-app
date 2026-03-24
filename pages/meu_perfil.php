@@ -330,7 +330,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <!-- Horas Extras -->
+            <!-- Horas adicionais (prestação) -->
             <div class="col-xl-3 col-lg-6">
                 <div class="card stat-card h-100">
                     <div class="card-body">
@@ -346,7 +346,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 </span>
                             </div>
                             <div class="flex-grow-1">
-                                <span class="text-gray-700 fw-bold d-block fs-7">Horas Extras</span>
+                                <span class="text-gray-700 fw-bold d-block fs-7">Horas adicionais</span>
                                 <span class="fw-bold fs-2 text-gray-900"><?= count($horas_extras_colaborador) ?></span>
                             </div>
                         </div>
@@ -434,7 +434,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="path3"></span>
                                 <span class="path4"></span>
                             </i>
-                            Horas Extras
+                            Horas adicionais
                         </a>
                     </li>
                     <li class="nav-item">
@@ -482,7 +482,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php require __DIR__ . '/../includes/meu_perfil_tabs/banco_horas.php'; ?>
                     </div>
 
-                    <!-- Tab: Horas Extras -->
+                    <!-- Tab: Horas adicionais -->
                     <div class="tab-pane fade" id="tab_horas_extras">
                         <?php require __DIR__ . '/../includes/meu_perfil_tabs/horas_extras.php'; ?>
                     </div>

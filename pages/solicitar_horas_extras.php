@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/horas_extras_ui.php';
 
 require_login();
 
@@ -13,7 +14,7 @@ $usuario = $_SESSION['usuario'];
 
 // Verifica se é colaborador
 if ($usuario['role'] !== 'COLABORADOR' || !isset($usuario['colaborador_id'])) {
-    redirect('dashboard.php', 'Acesso negado! Apenas colaboradores podem solicitar horas extras.', 'error');
+    redirect('dashboard.php', 'Acesso negado! Apenas prestadores de serviço (perfil colaborador) podem usar esta solicitação.', 'error');
 }
 
 $pdo = getDB();
@@ -75,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Verifica se a data não é futura
         if (strtotime($data_trabalho) > strtotime('today')) {
-            redirect('solicitar_horas_extras.php', 'Não é possível solicitar horas extras para datas futuras!', 'error');
+            redirect('solicitar_horas_extras.php', 'Não é possível solicitar horas adicionais para datas futuras!', 'error');
         }
         
         try {
@@ -91,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $motivo
             ]);
             
-            redirect('solicitar_horas_extras.php', 'Solicitação de horas extras enviada com sucesso! Aguarde aprovação do RH.', 'success');
+            redirect('solicitar_horas_extras.php', 'Solicitação enviada! A gestão vai analisar. Dúvidas sobre valores ou regras: fale com seu gestor.', 'success');
         } catch (PDOException $e) {
             redirect('solicitar_horas_extras.php', 'Erro ao enviar solicitação: ' . $e->getMessage(), 'error');
         }
@@ -139,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $solicitacao_id
             ]);
             
-            redirect('solicitar_horas_extras.php', 'Motivo atualizado com sucesso! O RH será notificado.', 'success');
+            redirect('solicitar_horas_extras.php', 'Motivo atualizado com sucesso! A gestão será notificada.', 'success');
         } catch (PDOException $e) {
             redirect('solicitar_horas_extras.php', 'Erro ao atualizar motivo: ' . $e->getMessage(), 'error');
         }
@@ -173,7 +174,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$colaborador_id]);
 $solicitacoes = $stmt->fetchAll();
 
-$page_title = 'Solicitar Horas Extras';
+$page_title = hx_ui_menu_solicitar();
 include __DIR__ . '/../includes/header.php';
 
 // Função para converter decimal para HH:MM
@@ -189,7 +190,7 @@ function decimalParaHorasMinutos($valor) {
         <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack">
             <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
                 <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
-                    Solicitar Horas Extras
+                    <?= htmlspecialchars(hx_ui_menu_solicitar()) ?>
                 </h1>
                 <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
                     <li class="breadcrumb-item text-muted">
@@ -198,7 +199,7 @@ function decimalParaHorasMinutos($valor) {
                     <li class="breadcrumb-item">
                         <span class="bullet bg-gray-400 w-5px h-2px"></span>
                     </li>
-                    <li class="breadcrumb-item text-muted">Solicitar Horas Extras</li>
+                    <li class="breadcrumb-item text-muted"><?= htmlspecialchars(hx_ui_menu_solicitar()) ?></li>
                 </ul>
             </div>
         </div>
@@ -206,6 +207,13 @@ function decimalParaHorasMinutos($valor) {
 
     <div id="kt_app_content" class="app-content flex-column-fluid">
         <div id="kt_app_content_container" class="app-container container-xxl">
+
+            <div class="alert alert-primary d-flex align-items-start p-5 mb-5">
+                <i class="ki-duotone ki-information-5 fs-2hx text-primary me-4 mt-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                <div class="text-gray-800">
+                    <strong>Prestação de serviço</strong> — <?= htmlspecialchars(hx_ui_contexto_prestador()) ?>
+                </div>
+            </div>
             
             <?php if ($solicitacao_editar): ?>
             <!-- Card para atualizar motivo -->
@@ -220,7 +228,7 @@ function decimalParaHorasMinutos($valor) {
                             </i>
                             Atualizar Motivo da Solicitação
                         </span>
-                        <span class="text-white mt-1 fw-semibold fs-7">O RH solicitou mais informações sobre esta solicitação</span>
+                        <span class="text-white mt-1 fw-semibold fs-7">A gestão solicitou mais informações sobre esta solicitação</span>
                     </h3>
                 </div>
                 <div class="card-body">
@@ -230,8 +238,8 @@ function decimalParaHorasMinutos($valor) {
                             <span class="path2"></span>
                             <span class="path3"></span>
                         </i>
-                        <strong>Atenção:</strong> O RH solicitou mais detalhes sobre o motivo das suas horas extras. 
-                        Por favor, forneça uma justificativa mais completa.
+                        <strong>Atenção:</strong> A gestão pediu mais detalhes sobre o motivo das horas adicionais da sua prestação. 
+                        Forneça uma justificativa mais completa. Dúvidas: fale com seu gestor.
                     </div>
                     
                     <div class="row mb-5">
@@ -261,7 +269,7 @@ function decimalParaHorasMinutos($valor) {
                                     <span class="path2"></span>
                                     <span class="path3"></span>
                                 </i>
-                                Observações do RH:
+                                Observações da gestão:
                             </label>
                             <div class="p-3 bg-light-warning rounded border border-warning border-dashed">
                                 <?= nl2br(htmlspecialchars($solicitacao_editar['observacoes_rh'])) ?>
@@ -279,13 +287,9 @@ function decimalParaHorasMinutos($valor) {
                             <textarea name="novo_motivo" 
                                       class="form-control" 
                                       rows="6" 
-                                      placeholder="Descreva detalhadamente o motivo das horas extras. Inclua informações como:
-- Qual projeto ou tarefa você estava executando
-- Por que era necessário fazer horas extras
-- Qual a urgência ou importância
-- Se houve solicuação do gestor ou foi iniciativa própria"
+                                      placeholder="Descreva o motivo das horas adicionais da prestação. Ex.: projeto/tarefa, urgência, se o gestor pediu ou foi iniciativa sua."
                                       required><?= htmlspecialchars($solicitacao_editar['motivo']) ?></textarea>
-                            <div class="form-text">Seja o mais específico possível. Isso ajuda o RH a entender a necessidade.</div>
+                            <div class="form-text">Quanto mais claro, mais rápido a gestão consegue analisar. Valores e regras: com seu gestor.</div>
                         </div>
                         
                         <div class="d-flex justify-content-between">
@@ -314,7 +318,7 @@ function decimalParaHorasMinutos($valor) {
                 <div class="card-header">
                     <h3 class="card-title align-items-start flex-column">
                         <span class="card-label fw-bold fs-3 mb-1">Nova Solicitação</span>
-                        <span class="text-muted mt-1 fw-semibold fs-7">Preencha os dados das horas extras trabalhadas</span>
+                        <span class="text-muted mt-1 fw-semibold fs-7">Registre tempo adicional da sua prestação. A análise e os valores são tratados pela gestão.</span>
                     </h3>
                 </div>
                 <div class="card-body">
@@ -353,7 +357,7 @@ function decimalParaHorasMinutos($valor) {
                                 <textarea name="motivo" 
                                           class="form-control" 
                                           rows="4" 
-                                          placeholder="Descreva o motivo das horas extras trabalhadas..."
+                                          placeholder="Descreva o motivo das horas adicionais (prestação de serviço)..."
                                           <?= $solicitacao_editar ? 'disabled' : 'required' ?>></textarea>
                             </div>
                         </div>

@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/horas_extras_ui.php';
 require_once __DIR__ . '/../includes/select_colaborador.php';
 
 require_page_permission('horas_extras.php');
@@ -93,14 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $d_fmt = date('d/m/Y', strtotime($data_trabalho));
                         enviar_push_colaborador(
                             (int)$colaborador_id,
-                            '⏰ Horas Extras Registradas',
+                            '⏰ Horas adicionais registradas',
                             "{$h_fmt}h extras do dia {$d_fmt} foram adicionadas ao seu banco de horas.",
                             get_base_url() . '/pages/banco_horas.php',
                             'horas_extras'
                         );
                     } catch (Exception $e) { error_log('[Push] horas_extras banco: ' . $e->getMessage()); }
 
-                    redirect('horas_extras.php', 'Hora extra adicionada ao banco de horas com sucesso!');
+                    redirect('horas_extras.php', 'Hora adicional lançada no saldo de horas com sucesso!');
                     
                 } catch (Exception $e) {
                     // Se falhar ao inserir hora_extra, reverte a movimentação do banco
@@ -116,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         date('Y-m-d')
                     );
                     
-                    redirect('horas_extras.php', 'Erro ao salvar hora extra: ' . $e->getMessage() . ' (Movimentação do banco revertida)', 'error');
+                    redirect('horas_extras.php', 'Erro ao salvar hora adicional: ' . $e->getMessage() . ' (Movimentação do banco revertida)', 'error');
                 }
                 
             } else {
@@ -167,14 +168,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $v_fmt = 'R$ ' . number_format($valor_total, 2, ',', '.');
                     enviar_push_colaborador(
                         (int)$colaborador_id,
-                        '⏰ Horas Extras Registradas',
+                        '⏰ Horas adicionais registradas',
                         "{$h_fmt}h extras do dia {$d_fmt} foram registradas. Valor a receber: {$v_fmt}.",
                         get_base_url() . '/pages/minhas_horas_extras.php',
                         'horas_extras'
                     );
                 } catch (Exception $e) { error_log('[Push] horas_extras dinheiro: ' . $e->getMessage()); }
 
-                redirect('horas_extras.php', 'Hora extra cadastrada com sucesso!');
+                redirect('horas_extras.php', 'Hora adicional registrada com sucesso!');
             }
         } catch (PDOException $e) {
             redirect('horas_extras.php', 'Erro ao salvar: ' . $e->getMessage(), 'error');
@@ -273,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hora_extra = $stmt->fetch();
             
             if (!$hora_extra) {
-                redirect('horas_extras.php', 'Hora extra não encontrada!', 'error');
+                redirect('horas_extras.php', 'Registro não encontrado!', 'error');
             }
             
             $pdo->beginTransaction();
@@ -341,7 +342,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $pdo->commit();
             
-            redirect('horas_extras.php', 'Hora extra excluída com sucesso e banco de horas ajustado!');
+            redirect('horas_extras.php', 'Registro de hora adicional excluído e saldo de horas ajustado!');
         } catch (PDOException $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -442,7 +443,7 @@ if ($usuario['role'] === 'ADMIN') {
     $empresas_percentual = $stmt->fetchAll();
 }
 
-$page_title = 'Horas Extras';
+$page_title = hx_ui_titulo_gestao();
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -450,7 +451,7 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="toolbar d-flex flex-stack mb-3 mb-lg-5" id="kt_toolbar">
     <div id="kt_toolbar_container" class="container-fluid d-flex flex-stack flex-wrap">
         <div class="page-title d-flex flex-column me-5 py-2">
-            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0">Horas Extras</h1>
+            <h1 class="d-flex flex-column text-gray-900 fw-bold fs-3 mb-0"><?= htmlspecialchars(hx_ui_titulo_gestao()) ?></h1>
             <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 pt-1">
                 <li class="breadcrumb-item text-muted">
                     <a href="dashboard.php" class="text-muted text-hover-primary">Home</a>
@@ -464,7 +465,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <li class="breadcrumb-item">
                     <span class="bullet bg-gray-200 w-5px h-2px"></span>
                 </li>
-                <li class="breadcrumb-item text-gray-900">Horas Extras</li>
+                <li class="breadcrumb-item text-gray-900"><?= htmlspecialchars(hx_ui_titulo_gestao()) ?></li>
             </ul>
         </div>
     </div>
@@ -489,7 +490,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
-                        <input type="text" data-kt-horaextra-table-filter="search" class="form-control form-control-solid w-250px ps-12" placeholder="Buscar horas extras" />
+                        <input type="text" data-kt-horaextra-table-filter="search" class="form-control form-control-solid w-250px ps-12" placeholder="Buscar horas adicionais" />
                     </div>
                     <!--end::Search-->
                 </div>
@@ -557,7 +558,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <!--begin::Add hora extra-->
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_horaextra">
                             <i class="ki-duotone ki-plus fs-2"></i>
-                            Nova Hora Extra
+                            Registrar hora adicional
                         </button>
                         <!--end::Add hora extra-->
                     </div>
@@ -820,7 +821,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
             <div class="modal-header" id="kt_modal_horaextra_header">
-                <h2 class="fw-bold">Nova Hora Extra</h2>
+                <h2 class="fw-bold">Registrar hora adicional (prestador)</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -1127,7 +1128,7 @@ function calcularValorTotal() {
             <span>Salário: R$ ${salario.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
             <span>Valor Hora Normal: R$ ${valorHora.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
             <span>Percentual Adicional: ${percentual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}%</span>
-            <span>Valor Hora Extra: R$ ${valorHoraExtra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+            <span>Valor da hora (com adicional): R$ ${valorHoraExtra.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
             <span class="fw-bold mt-1">${quantidadeHoras.toLocaleString('pt-BR', {minimumFractionDigits: 2})}h${horasMinutosTexto} × R$ ${valorHoraExtra.toLocaleString('pt-BR', {minimumFractionDigits: 2})} = R$ ${valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
         </div>
     `;
@@ -1675,7 +1676,7 @@ function initKTHorasExtrasList() {
 // Deletar hora extra
 function deletarHoraExtra(id) {
     Swal.fire({
-        text: "Tem certeza que deseja excluir esta hora extra?",
+        text: "Tem certeza que deseja excluir este registro de hora adicional?",
         icon: "warning",
         showCancelButton: true,
         buttonsStyling: false,
@@ -1836,7 +1837,7 @@ document.getElementById('exportar_excel')?.addEventListener('click', function(e)
 function exportarParaExcel(dadosExcel) {
     const ws = XLSX.utils.json_to_sheet(dadosExcel);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Horas Extras');
+    XLSX.utils.book_append_sheet(wb, ws, 'Horas adicionais');
     
     // Ajusta largura das colunas
     const colWidths = [
@@ -1910,7 +1911,7 @@ function exportarParaPDF(dados) {
     
     // Título
     doc.setFontSize(16);
-    doc.text('Relatório de Horas Extras', 14, 15);
+    doc.text('Relatório de horas adicionais (prestadores)', 14, 15);
     
     // Data de geração
     doc.setFontSize(10);
@@ -2458,7 +2459,7 @@ function enviarFormularioHoraExtra(form, btn) {
             
             // Mostra notificação de sucesso
             Swal.fire({
-                text: "Hora extra cadastrada com sucesso!",
+                text: "Hora adicional registrada com sucesso!",
                 icon: "success",
                 buttonsStyling: false,
                 confirmButtonText: "Ok",
@@ -2483,7 +2484,7 @@ function enviarFormularioHoraExtra(form, btn) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const alertElement = doc.querySelector('.alert-danger');
-            const mensagemErro = alertElement ? alertElement.textContent.trim() : 'Erro ao salvar hora extra';
+            const mensagemErro = alertElement ? alertElement.textContent.trim() : 'Erro ao salvar hora adicional';
             
             Swal.fire({
                 text: mensagemErro,

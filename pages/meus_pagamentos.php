@@ -1014,13 +1014,13 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td class="fw-bold">Horas Extras (Total)</td>
+                                                    <td class="fw-bold">Horas adicionais (total)</td>
                                                     <td class="text-end">
                                                         <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td class="fw-bold">Valor Horas Extras</td>
+                                                    <td class="fw-bold">Valor horas adicionais</td>
                                                     <td class="text-end">
                                                         <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                                     </td>
@@ -1081,11 +1081,11 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                             <span class="text-gray-800 fw-bold">R$ ${parseFloat(d.item.salario_base || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
-                                            <span class="fw-bold">Horas Extras (Total)</span>
+                                            <span class="fw-bold">Horas adicionais (total)</span>
                                             <span class="text-gray-800 fw-bold">${parseFloat(d.item.horas_extras || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</span>
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center p-3 bg-light-success rounded">
-                                            <span class="fw-bold">Valor Horas Extras</span>
+                                            <span class="fw-bold">Valor horas adicionais</span>
                                             <span class="text-success fw-bold">R$ ${parseFloat(d.item.valor_horas_extras || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center p-3 bg-light-success rounded">
@@ -1128,10 +1128,10 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                             </div>
                         </div>
                         
-                        <!-- Detalhes de Horas Extras -->
+                        <!-- Detalhes horas adicionais (prestação) -->
                         <div class="card card-flush mb-5">
                             <div class="card-header">
-                                <h3 class="card-title">Detalhes de Horas Extras</h3>
+                                <h3 class="card-title">Detalhes das horas adicionais</h3>
                             </div>
                             <div class="card-body">
                                 <div class="mb-5">
@@ -1144,7 +1144,7 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                                     <span class="path2"></span>
                                                 </i>
                                                 <div>
-                                                    <div class="text-muted fs-7">Horas Pagas em R$</div>
+                                                    <div class="text-muted fs-7">Horas adicionais (R$)</div>
                                                     <div class="fw-bold fs-4">${parseFloat(d.horas_extras.resumo.horas_dinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}h</div>
                                                     <div class="text-success fs-6">R$ ${parseFloat(d.horas_extras.resumo.valor_dinheiro || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                                                 </div>
@@ -1250,7 +1250,7 @@ function verDetalhesPagamentoColaborador(fechamentoId, colaboradorId) {
                                         </div>
                                     `).join('')}
                                 </div>
-                                ` : '<p class="text-muted">Nenhuma hora extra registrada neste período.</p>'}
+                                ` : '<p class="text-muted">Nenhuma hora adicional registrada neste período.</p>'}
                             </div>
                         </div>
                         

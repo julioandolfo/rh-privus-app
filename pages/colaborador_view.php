@@ -7,6 +7,7 @@ $page_title = 'Visualizar Colaborador';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/horas_extras_ui.php';
 require_once __DIR__ . '/../includes/ocorrencias_functions.php';
 
 require_page_permission('colaborador_view.php');
@@ -439,8 +440,8 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                <span class="d-none d-md-inline">Horas Extras</span>
-                                <span class="d-md-none">Horas Extras</span>
+                                <span class="d-none d-md-inline">Horas adicionais</span>
+                                <span class="d-md-none">Horas adic.</span>
                                 <?php if (count($horas_extras_colaborador) > 0): ?>
                                 <span class="badge badge-circle badge-info ms-2"><?= count($horas_extras_colaborador) ?></span>
                                 <?php endif; ?>
@@ -1028,22 +1029,59 @@ require_once __DIR__ . '/../includes/header.php';
                     <!--end::Tab Pane - Bônus/Pagamentos-->
                     <?php endif; ?>
                     
-                    <!--begin::Tab Pane - Horas Extras-->
+                    <!--begin::Tab Pane - Horas adicionais (prestação)-->
                     <div class="tab-pane fade" id="kt_tab_pane_horas_extras" role="tabpanel">
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-7 gap-3">
-                            <h3 class="fw-bold text-gray-800 mb-0">Horas Extras do Colaborador</h3>
+                            <h3 class="fw-bold text-gray-800 mb-0"><?= !empty($colab_sem_detalhe_occ) ? 'Horas adicionais da prestação' : 'Horas adicionais (prestador)' ?></h3>
                             <?php if ($usuario['role'] !== 'COLABORADOR'): ?>
                                 <a href="horas_extras.php" class="btn btn-primary w-100 w-md-auto">
                                     <i class="ki-duotone ki-plus fs-2">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
-                                    Nova Hora Extra
+                                    Registrar hora adicional
                                 </a>
                             <?php endif; ?>
                         </div>
                         
-                        <?php if (empty($horas_extras_colaborador)): ?>
+                        <?php if (!empty($colab_sem_detalhe_occ)): ?>
+                            <div class="alert alert-primary d-flex align-items-start p-5 mb-6">
+                                <i class="ki-duotone ki-information-5 fs-2hx text-primary me-4 mt-1">
+                                    <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+                                </i>
+                                <div>
+                                    <h4 class="mb-2 text-gray-900">Prestação de serviço</h4>
+                                    <p class="mb-0 text-gray-700"><?= htmlspecialchars(hx_ui_consulte_gestor_valores()) ?></p>
+                                </div>
+                            </div>
+                            <?php if (empty($horas_extras_colaborador)): ?>
+                            <div class="alert alert-info d-flex align-items-center p-5">
+                                <div class="d-flex flex-column">
+                                    <h4 class="mb-1 text-info">Nenhum registro</h4>
+                                    <span>Não há horas adicionais registradas para o seu cadastro.</span>
+                                </div>
+                            </div>
+                            <?php else: ?>
+                            <div class="d-flex flex-column gap-4">
+                                <?php foreach ($horas_extras_colaborador as $he):
+                                    $is_remocao = ($he['quantidade_horas'] < 0);
+                                ?>
+                                <div class="card card-flush border border-dashed border-gray-300 border-start border-4 border-primary">
+                                    <div class="card-body py-5 px-5">
+                                        <div class="fw-bold text-gray-900 fs-5 mb-1"><?= $is_remocao ? 'Ajuste de horas' : 'Hora adicional registrada' ?></div>
+                                        <div class="text-gray-700 mb-2">
+                                            Data de referência: <strong><?= date('d/m/Y', strtotime($he['data_trabalho'])) ?></strong>
+                                            <?php if (!$is_remocao): ?>
+                                            · Quantidade: <strong><?= number_format($he['quantidade_horas'], 2, ',', '.') ?>h</strong>
+                                            <?php endif; ?>
+                                        </div>
+                                        <p class="text-muted fs-7 mb-0"><?= htmlspecialchars(hx_ui_consulte_gestor_valores()) ?></p>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        <?php elseif (empty($horas_extras_colaborador)): ?>
                             <div class="alert alert-info d-flex align-items-center p-5">
                                 <i class="ki-duotone ki-information fs-2hx text-info me-4">
                                     <span class="path1"></span>
@@ -1051,8 +1089,8 @@ require_once __DIR__ . '/../includes/header.php';
                                     <span class="path3"></span>
                                 </i>
                                 <div class="d-flex flex-column">
-                                    <h4 class="mb-1 text-info">Nenhuma hora extra</h4>
-                                    <span>Nenhuma hora extra registrada para este colaborador.</span>
+                                    <h4 class="mb-1 text-info">Nenhuma hora adicional</h4>
+                                    <span>Nenhum registro de horas adicionais para este prestador.</span>
                                 </div>
                             </div>
                         <?php else: ?>
@@ -1064,7 +1102,7 @@ require_once __DIR__ . '/../includes/header.php';
                                                 <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
                                                     <th class="min-w-100px">Data</th>
                                                     <th class="min-w-100px">Quantidade</th>
-                                                    <th class="min-w-100px">Tipo</th>
+                                                    <th class="min-w-100px">Compensação</th>
                                                     <th class="min-w-120px">Valor Hora</th>
                                                     <th class="min-w-100px">% Adicional</th>
                                                     <th class="min-w-120px">Valor Total</th>
@@ -1091,11 +1129,11 @@ require_once __DIR__ . '/../includes/header.php';
                                                     </td>
                                                     <td>
                                                         <?php if ($is_remocao): ?>
-                                                            <span class="badge badge-light-warning">Remoção Banco</span>
+                                                            <span class="badge badge-light-warning">Ajuste saldo</span>
                                                         <?php elseif ($tipo_pagamento === 'banco_horas'): ?>
-                                                            <span class="badge badge-info">Banco de Horas</span>
+                                                            <span class="badge badge-info">Saldo de horas</span>
                                                         <?php else: ?>
-                                                            <span class="badge badge-success">R$</span>
+                                                            <span class="badge badge-success">Valor (R$)</span>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
@@ -1151,7 +1189,7 @@ require_once __DIR__ . '/../includes/header.php';
                             </div>
                         <?php endif; ?>
                     </div>
-                    <!--end::Tab Pane - Horas Extras-->
+                    <!--end::Tab Pane - Horas adicionais-->
                     
                     <!--begin::Tab Pane - Banco de Horas-->
                     <div class="tab-pane fade" id="kt_tab_pane_banco_horas" role="tabpanel">
@@ -1237,7 +1275,7 @@ require_once __DIR__ . '/../includes/header.php';
                                                 </select>
                                                 <select id="filtro_origem_historico" class="form-select form-select-solid w-150px">
                                                     <option value="">Todas as origens</option>
-                                                    <option value="hora_extra">Horas Extras</option>
+                                                    <option value="hora_extra">Horas adicionais</option>
                                                     <option value="ocorrencia">Ocorrências</option>
                                                     <option value="ajuste_manual">Ajustes Manuais</option>
                                                     <option value="remocao_manual">Remoções Manuais</option>
@@ -1290,7 +1328,7 @@ require_once __DIR__ . '/../includes/header.php';
                                                             <td>
                                                                 <?php
                                                                 $origem_labels = [
-                                                                    'hora_extra' => 'Hora Extra',
+                                                                    'hora_extra' => 'Hora adicional',
                                                                     'ocorrencia' => 'Ocorrência',
                                                                     'ajuste_manual' => 'Ajuste Manual',
                                                                     'remocao_manual' => 'Remoção Manual'
@@ -3443,7 +3481,7 @@ function deletarOcorrencia(ocorrenciaId) {
 // Função para deletar hora extra
 function deletarHoraExtra(id) {
     Swal.fire({
-        text: "Tem certeza que deseja excluir esta hora extra?",
+        text: "Tem certeza que deseja excluir este registro de hora adicional?",
         icon: "warning",
         showCancelButton: true,
         buttonsStyling: false,

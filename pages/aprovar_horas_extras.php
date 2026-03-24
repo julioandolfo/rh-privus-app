@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/horas_extras_ui.php';
 
 // Apenas ADMIN e RH podem acessar
 if (!can_show_menu(['ADMIN', 'RH']) || is_colaborador()) {
@@ -116,8 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 require_once __DIR__ . '/../includes/push_notifications.php';
                 enviar_push_colaborador(
                     $solicitacao['colaborador_id'],
-                    'Horas Extras Aprovadas! ⏰',
-                    'Suas ' . number_format($solicitacao['quantidade_horas'], 2, ',', '.') . ' horas extras foram aprovadas e serão pagas.',
+                    'Horas adicionais aprovadas ⏰',
+                    'Suas ' . number_format($solicitacao['quantidade_horas'], 2, ',', '.') . 'h adicionais foram aprovadas. Valores e pagamento: consulte seu gestor.',
                     get_base_url() . '/pages/meus_pagamentos.php',
                     'horas_extras',
                     $hora_extra_id,
@@ -263,8 +264,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 require_once __DIR__ . '/../includes/push_notifications.php';
                 enviar_push_colaborador(
                     $solicitacao['colaborador_id'],
-                    'Horas Extras Aprovadas! ⏰',
-                    'Suas ' . number_format($quantidade_final, 2, ',', '.') . ' horas extras foram aprovadas e serão pagas.',
+                    'Horas adicionais aprovadas ⏰',
+                    'Suas ' . number_format($quantidade_final, 2, ',', '.') . 'h adicionais foram aprovadas. Valores e pagamento: consulte seu gestor.',
                     get_base_url() . '/pages/meus_pagamentos.php',
                     'horas_extras',
                     $hora_extra_id,
@@ -275,7 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->commit();
             
             $mensagem = ($action === 'aprovar') 
-                ? 'Solicitação aprovada e horas extras registradas com sucesso!'
+                ? 'Solicitação aprovada e horas adicionais registradas com sucesso!'
                 : 'Solicitação rejeitada com sucesso!';
             
             redirect('aprovar_horas_extras.php', $mensagem, 'success');
@@ -343,8 +344,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             require_once __DIR__ . '/../includes/push_notifications.php';
             enviar_push_colaborador(
                 $solicitacao['colaborador_id'],
-                '📝 Motivo Necessário - Horas Extras',
-                'O RH solicitou mais informações sobre suas horas extras do dia ' . formatar_data($solicitacao['data_trabalho']) . '. Clique para adicionar o motivo.',
+                    '📝 Motivo necessário — horas adicionais',
+                    'A gestão pediu mais informações sobre suas horas adicionais do dia ' . formatar_data($solicitacao['data_trabalho']) . '. Clique para complementar o motivo.',
                 get_base_url() . '/pages/solicitar_horas_extras.php?acao=adicionar_motivo&id=' . $solicitacao_id,
                 'horas_extras_motivo',
                 $solicitacao_id,
@@ -397,7 +398,7 @@ $stmt = $pdo->prepare("
 $stmt->execute($params);
 $solicitacoes = $stmt->fetchAll();
 
-$page_title = 'Aprovar Horas Extras';
+$page_title = hx_ui_menu_aprovar();
 include __DIR__ . '/../includes/header.php';
 
 // Converte horas decimais para formato HH:MM
@@ -433,7 +434,7 @@ function motivoFoiSolicitado($observacoes_rh) {
         <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack">
             <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
                 <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
-                    Aprovar Horas Extras
+                    <?= htmlspecialchars(hx_ui_menu_aprovar()) ?>
                 </h1>
                 <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
                     <li class="breadcrumb-item text-muted">
@@ -442,7 +443,7 @@ function motivoFoiSolicitado($observacoes_rh) {
                     <li class="breadcrumb-item">
                         <span class="bullet bg-gray-400 w-5px h-2px"></span>
                     </li>
-                    <li class="breadcrumb-item text-muted">Aprovar Horas Extras</li>
+                    <li class="breadcrumb-item text-muted"><?= htmlspecialchars(hx_ui_menu_aprovar()) ?></li>
                 </ul>
             </div>
         </div>

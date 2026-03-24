@@ -8,6 +8,7 @@ if (!isset($_SESSION['usuario'])) {
 }
 
 require_once __DIR__ . '/permissions.php';
+require_once __DIR__ . '/horas_extras_ui.php';
 
 $usuario = $_SESSION['usuario'];
 $current_page = get_current_page();
@@ -1097,7 +1098,7 @@ function getIcon($name) {
                                     <span class="menu-bullet">
                                         <span class="bullet bullet-dot"></span>
                                     </span>
-                                    <span class="menu-title">Horas Extras</span>
+                                    <span class="menu-title"><?= hx_ui_menu_registro() ?></span>
                                 </a>
                             </div>
                             <!--end:Menu item-->
@@ -1109,7 +1110,7 @@ function getIcon($name) {
                                     <span class="menu-bullet">
                                         <span class="bullet bullet-dot"></span>
                                     </span>
-                                    <span class="menu-title">Aprovar Horas Extras</span>
+                                    <span class="menu-title"><?= hx_ui_menu_aprovar() ?></span>
                                 </a>
                             </div>
                             <!--end:Menu item-->
@@ -1675,7 +1676,7 @@ function getIcon($name) {
                                 <span class="path4"></span>
                             </i>
                         </span>
-                        <span class="menu-title">Solicitar Horas Extras</span>
+                        <span class="menu-title"><?= hx_ui_menu_solicitar() ?></span>
                     </a>
                 </div>
                 <!--end:Menu item-->
