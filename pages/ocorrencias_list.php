@@ -55,6 +55,7 @@ if ($sem_detalhe) {
     } else {
         $where_av[] = '1 = 0';
     }
+    $where_av[] = avisos_colaborador_sql_ocorrencia_dentro_prazo('o');
     $where_sql_av = 'WHERE ' . implode(' AND ', $where_av);
     $stmt = $pdo->prepare("SELECT o.id, o.data_ocorrencia FROM ocorrencias o $where_sql_av ORDER BY o.data_ocorrencia DESC, o.id DESC");
     $stmt->execute($params_av);

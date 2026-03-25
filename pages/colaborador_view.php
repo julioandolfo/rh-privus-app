@@ -59,6 +59,7 @@ if ($colab_sem_detalhe_occ) {
         SELECT o.id, o.data_ocorrencia
         FROM ocorrencias o
         WHERE o.colaborador_id = ?
+        AND " . avisos_colaborador_sql_ocorrencia_dentro_prazo('o') . "
         ORDER BY o.data_ocorrencia DESC, o.created_at DESC
     ");
     $stmt->execute([$id]);

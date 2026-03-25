@@ -16,6 +16,7 @@ $page_title = 'Dashboard';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/ocorrencias_functions.php';
 
 // Verifica login ANTES de incluir o header
 require_page_permission('dashboard.php');
@@ -55,12 +56,19 @@ if (is_colaborador() && !empty($colaborador_id)) {
         $stmt->execute([$colaborador_id, $mes_atual]);
         $ocorrencias_mes = $stmt->fetch()['total'];
         
-        // Total de ocorrências do colaborador
-        $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM ocorrencias WHERE colaborador_id = ?");
+        $colaborador_dashboard_aviso_occ = colaborador_ocorrencias_flags_sem_detalhe();
+        
+        // Total no modo aviso: só ocorrências ainda dentro do prazo de exibição (30 dias)
+        if ($colaborador_dashboard_aviso_occ) {
+            $stmt = $pdo->prepare(
+                'SELECT COUNT(*) as total FROM ocorrencias o WHERE o.colaborador_id = ? AND '
+                . avisos_colaborador_sql_ocorrencia_dentro_prazo('o')
+            );
+        } else {
+            $stmt = $pdo->prepare('SELECT COUNT(*) as total FROM ocorrencias WHERE colaborador_id = ?');
+        }
         $stmt->execute([$colaborador_id]);
         $total_ocorrencias = $stmt->fetch()['total'];
-        
-        $colaborador_dashboard_aviso_occ = colaborador_ocorrencias_flags_sem_detalhe();
         
         if ($colaborador_dashboard_aviso_occ) {
             $ocorrencias_recentes = [];

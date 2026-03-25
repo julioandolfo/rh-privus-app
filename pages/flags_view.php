@@ -35,6 +35,7 @@ if ($sem_detalhe) {
                 SELECT f.id, f.data_flag, f.data_validade, f.status
                 FROM ocorrencias_flags f
                 WHERE f.colaborador_id = ?
+                AND " . avisos_colaborador_sql_flag_dentro_prazo('f') . "
                 ORDER BY f.data_flag DESC, f.id DESC
             ");
             $stmt->execute([$cid]);

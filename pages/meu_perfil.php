@@ -61,6 +61,7 @@ if ($ocorrencias_modo_aviso) {
         SELECT o.id, o.data_ocorrencia
         FROM ocorrencias o
         WHERE o.colaborador_id = ?
+        AND " . avisos_colaborador_sql_ocorrencia_dentro_prazo('o') . "
         ORDER BY o.data_ocorrencia DESC, o.id DESC
     ");
     $stmt->execute([$colaborador_id]);

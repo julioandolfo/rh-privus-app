@@ -7,6 +7,27 @@ require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/evolution_service.php';
 require_once __DIR__ . '/slack_service.php';
 
+/** Dias em que cada aviso permanece visível ao colaborador (modo sem detalhe). */
+if (!defined('AVISOS_COLABORADOR_DIAS_VISIBILIDADE')) {
+    define('AVISOS_COLABORADOR_DIAS_VISIBILIDADE', 30);
+}
+
+/**
+ * Condição SQL: ocorrência ainda exibida como aviso (janela a partir do registro ou da data do fato).
+ */
+function avisos_colaborador_sql_ocorrencia_dentro_prazo(string $alias = 'o'): string {
+    $dias = (int) AVISOS_COLABORADOR_DIAS_VISIBILIDADE;
+    return "COALESCE(DATE({$alias}.created_at), {$alias}.data_ocorrencia) >= DATE_SUB(CURDATE(), INTERVAL {$dias} DAY)";
+}
+
+/**
+ * Condição SQL: flag ainda exibida como aviso (janela a partir de data_flag).
+ */
+function avisos_colaborador_sql_flag_dentro_prazo(string $alias = 'f'): string {
+    $dias = (int) AVISOS_COLABORADOR_DIAS_VISIBILIDADE;
+    return "{$alias}.data_flag >= DATE_SUB(CURDATE(), INTERVAL {$dias} DAY)";
+}
+
 /**
  * Faz upload de anexo de ocorrência
  */
