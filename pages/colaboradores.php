@@ -347,10 +347,10 @@ require_once __DIR__ . '/../includes/header.php';
                                     </div>
                                     <!--end::Menu item-->
                                     <?php endif; ?>
-                                    <?php if ($usuario['role'] !== 'GESTOR' && $colab['status'] === 'desligado'): ?>
+                                    <?php if ($usuario['role'] !== 'GESTOR'): ?>
                                     <!--begin::Menu item-->
                                     <div class="menu-item px-3">
-                                        <a href="#" class="menu-link px-3 text-warning" title="Gerar e enviar termo de distrato" onclick="enviarDistratoManual(<?= $colab['id'] ?>, '<?= htmlspecialchars($colab['nome_completo'], ENT_QUOTES) ?>'); return false;">
+                                        <a href="#" class="menu-link px-3 text-warning" title="Gerar e enviar termo de distrato" onclick="enviarDistratoManual(<?= $colab['id'] ?>, '<?= htmlspecialchars($colab['nome_completo'], ENT_QUOTES) ?>', '<?= $colab['status'] ?>'); return false;">
                                             Enviar Distrato
                                         </a>
                                     </div>
@@ -576,7 +576,62 @@ function abrirModalDemissao(colaboradorId, nomeColaborador) {
     });
 }
 
-function enviarDistratoManual(colaboradorId, nomeColaborador) {
+function enviarDistratoManual(colaboradorId, nomeColaborador, status) {
+    if (status !== 'desligado') {
+        Swal.fire({
+            title: 'Gerar Distrato Avulso',
+            html: `
+                <p>O colaborador <b>${nomeColaborador}</b> não está desligado. Você pode gerar um distrato avulso (ex: renovação de contrato).</p>
+                <div class="mb-3 text-start mt-4">
+                    <label class="form-label form-label-sm">Data do Distrato <span class="text-danger">*</span></label>
+                    <input type="date" id="swal-data-distrato" class="form-control form-control-solid" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+                <div class="mb-3 text-start">
+                    <label class="form-label form-label-sm">Motivo/Observação <span class="text-danger">*</span></label>
+                    <input type="text" id="swal-motivo-distrato" class="form-control form-control-solid" value="Renovação/Alteração contratual" required>
+                </div>
+            `,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Gerar Distrato',
+            cancelButtonText: 'Cancelar',
+            customClass: {
+                confirmButton: 'btn btn-primary',
+                cancelButton: 'btn btn-light'
+            },
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                const dataDistrato = document.getElementById('swal-data-distrato').value;
+                const motivoDistrato = document.getElementById('swal-motivo-distrato').value;
+                if (!dataDistrato || !motivoDistrato) {
+                    Swal.showValidationMessage('Preencha os campos obrigatórios.');
+                    return false;
+                }
+                const formData = new FormData();
+                formData.append('colaborador_id', colaboradorId);
+                formData.append('data_distrato', dataDistrato);
+                formData.append('motivo_distrato', motivoDistrato);
+
+                return fetch('../api/enviar_distrato_manual.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.message || 'Ocorreu um erro ao gerar distrato.');
+                    return data;
+                })
+                .catch(error => { Swal.showValidationMessage(error.message); });
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Sucesso!', text: result.value.message || 'Distrato processado.', icon: 'success', customClass: { confirmButton: 'btn btn-primary' } });
+            }
+        });
+        return;
+    }
+
+    // Caso já esteja desligado, segue fluxo original tentando buscar demissão
     Swal.fire({
         title: 'Enviar Distrato',
         html: `Tem certeza que deseja processar o envio do distrato para <b>${nomeColaborador}</b>?`,

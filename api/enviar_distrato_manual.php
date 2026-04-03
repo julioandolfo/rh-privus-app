@@ -1,6 +1,6 @@
 <?php
 /**
- * API para gerar e enviar distrato manualmente para um colaborador desligado.
+ * API para gerar e enviar distrato manualmente para um colaborador desligado ou ativo.
  */
 
 header('Content-Type: application/json');
@@ -35,6 +35,8 @@ try {
     }
     
     $colaborador_id = $_POST['colaborador_id'] ?? null;
+    $data_distrato = $_POST['data_distrato'] ?? null;
+    $motivo_distrato = $_POST['motivo_distrato'] ?? null;
     
     if (empty($colaborador_id)) {
         throw new Exception('Colaborador não informado.');
@@ -49,34 +51,52 @@ try {
         throw new Exception('Colaborador não encontrado.');
     }
     
-    if ($colaborador['status'] !== 'desligado') {
-        throw new Exception('O colaborador precisa estar desligado para gerar um distrato.');
-    }
-    
     // Verifica permissão de acesso ao colaborador
     if (!can_access_colaborador($colaborador_id)) {
         throw new Exception('Você não tem permissão para acessar este colaborador.');
     }
 
-    // Busca a demissão deste colaborador
-    $stmt = $pdo->prepare("
-        SELECT id 
-        FROM demissoes 
-        WHERE colaborador_id = ? 
-        ORDER BY data_demissao DESC, id DESC 
-        LIMIT 1
-    ");
-    $stmt->execute([$colaborador_id]);
-    $demissao = $stmt->fetch();
+    $demissao_id = null;
+    $dados_avulsos = null;
 
-    if (!$demissao) {
-        throw new Exception('Nenhum registro de demissão encontrado para este colaborador. Exclua o colaborador e registre a demissão novamente.');
+    if ($colaborador['status'] === 'desligado') {
+        // Busca a demissão deste colaborador
+        $stmt = $pdo->prepare("
+            SELECT id 
+            FROM demissoes 
+            WHERE colaborador_id = ? 
+            ORDER BY data_demissao DESC, id DESC 
+            LIMIT 1
+        ");
+        $stmt->execute([$colaborador_id]);
+        $demissao = $stmt->fetch();
+
+        if ($demissao) {
+            $demissao_id = (int)$demissao['id'];
+        } else {
+            // Permite gerar como avulso mesmo estando desligado se não houver demissão registrada
+            if (empty($data_distrato)) {
+                $data_distrato = date('Y-m-d');
+            }
+        }
+    } else {
+        // Se ativo ou pausado e quer gerar distrato (ex: renovação)
+        if (empty($data_distrato)) {
+            throw new Exception('É obrigatório informar a data do distrato ao gerar de forma avulsa.');
+        }
     }
 
-    $demissao_id = (int)$demissao['id'];
+    if (!$demissao_id) {
+        // É um distrato avulso
+        $dados_avulsos = [
+            'data_demissao' => $data_distrato,
+            'tipo_demissao' => 'outro',
+            'motivo' => $motivo_distrato ?: 'Renovação/Alteração contratual'
+        ];
+    }
 
     // Chama função que também enviará e verificará duplicidade
-    $res_distrato = criar_contrato_distrato_automatico($pdo, (int)$colaborador_id, $demissao_id, $usuario);
+    $res_distrato = criar_contrato_distrato_automatico($pdo, (int)$colaborador_id, $demissao_id, $usuario, $dados_avulsos);
 
     if (empty($res_distrato['created'])) {
         throw new Exception($res_distrato['message'] ?? 'Falha desconhecida ao criar distrato.');

@@ -112,20 +112,22 @@ HTML;
 /**
  * @return array{created:bool,enviado_autentique:bool,contrato_id:?int,message:string}
  */
-function criar_contrato_distrato_automatico(PDO $pdo, int $colaborador_id, int $demissao_id, array $usuario) {
+function criar_contrato_distrato_automatico(PDO $pdo, int $colaborador_id, ?int $demissao_id, array $usuario, ?array $dados_avulsos = null) {
     garantir_schema_contratos_distrato($pdo);
     seed_template_distrato_padrao_se_ausente($pdo);
 
     $vazio = ['created' => false, 'enviado_autentique' => false, 'contrato_id' => null, 'message' => ''];
 
-    try {
-        $chk = $pdo->prepare('SELECT id FROM contratos WHERE demissao_id = ? LIMIT 1');
-        $chk->execute([$demissao_id]);
-        if ($chk->fetch()) {
-            return $vazio + ['message' => 'Já existe distrato vinculado a esta demissão.'];
+    if ($demissao_id) {
+        try {
+            $chk = $pdo->prepare('SELECT id FROM contratos WHERE demissao_id = ? LIMIT 1');
+            $chk->execute([$demissao_id]);
+            if ($chk->fetch()) {
+                return $vazio + ['message' => 'Já existe distrato vinculado a esta demissão.'];
+            }
+        } catch (Exception $e) {
+            // coluna pode não existir em bases muito antigas sem migração
         }
-    } catch (Exception $e) {
-        // coluna pode não existir em bases muito antigas sem migração
     }
 
     $stmt = $pdo->prepare('SELECT * FROM contratos_templates WHERE padrao_distrato = 1 AND ativo = 1 ORDER BY id DESC LIMIT 1');
@@ -135,11 +137,19 @@ function criar_contrato_distrato_automatico(PDO $pdo, int $colaborador_id, int $
         return $vazio + ['message' => 'Nenhum template ativo marcado como padrão de distrato. Defina um em Contratos > Templates.'];
     }
 
-    $stmt = $pdo->prepare('SELECT * FROM demissoes WHERE id = ? AND colaborador_id = ?');
-    $stmt->execute([$demissao_id, $colaborador_id]);
-    $demissao = $stmt->fetch();
-    if (!$demissao) {
-        return $vazio + ['message' => 'Registro de demissão não encontrado.'];
+    if ($demissao_id) {
+        $stmt = $pdo->prepare('SELECT * FROM demissoes WHERE id = ? AND colaborador_id = ?');
+        $stmt->execute([$demissao_id, $colaborador_id]);
+        $demissao = $stmt->fetch();
+        if (!$demissao) {
+            return $vazio + ['message' => 'Registro de demissão não encontrado.'];
+        }
+    } else {
+        $demissao = [
+            'data_demissao' => $dados_avulsos['data_demissao'] ?? date('Y-m-d'),
+            'tipo_demissao' => $dados_avulsos['tipo_demissao'] ?? 'outro',
+            'motivo' => $dados_avulsos['motivo'] ?? 'Renovação/Alteração contratual',
+        ];
     }
 
     $colaborador = buscar_dados_colaborador_completos($colaborador_id);
