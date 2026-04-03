@@ -347,6 +347,15 @@ require_once __DIR__ . '/../includes/header.php';
                                     </div>
                                     <!--end::Menu item-->
                                     <?php endif; ?>
+                                    <?php if ($usuario['role'] !== 'GESTOR' && $colab['status'] === 'desligado'): ?>
+                                    <!--begin::Menu item-->
+                                    <div class="menu-item px-3">
+                                        <a href="#" class="menu-link px-3 text-warning" title="Gerar e enviar termo de distrato" onclick="enviarDistratoManual(<?= $colab['id'] ?>, '<?= htmlspecialchars($colab['nome_completo'], ENT_QUOTES) ?>'); return false;">
+                                            Enviar Distrato
+                                        </a>
+                                    </div>
+                                    <!--end::Menu item-->
+                                    <?php endif; ?>
                                     <?php if ($usuario['role'] !== 'GESTOR'): ?>
                                     <!--begin::Menu item-->
                                     <div class="menu-item px-3">
@@ -562,6 +571,53 @@ function abrirModalDemissao(colaboradorId, nomeColaborador) {
                 }
             }).then(() => {
                 location.reload();
+            });
+        }
+    });
+}
+
+function enviarDistratoManual(colaboradorId, nomeColaborador) {
+    Swal.fire({
+        title: 'Enviar Distrato',
+        html: `Tem certeza que deseja processar o envio do distrato para <b>${nomeColaborador}</b>?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, enviar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-warning',
+            cancelButton: 'btn btn-light'
+        },
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            const formData = new FormData();
+            formData.append('colaborador_id', colaboradorId);
+
+            return fetch('../api/enviar_distrato_manual.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Ocorreu um erro ao enviar distrato.');
+                }
+                return data;
+            })
+            .catch(error => {
+                Swal.showValidationMessage(error.message);
+            });
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Sucesso!',
+                text: result.value.message || 'Distrato processado com sucesso.',
+                icon: 'success',
+                confirmButtonText: 'Ok',
+                customClass: {
+                    confirmButton: 'btn btn-primary'
+                }
             });
         }
     });

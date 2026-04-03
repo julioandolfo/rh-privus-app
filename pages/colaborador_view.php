@@ -90,6 +90,17 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $horas_extras_colaborador = $stmt->fetchAll();
 
+// Busca contratos e distratos do colaborador
+$stmt = $pdo->prepare("
+    SELECT c.*, t.nome as template_nome 
+    FROM contratos c 
+    LEFT JOIN contratos_templates t ON c.template_id = t.id 
+    WHERE c.colaborador_id = ? 
+    ORDER BY c.data_criacao DESC, c.id DESC
+");
+$stmt->execute([$id]);
+$contratos_colaborador = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Busca documentos enviados pelo colaborador nos fechamentos de pagamento
 $stmt = $pdo->prepare("
     SELECT 
@@ -2228,9 +2239,78 @@ require_once __DIR__ . '/../includes/header.php';
 
                     <!--begin::Tab Pane - Documentos-->
                     <div class="tab-pane fade" id="kt_tab_pane_documentos" role="tabpanel">
-                        <div class="d-flex justify-content-between align-items-center mb-7">
+                        
+                        <!-- Contratos e Distratos -->
+                        <div class="d-flex justify-content-between align-items-center mb-7 mt-2">
                             <div>
-                                <h3 class="fw-bold text-gray-800 mb-1">Documentos Enviados</h3>
+                                <h3 class="fw-bold text-gray-800 mb-1">Contratos e Distratos</h3>
+                                <span class="text-muted fs-7"><?= count($contratos_colaborador) ?> registro<?= count($contratos_colaborador) != 1 ? 's' : '' ?></span>
+                            </div>
+                        </div>
+
+                        <?php if (empty($contratos_colaborador)): ?>
+                        <div class="text-center py-5 mb-10 border-bottom border-gray-300 border-bottom-dashed">
+                            <i class="ki-duotone ki-document fs-3x text-gray-300 mb-3"><span class="path1"></span><span class="path2"></span></i>
+                            <div class="text-gray-500 fw-semibold fs-6">Nenhum contrato ou distrato gerado para este colaborador.</div>
+                        </div>
+                        <?php else: ?>
+                        <div class="table-responsive mb-10 border-bottom border-gray-300 border-bottom-dashed pb-5">
+                            <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                <thead>
+                                    <tr class="fw-bold text-muted bg-light">
+                                        <th class="ps-4 min-w-150px rounded-start">Título</th>
+                                        <th class="min-w-150px">Template</th>
+                                        <th class="min-w-120px">Data Criação</th>
+                                        <th class="min-w-120px">Status</th>
+                                        <th class="text-end min-w-130px rounded-end pe-4">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($contratos_colaborador as $contrato): 
+                                        $c_status_cfg = [
+                                            'rascunho' => ['label' => 'Rascunho', 'class' => 'secondary'],
+                                            'enviado'  => ['label' => 'Enviado',  'class' => 'warning'],
+                                            'assinado' => ['label' => 'Assinado', 'class' => 'success'],
+                                            'cancelado'=> ['label' => 'Cancelado','class' => 'danger'],
+                                        ];
+                                        $c_st = $c_status_cfg[$contrato['status']] ?? ['label' => ucfirst($contrato['status']), 'class' => 'light'];
+                                    ?>
+                                    <tr>
+                                        <td class="ps-4">
+                                            <span class="fw-bold text-gray-800 d-block"><?= htmlspecialchars($contrato['titulo']) ?></span>
+                                            <?php if ($contrato['demissao_id']): ?>
+                                            <span class="badge badge-light-danger fs-8 mt-1">Distrato</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <span class="text-gray-600"><?= $contrato['template_nome'] ? htmlspecialchars($contrato['template_nome']) : '-' ?></span>
+                                        </td>
+                                        <td>
+                                            <span class="text-gray-600"><?= date('d/m/Y', strtotime($contrato['data_criacao'])) ?></span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-light-<?= $c_st['class'] ?>"><?= $c_st['label'] ?></span>
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <?php if ($contrato['pdf_path']): ?>
+                                            <a href="../<?= htmlspecialchars($contrato['pdf_path']) ?>" target="_blank" class="btn btn-sm btn-light-info me-2" title="Baixar PDF">
+                                                <i class="ki-duotone ki-file-down fs-5 m-0"><span class="path1"></span><span class="path2"></span></i>
+                                            </a>
+                                            <?php endif; ?>
+                                            <a href="contrato_view.php?id=<?= $contrato['id'] ?>" class="btn btn-sm btn-light-primary" title="Ver Detalhes">
+                                                <i class="ki-duotone ki-eye fs-5 m-0"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Ver
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="d-flex justify-content-between align-items-center mb-7 mt-2">
+                            <div>
+                                <h3 class="fw-bold text-gray-800 mb-1">Documentos Enviados (Pagamentos)</h3>
                                 <span class="text-muted fs-7"><?= count($documentos_colaborador) ?> documento<?= count($documentos_colaborador) != 1 ? 's' : '' ?> encontrado<?= count($documentos_colaborador) != 1 ? 's' : '' ?></span>
                             </div>
                             <?php if (!empty($documentos_colaborador)): ?>
