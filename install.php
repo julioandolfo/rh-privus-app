@@ -319,6 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 horas_extras DECIMAL(5,2) DEFAULT 0.00,
                 valor_horas_extras DECIMAL(10,2) DEFAULT 0.00,
                 descontos DECIMAL(10,2) DEFAULT 0.00,
+                desconto_saldo_negativo DECIMAL(10,2) DEFAULT 0.00,
                 adicionais DECIMAL(10,2) DEFAULT 0.00,
                 valor_total DECIMAL(10,2) NOT NULL,
                 observacoes TEXT,

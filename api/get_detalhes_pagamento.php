@@ -410,6 +410,7 @@ try {
                 'horas_extras' => (float)$item['horas_extras'],
                 'valor_horas_extras' => (float)$item['valor_horas_extras'],
                 'descontos' => (float)($item['descontos'] ?? 0),
+                'desconto_saldo_negativo' => (float)($item['desconto_saldo_negativo'] ?? 0),
                 'adicionais' => (float)($item['adicionais'] ?? 0),
                 'valor_total_original' => (float)$item['valor_total'], // Valor original do banco
                 'valor_total' => (float)$item['valor_total'], // Será recalculado abaixo se necessário

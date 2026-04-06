@@ -691,17 +691,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Insere item (salva também informações sobre tipo de horas extras)
                 $stmt = $pdo->prepare("
-                    INSERT INTO fechamentos_pagamento_itens 
-                    (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, valor_total)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO fechamentos_pagamento_itens
+                    (fechamento_id, colaborador_id, salario_base, horas_extras, valor_horas_extras, descontos, desconto_saldo_negativo, valor_total)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
-                    $fechamento_id, 
-                    $colab_id, 
-                    $salario_base, 
-                    $horas_extras, 
-                    $valor_horas_extras, 
+                    $fechamento_id,
+                    $colab_id,
+                    $salario_base,
+                    $horas_extras,
+                    $valor_horas_extras,
                     $total_descontos_ocorrencias,
+                    $desconto_saldo_negativo,
                     $valor_total
                 ]);
                 
@@ -6996,7 +6997,25 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                     html += '<tr><td class="fw-bold text-danger">Desconto por Ocorrencias (Bonus)</td><td class="text-end"><span class="text-danger fw-bold">-R$ ' + parseFloat(d.bonus.total_desconto_ocorrencias).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
                 }
                 if (d.item.descontos > 0) {
-                    html += '<tr><td class="fw-bold text-danger">Descontos</td><td class="text-end"><span class="text-danger fw-bold">-R$ ' + parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
+                    var descontoSaldoNeg = parseFloat(d.item.desconto_saldo_negativo || 0);
+                    var totalAdiantDescontados = 0;
+                    if (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) {
+                        d.adiantamentos_descontados.forEach(function(ad) { totalAdiantDescontados += parseFloat(ad.valor_descontar || 0); });
+                    }
+                    var descontoOcorrencias = parseFloat(d.item.descontos) - descontoSaldoNeg - totalAdiantDescontados;
+                    if (descontoOcorrencias < 0) descontoOcorrencias = 0;
+
+                    html += '<tr><td class="fw-bold text-danger">Descontos (Total)</td><td class="text-end"><span class="text-danger fw-bold">-R$ ' + parseFloat(d.item.descontos).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
+
+                    if (descontoOcorrencias > 0) {
+                        html += '<tr><td class="ps-8 text-muted"><small>Ocorrencias</small></td><td class="text-end"><small class="text-danger">-R$ ' + descontoOcorrencias.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</small></td></tr>';
+                    }
+                    if (descontoSaldoNeg > 0) {
+                        html += '<tr><td class="ps-8 text-muted"><small>Saldo Negativo (Produtos/Loja)</small></td><td class="text-end"><small class="text-danger">-R$ ' + descontoSaldoNeg.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</small></td></tr>';
+                    }
+                    if (totalAdiantDescontados > 0) {
+                        html += '<tr><td class="ps-8 text-muted"><small>Adiantamentos Descontados</small></td><td class="text-end"><small class="text-danger">-R$ ' + totalAdiantDescontados.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</small></td></tr>';
+                    }
                 }
                 if (d.item.adicionais > 0) {
                     html += '<tr><td class="fw-bold text-success">Adicionais</td><td class="text-end"><span class="text-success fw-bold">+R$ ' + parseFloat(d.item.adicionais).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</span></td></tr>';
@@ -7048,7 +7067,25 @@ function verDetalhesPagamento(fechamentoId, colaboradorId) {
                     });
                     html += '</tbody></table></div></div></div>';
                 }
-                
+
+                // Saldo Negativo (Produtos/Loja)
+                if (d.item.desconto_saldo_negativo > 0) {
+                    html += '<div class="card card-flush mb-5"><div class="card-header"><h3 class="card-title">Desconto de Saldo Negativo</h3></div><div class="card-body">';
+                    html += '<div class="d-flex align-items-center p-4 bg-light-danger rounded">';
+                    html += '<div class="flex-grow-1"><div class="text-muted fs-7">Saldo negativo descontado (produtos da empresa, loja, etc.)</div>';
+                    html += '<div class="fw-bold fs-3 text-danger">-R$ ' + parseFloat(d.item.desconto_saldo_negativo).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</div></div></div>';
+                    html += '</div></div>';
+                }
+
+                // Adiantamentos Descontados
+                if (d.adiantamentos_descontados && d.adiantamentos_descontados.length > 0) {
+                    html += '<div class="card card-flush mb-5"><div class="card-header"><h3 class="card-title">Adiantamentos Descontados</h3></div><div class="card-body"><div class="table-responsive"><table class="table table-row-bordered table-row-dashed gy-4"><thead><tr class="fw-bold"><th>Ref. Adiantamento</th><th>Data</th><th>Valor Adiantamento</th><th>Valor Descontado</th><th>Obs</th></tr></thead><tbody>';
+                    d.adiantamentos_descontados.forEach(function(ad) {
+                        html += '<tr><td>' + (ad.mes_desconto_formatado || '-') + '</td><td>' + (ad.fechamento_data || '-') + '</td><td>R$ ' + parseFloat(ad.valor_adiantamento || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td><td class="text-danger fw-bold">-R$ ' + parseFloat(ad.valor_descontar || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td><td>' + (ad.observacoes || '-') + '</td></tr>';
+                    });
+                    html += '</tbody></table></div></div></div>';
+                }
+
                 html += '</div>';
                 conteudo.innerHTML = html;
             } else {
