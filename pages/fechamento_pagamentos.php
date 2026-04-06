@@ -3163,6 +3163,9 @@ require_once __DIR__ . '/../includes/header.php';
                             <?php if ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
                             <th>Documento</th>
                             <?php endif; ?>
+                            <?php if (in_array($fechamento_view['status'], ['fechado', 'pago'])): ?>
+                            <th class="text-center" style="width: 60px;">Detalhes</th>
+                            <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'aberto'): ?>
                             <th>Ações</th>
                             <?php endif; ?>
@@ -3433,6 +3436,19 @@ require_once __DIR__ . '/../includes/header.php';
                                 </small>
                                 <?php endif; ?>
                             </td>
+                            <?php if (in_array($fechamento_view['status'], ['fechado', 'pago'])): ?>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-icon btn-light-info"
+                                        onclick="verDetalhesPagamento(<?= $fechamento_view['id'] ?>, <?= $item['colaborador_id'] ?>)"
+                                        title="Ver detalhes do pagamento">
+                                    <i class="ki-duotone ki-eye fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                </button>
+                            </td>
+                            <?php endif; ?>
                             <?php endif; ?>
                             <?php if ($fechamento_view['status'] === 'aberto'): ?>
                             <td>
