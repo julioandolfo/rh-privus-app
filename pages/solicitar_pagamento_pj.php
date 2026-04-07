@@ -160,7 +160,9 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="separator my-5"></div>
 
                     <h4>1. Planilha de Horas Trabalhadas</h4>
-                    <p class="text-muted fs-7">Faça o upload de um arquivo CSV. <a href="../api/baixar_modelo_pagamento_pj.php">Baixar modelo</a></p>
+                    <p class="text-muted fs-7">
+                        <a href="../api/baixar_modelo_pagamento_pj.php"><i class="ki-duotone ki-file-down fs-5"></i> Baixar modelo (XLSX)</a> — preencha no Excel/Google Sheets, depois exporte como <strong>CSV</strong> (Arquivo → Salvar como → CSV) e envie aqui.
+                    </p>
                     <div class="mb-5">
                         <input type="file" name="planilha" id="planilha" class="form-control form-control-solid" accept=".csv" required />
                         <button type="button" class="btn btn-sm btn-light-primary mt-2" onclick="validarPlanilha()">

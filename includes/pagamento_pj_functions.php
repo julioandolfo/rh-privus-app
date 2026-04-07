@@ -295,22 +295,86 @@ function log_solicitacao_pj($pdo, $solicitacao_id, $acao, $detalhes = null, $usu
 }
 
 /**
- * Gera o conteúdo CSV do modelo de planilha (para download)
+ * Gera o arquivo XLSX do modelo de planilha (para download)
+ * - Cabeçalho com fundo preto, texto branco negrito centralizado
+ * - Máscara hh:mm em Hora Início/Fim
+ * - Coluna Pausa em minutos
+ * - Horas Trabalhadas calculadas automaticamente: ((Fim-Início)*24)-(Pausa/60)
+ * - Linha Total no rodapé
+ *
+ * @param string $output_path Caminho onde gravar o arquivo XLSX
  */
-function gerar_modelo_csv_pagamento_pj() {
-    $linhas = [
-        ['Data', 'Hora Inicio', 'Hora Fim', 'Pausa (min)', 'Horas Trabalhadas', 'Projeto', 'Descricao'],
-        ['01/04/2026', '09:00', '18:00', '60', '8.00', 'Projeto X', 'Desenvolvimento de tela de login'],
-        ['02/04/2026', '09:00', '18:00', '60', '8.00', 'Projeto X', 'Implementacao de API'],
-        ['03/04/2026', '08:00', '12:00', '0', '4.00', 'Projeto Y', 'Reuniao com cliente'],
+function gerar_modelo_xlsx_pagamento_pj($output_path) {
+    require_once __DIR__ . '/lib/xlsxwriter.class.php';
+
+    $writer = new XLSXWriter();
+    $writer->setAuthor('RH Privus');
+
+    // Estilo do cabeçalho
+    $header_style = [
+        'font' => 'Arial',
+        'font-size' => 11,
+        'font-style' => 'bold',
+        'color' => '#FFFFFF',
+        'fill' => '#000000',
+        'halign' => 'center',
+        'valign' => 'center',
+        'border' => 'left,right,top,bottom',
+        'border-color' => '#000000',
+        'height' => 24,
     ];
-    $out = fopen('php://temp', 'r+');
-    foreach ($linhas as $l) {
-        fputcsv($out, $l, ';');
+
+    // Cabeçalho da planilha + tipos das colunas
+    $header = [
+        'Data'              => 'DD/MM/YYYY',
+        'Hora Início'       => 'HH:MM',
+        'Hora Fim'          => 'HH:MM',
+        'Pausa (min)'       => 'integer',
+        'Horas Trabalhadas' => '0.00',
+        'Projeto'           => 'string',
+        'Descrição'         => 'string',
+    ];
+
+    $writer->writeSheetHeader('Horas Trabalhadas', $header, ['widths' => [12, 12, 12, 12, 18, 25, 50], 'suppress_row' => false] + $header_style);
+
+    // Estilos das linhas de dados
+    $row_data_style = [
+        ['halign' => 'center', 'border' => 'left,right,top,bottom', 'border-color' => '#CCCCCC'],
+        ['halign' => 'center', 'border' => 'left,right,top,bottom', 'border-color' => '#CCCCCC'],
+        ['halign' => 'center', 'border' => 'left,right,top,bottom', 'border-color' => '#CCCCCC'],
+        ['halign' => 'center', 'border' => 'left,right,top,bottom', 'border-color' => '#CCCCCC'],
+        ['halign' => 'center', 'border' => 'left,right,top,bottom', 'border-color' => '#CCCCCC', 'font-style' => 'bold'],
+        ['halign' => 'left',   'border' => 'left,right,top,bottom', 'border-color' => '#CCCCCC'],
+        ['halign' => 'left',   'border' => 'left,right,top,bottom', 'border-color' => '#CCCCCC'],
+    ];
+
+    // Linhas de exemplo (3) com fórmulas para Horas Trabalhadas
+    // Fórmula: =((C2-B2)*24)-(D2/60)  → diferença em horas - pausa em horas
+    $exemplos = [
+        ['01/04/2026', '09:00', '18:00', 60, '=((C2-B2)*24)-(D2/60)', 'Projeto X', 'Desenvolvimento de tela de login'],
+        ['02/04/2026', '09:00', '18:00', 60, '=((C3-B3)*24)-(D3/60)', 'Projeto X', 'Implementação de API'],
+        ['03/04/2026', '08:00', '12:00', 0,  '=((C4-B4)*24)-(D4/60)', 'Projeto Y', 'Reunião com cliente'],
+    ];
+    foreach ($exemplos as $linha) {
+        $writer->writeSheetRow('Horas Trabalhadas', $linha, $row_data_style);
     }
-    rewind($out);
-    $csv = stream_get_contents($out);
-    fclose($out);
-    // BOM UTF-8 para Excel reconhecer acentos
-    return "\xEF\xBB\xBF" . $csv;
+
+    // Linhas vazias para preenchimento (até linha 50 — fórmulas pré-criadas)
+    for ($i = 5; $i <= 50; $i++) {
+        $linha_vazia = ['', '', '', '', "=IFERROR(((C{$i}-B{$i})*24)-(D{$i}/60),\"\")", '', ''];
+        $writer->writeSheetRow('Horas Trabalhadas', $linha_vazia, $row_data_style);
+    }
+
+    // Linha de Total
+    $total_style = [
+        'font-style' => 'bold',
+        'fill' => '#FFE699',
+        'halign' => 'center',
+        'border' => 'left,right,top,bottom',
+        'border-color' => '#000000',
+        'height' => 22,
+    ];
+    $writer->writeSheetRow('Horas Trabalhadas', ['', '', '', 'TOTAL:', '=SUM(E2:E50)', '', ''], $total_style);
+
+    $writer->writeToFile($output_path);
 }

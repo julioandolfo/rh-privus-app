@@ -14,7 +14,9 @@
       "Bash(ls c:/laragon/www/rh-privus/includes/notificacoes*.php)",
       "Bash(ls c:/laragon/www/rh-privus/includes/footer*.php)",
       "Read(//c/Users/julio/Downloads/**)",
-      "Bash(ls c:/laragon/www/rh-privus/migracao_template_*.sql)"
+      "Bash(ls c:/laragon/www/rh-privus/migracao_template_*.sql)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -sL https://raw.githubusercontent.com/mk-j/PHP_XLSXWriter/master/xlsxwriter.class.php -o c:/laragon/www/rh-privus/includes/lib/xlsxwriter.class.php)"
     ]
   }
 }
