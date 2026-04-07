@@ -907,6 +907,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
         // Máscara para salário
         jQuery('#salario').mask('#.##0,00', {reverse: true});
+        jQuery('#valor_hora').mask('#.##0,00', {reverse: true});
         
         // Máscara para CNPJ
         jQuery('#cnpj').mask('00.000.000/0000-00');
@@ -925,6 +926,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(function() {
             if (typeof jQuery !== 'undefined' && jQuery.fn.mask) {
                 jQuery('#salario').mask('#.##0,00', {reverse: true});
+        jQuery('#valor_hora').mask('#.##0,00', {reverse: true});
                 jQuery('#cnpj').mask('00.000.000/0000-00');
                 jQuery('#cep').mask('00000-000');
                 jQuery('#estado_endereco').mask('AA', {
