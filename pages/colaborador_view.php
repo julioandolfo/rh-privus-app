@@ -532,6 +532,19 @@ require_once __DIR__ . '/../includes/header.php';
                                 <?php endif; ?>
                             </a>
                         </li>
+                        <?php if (in_array($_SESSION['usuario']['role'] ?? '', ['ADMIN','RH'])): ?>
+                        <li class="nav-item mt-2 flex-shrink-0">
+                            <a class="nav-link text-active-primary py-5" data-bs-toggle="tab" href="#kt_tab_pane_pagamentos_pj">
+                                <i class="ki-duotone ki-dollar fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <span class="d-none d-md-inline">Pagamentos PJ</span>
+                                <span class="d-md-none">PJ</span>
+                            </a>
+                        </li>
+                        <?php endif; ?>
                     </ul>
                     </div>
                     <!--end::Tabs-->
@@ -2445,6 +2458,80 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php endif; ?>
                     </div>
                     <!--end::Tab Pane - Documentos-->
+
+                    <?php if (in_array($_SESSION['usuario']['role'] ?? '', ['ADMIN','RH'])):
+                        $stmt_pj = $pdo->prepare("
+                            SELECT s.*, u.nome as aprovador_nome
+                            FROM solicitacoes_pagamento_pj s
+                            LEFT JOIN usuarios u ON s.aprovado_por = u.id
+                            WHERE s.colaborador_id = ?
+                            ORDER BY s.created_at DESC
+                        ");
+                        $stmt_pj->execute([$id]);
+                        $solicitacoes_pj = $stmt_pj->fetchAll();
+                    ?>
+                    <!--begin::Tab Pane - Pagamentos PJ-->
+                    <div class="tab-pane fade" id="kt_tab_pane_pagamentos_pj" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-7 mt-2">
+                            <div>
+                                <h3 class="fw-bold text-gray-800 mb-1">Histórico de Solicitações de Pagamento PJ</h3>
+                                <span class="text-muted fs-7"><?= count($solicitacoes_pj) ?> solicitação(ões) — visível apenas para Admin/RH</span>
+                            </div>
+                        </div>
+
+                        <?php if (empty($solicitacoes_pj)): ?>
+                        <div class="text-center py-15">
+                            <i class="ki-duotone ki-dollar fs-5x text-gray-300 mb-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            <div class="text-gray-500 fw-semibold fs-5">Nenhuma solicitação de pagamento PJ enviada</div>
+                        </div>
+                        <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                <thead>
+                                    <tr class="fw-bold text-muted bg-light">
+                                        <th class="ps-4">Mês Ref.</th>
+                                        <th>Total Horas</th>
+                                        <th>Valor/Hora</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                        <th>Enviada</th>
+                                        <th>Aprovador</th>
+                                        <th class="text-end pe-4">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($solicitacoes_pj as $sp):
+                                        $badges_pj = [
+                                            'enviada' => ['Enviada','info'],
+                                            'em_analise' => ['Em Análise','warning'],
+                                            'aprovada' => ['Aprovada','success'],
+                                            'rejeitada' => ['Rejeitada','danger'],
+                                            'paga' => ['Paga','success'],
+                                        ];
+                                        $b = $badges_pj[$sp['status']] ?? [$sp['status'],'secondary'];
+                                    ?>
+                                    <tr>
+                                        <td class="ps-4 fw-bold"><?= date('m/Y', strtotime($sp['mes_referencia'].'-01')) ?></td>
+                                        <td><?= number_format($sp['total_horas'], 2, ',', '.') ?>h</td>
+                                        <td>R$ <?= number_format($sp['valor_hora_aplicado'], 2, ',', '.') ?></td>
+                                        <td><strong class="text-success">R$ <?= number_format($sp['valor_total'], 2, ',', '.') ?></strong></td>
+                                        <td><span class="badge badge-light-<?= $b[1] ?>"><?= $b[0] ?></span></td>
+                                        <td><small><?= date('d/m/Y H:i', strtotime($sp['created_at'])) ?></small></td>
+                                        <td><small><?= htmlspecialchars($sp['aprovador_nome'] ?? '-') ?></small></td>
+                                        <td class="text-end pe-4">
+                                            <a href="admin_solicitacoes_pagamento_pj.php?view=<?= $sp['id'] ?>" class="btn btn-sm btn-light-primary">
+                                                <i class="ki-duotone ki-eye fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Ver
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <!--end::Tab Pane - Pagamentos PJ-->
+                    <?php endif; ?>
                 </div>
                 <!--end::Tab Content-->
             </div>

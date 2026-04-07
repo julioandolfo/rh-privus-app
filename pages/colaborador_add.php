@@ -61,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lider_id = !empty($_POST['lider_id']) ? (int)$_POST['lider_id'] : null;
     $senha = $_POST['senha'] ?? '';
     $salario = !empty($_POST['salario']) ? str_replace(['.', ','], ['', '.'], $_POST['salario']) : null;
+    $valor_hora = !empty($_POST['valor_hora']) ? str_replace(['.', ','], ['', '.'], $_POST['valor_hora']) : null;
     $pix = sanitize($_POST['pix'] ?? '');
     $banco = sanitize($_POST['banco'] ?? '');
     $agencia = sanitize($_POST['agencia'] ?? '');
@@ -104,13 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $stmt = $pdo->prepare("
             INSERT INTO colaboradores 
-            (empresa_id, setor_id, cargo_id, nivel_hierarquico_id, lider_id, nome_completo, cpf, cnpj, rg, data_nascimento, estado_civil, telefone, email_pessoal, data_inicio, status, tipo_contrato, salario, pix, banco, agencia, conta, tipo_conta, cep, logradouro, numero, complemento, bairro, cidade_endereco, estado_endereco, regiao, descricao_funcao, observacoes, foto, senha_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, setor_id, cargo_id, nivel_hierarquico_id, lider_id, nome_completo, cpf, cnpj, rg, data_nascimento, estado_civil, telefone, email_pessoal, data_inicio, status, tipo_contrato, salario, valor_hora, pix, banco, agencia, conta, tipo_conta, cep, logradouro, numero, complemento, bairro, cidade_endereco, estado_endereco, regiao, descricao_funcao, observacoes, foto, senha_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
-            $empresa_id, $setor_id, $cargo_id, $nivel_hierarquico_id, $lider_id, $nome_completo, $cpf, 
-            !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $estado_civil ?: null, $telefone, $email_pessoal, $data_inicio, 
-            $status, $tipo_contrato, $salario, $pix, $banco, $agencia, $conta, $tipo_conta, 
+            $empresa_id, $setor_id, $cargo_id, $nivel_hierarquico_id, $lider_id, $nome_completo, $cpf,
+            !empty($cnpj) ? $cnpj : null, $rg, $data_nascimento ?: null, $estado_civil ?: null, $telefone, $email_pessoal, $data_inicio,
+            $status, $tipo_contrato, $salario, $valor_hora, $pix, $banco, $agencia, $conta, $tipo_conta,
             !empty($cep) ? $cep : null, $logradouro, $numero, $complemento, $bairro, $cidade_endereco,
             !empty($estado_endereco) ? $estado_endereco : null, $regiao, $descricao_funcao, $observacoes, $foto_path, $senha_hash
         ]);
@@ -426,6 +427,10 @@ require_once __DIR__ . '/../includes/header.php';
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Salário</label>
                                 <input type="text" name="salario" id="salario" class="form-control" placeholder="0,00">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Valor da Hora (PJ)</label>
+                                <input type="text" name="valor_hora" id="valor_hora" class="form-control" placeholder="0,00">
                             </div>
                         </div>
                         

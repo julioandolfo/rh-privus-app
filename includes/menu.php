@@ -1127,6 +1127,18 @@ function getIcon($name) {
                             </div>
                             <!--end:Menu item-->
                             <?php endif; ?>
+                            <?php if (can_access_page('admin_solicitacoes_pagamento_pj.php')): ?>
+                            <!--begin:Menu item-->
+                            <div class="menu-item">
+                                <a class="menu-link <?= isActive('admin_solicitacoes_pagamento_pj.php') ?>" href="admin_solicitacoes_pagamento_pj.php">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot"></span>
+                                    </span>
+                                    <span class="menu-title">Solicitações Pagamento PJ</span>
+                                </a>
+                            </div>
+                            <!--end:Menu item-->
+                            <?php endif; ?>
                             <?php if (can_access_page('relatorios_fechamentos_extras.php')): ?>
                             <!--begin:Menu item-->
                             <div class="menu-item">
@@ -1693,6 +1705,23 @@ function getIcon($name) {
                             </i>
                         </span>
                         <span class="menu-title">Meus Pagamentos</span>
+                    </a>
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+
+                <!--begin:Menu item - Solicitar Pagamento PJ (apenas para colaboradores)-->
+                <?php if (can_access_page('solicitar_pagamento_pj.php')): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('solicitar_pagamento_pj.php') ?>" href="solicitar_pagamento_pj.php">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-dollar fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Solicitar Pagamento</span>
                     </a>
                 </div>
                 <!--end:Menu item-->

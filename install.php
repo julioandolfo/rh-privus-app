@@ -125,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 status ENUM('ativo', 'pausado', 'desligado') DEFAULT 'ativo',
                 tipo_contrato ENUM('PJ', 'CLT', 'Estágio', 'Terceirizado') DEFAULT 'PJ',
                 salario DECIMAL(10,2) NULL,
+                valor_hora DECIMAL(10,2) NULL,
                 pix VARCHAR(255) NULL,
                 banco VARCHAR(100) NULL,
                 agencia VARCHAR(20) NULL,

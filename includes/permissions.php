@@ -64,6 +64,8 @@ function get_page_permissions() {
         'solicitar_horas_extras.php' => ['COLABORADOR'],
         'aprovar_horas_extras.php' => ['ADMIN', 'RH'],
         'fechamento_pagamentos.php' => ['ADMIN', 'RH'],
+        'admin_solicitacoes_pagamento_pj.php' => ['ADMIN', 'RH'],
+        'solicitar_pagamento_pj.php' => ['COLABORADOR'],
         'tipos_bonus.php' => ['ADMIN', 'RH'],
         
         // Ocorrências - todos podem acessar (com restrições de dados)
