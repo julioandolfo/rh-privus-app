@@ -3160,15 +3160,11 @@ require_once __DIR__ . '/../includes/header.php';
                             <th>Total</th>
                             <?php if (in_array($fechamento_view['status'], ['fechado', 'pago'])): ?>
                             <th class="text-center" style="width: 80px;">Pago</th>
-                            <?php endif; ?>
-                            <?php if ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
-                            <th>Documento</th>
-                            <?php endif; ?>
-                            <?php if (in_array($fechamento_view['status'], ['fechado', 'pago'])): ?>
                             <th class="text-center" style="width: 60px;">Detalhes</th>
                             <?php endif; ?>
-                            <?php if ($fechamento_view['status'] === 'aberto'): ?>
                             <th>Ações</th>
+                            <?php if ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
+                            <th>Documento</th>
                             <?php endif; ?>
                         </tr>
                     </thead>
@@ -3451,7 +3447,7 @@ require_once __DIR__ . '/../includes/header.php';
                             </td>
                             <?php endif; ?>
                             <?php endif; ?>
-                            <?php if ($fechamento_view['status'] === 'aberto'): ?>
+                            <?php /* Ações sempre disponíveis (incluindo fechado/pago para edição) */ ?>
                             <td>
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-light-primary dropdown-toggle" type="button" id="dropdownAcoes_<?= $item['id'] ?>" data-bs-toggle="dropdown" aria-expanded="false">
@@ -3524,7 +3520,7 @@ require_once __DIR__ . '/../includes/header.php';
                                     </ul>
                                 </div>
                             </td>
-                            <?php elseif ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
+                            <?php if ($fechamento_view['status'] === 'fechado' && !$is_fechamento_extra): ?>
                             <td>
                                 <?php
                                 $status_doc = $item['documento_status'] ?? 'pendente';
@@ -3605,17 +3601,6 @@ require_once __DIR__ . '/../includes/header.php';
                                     </small>
                                     </div>
                                 <?php endif; ?>
-                            </td>
-                            <?php elseif ($fechamento_view['status'] === 'fechado' && $is_fechamento_extra): ?>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-light-info" onclick="verDetalhesPagamento(<?= $fechamento_view['id'] ?>, <?= $item['colaborador_id'] ?>)">
-                                    <i class="ki-duotone ki-eye fs-5">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                    </i>
-                                    Ver Detalhes
-                                </button>
                             </td>
                             <?php endif; ?>
                         </tr>
