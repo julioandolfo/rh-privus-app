@@ -108,13 +108,15 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
         '{{colaborador.cargo_nome}}' => $colaborador['cargo_nome'] ?? '',
         '{{colaborador.salario}}' => formatar_moeda($colaborador['salario'] ?? 0),
         '{{colaborador.salario_extenso}}' => numero_por_extenso($colaborador['salario'] ?? 0),
+        '{{colaborador.valor_hora}}' => formatar_moeda($colaborador['valor_hora'] ?? 0),
+        '{{colaborador.valor_hora_extenso}}' => numero_por_extenso($colaborador['valor_hora'] ?? 0),
         '{{colaborador.data_admissao}}' => formatar_data($colaborador['data_admissao'] ?? ''),
         '{{colaborador.regiao}}' => $colaborador['regiao'] ?? '',
         '{{colaborador.estado_civil_label}}' => label_estado_civil_contrato($colaborador['estado_civil'] ?? ''),
         '{{colaborador.qualificacao_contratual}}' => $qualificacao,
         '{{colaborador.categoria_contrato_titulo}}' => $categoria_titulo,
     ];
-    
+
     // Dados da empresa (contratante)
     $variaveis['{{empresa.nome_fantasia}}'] = $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '';
     $variaveis['{{empresa.razao_social}}'] = $empresa['razao_social'] ?? $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '';
@@ -127,12 +129,12 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
     $variaveis['{{empresa.bairro}}'] = $empresa['bairro'] ?? '';
     $variaveis['{{empresa.cep}}'] = formatar_cep($empresa['cep'] ?? '');
     $variaveis['{{empresa.endereco_completo}}'] = montar_endereco_completo_empresa($empresa) ?: ($empresa['endereco'] ?? '');
-    
+
     // Dados do contrato
     $variaveis['{{contrato.titulo}}'] = $contrato_data['titulo'] ?? '';
     // Descrição da função: primeiro tenta usar do contrato, depois do cadastro do colaborador
-    $variaveis['{{contrato.descricao_funcao}}'] = !empty($contrato_data['descricao_funcao']) 
-        ? $contrato_data['descricao_funcao'] 
+    $variaveis['{{contrato.descricao_funcao}}'] = !empty($contrato_data['descricao_funcao'])
+        ? $contrato_data['descricao_funcao']
         : ($colaborador['descricao_funcao'] ?? '');
     // Também disponibiliza como variável do colaborador
     $variaveis['{{colaborador.descricao_funcao}}'] = $colaborador['descricao_funcao'] ?? '';
@@ -275,6 +277,7 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
         'colaborador.estado' => ['valor' => $colaborador['estado_endereco'] ?? $colaborador['estado'] ?? '', 'label' => 'Estado do Colaborador', 'tipo' => 'text'],
         'colaborador.cep' => ['valor' => $colaborador['cep'] ?? '', 'label' => 'CEP do Colaborador', 'tipo' => 'text'],
         'colaborador.salario' => ['valor' => $colaborador['salario'] ?? 0, 'label' => 'Salário/Valor Mensal', 'tipo' => 'number'],
+        'colaborador.valor_hora' => ['valor' => $colaborador['valor_hora'] ?? 0, 'label' => 'Valor da Hora (PJ)', 'tipo' => 'number'],
         'colaborador.regiao' => ['valor' => $colaborador['regiao'] ?? '', 'label' => 'Região do Colaborador', 'tipo' => 'text'],
         
         // Empresa
@@ -350,6 +353,9 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
             // Considera vazio se for string vazia, null, ou 0 para salário
             $vazio = empty($valor) || (is_string($valor) && trim($valor) === '');
             if ($variavel === 'colaborador.salario' && (empty($valor) || floatval($valor) == 0)) {
+                $vazio = true;
+            }
+            if ($variavel === 'colaborador.valor_hora' && (empty($valor) || floatval($valor) == 0)) {
                 $vazio = true;
             }
             
@@ -433,13 +439,15 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
         '{{colaborador.cargo_nome}}' => $colaborador['cargo_nome'] ?? '',
         '{{colaborador.salario}}' => formatar_moeda($colaborador['salario'] ?? 0),
         '{{colaborador.salario_extenso}}' => numero_por_extenso($colaborador['salario'] ?? 0),
+        '{{colaborador.valor_hora}}' => formatar_moeda($colaborador['valor_hora'] ?? 0),
+        '{{colaborador.valor_hora_extenso}}' => numero_por_extenso($colaborador['valor_hora'] ?? 0),
         '{{colaborador.data_admissao}}' => formatar_data($colaborador['data_admissao'] ?? ''),
         '{{colaborador.regiao}}' => $colaborador['regiao'] ?? '',
         '{{colaborador.estado_civil_label}}' => label_estado_civil_contrato($colaborador['estado_civil'] ?? ''),
         '{{colaborador.qualificacao_contratual}}' => $qualificacao,
         '{{colaborador.categoria_contrato_titulo}}' => $categoria_titulo,
     ];
-    
+
     // Dados da empresa (contratante)
     $variaveis['{{empresa.nome_fantasia}}'] = $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '';
     $variaveis['{{empresa.razao_social}}'] = $empresa['razao_social'] ?? $empresa['nome_fantasia'] ?? $colaborador['empresa_nome'] ?? '';
@@ -500,6 +508,9 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
             if ($variavel === 'colaborador.salario') {
                 $variaveis[$chave] = formatar_moeda(floatval(str_replace(['.', ','], ['', '.'], $valor)));
                 $variaveis['{{colaborador.salario_extenso}}'] = numero_por_extenso(floatval(str_replace(['.', ','], ['', '.'], $valor)));
+            } elseif ($variavel === 'colaborador.valor_hora') {
+                $variaveis[$chave] = formatar_moeda(floatval(str_replace(['.', ','], ['', '.'], $valor)));
+                $variaveis['{{colaborador.valor_hora_extenso}}'] = numero_por_extenso(floatval(str_replace(['.', ','], ['', '.'], $valor)));
             } else {
                 $variaveis[$chave] = htmlspecialchars($valor);
             }

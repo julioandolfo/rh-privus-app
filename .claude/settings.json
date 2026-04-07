@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(mysql -u root rh_privus -e \"DESCRIBE fechamentos_pagamento_itens;\")",
+      "Read(//c/laragon/bin/mysql/**)",
+      "Bash(c:/laragon/bin/mysql/mysql-8.4.3-winx64/bin/mysql.exe -u root rh_privus -e \"DESCRIBE fechamentos_pagamento_itens;\")",
+      "Bash(grep -E \"\\\\.\\(php|sql\\)$\")",
+      "Bash(grep -r \"upload\" /c/laragon/www/rh-privus/includes/*.php)",
+      "Bash(grep -r \"notificacao\\\\|notification\" /c/laragon/www/rh-privus/includes/*.php)",
+      "Bash(grep -r \"INSERT INTO solicitacoes\\\\|solicitacoes_horas\\\\|feedback_solicitacoes\" /c/laragon/www/rh-privus/pages/*.php)",
+      "Bash(ls c:/laragon/www/rh-privus/includes/notificacoes*.php)",
+      "Bash(ls c:/laragon/www/rh-privus/includes/footer*.php)",
+      "Read(//c/Users/julio/Downloads/**)",
+      "Bash(ls c:/laragon/www/rh-privus/migracao_template_*.sql)"
+    ]
+  }
+}

@@ -95,7 +95,7 @@ VALUES (
         2.8. Desde já, a CONTRATADA aceita sem restrições que sejam descontados dos pagamentos devidos pela CONTRATANTE à CONTRATADA, os valores relativos aos danos causados e devidamente comprovados pela CONTRATADA à CONTRATANTE, sem prejuízos das demais penalidades cabíveis.
     </p>
     <p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">
-        2.9. A CONTRATADA deverá encaminhar à CONTRATANTE até o dia 20 de cada mês os documentos que se referem ao cumprimento dos encargos trabalhistas e contribuições previdenciárias do mês anterior.
+        2.9. A CONTRATADA deverá encaminhar à CONTRATANTE até o dia 01 e o dia 15 de cada mês os documentos que se referem ao cumprimento dos encargos trabalhistas e contribuições previdenciárias do período anterior.
     </p>
     <p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">
         2.10. Demais documentos que a CONTRATANTE solicitar esporadicamente deverão ser entregues pela CONTRATADA em até 5 (cinco) dias úteis após a solicitação.
@@ -335,8 +335,17 @@ VALUES (
         Em observância ao disposto na Cláusula "6. PREÇO E FORMA DE PAGAMENTO", serão detalhados abaixo os valores a serem pagos pela CONTRATANTE à CONTRATADA:
     </p>
     
-    <p style="text-align: justify; margin-bottom: 30px; margin-left: 20px;">
-        <strong>2.</strong> A CONTRATANTE pagará o montante de <strong>{{colaborador.salario}}</strong> ({{colaborador.salario_extenso}}), mensais, iguais e consecutivos.
+    <p style="text-align: justify; margin-bottom: 10px;">
+        <strong>2.</strong> A CONTRATADA será remunerada baseada em regime de valor por hora técnica efetivamente trabalhada, conforme segue:
+    </p>
+    <p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">
+        2.1. A CONTRATANTE pagará à CONTRATADA o valor bruto de <strong>{{colaborador.valor_hora}}</strong> ({{colaborador.valor_hora_extenso}}) por hora de serviço prestado.
+    </p>
+    <p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">
+        2.2. A CONTRATADA deverá apresentar, juntamente com a Nota Fiscal mensal, um relatório descritivo (timesheet) das horas dedicadas à execução das atividades previstas no objeto contratual.
+    </p>
+    <p style="text-align: justify; margin-left: 20px; margin-bottom: 30px;">
+        2.3. O pagamento será realizado de acordo com a produtividade e demanda, não havendo garantia de faturamento mínimo mensal, reforçando a natureza eventual e autônoma da prestação.
     </p>
     
     <p style="text-align: center; margin-bottom: 50px;">
@@ -486,7 +495,7 @@ VALUES (
     </div>
     
 </div>',
-    '["empresa.razao_social", "empresa.cnpj", "empresa.endereco", "empresa.cidade", "empresa.estado", "empresa.cep", "colaborador.nome_completo", "colaborador.cnpj", "colaborador.endereco_completo", "colaborador.salario", "colaborador.salario_extenso", "contrato.descricao_funcao", "data_formatada"]',
+    '["empresa.razao_social", "empresa.cnpj", "empresa.endereco", "empresa.cidade", "empresa.estado", "empresa.cep", "colaborador.nome_completo", "colaborador.cnpj", "colaborador.endereco_completo", "colaborador.valor_hora", "colaborador.valor_hora_extenso", "contrato.descricao_funcao", "data_formatada"]',
     1,
     1
 ) ON DUPLICATE KEY UPDATE 
