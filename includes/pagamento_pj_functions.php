@@ -325,10 +325,11 @@ function gerar_modelo_xlsx_pagamento_pj($output_path) {
     ];
 
     // Cabeçalho da planilha + tipos das colunas
+    // Hora Início/Fim como string para aceitar "8:00", "08:00", "8:30" etc
     $header = [
         'Data'              => 'DD/MM/YYYY',
-        'Hora Início'       => 'HH:MM',
-        'Hora Fim'          => 'HH:MM',
+        'Hora Início'       => 'string',
+        'Hora Fim'          => 'string',
         'Pausa (min)'       => 'integer',
         'Horas Trabalhadas' => '0.00',
         'Projeto'           => 'string',
@@ -351,9 +352,9 @@ function gerar_modelo_xlsx_pagamento_pj($output_path) {
     // Linhas de exemplo (3) com fórmulas para Horas Trabalhadas
     // Fórmula: =((C2-B2)*24)-(D2/60)  → diferença em horas - pausa em horas
     $exemplos = [
-        ['01/04/2026', '09:00', '18:00', 60, '=((C2-B2)*24)-(D2/60)', 'Projeto X', 'Desenvolvimento de tela de login'],
-        ['02/04/2026', '09:00', '18:00', 60, '=((C3-B3)*24)-(D3/60)', 'Projeto X', 'Implementação de API'],
-        ['03/04/2026', '08:00', '12:00', 0,  '=((C4-B4)*24)-(D4/60)', 'Projeto Y', 'Reunião com cliente'],
+        ['01/04/2026', '09:00', '18:00', 60, '=IFERROR((TIMEVALUE(C2)-TIMEVALUE(B2))*24-(D2/60),"")', 'Projeto X', 'Desenvolvimento de tela de login'],
+        ['02/04/2026', '09:00', '18:00', 60, '=IFERROR((TIMEVALUE(C3)-TIMEVALUE(B3))*24-(D3/60),"")', 'Projeto X', 'Implementação de API'],
+        ['03/04/2026', '08:00', '12:00', 0,  '=IFERROR((TIMEVALUE(C4)-TIMEVALUE(B4))*24-(D4/60),"")', 'Projeto Y', 'Reunião com cliente'],
     ];
     foreach ($exemplos as $linha) {
         $writer->writeSheetRow('Horas Trabalhadas', $linha, $row_data_style);
@@ -361,7 +362,7 @@ function gerar_modelo_xlsx_pagamento_pj($output_path) {
 
     // Linhas vazias para preenchimento (até linha 50 — fórmulas pré-criadas)
     for ($i = 5; $i <= 50; $i++) {
-        $linha_vazia = ['', '', '', '', "=IFERROR(((C{$i}-B{$i})*24)-(D{$i}/60),\"\")", '', ''];
+        $linha_vazia = ['', '', '', '', "=IFERROR((TIMEVALUE(C{$i})-TIMEVALUE(B{$i}))*24-(D{$i}/60),\"\")", '', ''];
         $writer->writeSheetRow('Horas Trabalhadas', $linha_vazia, $row_data_style);
     }
 
