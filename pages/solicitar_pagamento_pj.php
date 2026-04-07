@@ -47,6 +47,10 @@ require_once __DIR__ . '/../includes/header.php';
             <span class="text-muted fs-7">Envie mensalmente sua planilha de horas, NFe e boleto</span>
         </div>
         <div>
+            <a href="controle_horas_online.php" class="btn btn-light-info me-2">
+                <i class="ki-duotone ki-laptop fs-2"><span class="path1"></span><span class="path2"></span></i>
+                Usar Modelo Online
+            </a>
             <a href="../api/baixar_modelo_pagamento_pj.php" class="btn btn-light-primary me-2">
                 <i class="ki-duotone ki-file-down fs-2"><span class="path1"></span><span class="path2"></span></i>
                 Baixar Planilha Modelo
