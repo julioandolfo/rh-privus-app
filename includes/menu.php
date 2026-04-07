@@ -1380,7 +1380,7 @@ function getIcon($name) {
                 <?php endif; ?>
                 
                 
-                <?php if (can_access_engajamento_menu()): ?>
+                <?php if (!is_colaborador() && can_access_engajamento_menu()): ?>
                     <!--begin:Menu item-->
                     <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('gestao_engajamento.php') || isActive('reunioes_1on1.php') || isActive('celebracoes.php') || isActive('pesquisas_satisfacao.php') || isActive('pesquisas_rapidas.php') || isActive('pdis.php')) ? 'here show' : '' ?>">
                         <!--begin:Menu link-->
@@ -1677,7 +1677,7 @@ function getIcon($name) {
                 <?php endif; ?>
                 
                 <!--begin:Menu item - Solicitar Horas Extras (apenas para colaboradores)-->
-                <?php if (can_access_page('solicitar_horas_extras.php')): ?>
+                <?php if (!is_colaborador() && can_access_page('solicitar_horas_extras.php')): ?>
                 <div class="menu-item">
                     <a class="menu-link <?= isActive('solicitar_horas_extras.php') ?>" href="solicitar_horas_extras.php">
                         <span class="menu-icon">
