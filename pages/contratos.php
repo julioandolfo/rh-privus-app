@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const btn = document.getElementById('btn_sincronizar_contratos');
         const originalHtml = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Sincronizando...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm align-middle me-2" role="status" aria-hidden="true"></span><span class="align-middle">Sincronizando...</span>';
 
         fetch('../api/contratos/sincronizar.php', { method: 'POST' })
             .then(r => r.json())
