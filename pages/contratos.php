@@ -212,6 +212,10 @@ require_once __DIR__ . '/../includes/header.php';
             </ul>
         </div>
         <div class="d-flex align-items-center gap-2 gap-lg-3">
+            <button type="button" class="btn btn-light-success" id="btn_sincronizar_contratos" onclick="sincronizarContratos()">
+                <i class="ki-duotone ki-arrows-circle fs-2"><span class="path1"></span><span class="path2"></span></i>
+                Sincronizar Contratos
+            </button>
             <?php if (can_access_page('contrato_templates.php')): ?>
             <a href="contrato_templates.php" class="btn btn-light-primary">
                 <i class="ki-duotone ki-file fs-2">
@@ -540,6 +544,42 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Função global para sincronizar contratos com Autentique
+    window.sincronizarContratos = function() {
+        const btn = document.getElementById('btn_sincronizar_contratos');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Sincronizando...';
+
+        fetch('../api/contratos/sincronizar.php', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                if (data.success) {
+                    Swal.fire({
+                        icon: data.atualizados > 0 ? 'success' : 'info',
+                        title: 'Sincronização concluída',
+                        html: `<div class="text-start">
+                            <strong>Total verificados:</strong> ${data.total}<br>
+                            <strong>Atualizados:</strong> ${data.atualizados}<br>
+                            <strong>Sem mudança:</strong> ${data.sem_mudanca}<br>
+                            <strong>Erros:</strong> ${data.erros}
+                        </div>`
+                    }).then(() => {
+                        if (data.atualizados > 0) location.reload();
+                    });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Erro', text: data.message || 'Falha ao sincronizar' });
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro de conexão' });
+            });
+    };
+
     // Função global para deletar contrato individual
     window.deletarContrato = function(id, nome) {
         Swal.fire({
