@@ -133,11 +133,12 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
     // Dados do contrato
     $variaveis['{{contrato.titulo}}'] = $contrato_data['titulo'] ?? '';
     // Descrição da função: primeiro tenta usar do contrato, depois do cadastro do colaborador
-    $variaveis['{{contrato.descricao_funcao}}'] = !empty($contrato_data['descricao_funcao'])
+    $descricao_raw = !empty($contrato_data['descricao_funcao'])
         ? $contrato_data['descricao_funcao']
         : ($colaborador['descricao_funcao'] ?? '');
+    $variaveis['{{contrato.descricao_funcao}}'] = formatar_descricao_funcao_contrato($descricao_raw);
     // Também disponibiliza como variável do colaborador
-    $variaveis['{{colaborador.descricao_funcao}}'] = $colaborador['descricao_funcao'] ?? '';
+    $variaveis['{{colaborador.descricao_funcao}}'] = formatar_descricao_funcao_contrato($colaborador['descricao_funcao'] ?? '');
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';
@@ -207,6 +208,53 @@ function numero_por_extenso($valor) {
     }
     
     return trim($rt);
+}
+
+/**
+ * Formata a descrição de função para HTML, preservando estrutura.
+ * - Se cada linha (não vazia) começar com letra/número (a., b., 1., -, *), gera lista <ol> com letras a,b,c
+ * - Caso contrário, usa nl2br para preservar quebras de linha
+ * Aceita texto puro (textarea) e devolve HTML pronto para inserir no contrato.
+ */
+function formatar_descricao_funcao_contrato($texto) {
+    if (empty($texto)) return '';
+
+    // Se já vier com tag HTML (ex: lista pronta), retorna como está
+    if (strip_tags($texto) !== $texto) {
+        return $texto;
+    }
+
+    // Quebra em linhas não vazias
+    $linhas = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $texto)), function($l) {
+        return $l !== '';
+    }));
+
+    if (empty($linhas)) return '';
+
+    // Detecta se as linhas já têm marcadores (a., b., 1., -, *) — remove o marcador
+    $tem_marcadores = false;
+    $linhas_limpas = [];
+    foreach ($linhas as $l) {
+        if (preg_match('/^([a-zA-Z]\.|[a-zA-Z]\)|\d+\.|\d+\)|\-|\*)\s*(.+)$/u', $l, $m)) {
+            $tem_marcadores = true;
+            $linhas_limpas[] = $m[2];
+        } else {
+            $linhas_limpas[] = $l;
+        }
+    }
+
+    // Se tem mais de 1 linha (com ou sem marcadores), gera lista com letras a,b,c...
+    if (count($linhas_limpas) > 1) {
+        $html = '<ol type="a" style="margin-left: 20px; padding-left: 10px;">';
+        foreach ($linhas_limpas as $item) {
+            $html .= '<li style="margin-bottom: 4px;">' . htmlspecialchars($item) . '</li>';
+        }
+        $html .= '</ol>';
+        return $html;
+    }
+
+    // Linha única — apenas escapa
+    return nl2br(htmlspecialchars($linhas_limpas[0]));
 }
 
 /**
@@ -464,11 +512,13 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
     // Dados do contrato
     $variaveis['{{contrato.titulo}}'] = $contrato_data['titulo'] ?? '';
     // Descrição da função: primeiro tenta usar do contrato, depois do cadastro do colaborador
-    $variaveis['{{contrato.descricao_funcao}}'] = !empty($contrato_data['descricao_funcao']) 
-        ? $contrato_data['descricao_funcao'] 
+    // Se cada linha começar com letra/número (a., b., 1., -, *), gera lista HTML; senão usa nl2br
+    $descricao_raw = !empty($contrato_data['descricao_funcao'])
+        ? $contrato_data['descricao_funcao']
         : ($colaborador['descricao_funcao'] ?? '');
+    $variaveis['{{contrato.descricao_funcao}}'] = formatar_descricao_funcao_contrato($descricao_raw);
     // Também disponibiliza como variável do colaborador
-    $variaveis['{{colaborador.descricao_funcao}}'] = $colaborador['descricao_funcao'] ?? '';
+    $variaveis['{{colaborador.descricao_funcao}}'] = formatar_descricao_funcao_contrato($colaborador['descricao_funcao'] ?? '');
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';
