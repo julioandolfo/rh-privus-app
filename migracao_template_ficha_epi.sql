@@ -42,11 +42,11 @@ VALUES (
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
         <thead>
             <tr>
-                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; width: 12%;">Data</th>
-                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; width: 28%;">EPI</th>
-                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; width: 12%;">CA</th>
-                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; width: 15%;">Quantidade</th>
-                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; width: 33%;">Assinatura</th>
+                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; color: #000; width: 12%;">Data</th>
+                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; color: #000; width: 28%;">EPI</th>
+                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; color: #000; width: 12%;">CA</th>
+                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; color: #000; width: 15%;">Quantidade</th>
+                <th style="border: 1px solid #000; padding: 8px; text-align: center; background: #f5f5f5; color: #000; width: 33%;">Assinatura</th>
             </tr>
         </thead>
         <tbody>
