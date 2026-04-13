@@ -50,48 +50,7 @@ VALUES (
             </tr>
         </thead>
         <tbody>
-            <tr>
-                <td style="border: 1px solid #000; padding: 8px; height: 35px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">Luvas nitrílicas</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 8px; height: 35px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">Óculos de proteção incolor</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 8px; height: 35px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">Protetor auricular</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 8px; height: 35px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">Máscara PFF2 ou PFF3 (com válvula)</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 8px; height: 35px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 8px; height: 35px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-                <td style="border: 1px solid #000; padding: 8px;">&nbsp;</td>
-            </tr>
+            {{contrato.lista_epis}}
         </tbody>
     </table>
 
@@ -116,7 +75,7 @@ VALUES (
     </div>
 
 </div>',
-    '["empresa.razao_social", "empresa.cnpj", "colaborador.nome_completo", "colaborador.cnpj", "colaborador.cargo_nome"]',
+    '["empresa.razao_social", "empresa.cnpj", "colaborador.nome_completo", "colaborador.cnpj", "colaborador.cargo_nome", "contrato.lista_epis"]',
     1,
     1
 );

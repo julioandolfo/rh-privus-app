@@ -142,6 +142,7 @@ function substituir_variaveis_contrato($template, $colaborador, $contrato_data =
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';
+    $variaveis['{{contrato.lista_epis}}'] = formatar_lista_epis_contrato($contrato_data['lista_epis'] ?? '');
 
     // Demissão / distrato (preenchidos em contrato_data ao gerar distrato automático)
     $variaveis['{{demissao.data}}'] = formatar_data($contrato_data['demissao_data'] ?? '');
@@ -260,6 +261,47 @@ function formatar_descricao_funcao_contrato($texto) {
 /**
  * Formata CEP
  */
+/**
+ * Formata lista de EPIs para tabela HTML no contrato.
+ * Cada linha do textarea vira uma <tr> com colunas: Data | EPI | CA | Quantidade | Assinatura (vazias).
+ * Adiciona 2 linhas extras vazias no final para preenchimento manual.
+ */
+function formatar_lista_epis_contrato($texto) {
+    if (empty(trim($texto))) return '';
+
+    $linhas = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $texto)), function($l) {
+        return $l !== '';
+    }));
+
+    if (empty($linhas)) return '';
+
+    $html = '';
+    $style_td = 'border: 1px solid #000; padding: 8px; height: 35px;';
+
+    foreach ($linhas as $epi) {
+        // Remove marcadores se houver (-, *, a., 1., etc)
+        $epi = preg_replace('/^([a-zA-Z]\.|[a-zA-Z]\)|\d+\.|\d+\)|\-|\*)\s*/', '', $epi);
+        $html .= '<tr>';
+        $html .= '<td style="' . $style_td . '">&nbsp;</td>';
+        $html .= '<td style="' . $style_td . '">' . htmlspecialchars($epi) . '</td>';
+        $html .= '<td style="' . $style_td . '">&nbsp;</td>';
+        $html .= '<td style="' . $style_td . '">&nbsp;</td>';
+        $html .= '<td style="' . $style_td . '">&nbsp;</td>';
+        $html .= '</tr>';
+    }
+
+    // 2 linhas extras vazias
+    for ($i = 0; $i < 2; $i++) {
+        $html .= '<tr>';
+        for ($j = 0; $j < 5; $j++) {
+            $html .= '<td style="' . $style_td . '">&nbsp;</td>';
+        }
+        $html .= '</tr>';
+    }
+
+    return $html;
+}
+
 function formatar_cep($cep) {
     $cep = preg_replace('/[^0-9]/', '', $cep);
     if (strlen($cep) === 8) {
@@ -348,6 +390,7 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
             'tipo' => 'textarea'
         ],
         'colaborador.descricao_funcao' => ['valor' => $colaborador['descricao_funcao'] ?? '', 'label' => 'Descrição da Função do Colaborador', 'tipo' => 'textarea'],
+        'contrato.lista_epis' => ['valor' => $contrato_data['lista_epis'] ?? '', 'label' => 'Lista de EPIs (um por linha)', 'tipo' => 'textarea'],
 
         // Valores financeiros do contrato (para templates de representação comercial)
         'contrato.valor_pedido' => ['valor' => $contrato_data['valor_pedido'] ?? '', 'label' => 'Valor por Pedido (R$)', 'tipo' => 'number'],
@@ -522,6 +565,7 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
     $variaveis['{{contrato.data_criacao}}'] = formatar_data($contrato_data['data_criacao'] ?? date('Y-m-d'));
     $variaveis['{{contrato.data_vencimento}}'] = formatar_data($contrato_data['data_vencimento'] ?? '');
     $variaveis['{{contrato.observacoes}}'] = $contrato_data['observacoes'] ?? '';
+    $variaveis['{{contrato.lista_epis}}'] = formatar_lista_epis_contrato($contrato_data['lista_epis'] ?? '');
 
     // Demissão / distrato
     $variaveis['{{demissao.data}}'] = formatar_data($contrato_data['demissao_data'] ?? '');
@@ -561,6 +605,8 @@ function substituir_variaveis_contrato_com_manuais($template, $colaborador, $con
             } elseif ($variavel === 'colaborador.valor_hora') {
                 $variaveis[$chave] = formatar_moeda(floatval(str_replace(['.', ','], ['', '.'], $valor)));
                 $variaveis['{{colaborador.valor_hora_extenso}}'] = numero_por_extenso(floatval(str_replace(['.', ','], ['', '.'], $valor)));
+            } elseif ($variavel === 'contrato.lista_epis') {
+                $variaveis[$chave] = formatar_lista_epis_contrato($valor);
             } else {
                 $variaveis[$chave] = htmlspecialchars($valor);
             }
