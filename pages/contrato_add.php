@@ -1001,6 +1001,23 @@ function atualizarCamposFaltantes(campos, valoresPrePreenchidos = {}) {
     const btnEnviar = document.getElementById('btn_enviar');
     const statusEnvio = document.getElementById('status_envio');
 
+    // Re-adiciona campos manuais já preenchidos que sumiram da lista de faltantes
+    // (para que o user possa continuar editando)
+    const variaveisFaltantes = camposFaltantes.map(c => c.variavel);
+    Object.keys(valoresPrePreenchidos).forEach(variavel => {
+        if (valoresPrePreenchidos[variavel] && !variaveisFaltantes.includes(variavel)) {
+            camposFaltantes.push({
+                variavel: variavel,
+                label: variavel.replace('contrato.', '').replace('colaborador.', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                tipo: valoresPrePreenchidos[variavel].includes('\n') ? 'textarea' : 'text',
+                placeholder: '{{' + variavel + '}}',
+                _preenchido: true
+            });
+        }
+    });
+
+    const temFaltantesReais = campos.length > 0;
+
     if (camposFaltantes.length === 0) {
         card.style.display = 'none';
         btnEnviar.disabled = false;
@@ -1008,7 +1025,24 @@ function atualizarCamposFaltantes(campos, valoresPrePreenchidos = {}) {
         btnEnviar.classList.add('btn-primary');
         podeEnviar = true;
 
-        // Mostra status de OK
+        statusEnvio.style.display = 'flex !important';
+        statusEnvio.innerHTML = `
+            <span class="badge badge-light-success fs-7">
+                <i class="ki-duotone ki-check-circle fs-4 text-success me-1">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Pronto para enviar
+            </span>
+        `;
+    } else if (!temFaltantesReais) {
+        // Todos campos manuais já preenchidos — pode enviar, mas mantém editável
+        card.style.display = 'block';
+        btnEnviar.disabled = false;
+        btnEnviar.classList.remove('btn-secondary');
+        btnEnviar.classList.add('btn-primary');
+        podeEnviar = true;
+
         statusEnvio.style.display = 'flex !important';
         statusEnvio.innerHTML = `
             <span class="badge badge-light-success fs-7">
