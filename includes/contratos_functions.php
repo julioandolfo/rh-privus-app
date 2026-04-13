@@ -263,8 +263,14 @@ function formatar_descricao_funcao_contrato($texto) {
  */
 /**
  * Formata lista de EPIs para tabela HTML no contrato.
- * Cada linha do textarea vira uma <tr> com colunas: Data | EPI | CA | Quantidade | Assinatura (vazias).
- * Adiciona 2 linhas extras vazias no final para preenchimento manual.
+ * Formato por linha: EPI ; CA ; Quantidade ; Data
+ *   - Separador: ponto-e-vírgula (;)
+ *   - Campos opcionais da direita para esquerda (só EPI é obrigatório)
+ *   - Exemplos:
+ *     Luvas nitrílicas ; 12345 ; 2
+ *     Óculos de proteção
+ *     Protetor auricular ; 9876 ; 1 ; 10/04/2026
+ * Sempre adiciona 2 linhas extras vazias no final.
  */
 function formatar_lista_epis_contrato($texto) {
     if (empty(trim($texto))) return '';
@@ -276,17 +282,24 @@ function formatar_lista_epis_contrato($texto) {
     if (empty($linhas)) return '';
 
     $html = '';
-    $style_td = 'border: 1px solid #000; padding: 8px; height: 35px;';
+    $s = 'border: 1px solid #000; padding: 8px; height: 35px; color: #000;';
 
-    foreach ($linhas as $epi) {
+    foreach ($linhas as $linha) {
         // Remove marcadores se houver (-, *, a., 1., etc)
-        $epi = preg_replace('/^([a-zA-Z]\.|[a-zA-Z]\)|\d+\.|\d+\)|\-|\*)\s*/', '', $epi);
+        $linha = preg_replace('/^([a-zA-Z]\.|[a-zA-Z]\)|\d+\.|\d+\)|\-|\*)\s*/', '', $linha);
+
+        $partes = array_map('trim', explode(';', $linha));
+        $epi   = htmlspecialchars($partes[0] ?? '');
+        $ca    = htmlspecialchars($partes[1] ?? '');
+        $qtd   = htmlspecialchars($partes[2] ?? '');
+        $data  = htmlspecialchars($partes[3] ?? '');
+
         $html .= '<tr>';
-        $html .= '<td style="' . $style_td . '">&nbsp;</td>';
-        $html .= '<td style="' . $style_td . '">' . htmlspecialchars($epi) . '</td>';
-        $html .= '<td style="' . $style_td . '">&nbsp;</td>';
-        $html .= '<td style="' . $style_td . '">&nbsp;</td>';
-        $html .= '<td style="' . $style_td . '">&nbsp;</td>';
+        $html .= '<td style="' . $s . '">' . ($data ?: '&nbsp;') . '</td>';
+        $html .= '<td style="' . $s . '">' . ($epi ?: '&nbsp;') . '</td>';
+        $html .= '<td style="' . $s . '">' . ($ca ?: '&nbsp;') . '</td>';
+        $html .= '<td style="' . $s . '">' . ($qtd ?: '&nbsp;') . '</td>';
+        $html .= '<td style="' . $s . '">&nbsp;</td>';
         $html .= '</tr>';
     }
 
@@ -294,7 +307,7 @@ function formatar_lista_epis_contrato($texto) {
     for ($i = 0; $i < 2; $i++) {
         $html .= '<tr>';
         for ($j = 0; $j < 5; $j++) {
-            $html .= '<td style="' . $style_td . '">&nbsp;</td>';
+            $html .= '<td style="' . $s . '">&nbsp;</td>';
         }
         $html .= '</tr>';
     }
@@ -390,7 +403,7 @@ function verificar_campos_faltantes_contrato($template, $colaborador, $contrato_
             'tipo' => 'textarea'
         ],
         'colaborador.descricao_funcao' => ['valor' => $colaborador['descricao_funcao'] ?? '', 'label' => 'Descrição da Função do Colaborador', 'tipo' => 'textarea'],
-        'contrato.lista_epis' => ['valor' => $contrato_data['lista_epis'] ?? '', 'label' => 'Lista de EPIs (um por linha)', 'tipo' => 'textarea'],
+        'contrato.lista_epis' => ['valor' => $contrato_data['lista_epis'] ?? '', 'label' => 'Lista de EPIs (um por linha: EPI ; CA ; Qtd ; Data)', 'tipo' => 'textarea'],
 
         // Valores financeiros do contrato (para templates de representação comercial)
         'contrato.valor_pedido' => ['valor' => $contrato_data['valor_pedido'] ?? '', 'label' => 'Valor por Pedido (R$)', 'tipo' => 'number'],
