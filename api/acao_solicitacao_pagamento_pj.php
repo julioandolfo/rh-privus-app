@@ -63,12 +63,29 @@ try {
         $stmt->execute([$solicitacao_id]);
         $log = $stmt->fetchAll();
 
+        // Conferência: busca solicitação anterior aprovada/paga (apenas para admin)
+        $solicitacao_anterior = null;
+        if ($is_admin) {
+            $stmt = $pdo->prepare("
+                SELECT id, mes_referencia, total_horas, valor_hora_aplicado, valor_total, status, data_aprovacao
+                FROM solicitacoes_pagamento_pj
+                WHERE colaborador_id = ?
+                  AND id <> ?
+                  AND status IN ('aprovada', 'paga')
+                ORDER BY mes_referencia DESC, data_aprovacao DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$sol['colaborador_id'], $solicitacao_id]);
+            $solicitacao_anterior = $stmt->fetch() ?: null;
+        }
+
         echo json_encode([
             'success' => true,
             'data' => [
                 'solicitacao' => $sol,
                 'linhas' => $linhas,
-                'log' => $log
+                'log' => $log,
+                'solicitacao_anterior' => $solicitacao_anterior
             ]
         ], JSON_UNESCAPED_UNICODE);
         exit;

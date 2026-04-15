@@ -173,6 +173,7 @@ function renderAdmin(d) {
     var s = d.solicitacao;
     var linhas = d.linhas;
     var log = d.log;
+    var anterior = d.solicitacao_anterior;
     var html = '';
 
     html += '<div class="row mb-5">';
@@ -181,6 +182,71 @@ function renderAdmin(d) {
     html += '<div class="col-md-3"><strong>Total Horas:</strong><br>' + parseFloat(s.total_horas).toFixed(2).replace('.',',') + 'h</div>';
     html += '<div class="col-md-3"><strong>Valor Total:</strong><br><span class="text-success fw-bold fs-4">R$ ' + parseFloat(s.valor_total).toLocaleString('pt-BR', {minimumFractionDigits:2}) + '</span></div>';
     html += '</div>';
+
+    // === CONFERÊNCIA: comparação com último pagamento aprovado/pago ===
+    html += '<h4><i class="ki-duotone ki-check-circle fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>Conferência — Comparação com último pagamento</h4>';
+    if (!anterior) {
+        html += '<div class="alert alert-light-info mb-5"><i class="ki-duotone ki-information-5 fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Este é o <strong>primeiro pagamento</strong> deste colaborador — não há histórico para comparar.</div>';
+    } else {
+        var atualHoras = parseFloat(s.total_horas) || 0;
+        var antHoras = parseFloat(anterior.total_horas) || 0;
+        var atualValorHora = parseFloat(s.valor_hora_aplicado) || 0;
+        var antValorHora = parseFloat(anterior.valor_hora_aplicado) || 0;
+        var atualTotal = parseFloat(s.valor_total) || 0;
+        var antTotal = parseFloat(anterior.valor_total) || 0;
+
+        var diffHoras = atualHoras - antHoras;
+        var diffValorHora = atualValorHora - antValorHora;
+        var diffTotal = atualTotal - antTotal;
+        var pctTotal = antTotal > 0 ? ((diffTotal / antTotal) * 100) : 0;
+
+        function fmtDiff(valor, isMoeda, casas) {
+            casas = typeof casas === 'number' ? casas : 2;
+            var abs = Math.abs(valor);
+            var prefix = valor > 0 ? '+' : (valor < 0 ? '−' : '');
+            var cls = valor > 0 ? 'text-success' : (valor < 0 ? 'text-danger' : 'text-muted');
+            var txt = isMoeda
+                ? 'R$ ' + abs.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                : abs.toFixed(casas).replace('.', ',');
+            return '<span class="' + cls + ' fw-bold">' + prefix + txt + '</span>';
+        }
+
+        var alertClass = 'alert-light-info';
+        if (Math.abs(pctTotal) > 30) alertClass = 'alert-light-warning';
+        if (Math.abs(pctTotal) > 60) alertClass = 'alert-light-danger';
+
+        html += '<div class="alert ' + alertClass + ' mb-5">';
+        html += '<div class="table-responsive"><table class="table table-sm mb-0"><thead><tr class="fw-bold">';
+        html += '<th></th><th class="text-end">Anterior (' + anterior.mes_referencia + ')</th>';
+        html += '<th class="text-end">Atual (' + s.mes_referencia + ')</th>';
+        html += '<th class="text-end">Diferença</th></tr></thead><tbody>';
+
+        html += '<tr><td><strong>Total de Horas</strong></td>';
+        html += '<td class="text-end">' + antHoras.toFixed(2).replace('.',',') + 'h</td>';
+        html += '<td class="text-end">' + atualHoras.toFixed(2).replace('.',',') + 'h</td>';
+        html += '<td class="text-end">' + fmtDiff(diffHoras, false) + 'h</td></tr>';
+
+        html += '<tr><td><strong>Valor / Hora</strong></td>';
+        html += '<td class="text-end">R$ ' + antValorHora.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + '</td>';
+        html += '<td class="text-end">R$ ' + atualValorHora.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + '</td>';
+        html += '<td class="text-end">' + fmtDiff(diffValorHora, true) + '</td></tr>';
+
+        html += '<tr class="fw-bold border-top border-2"><td>Valor Total</td>';
+        html += '<td class="text-end">R$ ' + antTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + '</td>';
+        html += '<td class="text-end">R$ ' + atualTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + '</td>';
+        html += '<td class="text-end">' + fmtDiff(diffTotal, true);
+        if (antTotal > 0) {
+            var pctCls = pctTotal > 0 ? 'text-success' : (pctTotal < 0 ? 'text-danger' : 'text-muted');
+            html += ' <small class="' + pctCls + '">(' + (pctTotal > 0 ? '+' : '') + pctTotal.toFixed(1).replace('.',',') + '%)</small>';
+        }
+        html += '</td></tr>';
+
+        html += '</tbody></table></div>';
+        if (Math.abs(pctTotal) > 30) {
+            html += '<div class="mt-2"><i class="ki-duotone ki-information-5 fs-3 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i><small><strong>Atenção:</strong> diferença superior a 30% em relação ao último pagamento. Conferir antes de aprovar.</small></div>';
+        }
+        html += '</div>';
+    }
 
     html += '<h4>Anexos</h4><div class="row mb-5">';
     html += '<div class="col-md-4"><a href="../' + s.planilha_anexo + '" target="_blank" class="btn btn-light-primary w-100"><i class="ki-duotone ki-file fs-2"><span class="path1"></span><span class="path2"></span></i> Planilha CSV</a></div>';
