@@ -94,12 +94,16 @@ function validar_planilha_pagamento_pj($filepath, $mes_ref) {
         'total_linhas' => 0
     ];
 
+    // === APENAS VALIDAÇÃO DE FORMATO ===
+    // Não valida datas, horas, coerência etc — confia no colaborador.
+    // Só rejeita se o arquivo não for um CSV legível.
+
     if (!file_exists($filepath)) {
         $resultado['erros'][] = 'Arquivo não encontrado';
         return $resultado;
     }
 
-    // Detecta delimitador (vírgula, ponto-e-vírgula ou tab)
+    // Detecta delimitador
     $primeira_linha = '';
     $fp = fopen($filepath, 'r');
     if ($fp) {
@@ -119,7 +123,6 @@ function validar_planilha_pagamento_pj($filepath, $mes_ref) {
         return $resultado;
     }
 
-    // Lê cabeçalho
     $header = fgetcsv($fp, 0, $delim);
     if (!$header) {
         $resultado['erros'][] = 'Arquivo CSV vazio ou inválido';
@@ -127,14 +130,14 @@ function validar_planilha_pagamento_pj($filepath, $mes_ref) {
         return $resultado;
     }
 
-    // Normaliza cabeçalho (remove acentos, lowercase)
+    // Normaliza cabeçalho
     $header_norm = array_map(function($h) {
         $h = mb_strtolower(trim($h));
         $h = strtr($h, ['á'=>'a','à'=>'a','ã'=>'a','â'=>'a','é'=>'e','ê'=>'e','í'=>'i','ó'=>'o','ô'=>'o','õ'=>'o','ú'=>'u','ç'=>'c']);
         return $h;
     }, $header);
 
-    // Mapeia índices das colunas obrigatórias e opcionais
+    // Detecta colunas de forma flexível — nenhuma é obrigatória
     $col_map = [
         'data' => array_search('data', $header_norm),
         'hora_inicio' => false,
@@ -144,7 +147,6 @@ function validar_planilha_pagamento_pj($filepath, $mes_ref) {
         'projeto' => array_search('projeto', $header_norm),
         'descricao' => array_search('descricao', $header_norm),
     ];
-
     foreach ($header_norm as $i => $h) {
         if ($h === 'hora inicio' || $h === 'inicio' || $h === 'hora_inicio') $col_map['hora_inicio'] = $i;
         if ($h === 'hora fim' || $h === 'fim' || $h === 'hora_fim') $col_map['hora_fim'] = $i;
@@ -153,63 +155,40 @@ function validar_planilha_pagamento_pj($filepath, $mes_ref) {
         if (strpos($h, 'descric') !== false) $col_map['descricao'] = $i;
     }
 
-    if ($col_map['data'] === false || $col_map['horas_trabalhadas'] === false) {
-        $resultado['erros'][] = 'Cabeçalho inválido. Colunas obrigatórias: Data, Horas Trabalhadas. Use o modelo disponível para download.';
-        fclose($fp);
-        return $resultado;
-    }
-
     $linhas_parseadas = [];
-    $datas_vistas = [];
-    $linha_num = 1;
-    $ano_mes_ref = $mes_ref; // YYYY-MM
 
     while (($row = fgetcsv($fp, 0, $delim)) !== false) {
-        $linha_num++;
-
-        // Pula linhas vazias
+        // Pula linhas completamente vazias
         if (count(array_filter($row, function($v) { return trim($v) !== ''; })) === 0) {
             continue;
         }
 
-        $data_raw = trim($row[$col_map['data']] ?? '');
-        $horas_raw = trim($row[$col_map['horas_trabalhadas']] ?? '');
+        $data_raw = $col_map['data'] !== false ? trim($row[$col_map['data']] ?? '') : '';
+        $horas_raw = $col_map['horas_trabalhadas'] !== false ? trim($row[$col_map['horas_trabalhadas']] ?? '') : '';
         $hora_ini_raw = $col_map['hora_inicio'] !== false ? trim($row[$col_map['hora_inicio']] ?? '') : '';
         $hora_fim_raw = $col_map['hora_fim'] !== false ? trim($row[$col_map['hora_fim']] ?? '') : '';
         $pausa_raw = $col_map['pausa'] !== false ? trim($row[$col_map['pausa']] ?? '') : '0';
         $projeto = $col_map['projeto'] !== false ? trim($row[$col_map['projeto']] ?? '') : '';
         $descricao = $col_map['descricao'] !== false ? trim($row[$col_map['descricao']] ?? '') : '';
 
-        // Valida data (aceita DD/MM/YYYY ou YYYY-MM-DD)
+        // Tenta parsear data — aceita DD/MM/YYYY, YYYY-MM-DD, ou deixa null se inválida
         $data_obj = null;
         if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $data_raw, $m)) {
             $data_obj = "{$m[3]}-{$m[2]}-{$m[1]}";
         } elseif (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $data_raw, $m)) {
             $data_obj = "{$m[1]}-{$m[2]}-{$m[3]}";
         }
-
-        if (!$data_obj || !strtotime($data_obj)) {
-            $resultado['erros'][] = "Linha $linha_num: data inválida ('$data_raw'). Use DD/MM/AAAA";
-            continue;
+        if ($data_obj && !strtotime($data_obj)) {
+            $data_obj = null;
         }
 
-        // Valida que data está no mês de referência
-        if (substr($data_obj, 0, 7) !== $ano_mes_ref) {
-            $resultado['erros'][] = "Linha $linha_num: data $data_raw fora do mês de referência ($ano_mes_ref)";
-            continue;
-        }
-
-        // Valida horas trabalhadas
+        // Horas — aceita vírgula ou ponto decimal
         $horas = (float) str_replace(',', '.', $horas_raw);
-        if ($horas <= 0) {
-            $resultado['erros'][] = "Linha $linha_num: horas trabalhadas devem ser maiores que zero";
-            continue;
-        }
 
-        // Pausa em minutos
+        // Pausa
         $pausa_min = (int) preg_replace('/[^0-9]/', '', $pausa_raw);
 
-        // Valida hora_inicio e hora_fim se preenchidas
+        // Horas início/fim (opcionais)
         $hora_ini = null;
         $hora_fim = null;
         if ($hora_ini_raw && preg_match('/^(\d{1,2}):(\d{2})/', $hora_ini_raw, $m)) {
@@ -218,35 +197,6 @@ function validar_planilha_pagamento_pj($filepath, $mes_ref) {
         if ($hora_fim_raw && preg_match('/^(\d{1,2}):(\d{2})/', $hora_fim_raw, $m)) {
             $hora_fim = sprintf('%02d:%02d:00', $m[1], $m[2]);
         }
-
-        // Se ambas as horas foram preenchidas, valida coerência com horas_trabalhadas
-        if ($hora_ini && $hora_fim) {
-            $ts_ini = strtotime("$data_obj $hora_ini");
-            $ts_fim = strtotime("$data_obj $hora_fim");
-            if ($ts_fim <= $ts_ini) {
-                $resultado['erros'][] = "Linha $linha_num: hora fim ($hora_fim_raw) deve ser maior que hora início ($hora_ini_raw)";
-                continue;
-            }
-            $horas_calc = (($ts_fim - $ts_ini) - ($pausa_min * 60)) / 3600;
-            // Tolerância de 5 minutos
-            if (abs($horas_calc - $horas) > 0.0834) {
-                $resultado['avisos'][] = "Linha $linha_num: horas trabalhadas ($horas) não bate com cálculo (início/fim - pausa = " . number_format($horas_calc, 2, ',', '.') . ")";
-            }
-        }
-
-        // Avisa horas excessivas
-        if ($horas > 14) {
-            $resultado['avisos'][] = "Linha $linha_num: $horas horas em um único dia parece excessivo";
-        }
-
-        // Avisa fim de semana
-        $dia_sem = (int) date('w', strtotime($data_obj));
-        if ($dia_sem === 0 || $dia_sem === 6) {
-            $resultado['avisos'][] = "Linha $linha_num: data $data_raw é fim de semana";
-        }
-
-        // Conta data duplicada apenas como aviso
-        $datas_vistas[$data_obj] = ($datas_vistas[$data_obj] ?? 0) + 1;
 
         $linhas_parseadas[] = [
             'data_trabalho' => $data_obj,
@@ -258,22 +208,17 @@ function validar_planilha_pagamento_pj($filepath, $mes_ref) {
             'descricao' => $descricao
         ];
 
-        $resultado['total_horas'] += $horas;
+        if ($horas > 0) {
+            $resultado['total_horas'] += $horas;
+        }
     }
 
     fclose($fp);
 
-    if (empty($linhas_parseadas) && empty($resultado['erros'])) {
-        $resultado['erros'][] = 'Nenhum registro válido encontrado na planilha';
-    }
-
-    if ($resultado['total_horas'] <= 0 && empty($resultado['erros'])) {
-        $resultado['erros'][] = 'Total de horas deve ser maior que zero';
-    }
-
     $resultado['linhas'] = $linhas_parseadas;
     $resultado['total_linhas'] = count($linhas_parseadas);
-    $resultado['valido'] = empty($resultado['erros']);
+    // Aceita qualquer CSV legível — só falha se não conseguir abrir/ler
+    $resultado['valido'] = true;
 
     return $resultado;
 }

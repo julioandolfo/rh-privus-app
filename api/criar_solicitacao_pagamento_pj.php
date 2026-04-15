@@ -141,6 +141,8 @@ try {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
     foreach ($validacao['linhas'] as $linha) {
+        // Pula linhas sem data (não salva no banco, mas aceita a planilha)
+        if (empty($linha['data_trabalho'])) continue;
         $stmt_linha->execute([
             $solicitacao_id,
             $linha['data_trabalho'],
