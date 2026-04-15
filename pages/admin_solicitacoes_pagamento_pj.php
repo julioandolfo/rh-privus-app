@@ -247,15 +247,32 @@ function aprovarSolicitacao() {
 }
 
 function rejeitarSolicitacao() {
+    // Fecha o modal Bootstrap antes de abrir o SweetAlert para evitar conflito de foco
+    var modalEl = document.getElementById('kt_modal_admin_solicitacao');
+    var modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) modalInstance.hide();
+
     Swal.fire({
         title: 'Motivo da rejeição',
         input: 'textarea',
         inputPlaceholder: 'Informe o motivo...',
+        inputAttributes: { 'aria-label': 'Motivo da rejeição' },
         showCancelButton: true,
         confirmButtonText: 'Rejeitar',
-        cancelButtonText: 'Cancelar'
+        cancelButtonText: 'Cancelar',
+        heightAuto: false,
+        didOpen: function() {
+            var textarea = Swal.getInput();
+            if (textarea) {
+                setTimeout(function() { textarea.focus(); }, 100);
+            }
+        }
     }).then(function(result) {
-        if (!result.value) return;
+        if (!result.value) {
+            // Reabre o modal se cancelou
+            if (modalInstance) modalInstance.show();
+            return;
+        }
         var fd = new FormData();
         fd.append('acao', 'rejeitar');
         fd.append('solicitacao_id', __solicitacaoAtual);
