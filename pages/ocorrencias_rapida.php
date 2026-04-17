@@ -131,19 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt_colab->execute([$colaborador_id]);
         $colab = $stmt_colab->fetch();
         
-        // Notifica colaborador (se tiver usuário vinculado)
-        if (!empty($colab['usuario_id'])) {
-            criar_notificacao(
-                $colab['usuario_id'], 
-                $colaborador_id, 
-                'ocorrencia', 
-                'Nova Ocorrência', 
-                "Uma ocorrência foi registrada para você: {$motivo}", 
-                "ocorrencia_view.php?id={$ocorrencia_id}", 
-                $ocorrencia_id, 
-                'ocorrencia'
-            );
-        }
+        // Notificações ao colaborador removidas — ocorrências são apenas controle interno (Admin/RH/Gestor)
         
         $pdo->commit();
         

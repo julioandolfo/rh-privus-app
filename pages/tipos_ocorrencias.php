@@ -72,10 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $validacoes_customizadas = json_encode($validacoes_array);
             }
         }
-        $notificar_colaborador = isset($_POST['notificar_colaborador']) ? 1 : 0;
-        $notificar_colaborador_sistema = isset($_POST['notificar_colaborador_sistema']) ? 1 : 0;
-        $notificar_colaborador_email = isset($_POST['notificar_colaborador_email']) ? 1 : 0;
-        $notificar_colaborador_push = isset($_POST['notificar_colaborador_push']) ? 1 : 0;
+        // Notificações ao colaborador desativadas — ocorrências são apenas controle interno
+        $notificar_colaborador = 0;
+        $notificar_colaborador_sistema = 0;
+        $notificar_colaborador_email = 0;
+        $notificar_colaborador_push = 0;
         $notificar_gestor = isset($_POST['notificar_gestor']) ? 1 : 0;
         $notificar_gestor_sistema = isset($_POST['notificar_gestor_sistema']) ? 1 : 0;
         $notificar_gestor_email = isset($_POST['notificar_gestor_email']) ? 1 : 0;
@@ -970,67 +971,6 @@ require_once __DIR__ . '/../includes/header.php';
                                 <strong>notificação interna</strong> (dentro do sistema), <strong>e-mail</strong> e <strong>push notification</strong> (no celular).
                             </div>
                             
-                            <!-- Notificar Colaborador -->
-                            <div class="card card-flush mb-7">
-                                <div class="card-header">
-                                    <div class="card-title">
-                                        <div class="form-check form-check-custom form-check-solid">
-                                            <input class="form-check-input" type="checkbox" name="notificar_colaborador" id="notificar_colaborador" value="1" checked />
-                                            <label class="form-check-label fw-bold fs-5" for="notificar_colaborador">
-                                                Notificar Colaborador
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <p class="text-gray-700 mb-4 fs-7">
-                                        O colaborador que recebeu a ocorrência será notificado através dos canais selecionados abaixo.
-                                    </p>
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="form-check form-check-custom form-check-solid">
-                                                <input class="form-check-input" type="checkbox" name="notificar_colaborador_sistema" id="notificar_colaborador_sistema" value="1" checked />
-                                                <label class="form-check-label" for="notificar_colaborador_sistema">
-                                                    <i class="ki-duotone ki-notification-status fs-4 text-primary me-2">
-                                                        <span class="path1"></span>
-                                                        <span class="path2"></span>
-                                                        <span class="path3"></span>
-                                                    </i>
-                                                    Notificação Interna
-                                                </label>
-                                            </div>
-                                            <small class="text-muted d-block ms-8">Notificação dentro do sistema</small>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="form-check form-check-custom form-check-solid">
-                                                <input class="form-check-input" type="checkbox" name="notificar_colaborador_email" id="notificar_colaborador_email" value="1" checked />
-                                                <label class="form-check-label" for="notificar_colaborador_email">
-                                                    <i class="ki-duotone ki-sms fs-4 text-success me-2">
-                                                        <span class="path1"></span>
-                                                        <span class="path2"></span>
-                                                    </i>
-                                                    E-mail
-                                                </label>
-                                            </div>
-                                            <small class="text-muted d-block ms-8">Envio de e-mail</small>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="form-check form-check-custom form-check-solid">
-                                                <input class="form-check-input" type="checkbox" name="notificar_colaborador_push" id="notificar_colaborador_push" value="1" checked />
-                                                <label class="form-check-label" for="notificar_colaborador_push">
-                                                    <i class="ki-duotone ki-phone fs-4 text-info me-2">
-                                                        <span class="path1"></span>
-                                                        <span class="path2"></span>
-                                                    </i>
-                                                    Push Notification
-                                                </label>
-                                            </div>
-                                            <small class="text-muted d-block ms-8">Notificação no celular</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
                             <!-- Notificar Gestor -->
                             <div class="card card-flush mb-7">
                                 <div class="card-header">
@@ -1672,16 +1612,6 @@ function toggleCanaisNotificacao(checkboxPrincipal, prefixo) {
 
 // Adiciona listeners para checkboxes principais
 document.addEventListener('DOMContentLoaded', function() {
-    // Colaborador
-    var notificarColab = document.getElementById('notificar_colaborador');
-    if (notificarColab) {
-        notificarColab.addEventListener('change', function() {
-            toggleCanaisNotificacao(this, 'notificar_colaborador');
-        });
-        // Inicializa estado
-        toggleCanaisNotificacao(notificarColab, 'notificar_colaborador');
-    }
-    
     // Gestor
     var notificarGestor = document.getElementById('notificar_gestor');
     if (notificarGestor) {
@@ -1706,11 +1636,9 @@ document.addEventListener('DOMContentLoaded', function() {
 // Reinicializa quando modal é aberto
 document.getElementById('kt_modal_tipo_ocorrencia').addEventListener('shown.bs.modal', function() {
     setTimeout(function() {
-        var notificarColab = document.getElementById('notificar_colaborador');
         var notificarGestor = document.getElementById('notificar_gestor');
         var notificarRh = document.getElementById('notificar_rh');
-        
-        if (notificarColab) toggleCanaisNotificacao(notificarColab, 'notificar_colaborador');
+
         if (notificarGestor) toggleCanaisNotificacao(notificarGestor, 'notificar_gestor');
         if (notificarRh) toggleCanaisNotificacao(notificarRh, 'notificar_rh');
     }, 100);
@@ -1766,10 +1694,6 @@ window.editarTipoOcorrencia = function(tipo) {
         tipoFlag.value = tipo.tipo_flag;
     }
     document.getElementById('valor_desconto').value = tipo.valor_desconto || '';
-    document.getElementById('notificar_colaborador').checked = tipo.notificar_colaborador != 0;
-    document.getElementById('notificar_colaborador_sistema').checked = tipo.notificar_colaborador_sistema != 0;
-    document.getElementById('notificar_colaborador_email').checked = tipo.notificar_colaborador_email != 0;
-    document.getElementById('notificar_colaborador_push').checked = tipo.notificar_colaborador_push != 0;
     document.getElementById('notificar_gestor').checked = tipo.notificar_gestor != 0;
     document.getElementById('notificar_gestor_sistema').checked = tipo.notificar_gestor_sistema != 0;
     document.getElementById('notificar_gestor_email').checked = tipo.notificar_gestor_email != 0;
@@ -1780,13 +1704,9 @@ window.editarTipoOcorrencia = function(tipo) {
     document.getElementById('notificar_rh_push').checked = tipo.notificar_rh_push != 0;
     
     setTimeout(function() {
-        var notificarColab = document.getElementById('notificar_colaborador');
         var notificarGestor = document.getElementById('notificar_gestor');
         var notificarRh = document.getElementById('notificar_rh');
-        
-        if (notificarColab && typeof toggleCanaisNotificacao === 'function') {
-            toggleCanaisNotificacao(notificarColab, 'notificar_colaborador');
-        }
+
         if (notificarGestor && typeof toggleCanaisNotificacao === 'function') {
             toggleCanaisNotificacao(notificarGestor, 'notificar_gestor');
         }

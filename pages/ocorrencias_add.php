@@ -260,9 +260,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Envia notificações
         enviar_notificacoes_ocorrencia($ocorrencia_id);
         
-        // Envia email de ocorrência se template estiver ativo
-        require_once __DIR__ . '/../includes/email_templates.php';
-        enviar_email_ocorrencia($ocorrencia_id);
+        // Email de ocorrência ao colaborador removido — ocorrências são apenas controle interno (Admin/RH/Gestor)
         
         $pdo->commit();
         
