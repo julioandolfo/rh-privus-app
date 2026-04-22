@@ -43,9 +43,33 @@ function adicionar_pontos($acao, $usuario_id = null, $colaborador_id = null, $re
             } else {
                 return false;
             }
-            
+
             if ($stmt->fetch()) {
                 return false; // Já ganhou pontos hoje por acesso
+            }
+        }
+
+        // Proteção genérica contra duplicação: se há referência, não pontua a mesma ação
+        // sobre o mesmo objeto duas vezes (ex: curtir/descurtir/curtir o mesmo post)
+        if ($referencia_id !== null && $referencia_tipo !== null && $acao !== 'acesso_diario') {
+            if ($usuario_id) {
+                $stmt = $pdo->prepare("
+                    SELECT id FROM pontos_historico
+                    WHERE usuario_id = ? AND acao = ? AND referencia_id = ? AND referencia_tipo = ?
+                ");
+                $stmt->execute([$usuario_id, $acao, $referencia_id, $referencia_tipo]);
+            } else if ($colaborador_id) {
+                $stmt = $pdo->prepare("
+                    SELECT id FROM pontos_historico
+                    WHERE colaborador_id = ? AND acao = ? AND referencia_id = ? AND referencia_tipo = ?
+                ");
+                $stmt->execute([$colaborador_id, $acao, $referencia_id, $referencia_tipo]);
+            } else {
+                return false;
+            }
+
+            if ($stmt->fetch()) {
+                return false; // Já pontuou por esta ação+referência
             }
         }
         
