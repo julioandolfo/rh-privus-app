@@ -51,7 +51,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <i class="ki-duotone ki-laptop fs-2"><span class="path1"></span><span class="path2"></span></i>
                 Usar Modelo Online
             </a>
-            <a href="../api/baixar_modelo_pagamento_pj.php" class="btn btn-light-primary me-2">
+            <a href="../api/baixar_modelo_pagamento_pj.php" download="modelo_horas_trabalhadas.xlsx" class="btn btn-light-primary me-2">
                 <i class="ki-duotone ki-file-down fs-2"><span class="path1"></span><span class="path2"></span></i>
                 Baixar Planilha Modelo
             </a>
@@ -165,7 +165,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                     <h4>1. Planilha de Horas Trabalhadas</h4>
                     <p class="text-muted fs-7">
-                        <a href="../api/baixar_modelo_pagamento_pj.php"><i class="ki-duotone ki-file-down fs-5"></i> Baixar modelo (XLSX)</a> — preencha no Excel/Google Sheets, depois exporte como <strong>CSV</strong> (Arquivo → Salvar como → CSV) e envie aqui.
+                        <a href="../api/baixar_modelo_pagamento_pj.php" download="modelo_horas_trabalhadas.xlsx"><i class="ki-duotone ki-file-down fs-5"></i> Baixar modelo (XLSX)</a> — preencha no Excel/Google Sheets, depois exporte como <strong>CSV</strong> (Arquivo → Salvar como → CSV) e envie aqui.
                     </p>
                     <div class="mb-5">
                         <input type="file" name="planilha" id="planilha" class="form-control form-control-solid" accept=".csv" required />
