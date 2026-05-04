@@ -36,11 +36,42 @@ $sql = "
     LEFT JOIN empresas e ON c.empresa_id = e.id
     LEFT JOIN usuarios u ON s.aprovado_por = u.id
     WHERE " . implode(' AND ', $where) . "
-    ORDER BY s.created_at DESC
+    ORDER BY s.mes_referencia DESC, s.created_at DESC
 ";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $solicitacoes = $stmt->fetchAll();
+
+// Agrupa por status
+$grupos_status = [
+    'pendentes'  => ['label' => 'Pendentes',   'icone' => 'time',     'cor' => 'info',    'statuses' => ['enviada', 'em_analise']],
+    'aprovadas'  => ['label' => 'Aprovadas',   'icone' => 'check',    'cor' => 'success', 'statuses' => ['aprovada']],
+    'pagas'      => ['label' => 'Pagas',       'icone' => 'wallet',   'cor' => 'primary', 'statuses' => ['paga']],
+    'rejeitadas' => ['label' => 'Rejeitadas',  'icone' => 'cross',    'cor' => 'danger',  'statuses' => ['rejeitada']],
+];
+$solicitacoes_por_grupo = [];
+foreach ($grupos_status as $key => $info) {
+    $solicitacoes_por_grupo[$key] = [];
+}
+foreach ($solicitacoes as $s) {
+    foreach ($grupos_status as $key => $info) {
+        if (in_array($s['status'], $info['statuses'])) {
+            $solicitacoes_por_grupo[$key][] = $s;
+            break;
+        }
+    }
+}
+
+// Dentro de cada grupo, agrupa por mês de referência
+function agrupar_por_mes($lista) {
+    $por_mes = [];
+    foreach ($lista as $s) {
+        $mes = $s['mes_referencia'];
+        if (!isset($por_mes[$mes])) $por_mes[$mes] = [];
+        $por_mes[$mes][] = $s;
+    }
+    return $por_mes;
+}
 
 // Lista de colaboradores PJ para filtro
 $stmt = $pdo->query("SELECT id, nome_completo FROM colaboradores WHERE tipo_contrato = 'PJ' ORDER BY nome_completo");
@@ -80,54 +111,118 @@ require_once __DIR__ . '/../includes/header.php';
                 <a href="admin_solicitacoes_pagamento_pj.php" class="btn btn-light">Limpar</a>
             </form>
         </div>
-        <div class="card-body">
+        <div class="card-body pt-3">
             <?php if (empty($solicitacoes)): ?>
                 <div class="text-center py-10 text-muted">Nenhuma solicitação encontrada</div>
             <?php else: ?>
-            <div class="table-responsive">
-                <table class="table table-row-bordered align-middle">
-                    <thead>
-                        <tr class="fw-bold text-muted">
-                            <th>Colaborador</th>
-                            <th>Empresa</th>
-                            <th>Mês Ref.</th>
-                            <th>Horas</th>
-                            <th>Valor/h</th>
-                            <th>Total</th>
-                            <th>Status</th>
-                            <th>Enviada</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($solicitacoes as $s):
-                        $badges = [
-                            'enviada' => '<span class="badge badge-light-info">Enviada</span>',
-                            'em_analise' => '<span class="badge badge-light-warning">Em Análise</span>',
-                            'aprovada' => '<span class="badge badge-light-success">Aprovada</span>',
-                            'rejeitada' => '<span class="badge badge-light-danger">Rejeitada</span>',
-                            'paga' => '<span class="badge badge-success">Paga</span>',
-                        ];
-                    ?>
-                        <tr>
-                            <td><strong><?= htmlspecialchars($s['colaborador_nome']) ?></strong></td>
-                            <td><small><?= htmlspecialchars($s['empresa_nome'] ?? '-') ?></small></td>
-                            <td><?= date('m/Y', strtotime($s['mes_referencia'].'-01')) ?></td>
-                            <td><?= number_format($s['total_horas'], 2, ',', '.') ?>h</td>
-                            <td>R$ <?= number_format($s['valor_hora_aplicado'], 2, ',', '.') ?></td>
-                            <td><strong class="text-success">R$ <?= number_format($s['valor_total'], 2, ',', '.') ?></strong></td>
-                            <td><?= $badges[$s['status']] ?? $s['status'] ?></td>
-                            <td><small><?= date('d/m/Y H:i', strtotime($s['created_at'])) ?></small></td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-light-info" onclick="verDetalhesAdmin(<?= $s['id'] ?>)">
-                                    <i class="ki-duotone ki-eye fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Detalhes
-                                </button>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+
+            <!-- Abas por status -->
+            <ul class="nav nav-tabs nav-line-tabs nav-stretch fs-6 border-0 mb-5" id="tabs_status_pj" role="tablist">
+                <?php
+                $primeiro_ativo = false;
+                $aba_inicial = '';
+                foreach ($grupos_status as $key => $info):
+                    $count = count($solicitacoes_por_grupo[$key]);
+                    if ($count === 0 && $key !== 'pendentes') continue;
+                    if (!$primeiro_ativo) { $primeiro_ativo = true; $aba_inicial = $key; $ativo = ' active'; } else { $ativo = ''; }
+                ?>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link<?= $ativo ?>" data-bs-toggle="tab" href="#tab_<?= $key ?>" role="tab">
+                        <i class="ki-duotone ki-<?= $info['icone'] ?> fs-3 me-2 text-<?= $info['cor'] ?>"><span class="path1"></span><span class="path2"></span></i>
+                        <?= $info['label'] ?>
+                        <span class="badge badge-light-<?= $info['cor'] ?> ms-2"><?= $count ?></span>
+                    </a>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+
+            <!-- Conteúdo das abas -->
+            <div class="tab-content" id="tabs_status_pj_content">
+                <?php
+                $primeiro_ativo = false;
+                foreach ($grupos_status as $key => $info):
+                    $lista = $solicitacoes_por_grupo[$key];
+                    if (empty($lista) && $key !== 'pendentes') continue;
+                    if (!$primeiro_ativo) { $primeiro_ativo = true; $ativo = ' show active'; } else { $ativo = ''; }
+                    $por_mes = agrupar_por_mes($lista);
+                ?>
+                <div class="tab-pane fade<?= $ativo ?>" id="tab_<?= $key ?>" role="tabpanel">
+                    <?php if (empty($lista)): ?>
+                        <div class="text-center py-10 text-muted">
+                            <i class="ki-duotone ki-information-5 fs-3x text-muted mb-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            <div>Nenhuma solicitação <?= mb_strtolower($info['label']) ?></div>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($por_mes as $mes => $itens):
+                            $total_mes = array_sum(array_column($itens, 'valor_total'));
+                            $total_horas_mes = array_sum(array_column($itens, 'total_horas'));
+                        ?>
+                        <div class="mb-7">
+                            <!-- Cabeçalho do mês -->
+                            <div class="d-flex justify-content-between align-items-center bg-light-<?= $info['cor'] ?> rounded p-3 mb-3">
+                                <h4 class="mb-0">
+                                    <i class="ki-duotone ki-calendar fs-2 me-2 text-<?= $info['cor'] ?>"><span class="path1"></span><span class="path2"></span></i>
+                                    <?= date('m/Y', strtotime($mes.'-01')) ?>
+                                    <span class="badge badge-<?= $info['cor'] ?> ms-2"><?= count($itens) ?> solicitação(ões)</span>
+                                </h4>
+                                <div class="text-end">
+                                    <div class="text-muted fs-7">Total do mês</div>
+                                    <div class="fw-bold fs-4">
+                                        <?= number_format($total_horas_mes, 2, ',', '.') ?>h
+                                        <span class="text-success ms-3">R$ <?= number_format($total_mes, 2, ',', '.') ?></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-row-bordered align-middle">
+                                    <thead>
+                                        <tr class="fw-bold text-muted fs-7">
+                                            <th>Colaborador</th>
+                                            <th>Empresa</th>
+                                            <th>Horas</th>
+                                            <th>Valor/h</th>
+                                            <th>Total</th>
+                                            <th>Status</th>
+                                            <th>Enviada</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    <?php foreach ($itens as $s):
+                                        $badges = [
+                                            'enviada'    => '<span class="badge badge-light-info">Enviada</span>',
+                                            'em_analise' => '<span class="badge badge-light-warning">Em Análise</span>',
+                                            'aprovada'   => '<span class="badge badge-light-success">Aprovada</span>',
+                                            'rejeitada'  => '<span class="badge badge-light-danger">Rejeitada</span>',
+                                            'paga'       => '<span class="badge badge-success">Paga</span>',
+                                        ];
+                                    ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($s['colaborador_nome']) ?></strong></td>
+                                            <td><small><?= htmlspecialchars($s['empresa_nome'] ?? '-') ?></small></td>
+                                            <td><?= number_format($s['total_horas'], 2, ',', '.') ?>h</td>
+                                            <td>R$ <?= number_format($s['valor_hora_aplicado'], 2, ',', '.') ?></td>
+                                            <td><strong class="text-success">R$ <?= number_format($s['valor_total'], 2, ',', '.') ?></strong></td>
+                                            <td><?= $badges[$s['status']] ?? $s['status'] ?></td>
+                                            <td><small><?= date('d/m/Y H:i', strtotime($s['created_at'])) ?></small></td>
+                                            <td class="text-end">
+                                                <button type="button" class="btn btn-sm btn-light-info" onclick="verDetalhesAdmin(<?= $s['id'] ?>)">
+                                                    <i class="ki-duotone ki-eye fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Detalhes
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
             </div>
+
             <?php endif; ?>
         </div>
     </div>
