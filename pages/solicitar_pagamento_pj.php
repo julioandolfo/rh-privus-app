@@ -51,10 +51,10 @@ require_once __DIR__ . '/../includes/header.php';
                 <i class="ki-duotone ki-laptop fs-2"><span class="path1"></span><span class="path2"></span></i>
                 Usar Modelo Online
             </a>
-            <a href="../api/baixar_modelo_pagamento_pj.php" download="modelo_horas_trabalhadas.xlsx" class="btn btn-light-primary me-2">
+            <button type="button" class="btn btn-light-primary me-2" onclick="baixarModeloXlsx(this)">
                 <i class="ki-duotone ki-file-down fs-2"><span class="path1"></span><span class="path2"></span></i>
                 Baixar Planilha Modelo
-            </a>
+            </button>
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_nova_solicitacao">
                 <i class="ki-duotone ki-plus fs-2"></i>
                 Nova Solicitação
@@ -165,7 +165,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                     <h4>1. Planilha de Horas Trabalhadas</h4>
                     <p class="text-muted fs-7">
-                        <a href="../api/baixar_modelo_pagamento_pj.php" download="modelo_horas_trabalhadas.xlsx"><i class="ki-duotone ki-file-down fs-5"></i> Baixar modelo (XLSX)</a> — preencha no Excel/Google Sheets, depois exporte como <strong>CSV</strong> (Arquivo → Salvar como → CSV) e envie aqui.
+                        <a href="javascript:void(0)" onclick="baixarModeloXlsx(this); return false;"><i class="ki-duotone ki-file-down fs-5"></i> Baixar modelo (XLSX)</a> — preencha no Excel/Google Sheets, depois exporte como <strong>CSV</strong> (Arquivo → Salvar como → CSV) e envie aqui.
                     </p>
                     <div class="mb-5">
                         <input type="file" name="planilha" id="planilha" class="form-control form-control-solid" accept=".csv" required />
@@ -236,6 +236,46 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+function baixarModeloXlsx(el) {
+    var originalHtml = el.innerHTML;
+    if (el.tagName === 'BUTTON') {
+        el.disabled = true;
+        el.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Gerando...';
+    }
+
+    fetch('../api/baixar_modelo_pagamento_pj.php', {
+        method: 'GET',
+        credentials: 'same-origin'
+    })
+    .then(function(r) {
+        if (!r.ok) throw new Error('Erro ao gerar arquivo (' + r.status + ')');
+        return r.blob();
+    })
+    .then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'modelo_horas_trabalhadas.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    })
+    .catch(function(err) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'error', title: 'Erro', text: err.message || 'Erro ao baixar' });
+        } else {
+            alert('Erro ao baixar: ' + (err.message || 'desconhecido'));
+        }
+    })
+    .finally(function() {
+        if (el.tagName === 'BUTTON') {
+            el.disabled = false;
+            el.innerHTML = originalHtml;
+        }
+    });
+}
+
 function validarPlanilha() {
     var fileInput = document.getElementById('planilha');
     var mesRef = document.getElementById('mes_referencia').value;
