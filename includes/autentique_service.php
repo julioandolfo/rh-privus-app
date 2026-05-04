@@ -354,7 +354,7 @@ class AutentiqueService {
     public function reenviarAssinatura($documentId, $signerId) {
         // A API v2 usa resendSignatures com array de public_ids
         $query = '
-            mutation ResendSignatures($public_ids: [String!]!) {
+            mutation ResendSignatures($public_ids: [UUID]) {
                 resendSignatures(public_ids: $public_ids)
             }
         ';
